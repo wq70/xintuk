@@ -1,0 +1,946 @@
+          pet.petChatHistory.forEach((msg) => {
+            const wrapper = document.createElement("div");
+
+            wrapper.className = `message-wrapper ${msg.sender}`;
+
+            const bubble = document.createElement("div");
+            bubble.className = "message-bubble";
+
+            let avatarSrc = "";
+            let avatarHtml = "";
+
+            if (msg.sender === "user") {
+              // 如果是用户发的，使用用户头像
+              avatarSrc = myAvatar;
+              avatarHtml = `<img src="${avatarSrc}" class="avatar">`;
+            } else if (msg.sender === "char") {
+              // 如果是角色(char)发的，就使用角色的头像
+              avatarSrc = chat.settings.aiAvatar || defaultAvatar;
+              avatarHtml = `<img src="${avatarSrc}" class="avatar">`;
+            } else {
+              // 剩下的情况就是宠物(pet)自己发的
+              avatarSrc = pet.isCustomImage ? pet.image : null;
+              if (avatarSrc) {
+                // 如果是图片，显示图片
+                avatarHtml = `<img src="${avatarSrc}" class="avatar">`;
+              } else {
+                // 如果是Emoji，直接显示Emoji
+                avatarHtml = `<div class="avatar" style="font-size: 28px; text-align: center;">${pet.image}</div>`;
+              }
+            }
+
+            bubble.innerHTML = `
+			            ${avatarHtml}
+			            <div class="content">${msg.content.replace(/\n/g, "<br>")}</div>
+			        `;
+            wrapper.appendChild(bubble);
+            messagesEl.appendChild(wrapper);
+          });
+
+          messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+
+        /**
+         * 处理用户在宠物聊天框中发送消息
+         */
+        async function handleSendToPet() {
+          const chat = state.chats[state.activeChatId];
+          const pet = chat.settings.pet;
+          const input = document.getElementById("pet-chat-input");
+          const userInput = input.value.trim();
+          if (!userInput) return;
+
+          input.value = "";
+          input.style.height = "auto";
+
+          pet.petChatHistory.push({ sender: "user", content: userInput });
+          renderPetChatHistory();
+
+          const petResponse = await getPetApiResponse(pet);
+          if (petResponse) {
+            pet.petChatHistory.push({ sender: "pet", content: petResponse });
+            renderPetChatHistory();
+          }
+
+          // 创建对用户【可见】的系统消息，记录这次对话
+          const visibleLog = `[系统：你和宠物“${pet.name}”进行了对话。你说：“${userInput}”，它回应：“${petResponse}”。]`;
+          const visibleMessage = {
+            role: "system",
+            type: "pat_message", // 使用这个类型来显示居中灰色气泡
+            content: visibleLog,
+            timestamp: Date.now(),
+          };
+          chat.history.push(visibleMessage);
+
+          // 只有当用户正在查看当前聊天时，才实时追加到界面上
+          if (
+            document
+              .getElementById("chat-interface-screen")
+              .classList.contains("active") &&
+            state.activeChatId === chat.id
+          ) {
+            appendMessage(visibleMessage, chat);
+          }
+
+          // 创建给AI看的【隐藏】指令
+          const hiddenMessageForAI = `[系统提示：用户刚刚和宠物“${pet.name}”进行了一次对话。用户说：“${userInput}”，宠物回应：“${petResponse}”。]`;
+          const hiddenMessage = {
+            role: "system",
+            content: hiddenMessageForAI,
+            timestamp: Date.now() + 1,
+            isHidden: true,
+          };
+          chat.history.push(hiddenMessage);
+
+          await db.chats.put(chat);
+        }
+
+        /**
+         * 为宠物获取API回复
+         * @param {object} pet - 宠物对象
+         * @returns {Promise<string|null>} - AI生成的宠物回复文本
+         */
+        async function getPetApiResponse(pet) {
+          const { proxyUrl, apiKey, model } = state.apiConfig;
+          if (!proxyUrl || !apiKey || !model) {
+            alert("请先配置API！");
+            return "（我好像断线了...）";
+          }
+
+          // 重构对话历史的生成逻辑
+          const historyForPet = pet.petChatHistory
+            .slice(-6)
+            .map((msg) => {
+              let senderName;
+              if (msg.sender === "user") {
+                senderName = "主人";
+              } else if (msg.sender === "char") {
+                senderName = msg.senderName; // 正确获取Char的名字
+              } else {
+                // 'pet'
+                senderName = pet.name;
+              }
+              return `${senderName}: ${msg.content}`;
+            })
+            .join("\n");
+
+          const systemPrompt = `你现在正在扮演一只宠物。
+			# 你的核心设定
+			- 你的种类: ${pet.type}
+			- 你的名字: ${pet.name}
+			- 你的性格和背景故事: ${pet.persona}
+
+			# 核心规则
+			1. 你【必须】完全代入你的角色设定进行回复。
+			2. 你的回复应该是简短、可爱的，符合一只宠物的说话方式（例如，使用拟声词、简单的词汇）。
+			3. 你的回复【只能是纯文本】，不要包含任何JSON或特殊格式。
+
+			# 最近的对话
+			${historyForPet}
+
+			现在，请根据上面的对话，继续你的回应。`;
+
+          try {
+            const messagesForApi = [
+              {
+                role: "user",
+                content: "请根据你在系统指令中读到的规则，立即开始你的行动。",
+              },
+            ];
+            let isGemini = proxyUrl === GEMINI_API_URL;
+            let geminiConfig = toGeminiRequestData(
+              model,
+              apiKey,
+              systemPrompt,
+              messagesForApi,
+              isGemini,
+              state.apiConfig.temperature,
+            );
+
+            const response = isGemini
+              ? await fetch(geminiConfig.url, geminiConfig.data)
+              : await fetch(`${proxyUrl}/v1/chat/completions`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${apiKey}`,
+                  },
+                  body: JSON.stringify({
+                    model: model,
+                    messages: [
+                      { role: "system", content: systemPrompt },
+                      ...messagesForApi,
+                    ],
+                    temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+                  }),
+                });
+
+            if (!response.ok) throw new Error(await response.text());
+            const data = await response.json();
+            return (
+              isGemini
+                ? data.candidates[0].content.parts[0].text
+                : data.choices[0].message.content
+            ).trim();
+          } catch (error) {
+            console.error("获取宠物回复失败:", error);
+            return "（呜...我好像说不出话了...）";
+          }
+        }
+
+        /**
+         * 初始化宠物的拖拽功能
+         */
+        function initPetDragging() {
+          const petEl = document.getElementById("chat-pet");
+          const container = document.getElementById("chat-pet-container");
+
+          const onDragStart = (e) => {
+            if (!petEl.style.display || petEl.style.display === "none") return;
+            e.preventDefault();
+            isPetDragging = true;
+
+            const rect = petEl.getBoundingClientRect();
+            const coords = getEventCoords(e);
+
+            petDragOffset.x = coords.x - rect.left;
+            petDragOffset.y = coords.y - rect.top;
+
+            document.addEventListener("mousemove", onDragMove);
+            document.addEventListener("mouseup", onDragEnd);
+            document.addEventListener("touchmove", onDragMove, {
+              passive: false,
+            });
+            document.addEventListener("touchend", onDragEnd);
+          };
+
+          const onDragMove = (e) => {
+            if (!isPetDragging) return;
+            e.preventDefault();
+
+            const containerRect = container.getBoundingClientRect();
+            const coords = getEventCoords(e);
+
+            let newLeft = coords.x - petDragOffset.x - containerRect.left;
+            let newTop = coords.y - petDragOffset.y - containerRect.top;
+
+            // 边界检测
+            newLeft = Math.max(
+              0,
+              Math.min(newLeft, container.clientWidth - petEl.offsetWidth),
+            );
+            newTop = Math.max(
+              0,
+              Math.min(newTop, container.clientHeight - petEl.offsetHeight),
+            );
+
+            // 用百分比存储，以适应不同屏幕尺寸
+            petEl.style.left = `${(newLeft / container.clientWidth) * 100}%`;
+            petEl.style.top = `${(newTop / container.clientHeight) * 100}%`;
+          };
+
+          const onDragEnd = async () => {
+            if (!isPetDragging) return;
+            isPetDragging = false;
+
+            // 拖动结束后，保存新的位置
+            const chat = state.chats[state.activeChatId];
+            if (chat && chat.settings.pet) {
+              chat.settings.pet.display.top = petEl.style.top;
+              chat.settings.pet.display.left = petEl.style.left;
+              await db.chats.put(chat);
+            }
+
+            document.removeEventListener("mousemove", onDragMove);
+            document.removeEventListener("mouseup", onDragEnd);
+            document.removeEventListener("touchmove", onDragMove);
+            document.removeEventListener("touchend", onDragEnd);
+          };
+
+          petEl.addEventListener("mousedown", onDragStart);
+          petEl.addEventListener("touchstart", onDragStart, { passive: true });
+        }
+
+        /**
+         * 渲染线下模式预设的下拉框
+         */
+        function renderOfflinePresetsSelector() {
+          const select = document.getElementById("offline-preset-select");
+          // 直接从全局 state 读取预设
+          const presets = state.offlinePresets || [];
+          select.innerHTML = '<option value="">-- 使用自定义输入 --</option>';
+
+          presets.forEach((preset) => {
+            const option = document.createElement("option");
+            // 使用数据库的 ID 作为 option 的 value，这更可靠
+            option.value = preset.id;
+            option.textContent = preset.name;
+            select.appendChild(option);
+          });
+        }
+
+        /**
+         * 当用户选择一个预设时，自动填充输入框
+         */
+        function handleOfflinePresetSelection() {
+          const select = document.getElementById("offline-preset-select");
+          const selectedId = parseInt(select.value);
+
+          // 如果选择的不是“自定义输入”
+          if (selectedId) {
+            // 从全局 state 中根据 ID 查找预设
+            const preset = state.offlinePresets.find(
+              (p) => p.id === selectedId,
+            );
+            if (preset) {
+              document.getElementById("offline-prompt-input").value =
+                preset.prompt;
+              document.getElementById("offline-style-input").value =
+                preset.style;
+            }
+          }
+        }
+
+        /**
+         * 打开预设管理的操作菜单
+         */
+        async function openOfflinePresetManager() {
+          const select = document.getElementById("offline-preset-select");
+          // 获取当前选中的预设ID
+          const selectedId = select.value ? parseInt(select.value) : null;
+
+          const choice = await showChoiceModal("管理线下模式预设", [
+            { text: "💾 保存当前为新预设", value: "save_new" },
+            {
+              text: "✏️ 更新选中预设",
+              value: "update_selected",
+              disabled: !selectedId,
+            },
+            {
+              text: "🗑️ 删除选中预设",
+              value: "delete_selected",
+              disabled: !selectedId,
+            },
+          ]);
+
+          // 根据选择执行相应的全局操作函数
+          switch (choice) {
+            case "save_new":
+              await saveCurrentAsOfflinePreset();
+              break;
+            case "update_selected":
+              if (selectedId) await updateSelectedOfflinePreset(selectedId);
+              break;
+            case "delete_selected":
+              if (selectedId) await deleteSelectedOfflinePreset(selectedId);
+              break;
+          }
+        }
+
+        /**
+         * 将当前输入框的内容保存为一个新预设
+         */
+        async function saveCurrentAsOfflinePreset() {
+          const name = await showCustomPrompt("保存新预设", "请输入预设名称：");
+
+          if (name && name.trim()) {
+            const newPreset = {
+              name: name.trim(),
+              prompt: document
+                .getElementById("offline-prompt-input")
+                .value.trim(),
+              style: document
+                .getElementById("offline-style-input")
+                .value.trim(),
+            };
+            // 直接添加到全局的 offlinePresets 表中
+            const newId = await db.offlinePresets.add(newPreset);
+
+            // 更新内存中的 state
+            if (!state.offlinePresets) state.offlinePresets = [];
+            state.offlinePresets.push({ id: newId, ...newPreset });
+
+            renderOfflinePresetsSelector(); // 刷新下拉框
+            document.getElementById("offline-preset-select").value = newId; // 自动选中新保存的
+            alert(`预设 "${name.trim()}" 已保存！`);
+          }
+        }
+
+        /**
+         * 用当前输入框的内容更新选中的预设
+         */
+        async function updateSelectedOfflinePreset(presetId) {
+          const preset = state.offlinePresets.find((p) => p.id === presetId);
+          if (!preset) return;
+
+          const confirmed = await showCustomConfirm(
+            "确认更新",
+            `确定要用当前内容覆盖预设 "${preset.name}" 吗？`,
+          );
+          if (confirmed) {
+            const updatedData = {
+              prompt: document
+                .getElementById("offline-prompt-input")
+                .value.trim(),
+              style: document
+                .getElementById("offline-style-input")
+                .value.trim(),
+            };
+            // 更新数据库
+            await db.offlinePresets.update(presetId, updatedData);
+            // 更新内存
+            preset.prompt = updatedData.prompt;
+            preset.style = updatedData.style;
+            alert("预设已更新！");
+          }
+        }
+
+        /**
+         * 删除选中的预设
+         */
+        async function deleteSelectedOfflinePreset(presetId) {
+          const preset = state.offlinePresets.find((p) => p.id === presetId);
+          if (!preset) return;
+
+          const confirmed = await showCustomConfirm(
+            "确认删除",
+            `确定要删除预设 "${preset.name}" 吗？`,
+            {
+              confirmButtonClass: "btn-danger",
+            },
+          );
+          if (confirmed) {
+            // 从数据库删除
+            await db.offlinePresets.delete(presetId);
+            // 从内存中删除
+            state.offlinePresets = state.offlinePresets.filter(
+              (p) => p.id !== presetId,
+            );
+
+            renderOfflinePresetsSelector(); // 刷新下拉框
+            // 清空输入框
+            document.getElementById("offline-prompt-input").value = "";
+            document.getElementById("offline-style-input").value = "";
+            alert("预设已删除。");
+          }
+        }
+
+        let isSummarizing = false; // 全局锁，防止重复触发总结
+
+        /**
+         * 检查是否需要触发总结或提醒
+         * @param {string} chatId - 当前聊天的ID
+         */
+        async function checkAndTriggerSummary(chatId) {
+          if (isSummarizing) return;
+
+          const chat = state.chats[chatId];
+          if (!chat || !chat.settings.summary || !chat.settings.summary.enabled)
+            return;
+
+          const summarySettings = chat.settings.summary;
+          // 不再从0开始，而是从上次总结的位置开始计算
+          const lastSummaryIndex = summarySettings.lastSummaryIndex;
+          const messagesSinceLastSummary = chat.history.slice(
+            lastSummaryIndex + 1,
+          );
+
+          if (messagesSinceLastSummary.length >= summarySettings.count) {
+            isSummarizing = true;
+            if (summarySettings.mode === "auto") {
+              await performAutomaticSummary(chatId);
+            } else {
+              // 对于手动模式，现在只弹提醒
+              await notifyForManualSummary(chatId);
+            }
+            isSummarizing = false;
+          }
+        }
+
+        /**
+         * 自动在后台执行总结，只总结触发条件的N条消息
+         */
+        async function performAutomaticSummary(chatId) {
+          console.log(`自动总结触发 for chat: ${chatId}`);
+          const chat = state.chats[chatId];
+          const summarySettings = chat.settings.summary;
+
+          // 精确截取最后N条消息作为总结范围
+          const messagesToSummarize = chat.history.slice(
+            -summarySettings.count,
+          );
+
+          try {
+            const summaryText = await generateSummary(
+              chatId,
+              messagesToSummarize,
+            );
+            if (summaryText) {
+              await saveSummaryAsMemory(chatId, summaryText);
+            }
+          } catch (e) {
+            // generateSummary 内部已经处理了错误弹窗，这里我们只需要记录日志即可
+            console.error("自动总结过程中发生未捕获的错误:", e);
+          }
+        }
+
+        /**
+         * 弹出提示框，【提醒】用户可以进行手动总结了
+         */
+        async function notifyForManualSummary(chatId) {
+          console.log(`手动总结提醒触发 for chat: ${chatId}`);
+
+          // 只弹出一个简单的通知
+          await showCustomAlert(
+            "总结提醒",
+            "对话已达到设定长度，你可以随时在“聊天设置”中点击“立即手动总结”来生成对话记忆。",
+          );
+
+          // 这意味着计时器会从现在重新开始计算。
+          const chat = state.chats[chatId];
+          chat.settings.summary.lastSummaryIndex = chat.history.length - 1;
+          await db.chats.put(chat);
+        }
+
+        /**
+         * 调用API生成总结内容
+         * @param {string} chatId - 聊天的ID
+         * @param {Array | null} specificMessages - 如果提供，则只总结这个数组里的消息；如果为null，则总结自上次以来的所有消息。
+         * @returns {Promise<string|null>} - AI生成的总结文本
+         */
+        async function generateSummary(chatId, specificMessages = null) {
+          const chat = state.chats[chatId];
+          const { proxyUrl, apiKey, model } = state.apiConfig;
+
+          if (!proxyUrl || !apiKey || !model) {
+            throw new Error("API未配置，无法生成总结。");
+          }
+
+          const summarySettings = chat.settings.summary;
+          let messagesToSummarize;
+
+          if (specificMessages && specificMessages.length > 0) {
+            messagesToSummarize = specificMessages;
+          } else {
+            const lastSummaryIndex =
+              summarySettings.lastSummaryIndex > -1
+                ? summarySettings.lastSummaryIndex
+                : 0;
+            messagesToSummarize = chat.history.slice(lastSummaryIndex + 1);
+          }
+
+          const filteredMessagesForSummary = messagesToSummarize.filter(
+            (msg) => msg.type !== "summary",
+          );
+
+          if (filteredMessagesForSummary.length === 0) {
+            if (!specificMessages) {
+              await showCustomAlert(
+                "无需总结",
+                "自上次总结以来没有新的对话内容。",
+              );
+            }
+            return null;
+          }
+
+          // --- 在构建对话文本时，加入时间戳 ---
+          const conversationText = filteredMessagesForSummary
+            .map((msg) => {
+              const sender =
+                msg.role === "user"
+                  ? chat.isGroup
+                    ? chat.settings.myNickname || "我"
+                    : "我"
+                  : msg.senderName || chat.name;
+              let content = "";
+              if (typeof msg.content === "string") {
+                content = msg.content;
+              } else if (Array.isArray(msg.content)) {
+                content = "[图片]";
+              } else if (msg.type) {
+                content = `[${msg.type}]`;
+              }
+              // 将毫秒时间戳转换为人类可读的日期时间字符串
+              const readableTime = new Date(msg.timestamp).toLocaleString(
+                "zh-CN",
+                { hour12: false },
+              );
+              return `[${readableTime}] ${sender}: ${content}`;
+            })
+            .join("\n");
+
+          // --- 更新系统指令，要求AI使用时间戳 ---
+          const systemPrompt =
+            summarySettings.prompt +
+            `\n\n重要提示：每条消息开头都有一个 [时间] 标记。你在总结时，【必须】参考这些时间，在总结关键事件时附上对应的时间范围或具体时间点，让总结包含时间线索。\n\n--- 对话开始 ---\n${conversationText}\n--- 对话结束 ---`;
+
+          try {
+            if (!specificMessages) {
+              await showCustomAlert(
+                "正在生成...",
+                "AI正在努力总结你们的对话，请稍候...",
+              );
+            }
+
+            const isGemini = proxyUrl === GEMINI_API_URL;
+            const messagesForApi = [{ role: "user", content: systemPrompt }];
+            const geminiConfig = toGeminiRequestData(
+              model,
+              apiKey,
+              systemPrompt,
+              messagesForApi,
+              isGemini,
+            );
+
+            const response = isGemini
+              ? await fetch(geminiConfig.url, geminiConfig.data)
+              : await fetch(`${proxyUrl}/v1/chat/completions`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${apiKey}`,
+                  },
+                  body: JSON.stringify({
+                    model: model,
+                    messages: messagesForApi,
+                    temperature: parseFloat(state.apiConfig.temperature) || 0.3,
+                  }),
+                });
+
+            if (!response.ok) throw new Error(await response.text());
+            const data = await response.json();
+            const aiContent = isGemini
+              ? data?.candidates?.[0]?.content?.parts?.[0]?.text
+              : data?.choices?.[0]?.message?.content;
+
+            if (!aiContent) {
+              throw new Error("AI返回了空内容。");
+            }
+
+            return aiContent;
+          } catch (error) {
+            console.error("生成总结失败:", error);
+            await showCustomAlert("总结失败", `发生错误: ${error.message}`);
+            return null;
+          }
+        }
+
+        /**
+         * 将生成的总结作为一条特殊的记忆消息保存起来
+         */
+        async function saveSummaryAsMemory(chatId, summaryText) {
+          const chat = state.chats[chatId];
+
+          // 记录下总结操作发生时的最后一条消息的索引
+          const newLastSummaryIndex = chat.history.length - 1;
+
+          const summaryMessage = {
+            role: "system",
+            type: "summary", // 特殊类型
+            content: summaryText,
+            timestamp: Date.now(),
+            isHidden: true, // 这条消息对AI可见，但对用户隐藏
+          };
+
+          chat.history.push(summaryMessage);
+          chat.settings.summary.lastSummaryIndex = newLastSummaryIndex; // 更新索引
+
+          await db.chats.put(chat);
+          console.log(`新的总结已作为记忆保存 for chat: ${chatId}`);
+        }
+
+        // --- 总结管理界面的函数 ---
+
+        let editingSummaryTimestamp = null;
+
+        async function openSummaryViewer() {
+          const chat = state.chats[state.activeChatId];
+          document.getElementById("summary-viewer-title").textContent =
+            `“${chat.name}”的对话记忆`;
+
+          const listEl = document.getElementById("summary-list");
+          listEl.innerHTML = "";
+
+          const summaries = chat.history.filter(
+            (msg) => msg.type === "summary",
+          );
+
+          if (summaries.length === 0) {
+            listEl.innerHTML =
+              '<p style="text-align:center; color: #8a8a8a;">还没有生成过任何总结。</p>';
+          } else {
+            [...summaries].reverse().forEach((summary) => {
+              const card = document.createElement("div");
+              card.className = "summary-item-card";
+
+              card.innerHTML = `
+			                <div class="summary-actions">
+			                    <button class="concise-summary-btn" data-timestamp="${
+                            summary.timestamp
+                          }" title="精简总结">✨</button>
+			                    <button class="edit-summary-btn" data-timestamp="${summary.timestamp}" title="编辑">✏️</button>
+			                    <button class="delete-summary-btn" data-timestamp="${summary.timestamp}" title="删除">🗑️</button>
+			                </div>
+			                <div class="summary-content">${summary.content.replace(/\n/g, "<br>")}</div>
+			                <div class="summary-meta">
+			                    <span>生成于: ${new Date(summary.timestamp).toLocaleString(
+                            "zh-CN",
+                            {
+                              dateStyle: "short",
+                              timeStyle: "short",
+                            },
+                          )}</span>
+			                </div>
+			            `;
+              listEl.appendChild(card);
+            });
+          }
+
+          document
+            .getElementById("chat-settings-modal")
+            .classList.remove("visible");
+          document
+            .getElementById("summary-viewer-modal")
+            .classList.add("visible");
+        }
+
+        /**
+         * 编辑一条总结
+         */
+        async function editSummary(timestamp) {
+          const chat = state.chats[state.activeChatId];
+          const summary = chat.history.find(
+            (msg) => msg.timestamp === timestamp,
+          );
+          if (!summary) return;
+
+          const newContent = await showCustomPrompt(
+            "编辑总结",
+            "修改总结内容:",
+            summary.content,
+            "textarea",
+          );
+
+          if (newContent !== null) {
+            summary.content = newContent.trim();
+            await db.chats.put(chat);
+            openSummaryViewer(); // 重新渲染列表
+          }
+        }
+
+        /**
+         * 删除一条总结，并智能更新总结索引
+         */
+        async function deleteSummary(timestamp) {
+          const confirmed = await showCustomConfirm(
+            "确认删除",
+            "确定要删除这条总结记忆吗？这可能会影响AI的长期记忆。",
+            { confirmButtonClass: "btn-danger" },
+          );
+          if (confirmed) {
+            const chat = state.chats[state.activeChatId];
+
+            // 1. 从历史记录中过滤掉被删除的总结
+            chat.history = chat.history.filter(
+              (msg) => msg.timestamp !== timestamp,
+            );
+
+            // 2. --- 重新计算 lastSummaryIndex ---
+            // 找到剩下的总结中，最新的那一条
+            const lastRemainingSummary = chat.history
+              .filter((m) => m.type === "summary")
+              .pop();
+
+            let newLastSummaryIndex;
+
+            if (lastRemainingSummary) {
+              // 3. 如果还有其他总结，就找到它在历史记录中的位置
+              const lastSummaryMessageIndexInHistory = chat.history.findIndex(
+                (m) => m.timestamp === lastRemainingSummary.timestamp,
+              );
+              // 4. 新的索引就是它前面那条普通消息的索引
+              newLastSummaryIndex =
+                lastSummaryMessageIndexInHistory > 0
+                  ? lastSummaryMessageIndexInHistory - 1
+                  : -1;
+            } else {
+              // 5. 如果一条总结都不剩了，就彻底重置索引
+              newLastSummaryIndex = -1;
+            }
+
+            // 6. 更新设置
+            if (chat.settings.summary) {
+              chat.settings.summary.lastSummaryIndex = newLastSummaryIndex;
+            }
+
+            // 保存更改并刷新UI
+            await db.chats.put(chat);
+            openSummaryViewer();
+            await showCustomAlert("操作成功", "总结已删除！");
+          }
+        }
+
+        /**
+         * 调用API将指定文本精简为摘要
+         * @param {string} originalText - 原始的、较长的总结文本
+         * @returns {Promise<string|null>} - AI生成的精简摘要，如果失败则返回null
+         */
+        async function generateConciseSummary(originalText) {
+          const { proxyUrl, apiKey, model } = state.apiConfig;
+          if (!proxyUrl || !apiKey || !model) {
+            throw new Error("API未配置，无法生成精简摘要。");
+          }
+
+          // 核心Prompt：指示AI将内容精简为一句话
+          const systemPrompt = `请你将以下内容精简为一句话的核心摘要，保留最关键的人物、事件和结论，字数控制在20字以内：\n\n--- 内容开始 ---\n${originalText}\n--- 内容结束 ---`;
+
+          try {
+            const response = await fetch(`${proxyUrl}/v1/chat/completions`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${apiKey}`,
+              },
+              body: JSON.stringify({
+                model: model,
+                messages: [{ role: "user", content: systemPrompt }],
+                temperature: parseFloat(state.apiConfig.temperature) || 0.5,
+              }),
+            });
+
+            if (!response.ok) throw new Error(await response.text());
+            const data = await response.json();
+            return data.choices[0].message.content;
+          } catch (error) {
+            console.error("生成精简摘要失败:", error);
+            await showCustomAlert("精简失败", `发生错误: ${error.message}`);
+            return null;
+          }
+        }
+
+        /**
+         * 处理单条总结的精简
+         * @param {number} timestamp - 要精简的总结消息的时间戳
+         */
+        async function handleConciseSummary(timestamp) {
+          const chat = state.chats[state.activeChatId];
+          const summary = chat.history.find(
+            (msg) => msg.timestamp === timestamp,
+          );
+          if (!summary) return;
+
+          await showCustomAlert("请稍候...", "AI正在努力为您精简内容...");
+
+          const conciseText = await generateConciseSummary(summary.content);
+
+          if (conciseText) {
+            summary.content = conciseText.trim();
+            await db.chats.put(chat); // 保存到数据库
+            await openSummaryViewer(); // 重新渲染列表
+            await showCustomAlert("成功", "本条总结已精简！");
+          }
+        }
+
+        /**
+         * 处理全部总结的精简
+         */
+        async function handleConciseAllSummaries() {
+          const chat = state.chats[state.activeChatId];
+          const summaries = chat.history.filter(
+            (msg) => msg.type === "summary",
+          );
+
+          if (summaries.length === 0) {
+            alert("没有可以精简的总结。");
+            return;
+          }
+
+          const confirmed = await showCustomConfirm(
+            "确认全部精简",
+            `确定要精简全部 ${summaries.length} 条总结吗？此操作会覆盖原始内容且不可恢复。`,
+            { confirmButtonClass: "btn-danger" },
+          );
+          if (!confirmed) return;
+
+          await showCustomAlert(
+            "请稍候...",
+            `正在批量精简 ${summaries.length} 条总结，这可能需要一些时间...`,
+          );
+
+          try {
+            // 使用 for...of 循环来逐条处理，避免同时发送太多API请求导致被限制
+            for (const summary of summaries) {
+              const conciseText = await generateConciseSummary(summary.content);
+              if (conciseText) {
+                summary.content = conciseText.trim();
+              }
+              // 每处理完一条，稍微等待一下，给API一点喘息时间
+              await new Promise((resolve) => setTimeout(resolve, 500));
+            }
+
+            await db.chats.put(chat);
+            await openSummaryViewer();
+            await showCustomAlert("成功", "所有总结都已精简完毕！");
+          } catch (error) {
+            // generateConciseSummary 内部已经处理了错误弹窗，这里我们只需要确保流程正常结束
+            console.error("批量精简时出错:", error);
+          }
+        }
+
+        /**
+         * 用户点击“立即手动总结”按钮时触发的函数 (支持不同模式)
+         * @param {'latest' | 'range'} mode - 总结模式
+         * @param {{start: number, end: number} | null} range - 如果是范围模式，则为起始和结束序号
+         */
+        async function triggerManualSummaryNow(mode = "latest", range = null) {
+          if (isSummarizing) {
+            alert("正在处理上一个总结任务，请稍候...");
+            return;
+          }
+
+          const chat = state.chats[state.activeChatId];
+          if (!chat) {
+            alert("错误：找不到当前聊天，无法总结。");
+            return;
+          }
+
+          isSummarizing = true; // 上锁
+
+          try {
+            let messagesToSummarize = [];
+
+            // 1. 根据传入的模式，决定要截取哪些消息
+            if (mode === "latest") {
+              const summarySettings = chat.settings.summary;
+              const count =
+                summarySettings && summarySettings.count > 0
+                  ? summarySettings.count
+                  : 20;
+              messagesToSummarize = chat.history.slice(-count);
+              console.log(`手动总结最新 ${count} 条消息...`);
+            } else if (mode === "range" && range) {
+              // 注意：数组索引从0开始，而用户输入从1开始，所以需要-1
+              messagesToSummarize = chat.history.slice(
+                range.start - 1,
+                range.end,
+              );
+              console.log(
+                `手动总结从 ${range.start} 到 ${range.end} 的消息...`,
+              );
+            } else {
+              throw new Error("无效的总结模式或范围。");
+            }
+
+            // 后续的逻辑保持不变
+            if (messagesToSummarize.length === 0) {
+              alert("选定的范围内没有可总结的聊天记录。");
+              isSummarizing = false; // 解锁
+              return;
+            }
+
+            const summaryText = await generateSummary(
+              state.activeChatId,
+              messagesToSummarize,
+            );
+
+            if (summaryText) {

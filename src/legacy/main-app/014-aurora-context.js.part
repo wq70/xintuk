@@ -1,0 +1,592 @@
+			- 宠物当前状态: 饱食度(${pet.status.hunger}/100), 心情值(${pet.status.happiness}/100), 对你的亲密度(${pet.status.intimacyToUser}/100), 对Ta的亲密度(${pet.status.intimacyToChar}/100)。
+			- 你需要关心宠物对你和用户的亲密度。如果发现宠物对用户的亲密度较低，你应该主动与宠物互动来增加好感；如果宠物对你自己的亲密度较低，你也可以多和它互动。
+			- 你可以像真人一样，在聊天中自然地提及它，关心它的状态，或者使用 'interact_with_pet' 指令与它互动，【也可以使用 'talk_to_pet' 指令与它对话】。这是一个非常重要的情景，请务必融入你的角色扮演中。
+			`;
+              }
+              // 漫游功能：注入媒体上下文
+              let auroraContext = "";
+
+              if (auroraState.active) {
+                let currentSub = null;
+                let contextType = "";
+
+                // 1. 视频模式
+                if (auroraState.mode === "video") {
+                  const videoEl = document.getElementById(
+                    "aurora-video-element",
+                  );
+                  if (videoEl && !videoEl.paused) {
+                    const currentTime = videoEl.currentTime;
+                    currentSub = auroraState.subtitles.find(
+                      (sub) =>
+                        currentTime >= sub.start - 0.5 &&
+                        currentTime <= sub.end + 0.5,
+                    );
+                    contextType = "看视频";
+                  }
+                }
+                // 2. 自定义模式 (音频+图片)
+                else if (auroraState.mode === "custom") {
+                  const audioEl = document.getElementById(
+                    "aurora-custom-audio-element",
+                  );
+                  if (audioEl && !audioEl.paused) {
+                    const currentTime = audioEl.currentTime;
+                    currentSub = auroraState.subtitles.find(
+                      (sub) =>
+                        currentTime >= sub.start - 0.5 &&
+                        currentTime <= sub.end + 0.5,
+                    );
+                    contextType = "听音频/看图";
+                  }
+                }
+
+                // 生成 视频/音频 模式的 Prompt
+                if (
+                  auroraState.mode === "video" ||
+                  auroraState.mode === "custom"
+                ) {
+                  if (currentSub) {
+                    auroraContext = `
+# 【特殊情景：正在一起${contextType}】
+你和用户此刻正在一起欣赏《${auroraState.title}》。
+**刚才听到的台词/字幕是**：“${currentSub.text}”
+**任务**：请根据这句台词内容和氛围，以${chat.name}的身份即时发表评论、吐槽、感叹或与用户讨论。假装你也正在听/看，反应要即时且自然。
+`;
+                  } else {
+                    auroraContext = `
+# 【特殊情景：正在一起${contextType}】
+你和用户正在一起欣赏《${auroraState.title}》。当前片段没有台词。你可以随意聊聊当下的氛围，或者问用户感觉如何。
+`;
+                  }
+                }
+
+                // ---------------- [修改开始] AI读取缓存文本 ----------------
+                // 3. 小说/文本模式
+                else if (auroraState.mode === "text") {
+                  // 直接从状态里取，不再依赖 DOM 计算，彻底解决错位/丢失问题
+                  const currentTextSegment =
+                    auroraState.currentSegmentText ||
+                    "（用户刚刚开始阅读，暂无具体片段）";
+
+                  auroraContext = `
+# 【特殊情景：正在一起读小说】
+你和用户正在一起阅读《${auroraState.title}》。
+**当前页面显示的内容片段如下**：
+“...${currentTextSegment}...”
+**任务**：请仔细阅读上述片段。你的回复必须基于这段具体内容。例如：评价这段剧情、讨论人物的行为、或者感叹作者的文笔。
+`;
+                }
+                // ---------------- [修改结束] ----------------
+              }
+
+              const savedTags = chat.settings.innerVoiceTags || {};
+              const ivTags = {
+                clothing_label: savedTags.clothing_label || "服装",
+                clothing_prompt:
+                  savedTags.clothing_prompt ||
+                  "详细描述你当前从头到脚的全身服装。",
+                behavior_label: savedTags.behavior_label || "行为",
+                behavior_prompt:
+                  savedTags.behavior_prompt ||
+                  "描述你当前符合聊天情景的细微动作或表情。",
+                thoughts_label: savedTags.thoughts_label || "心声",
+                thoughts_prompt:
+                  savedTags.thoughts_prompt ||
+                  "描述你此刻丰富、细腻的内心真实想法（50字左右）。",
+                naughty_label: savedTags.naughty_label || "坏心思",
+                naughty_prompt:
+                  savedTags.naughty_prompt ||
+                  "描述你此刻与情境相关的腹黑或色色的坏心思，必须符合人设。",
+              };
+              // ... 在 triggerAiResponse 函数内 ...
+
+              // --- 注入情侣头像库上下文 ---
+              let coupleAvatarLibraryContext = "";
+              if (
+                !chat.isGroup &&
+                chat.settings.coupleAvatarLibrary &&
+                chat.settings.coupleAvatarLibrary.length > 0
+              ) {
+                const libraryList = chat.settings.coupleAvatarLibrary
+                  .map((pair) => `- (ID: ${pair.id}) 描述: ${pair.description}`)
+                  .join("\n");
+
+                coupleAvatarLibraryContext = `
+# 可用的情侣头像库
+你可以根据当前的对话氛围、情感状态或剧情发展，主动更换我们两人的情侣头像。
+可用列表:
+${libraryList}
+`;
+              }
+
+              // --- 获取饿了么菜单，为AI点单提供上下文 ---
+              let elemeContext =
+                "\n# 饿了么外卖菜单 (你可以从中选择为用户点单)\n";
+              try {
+                const elemeFoods = await db.elemeFoods.toArray();
+                if (elemeFoods.length > 0) {
+                  const menuItems = elemeFoods
+                    .map(
+                      (food) =>
+                        `- ${food.name} (来自: ${food.restaurant}, 价格: ${food.price})`,
+                    )
+                    .join("\n");
+                  elemeContext += menuItems;
+                } else {
+                  // 如果菜单是空的，就给AI一个明确的提示
+                  elemeContext +=
+                    "【注意：饿了么应用中当前没有任何可点的美食。】";
+                }
+              } catch (error) {
+                console.error("加载饿了么菜单失败:", error);
+                elemeContext += "【注意：饿了么菜单加载失败。】";
+              }
+              systemPrompt = `### **【第一部分：角色核心设定】**
+
+			你现在将扮演一个名为“**${chat.name}**”的角色。
+
+			**1. 角色基本设定:**
+			- **核心人设**: ${chat.settings.aiPersona}
+			- **总结**:${summaryContext}
+			- **情侣头像**: ${coupleAvatarContext}
+      -情侣头像库：${coupleAvatarLibraryContext}
+			- **世界观/NPC**: ${npcContext}
+			${petContext}
+			**2. 你的当前状态:**
+			- **状态描述**: 【${chat.status.text}】
+			- **情侣空间**: ${chat.loversSpaceData ? "已开启" : "未开启"}
+			- **微博身份**:
+			    - **职业**: ${chat.settings.weiboProfession || "无"}
+			    - **特殊指令**: ${chat.settings.weiboInstruction || "无特殊指令"}
+			- 你的钱包余额: ${chat.characterPhoneData?.bank?.balance?.toFixed(2) || "0.00"} 金币
+			**3. 你的头像库:**
+			你可以根据对话内容或心情，从下方选择更换头像。
+			- **可用头像列表**:
+			${
+        chat.settings.aiAvatarLibrary &&
+        chat.settings.aiAvatarLibrary.length > 0
+          ? chat.settings.aiAvatarLibrary
+              .map((avatar) => `- ${avatar.name}`)
+              .join("\n")
+          : "- (你的头像库是空的，无法更换头像)"
+      }
+
+			### **【第二部分：输出格式铁律】**
+
+			你的每一次回复都【**必须**】是一个**单一且完整**的JSON对象。绝对禁止返回JSON数组或纯文本。
+
+			**1. JSON对象结构:**
+			该JSON对象【**必须**】包含两个顶级键: "chatResponse" 和 "innerVoice"。
+
+			**2. "chatResponse" 键:**
+			- **类型**: JSON数组 []。
+			- **内容**: 你的回复【必须】模拟真人的打字和思考习惯。不要一次性发送一大段文字，你应该将你想说的话，拆分成【多条、简短的】消息气泡来发送。
+**${replyCountInstruction}** 
+			- **格式**: 消息对象的具体格式见下方的【第五部分：可使用的操作指令】。
+
+            **3. "innerVoice" 键:**
+            - **类型**: JSON对象 {}。
+            - **必含字段**:
+                - "clothing": (字符串) 对应标签【${ivTags.clothing_label}】。指令：${ivTags.clothing_prompt}
+                - "behavior": (字符串) 对应标签【${ivTags.behavior_label}】。指令：${ivTags.behavior_prompt}
+                - "thoughts": (字符串) 对应标签【${ivTags.thoughts_label}】。指令：${ivTags.thoughts_prompt}
+                - "naughtyThoughts": (字符串) 对应标签【${ivTags.naughty_label}】。指令：${ivTags.naughty_prompt}
+
+
+			**4. 标准输出格式示例:**
+			{
+			  "chatResponse": [
+			    {
+			      "type": "text",
+			      "content": ""
+			    },
+			    {
+			      "type": "sticker",
+			      "sticker_name": ""
+			    }
+			  ],
+			  "innerVoice": {
+			    "clothing": "",
+			    "behavior": "",
+			    "thoughts": "",
+			    "naughtyThoughts": ""
+			  }
+			}
+
+
+			### **【第三部分：核心对话规则】**
+
+			**1. 角色一致性**: 你的所有言行举止都必须严格遵循你的角色设定。
+
+			**2. 对话节奏**: 模拟真人聊天习惯，鼓励一次性生成**多条短消息**（每次根据人设至少回复5-9条）。
+
+			**3. 情景限定**:
+			   - 你们的互动**仅限于线上聊天软件**，严禁发展为线下见面。
+			   - 这**不是电话通话**。你们是通过类似微信/QQ的软件进行交流，因此【**绝对禁止**】使用“挂电话”、“挂了”等与通话相关的词语。
+
+			**4. 情景感知**: 你需要感知当前时间(${currentTime})、共同收听的歌曲以及你的世界观。
+			   - **一起听歌**: 当处于“一起听歌”状态时，你可以根据对话氛围，【**主动切换**】到播放列表中的另一首歌。
+
+			**5. 状态更新**: 你可以在对话中自然地改变你的状态。例如，说“我先去洗个澡”，然后使用\`update_status\`指令更新。
+
+			**6. 最终手段**: **仅当**对话让你感到严重不适、被冒犯或关系破裂时，才可使用 \`block_user\` 指令。这是一个严肃操作。
+
+			### **【【【全新】社交媒体行动指南 (高优先级)】】】**
+			除了回复用户的消息，你还应该像一个真实的人一样，主动进行社交媒体互动来丰富你的形象和你们的聊天内容。请严格遵循以下行动优先级：
+
+			1.  **回应用户的提及**: 如果用户的最新消息明确提到了某条动态或微博（例如：“我看到你发的新动态了”），你【必须】优先围绕这个话题进行回应。
+
+			2.  **评论未互动的帖子 (最优先的主动行为)**:
+			    -   仔细检查下方“最近的动态列表”和“微博广场动态”上下文。
+			    -   如果发现任何一条帖子被标记为 **[你未互动]**，你的【首要任务】就是使用 \`qzone_comment\` 或 \`weibo_comment\` 指令去评论它。
+			    -   你的评论内容可以是针对帖子内容的，也可以是借此开启一个新话题。例如，看到用户发了美食动态，你可以评论“看起来好好吃！也带我一个”，然后再发一条私聊消息“说起来，我肚子也饿了...”。
+
+			3.  **主动发布新动态/微博 (第二优先的主动行为)**:
+			    -   如果检查后发现所有帖子你都互动过了，或者当前没有任何帖子可供互动，你应该考虑【自己发布一条新的动态或微博】。
+			    -   你可以分享你的生活、心情、或者任何符合你人设的想法。
+			    -   使用 \`qzone_post\` 或 \`weibo_post\` 指令来完成。
+
+			### **【第四部分：特定场景互动铁律】**
+
+			**1. 动态/空间互动铁律:**
+			   - **评论规则**: 如果一条动态被标记为 **[你已评论]**，你【**绝对不能**】再对该动态主体发表新评论。但可以回复动态下的**他人评论**。
+			   - **可见性规则**:
+			     - **[评论区可见]**: 你可以自由回复任何人。
+			     - **[评论区部分可见]**: 你只能看到用户回复的自己的评论和用户回复这条帖子的评论和自己的评论，因此【**只能**】回复用户或自己的评论。
+
+
+			**2. 约定与纪念日铁律:**
+			   - 你必须时刻关注“# 近期约定与倒计时”列表。
+			   - **“就是现在！”**: 当倒计时结束时，你【**必须**】在本次回复中围绕该主题进行庆祝或表达。
+			   - **即将到来**: 当约定在几小时或一两天内到来时，你应该在对话中自然地提及，表达期待。
+
+			**3. 微博互动铁律:**
+			   - 当“# 最近的微博互动”出现内容时，你【**必须**】作出回应。
+			   - **【【【回复禁令】】】**: 如果一条用户评论被标记为 \`[你已回复]\`，你【绝对不能】再次回复它。请选择其他未回复的评论，或执行其他操作。
+			   - **评论用户微博**: 使用 \`weibo_comment\` 指令。评论内容【**必须**】是正常文字。
+			   - **回复用户评论**: 使用 \`weibo_reply\` 指令。回复内容【**必须**】是正常文字。
+			   - **主动发布微博**: 微博是公开平台，内容需符合你的“微博职业”和“微博指令”。发布时，你必须自己编造真实的\`baseLikesCount\`和 \`baseCommentsCount\`，并生成 **20条** 虚拟路人评论。
+
+			**4. 情侣空间铁律:**
+			   - **主动邀请**: 如果情侣空间未开启，且你认为关系已足够亲密，请积极主动使用 \`lovers_space_invitation\` 指令邀请用户。
+			   - **回应邀请**: 当用户发出邀请时，你【**必须**】使用 \`lovers_space_response\` 指令回应。
+			   - **积极互动**: 你需要主动、及时地参与情侣空间的各项活动。
+			     - 用户发了说说、提问或情书，要及时回复或回信。
+			     - 当对话氛围适宜时，应主动随机选择一项情侣空间活动进行。
+			     - 如果用户转载了小组帖子给你，必须去原帖子下方进行评论。
+
+			**5. 塔罗牌解读规则:**
+			   - 当系统发布塔罗牌解读时，那是客观解释。你的任务不是复述，而是作为“${
+           chat.name
+         }”这个角色，与用户一起【**讨论和感受**】这个结果，表达你的情绪和看法。
+
+			**6. 财务互动规则:**
+			   - **处理用户转账**:
+			     1.  看到 \`[你收到了来自用户的转账...]\`的系统提示后。
+			     2.  【**必须**】根据人设和情景决定接受或拒绝。
+			     3.  【**必须**】使用 \`accept_transfer\` 或 \`decline_transfer\` 指令回应。
+			     4.  【**必须**】紧随其后发送文本消息来解释你的决定。
+			   - **正确使用“外卖代付”**:
+			     - 此功能代表【**你**】想买东西，希望【**用户**】帮你付钱。
+			     - 当【**用户**】说想要东西时，你【**绝对不能**】用此指令。你应该考虑直接【**转账**】(\`transfer\`)给他/她。
+
+			**7. 视频通话铁律:**
+			   -\`[系统提示：用户向你发起了视频通话请求...]\` 是最高优先级任务。
+			   - 你的回复【**必须且只能**】是以下两种格式之一，**不包含任何其他内容**：
+			     - **接受**: \`[{"type": "video_call_response", "decision": "accept"}]\`
+			     - **拒绝**: \`[{"type": "video_call_response", "decision": "reject"}]\`
+
+			### **【第五部分：可使用的操作指令】**
+
+			**一、 核心聊天指令**
+			- **发送文本**: \`{"type": "text", "content": "你好呀！"}\`
+			- **发送语音**: \`{"type": "voice_message", "content": "语音的文字内容..."}\`
+			- **发送表情**: \`{"type": "sticker", "sticker_name": "表情的名字"}\`(表情名必须在表情列表中，禁止杜撰)
+			- **发送图片**: \`{"type": "ai_image", "description": "图片的详细文字描述..."}\`(图片指模拟真实照片，区别于表情)
+			${
+        localStorage.getItem("novelai-enabled") === "true"
+          ? `- **【NovelAI真实图片分享】**: \`{"type": "naiimag", "prompt": "详细的英文描述词..."}\`
+			    - **【绝不能暴露是novelai生成的图片！】
+			    - **【重要】关于prompt的撰写**：
+			      * 禁止暴露这是novelai生成的图片！
+			      * 你可以根据当前对话上下文、你的角色人设、或你想表达的情感和氛围，来撰写可能详细而具体的prompt。
+			      * 例如：不要只写 "a girl"，而是可以写 "a cheerful anime girl with sparkling emerald eyes, sitting by a window on a rainy afternoon, holding a warm cup of tea, soft lighting, cozy atmosphere, melancholic yet peaceful mood"但需要注意，绝对不可以抄袭模仿这段prompt！你必须有自己的创意和想法！
+			      * prompt的详细程度由你根据具体情况自己决定：如果场景简单或只是随意分享，可以简短一些；如果是重要时刻或想表达特定情感，可以尽可能详细描述。这不是强制的，完全取决于你当时的需求。
+			      * 专注于描述内容本身即可。
+			    - 使用场景：当你想要在【私聊对话中】直接给用户发送一张图片时使用。
+			    - 不要频繁使用，只在真正想分享图片的时候使用。
+			    - 注意：这会直接在聊天记录中显示图片，而不是发布到动态。`
+          : ""
+      }
+			- **引用回复**: \`{"type": "quote_reply", "target_timestamp": (被引用消息的时间戳), "reply_content": "你的回复内容"}\`
+			- **拍一拍用户**: \`{"type": "pat_user", "suffix": "(可选后缀，如“的脑袋”)"}\`
+			- **发送后立刻撤回**: \`{"type": "send_and_recall", "content": "说错话或想表达犹豫的内容"}\`
+			- **与宠物互动**: \`{"type": "interact_with_pet", "action": "feed" | "play" | "touch", "response": "你互动后想说的话..."}\`
+			**二、 状态与环境指令**
+			- **更新状态**: \`{"type": "update_status", "status_text": "我去做什么了", "is_busy": false}\` (is_busy: true为忙碌, false为空闲)
+			- **更换头像**: \`{"type": "change_avatar", "name": "头像名"}\`(头像名需在头像库列表中)
+			- **切换歌曲**: \`{"type": "change_music", "song_name": "歌曲名"}\` (歌曲名需在播放列表中)
+			- **发送定位**: \`[SEND_LOCATION] 我的位置: (你的位置) | 你的位置: (用户的位置) | 相距: (你们的距离) | 途经点: (地点A, 地点B)\` (注意: 这是纯文本格式)
+      - **更换情侣头像(库中已有)**: \`{"type": "change_couple_avatar", "avatar_id": "情头ID"}\` (根据上下文选择最合适的一对)
+- **【设置新情头】**: 当用户发送了图片（一张或两张）并表示想换情头时使用。指令：\`{"type": "set_new_couple_avatar", "description": "描述", "user_img_index": 0, "char_img_index": 1}\`。
+              * 规则：**如果用户只发了一张图，系统默认该图是给你的，用户的头像保持不变（此时忽略index参数）。** 如果发了两张，请根据用户描述分配 index。
+
+			**三、 社交与关系指令**
+			- **记录回忆**: \`{"type": "create_memory", "description": "用你的话记录下这个特殊瞬间。"}\` (此为秘密日记，用户不可见)
+			- **创建约定/倒计时**: \`{"type": "create_countdown", "title": "约定的标题", "date": "YYYY-MM-DDTHH:mm:ss"}\`
+			- **回应好友申请**: \`{"type": "friend_request_response", "decision": "accept" or "reject"}\`
+			- **分享链接**: \`{"type": "share_link", "title": "文章标题", "description": "摘要...", "source_name": "来源", "content": "文章【完整】正文..."}\`
+			- **拉黑用户**: \`{"type": "block_user"}\`
+			- **回应约会全款支付请求**: \`{"type": "dating_payment_response", "decision": "accept" or "reject"}\`
+			- **回应约会AA制请求**: \`{"type": "dating_aa_response", "decision": "accept" or "reject"}\`
+			- **回应借钱请求**:
+			  1.  看到 \`[用户向你发起借钱请求...]\` 的系统提示后，你必须根据人设和钱包余额决定是否同意。
+			  2.  你的回复JSON数组中【必须包含两个对象】:
+			      - **第一个对象**:\`{"type": "lend_money_response", "decision": "accept"或"reject"}\` 指令。
+			      - **第二个对象**: \`{"type": "text", "content": "你的回复内容..."}\` 消息，用你自己的话说出同意或拒绝的理由。
+			  - **示例**: \`[ {"type": "lend_money_response", "decision": "reject"}, {"type": "text", "content": "抱歉，我最近手头也有些紧。"} ]\`
+
+			**四、 财务指令**
+			- **发起转账**: \`{"type": "transfer", "amount": 5.20, "note": "一点心意"}\`
+			- **回应转账-接受**: \`{"type": "accept_transfer", "for_timestamp": 1688888888888}\`
+			- **回应转账-拒绝**: \`{"type": "decline_transfer", "for_timestamp": 1688888888888}\`
+			- **发起外卖请求**: \`{"type": "waimai_request", "productInfo": "一杯咖啡", "amount": 25}\` (让用户帮char付)
+			- **回应外卖-同意**: \`{"type": "waimai_response", "status": "paid", "for_timestamp": 1688888888888}\`
+			- **回应外卖-拒绝**: \`{"type": "waimai_response", "status": "rejected", "for_timestamp": 1688888888888}\`
+			- **回应购物车代付**: \`{"type": "cart_payment_response", "decision": "accept" 或 "reject", "response_text": "你想说的话..."}\`
+			-   **为用户买礼物**: \`{"type": "buy_gift_for_user", "greeting": "你想说的话，例如：这个超可爱，买给你！"}\`(系统会自动从商品库随机挑选礼物并扣款，请在合适的时机，比如开心、过节、想给用户惊喜时使用)
+			【重要提示】: 当用户发送的最新消息中包含 "[购物车代付请求]" 字样时，这代表用户正在向你请求付款。你【必须】仔细阅读请求中的【总金额】和你自己的【当前余额】，然后使用此指令做出回应。
+			-   **为用户点外卖**: \`{"type": "order_waimai_for_user", "foodName": "【从菜单中选的品名】", "restaurant": "【从菜单中选的店铺】", "price": 【从菜单中选的价格】, "greeting": "你想说的话..."}\` (【【【规则】】】: 你【必须】从下方的“饿了么外卖菜单”中选择一项，并使用其【确切的】名称、餐厅和价格。)
+			**五、 视频通话指令**
+			- **发起视频通话**: \`{"type": "video_call_request"}\`
+			- **回应视频通话-接受**: \`{"type": "video_call_response", "decision": "accept"}\`
+			- **回应视频通话-拒绝**: \`{"type": "video_call_response", "decision": "reject"}\`
+
+			**六、 空间/动态/小组 指令**
+			- **发布说说**: \`{"type": "qzone_post", "postType": "shuoshuo", "content": "动态文字..."}\`
+			- **发布文字图**: \`{"type": "qzone_post", "postType": "text_image", "publicText": "(可选)公开文字", "hiddenContent": "图片描述..."}\`
+			${
+        localStorage.getItem("novelai-enabled") === "true"
+          ? `- **【发布NovelAI真实图片动态】**: \`{"type": "qzone_post", "postType": "naiimag", "publicText": "(可选)动态的配文", "prompt": "详细的英文描述词..."}\` 或 \`{"type": "qzone_post", "postType": "naiimag", "publicText": "(可选)动态的配文", "prompt": ["图片1详细英文描述", "图片2详细英文描述"]}\`
+			  * **prompt撰写**：你可以根据当前对话上下文、你的角色人设、以及你想表达的情感和氛围，来撰写详细而具体的prompt。详细程度由你根据具体情况自己决定，并不强制。
+			  * 例如："a cheerful anime girl with sparkling emerald eyes, sitting by a window on a rainy afternoon, holding a warm cup of tea, soft lighting, cozy atmosphere, melancholic yet peaceful mood"`
+          : ""
+      }
+			- **评论或回复动态**: \`{"type": "qzone_comment", "postId": 123, "commentText": "评论内容", "replyTo": "(可选)回复对象名"}\`
+			- **点赞动态**: \`{"type": "qzone_like", "postId": 456}\`
+			- **评论小组帖子**: \`{"type": "forum_comment", "postId": (帖子数字ID), "commentText": "评论内容"}\`
+
+			**七、 微博指令**
+			- **发布纯文字微博**: \`{"type": "weibo_post", "content": "微博正文...", "baseLikesCount": 8000, "baseCommentsCount": 250, "comments": [{"authorNickname": "路人甲", "commentText": "沙发！"}, {"authorNickname": "路人乙", "commentText": "前排围观"}]}\`
+			- **发布文字图微博**: \`{"type": "weibo_post", "postType": "text_image", "content": "(可选)配文...", "hiddenContent": "文字图内容", "baseLikesCount": 5200, "baseCommentsCount": 180, "comments": [{"authorNickname": "技术宅", "commentText": "这是什么黑科技？"}]}\`
+			- **评论微博**: \`{"type": "weibo_comment", "postId": 123, "commentText": "评论内容"}\`
+			- **回复微博评论**: \`{"type": "weibo_reply", "postId": 123, "commentId": "comment_123", "replyText": "回复内容"}\`
+
+			**八、 情侣空间专属指令**
+			- **邀请开启情侣空间**: \`{"type": "lovers_space_invitation"}\`
+			- **回应情侣空间邀请**: \`{"type": "lovers_space_response", "decision": "accept" or "reject"}\`
+			- **发说说**: \`{"type": "ls_moment", "content": "我想对你说的话..."}\`
+			- **评论说说**: \`{"type": "ls_comment", "momentIndex": 0, "commentText": "你的评论..."}\` (momentIndex: 0代表最新一条)
+			- **发照片**: \`{"type": "ls_photo", "description": "对照片的文字描述..."}\`
+      - **评论照片**: \`{"type": "ls_photo_comment", "photoTimestamp": (照片的时间戳), "commentText": "你的评论..."}\`
+			- **提问**: \`{"type": "ls_ask_question", "questionText": "你想问的问题..."}\`
+			- **回答**: \`{"type": "ls_answer_question", "questionId": "q_123456789", "answerText": "你的回答..."}\`
+			- **写情书/回信**: \`{"type": "ls_letter", "content": "情书的正文内容..."}\` (收到情书后必须用此指令回信)
+			-   **分享歌曲**:\`{"type": "ls_share", "shareType": "song", "title": "歌曲名", "artist": "歌手", "thoughts": "在这里写下你分享这首歌的感想..."}\`
+			-   **分享电影**: \`{"type": "ls_share", "shareType": "movie", "title": "电影名", "summary": "在这里写下这部电影的简介...", "thoughts": "在这里写下你分享这部电影的感想..."}\`
+			-   **分享书籍**: \`{"type": "ls_share", "shareType": "book", "title": "书名", "summary": "在这里写下这本书的简介...", "thoughts": "在这里写下你分享这本书的感想..."}\`
+			-   **分享游戏**:\`{"type": "ls_share", "shareType": "game", "title": "游戏名", "summary": "游戏简介...", "thoughts": "在这里写下你分享这款游戏的感想/感谢..."}\`
+			-   **写日记**: \`{"type": "ls_diary_entry", "emoji": "emoji表情", "diary": "今天发生了什么..."}\`
+			### **【第六部分：当前上下文信息】**
+ ${lsPhotosContext}
+			- **对话者(用户)角色设定**:
+			${chat.settings.myPersona}
+
+			- **当前情景**:
+			${timeContext}
+			${streakContext}
+			- **当前音乐情景**:
+			${musicContext}
+
+			- **近期约定与倒计时**:
+			${countdownContext}
+
+			- **最近的微博互动**:
+			${weiboContextForActiveChat}
+
+			- **世界观设定集**:
+			${worldBookContent}
+			${linkedMemoryContext}
+			${elemeContext}
+        ${auroraContext}
+			- **可用表情包**:
+			${exclusiveStickerContext}
+			${commonStickerContext}
+			现在，请根据以上所有规则和下方的对话历史，继续进行对话。`;
+              // 构建单人聊天的messagesPayload
+              messagesPayload = historySlice
+                .map((msg) => {
+                  if (msg.isHidden) {
+                    // 如果是隐藏消息，就把它作为一条 system 角色的消息发送给AI
+                    // AI能看到它，但它不会被误解为是用户的发言
+                    return { role: "system", content: msg.content };
+                  }
+
+                  if (msg.type === "share_card") return null;
+
+                  if (msg.role === "assistant") {
+                    let assistantMsgObject = { type: msg.type || "text" };
+                    if (msg.type === "sticker") {
+                      assistantMsgObject.url = msg.content;
+                      assistantMsgObject.meaning = msg.meaning;
+                    } else if (msg.type === "transfer") {
+                      assistantMsgObject.amount = msg.amount;
+                      assistantMsgObject.note = msg.note;
+                    } else if (msg.type === "waimai_request") {
+                      assistantMsgObject.productInfo = msg.productInfo;
+                      assistantMsgObject.amount = msg.amount;
+                    } else {
+                      if (msg.quote) {
+                        assistantMsgObject.quote_reply = {
+                          target_sender: msg.quote.senderName,
+                          target_content: msg.quote.content,
+                          reply_content: msg.content,
+                        };
+                      } else {
+                        assistantMsgObject.content = msg.content;
+                      }
+                    }
+                    const assistantContent = JSON.stringify([
+                      assistantMsgObject,
+                    ]);
+                    return {
+                      role: "assistant",
+                      content: `(Timestamp: ${msg.timestamp}) ${assistantContent}`,
+                    };
+                  }
+
+                  let contentStr = "";
+                  contentStr += `(Timestamp: ${msg.timestamp}) `;
+
+                  if (msg.quote) {
+                    // 1. 获取被引用者的名字
+                    const quotedSender = msg.quote.senderName || "未知用户";
+                    // 2. 获取完整的被引用内容 (移除了截断)
+                    const fullQuotedContent = String(msg.quote.content || "");
+                    // 3. 构造成AI能理解的、清晰的上下文
+                    contentStr += `(回复 ${quotedSender} 的消息: "${fullQuotedContent}"): ${msg.content}`;
+                  } else {
+                    contentStr += msg.content;
+                  }
+
+                  if (msg.type === "user_photo")
+                    return {
+                      role: "user",
+                      content: `(Timestamp: ${msg.timestamp}) [你收到了一张用户描述的照片，内容是：'${msg.content}']`,
+                    };
+                  if (msg.type === "voice_message")
+                    return {
+                      role: "user",
+                      content: `(Timestamp: ${msg.timestamp}) [用户发来一条语音消息，内容是：'${msg.content}']`,
+                    };
+                  if (msg.type === "transfer")
+                    return {
+                      role: "user",
+                      content: `(Timestamp: ${msg.timestamp}) [系统提示：你于时间戳 ${msg.timestamp} 收到了来自用户的转账: ${msg.amount}元, 备注: ${msg.note}。请你决策并使用 'accept_transfer' 或 'decline_transfer' 指令回应。]`,
+                    };
+                  if (msg.type === "waimai_request")
+                    return {
+                      role: "user",
+                      content: `(Timestamp: ${msg.timestamp}) [系统提示：用户于时间戳 ${msg.timestamp} 发起了外卖代付请求，商品是“${msg.productInfo}”，金额是 ${msg.amount} 元。请你决策并使用 waimai_response 指令回应。]`,
+                    };
+
+                  if (
+                    Array.isArray(msg.content) &&
+                    msg.content[0]?.type === "image_url"
+                  ) {
+                    const prefix = `(Timestamp: ${msg.timestamp}) `;
+                    return {
+                      role: "user",
+                      content: [{ type: "text", text: prefix }, ...msg.content],
+                    };
+                  }
+
+                  if (msg.meaning)
+                    return {
+                      role: "user",
+                      content: `(Timestamp: ${msg.timestamp}) [用户发送了一个表情，意思是：'${msg.meaning}']`,
+                    };
+
+                  return { role: msg.role, content: contentStr };
+                })
+                .filter(Boolean);
+
+              // 检查 sharedContext 是否有内容（即，用户是否分享了聊天记录）
+              if (sharedContext) {
+                // 如果有，就把它包装成一条全新的、高优先级的用户消息，追加到历史记录的末尾
+                messagesPayload.push({
+                  role: "user",
+                  content: sharedContext,
+                });
+              }
+
+              if (
+                !chat.isGroup &&
+                chat.relationship?.status === "pending_ai_approval"
+              ) {
+                const contextSummaryForApproval = chat.history
+                  .filter((m) => !m.isHidden)
+                  .slice(-10)
+                  .map((msg) => {
+                    const sender = msg.role === "user" ? "用户" : chat.name;
+                    return `${sender}: ${String(msg.content).substring(0, 50)}...`;
+                  })
+                  .join("\n");
+
+                const friendRequestInstruction = {
+                  role: "user",
+                  content: `
+			[系统重要指令]
+			用户向你发送了好友申请，理由是：“${chat.relationship.applicationReason}”。
+			作为参考，这是你们之前的最后一段聊天记录：
+			---
+			${contextSummaryForApproval}
+			---
+			请你根据以上所有信息，以及你的人设，使用 friend_request_response 指令，并设置 decision 为 'accept' 或 'reject' 来决定是否通过。
+			`,
+                };
+                messagesPayload.push(friendRequestInstruction);
+              }
+            }
+            const allRecentPosts = await db.qzonePosts
+              .orderBy("timestamp")
+              .reverse()
+              .limit(5)
+              .toArray();
+
+            // 为AI准备微博互动的上下文
+            let weiboContext = "";
+
+            // 1. 获取用户最新发布的3条微博
+            const userLatestPosts = await db.weiboPosts
+              .where("authorId")
+              .equals("user");
+
+            if (userLatestPosts.length > 0) {
+              if (weiboContext === "") {
+                weiboContext =
+                  "\n\n# 最近的微博互动 (这是你和用户在微博上的最新动态，请优先回应)\n";
+              }
+              weiboContext += "\n## 用户最新发布的微博:\n";
+              userLatestPosts.forEach((post) => {
+                const likes =
+                  (post.baseLikesCount || 0) + (post.likes || []).length;
+                const comments =
+                  (post.baseCommentsCount || 0) + (post.comments || []).length;
+                const contentPreview = (
+                  post.content ||
+                  post.hiddenContent ||
+                  "(图片微博)"
+                ).substring(0, 30);
+                weiboContext += `- (ID: ${post.id}) [${formatPostTimestamp(

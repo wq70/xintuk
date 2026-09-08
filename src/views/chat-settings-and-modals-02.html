@@ -1,0 +1,1077 @@
+                  ><input type="radio" name="theme-select" value="pink_black" />
+                  粉黑</label
+                >
+                <label
+                  ><input type="radio" name="theme-select" value="pink_green" />
+                  粉绿</label
+                >
+                <label
+                  ><input
+                    type="radio"
+                    name="theme-select"
+                    value="green_black"
+                  />
+                  绿黑</label
+                >
+              </div>
+              <button
+                id="reset-theme-btn"
+                class="moe-btn-mini"
+                style="width: auto; margin-top: 5px"
+              >
+                恢复默认主题
+              </button>
+            </div>
+
+            <div class="form-group">
+              <label>字体大小: <span id="font-size-value">13px</span></label>
+              <input
+                type="range"
+                id="font-size-slider"
+                min="12"
+                max="20"
+                step="1"
+                class="moe-slider"
+              />
+            </div>
+
+            <div class="form-group">
+              <label>气泡样式预设</label>
+              <div class="input-with-btn-row">
+                <select
+                  id="bubble-style-preset-select"
+                  class="moe-input"
+                ></select>
+                <button id="manage-bubble-presets-btn" class="moe-btn-small">
+                  管理
+                </button>
+              </div>
+              <div class="moe-btn-group">
+                <button id="export-bubble-preset-btn" class="moe-btn-mini">
+                  导出
+                </button>
+                <button id="import-bubble-preset-btn" class="moe-btn-mini">
+                  导入
+                </button>
+              </div>
+              <input
+                type="file"
+                id="import-bubble-preset-input"
+                accept=".json, .txt, .css, .docx"
+                hidden
+              />
+            </div>
+
+            <div class="form-group">
+              <label
+                >自定义CSS
+                <button
+                  id="reset-custom-css-btn"
+                  class="moe-btn-mini"
+                  style="margin-left: 5px; padding: 2px 6px"
+                >
+                  重置
+                </button></label
+              >
+              <textarea
+                id="custom-css-input"
+                rows="4"
+                class="moe-input code-area"
+                placeholder="/* 在此输入自定义CSS代码 */"
+              ></textarea>
+            </div>
+
+            <div class="form-group">
+              <label>实时预览</label>
+              <div id="settings-preview-area" class="preview-box"></div>
+            </div>
+
+            <!-- NAI出图设置 -->
+            <div
+              class="form-group"
+              id="nai-character-settings-group"
+              style="display: none"
+            >
+              <div class="moe-divider"></div>
+              <label>NovelAI 出图 (单聊)</label>
+              <div style="display: flex; gap: 15px; margin: 10px 0">
+                <label
+                  ><input
+                    type="radio"
+                    name="nai-prompt-source"
+                    value="system"
+                    checked
+                  />
+                  系统默认</label
+                >
+                <label
+                  ><input
+                    type="radio"
+                    name="nai-prompt-source"
+                    value="character"
+                  />
+                  角色专属</label
+                >
+              </div>
+              <button id="character-nai-prompts-btn" class="moe-btn-secondary">
+                配置角色专属提示词
+              </button>
+            </div>
+
+            <div
+              class="form-group"
+              id="group-nai-settings-group"
+              style="display: none"
+            >
+              <div class="moe-divider"></div>
+              <label>NovelAI 出图 (群聊)</label>
+              <div style="display: flex; gap: 15px; margin: 10px 0">
+                <label
+                  ><input
+                    type="radio"
+                    name="group-nai-prompt-source"
+                    value="system"
+                    checked
+                  />
+                  系统默认</label
+                >
+                <label
+                  ><input
+                    type="radio"
+                    name="group-nai-prompt-source"
+                    value="character"
+                  />
+                  角色专属</label
+                >
+              </div>
+              <button
+                id="group-character-nai-prompts-btn"
+                class="moe-btn-secondary"
+              >
+                配置角色专属提示词
+              </button>
+            </div>
+          </div>
+
+          <!-- ============================== -->
+          <!-- 6. 数据与操作卡片 -->
+          <!-- ============================== -->
+          <div class="settings-group-card moe-card">
+            <div class="settings-section-title">💾 数据与操作</div>
+
+            <div class="moe-btn-group">
+              <button id="import-chat-history-btn" class="moe-btn-secondary">
+                导入聊天记录
+              </button>
+              <button id="export-chat-history-btn" class="moe-btn-secondary">
+                导出聊天记录
+              </button>
+            </div>
+            <input
+              type="file"
+              id="import-chat-history-input"
+              accept="application/json"
+              hidden
+            />
+
+            <button
+              id="search-chat-btn"
+              class="moe-btn-secondary"
+              style="margin-top: 10px"
+            >
+              🔍 查找聊天内容
+            </button>
+
+            <div class="moe-divider"></div>
+
+            <div class="moe-btn-group">
+              <button id="clear-chat-btn" class="moe-btn-danger">
+                🧹 清空聊天
+              </button>
+              <button id="block-chat-btn" class="moe-btn-danger">
+                🚫 拉黑对方
+              </button>
+            </div>
+          </div>
+
+          <!-- 底部垫高，防止被悬浮按钮遮挡 -->
+          <div style="height: 80px"></div>
+        </div>
+
+        <!-- 悬浮保存按钮 (FAB) -->
+        <div
+          class="modal-footer"
+          style="
+            border: none;
+            padding: 0;
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            pointer-events: none;
+          "
+        >
+          <!-- 取消按钮放左边 -->
+          <button
+            id="cancel-chat-settings-btn"
+            class="moe-fab-cancel"
+            style="pointer-events: auto"
+          >
+            ❌<span style="font-size: 10px; display: block">取消</span>
+          </button>
+
+          <!-- 保存按钮放右边 -->
+          <button
+            id="save-chat-settings-btn"
+            class="moe-fab-save"
+            style="pointer-events: auto"
+          >
+            💾<span style="font-size: 10px; display: block">保存</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="persona-library-modal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <span>我的人设库</span
+          ><button id="add-persona-preset-btn" class="action-button">
+            添加
+          </button>
+        </div>
+        <div class="modal-body"><div id="persona-library-grid"></div></div>
+        <div class="modal-footer">
+          <button class="cancel" id="close-persona-library-btn">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="persona-editor-modal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <span id="persona-editor-title">添加人设预设</span>
+        </div>
+        <div class="modal-body">
+          <!-- NPC名字输入框 -->
+          <div class="form-group" id="npc-editor-name-group">
+            <label for="npc-editor-name-input">NPC 名字</label>
+            <input type="text" id="npc-editor-name-input" />
+          </div>
+          <div class="form-group">
+            <label>头像</label>
+            <div class="avatar-upload">
+              <img id="preset-avatar-preview" />
+              <button
+                onclick="document.getElementById('preset-avatar-input').click()"
+              >
+                上传头像
+              </button>
+
+              <button
+                id="persona-editor-change-frame-btn"
+                class="change-frame-btn"
+                data-type="member"
+              >
+                更换头像框
+              </button>
+              <input type="file" id="preset-avatar-input" accept="image/*" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="preset-persona-input">人设</label>
+            <textarea
+              id="preset-persona-input"
+              rows="4"
+              placeholder="在此输入这个人设的详细设定..."
+            ></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="cancel-persona-editor-btn">取消</button>
+          <button class="save" id="save-persona-preset-btn">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="member-settings-modal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header"><span>编辑群成员</span></div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="member-name-input">名字</label
+            ><input type="text" id="member-name-input" />
+          </div>
+          <div class="form-group">
+            <label for="member-persona-input">人设</label
+            ><textarea id="member-persona-input" rows="4"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label>头像</label>
+            <div class="avatar-upload">
+              <img id="member-avatar-preview" />
+              <button
+                onclick="document.getElementById('member-avatar-input').click()"
+              >
+                上传头像
+              </button>
+              <!-- 更换头像框按钮 -->
+              <button
+                id="member-editor-change-frame-btn"
+                class="change-frame-btn"
+              >
+                更换头像框
+              </button>
+              <input
+                type="file"
+                id="member-avatar-input"
+                accept="image/*"
+                hidden
+              />
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="cancel-member-settings-btn">取消</button
+          ><button class="save" id="save-member-settings-btn">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="custom-modal-overlay">
+      <div id="custom-modal">
+        <div class="custom-modal-header" id="custom-modal-title"></div>
+        <div class="custom-modal-body" id="custom-modal-body"></div>
+        <div class="custom-modal-footer">
+          <button id="custom-modal-cancel">取消</button>
+          <button id="custom-modal-confirm" class="confirm-btn">确定</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="preset-actions-modal" class="modal">
+      <div id="custom-modal" style="width: 250px">
+        <div class="custom-modal-footer">
+          <button id="preset-action-edit">编辑预设</button>
+          <button id="preset-action-delete" class="btn-danger">删除预设</button>
+          <button
+            id="preset-action-cancel"
+            style="
+              margin-top: 8px;
+              border-radius: 8px;
+              background-color: #f0f0f0;
+            "
+          >
+            取消
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="transfer-modal">
+      <div class="transfer-content">
+        <div class="transfer-header">给Ta一个惊喜！</div>
+        <div class="transfer-input-group">
+          <label for="transfer-amount">转账金额</label>
+          <input
+            type="number"
+            id="transfer-amount"
+            placeholder="0.00"
+            min="0"
+            max="9999999999999"
+            step="0.01"
+          />
+        </div>
+        <div class="transfer-input-group">
+          <label for="transfer-note">备注 (可选)</label>
+          <input
+            type="text"
+            id="transfer-note"
+            placeholder="留下你的小心思~"
+            maxlength="20"
+          />
+        </div>
+        <div class="transfer-actions">
+          <button id="transfer-cancel-btn">取消</button>
+          <button id="transfer-confirm-btn">确认转账</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="battery-alert-modal">
+      <div class="battery-alert-content">
+        <img id="battery-alert-image" src="" />
+        <p id="battery-alert-text"></p>
+      </div>
+    </div>
+
+    <audio id="audio-player" style="display: none"></audio>
+
+    <audio id="dating-bgm-player" loop></audio>
+
+    <audio id="tts-audio-player" style="display: none"></audio>
+
+    <audio id="ringtone-player" loop></audio>
+    <audio id="notification-sound-player" preload="auto"></audio>
+    <audio
+      id="strong-keep-alive-player"
+      loop
+      src="https://files.catbox.moe/7jn7bp.mp3"
+    ></audio>
+
+    <div id="create-post-modal" class="modal">
+      <div class="modal-content" style="height: auto; max-height: 90%">
+        <div class="modal-header">
+          <span id="create-post-modal-title">发布动态</span>
+          <!-- 使用ID方便JS修改标题 -->
+        </div>
+        <div class="modal-body">
+          <!-- 公开文字输入区 -->
+          <div class="form-group">
+            <textarea
+              id="post-public-text"
+              rows="3"
+              placeholder="分享新鲜事..."
+            ></textarea>
+          </div>
+
+          <!-- 模式切换开关 -->
+          <div class="post-mode-switcher">
+            <button id="switch-to-image-mode" class="mode-btn active">
+              上传图片
+            </button>
+            <button id="switch-to-text-image-mode" class="mode-btn">
+              使用文字图
+            </button>
+          </div>
+
+          <!-- 图片模式区域 -->
+          <div id="image-mode-content" class="post-mode-content active">
+            <div class="form-group">
+              <div
+                id="post-image-preview-container"
+                class="post-image-preview-container"
+              >
+                <img id="post-image-preview" src="" alt="图片预览" />
+                <button id="post-remove-image-btn">×</button>
+              </div>
+              <div class="post-image-upload-options">
+                <button
+                  id="post-upload-local-btn"
+                  class="form-button-secondary"
+                >
+                  本地上传
+                </button>
+                <button id="post-use-url-btn" class="form-button-secondary">
+                  网络URL
+                </button>
+                <input
+                  type="file"
+                  id="post-local-image-input"
+                  accept="image/*"
+                  hidden
+                />
+              </div>
+            </div>
+            <!-- 这个是给AI看的图片描述，在微博模式下我们会用JS隐藏它 -->
+            <div
+              id="post-image-desc-group"
+              class="form-group"
+              style="display: none"
+            >
+              <label>图片描述 (必填，给AI看)</label>
+              <input
+                type="text"
+                id="post-image-description"
+                placeholder="简单描述图片内容，帮助AI理解"
+              />
+            </div>
+          </div>
+
+          <!-- 文字图模式区域 -->
+          <div id="text-image-mode-content" class="post-mode-content">
+            <div class="form-group">
+              <label>文字图 (给AI理解用的描述，点击图片后可见)</label>
+              <textarea
+                id="post-hidden-text"
+                rows="4"
+                placeholder="在这里写下图片描述..."
+              ></textarea>
+            </div>
+          </div>
+
+          <div class="form-group" id="post-visibility-group">
+            <label>可见范围</label>
+            <div style="display: flex; gap: 20px; margin-bottom: 10px">
+              <label
+                ><input type="radio" name="visibility" value="all" checked />
+                所有人可见</label
+              >
+              <label
+                ><input type="radio" name="visibility" value="groups" />
+                仅分组可见</label
+              >
+            </div>
+            <div
+              id="post-visibility-groups"
+              style="
+                display: none;
+                max-height: 120px;
+                overflow-y: auto;
+                background-color: #f0f2f5;
+                padding: 10px;
+                border-radius: 8px;
+              "
+            >
+              <!-- 分组的多选框会由JS动态生成在这里 -->
+            </div>
+          </div>
+
+          <!-- 这个是动态功能的评论开关，在微博模式下我们会用JS隐藏它 -->
+          <div
+            class="form-group"
+            id="post-comments-toggle-group"
+            style="margin-top: 15px"
+          >
+            <label for="post-comments-toggle" class="toggle-switch-label">
+              <span class="toggle-switch-text">允许角色看见评论区</span>
+              <input type="checkbox" id="post-comments-toggle" checked />
+              <span class="toggle-switch-slider"></span>
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="cancel-create-post-btn">取消</button>
+          <button class="save" id="confirm-create-post-btn">发布</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- NovelAI 生成设置弹窗 -->
+    <div id="novelai-settings-modal" class="modal" style="display: none">
+      <div
+        class="modal-content"
+        style="max-width: 600px; width: 90%; max-height: 85vh; overflow-y: auto"
+      >
+        <div class="modal-header">
+          <span>NovelAI 生成设置</span>
+          <span
+            class="close"
+            id="close-novelai-settings"
+            style="
+              cursor: pointer;
+              float: right;
+              font-size: 28px;
+              font-weight: bold;
+            "
+            >&times;</span
+          >
+        </div>
+        <div class="modal-body" style="padding: 20px">
+          <div class="form-group">
+            <label style="color: #333">图像尺寸（oplus可无限出小图）</label>
+            <select
+              id="nai-resolution"
+              style="
+                background-color: #f8f9fa;
+                color: #333;
+                border: 1px solid #ccc;
+                padding: 8px;
+                width: 100%;
+                border-radius: 4px;
+              "
+            >
+              <optgroup label="小">
+                <option value="512x768">纵向 (512x768)</option>
+                <option value="768x512">横向 (768x512)</option>
+                <option value="640x640">正方形 (640x640)</option>
+              </optgroup>
+              <optgroup label="正常">
+                <option value="832x1216">竖图 (832x1216)</option>
+                <option value="1216x832">横图 (1216x832)</option>
+                <option value="1024x1024" selected>方图 (1024x1024)</option>
+              </optgroup>
+              <optgroup label="壁纸">
+                <option value="1088x1920">纵向 (1088x1920)</option>
+                <option value="1920x1088">风景 (1920x1088)</option>
+              </optgroup>
+            </select>
+            <small style="color: #666"
+              >建议使用官方支持的标准尺寸以获得最佳效果</small
+            >
+          </div>
+
+          <div class="form-group">
+            <label style="color: #333">采样步数 (Steps)</label>
+            <input
+              type="number"
+              id="nai-steps"
+              value="28"
+              min="1"
+              max="50"
+              style="
+                background-color: #f8f9fa;
+                color: #333;
+                border: 1px solid #ccc;
+                padding: 8px;
+                width: 100%;
+                border-radius: 4px;
+              "
+            />
+            <small style="color: #666"
+              >推荐值: 28 (值越高质量越好但耗时越长)</small
+            >
+          </div>
+
+          <div class="form-group">
+            <label style="color: #333">提示词相关性 (CFG Scale)</label>
+            <input
+              type="number"
+              id="nai-cfg-scale"
+              value="5"
+              min="1"
+              max="20"
+              step="0.5"
+              style="
+                background-color: #f8f9fa;
+                color: #333;
+                border: 1px solid #ccc;
+                padding: 8px;
+                width: 100%;
+                border-radius: 4px;
+              "
+            />
+            <small style="color: #666"
+              >推荐值: 5 (控制图像与提示词的相关程度)</small
+            >
+          </div>
+
+          <div class="form-group">
+            <label style="color: #333">采样器 (Sampler)</label>
+            <select
+              id="nai-sampler"
+              style="
+                background-color: #f8f9fa;
+                color: #333;
+                border: 1px solid #ccc;
+                padding: 8px;
+                width: 100%;
+                border-radius: 4px;
+              "
+            >
+              <option value="k_euler">Euler</option>
+              <option value="k_euler_ancestral" selected>
+                Euler Ancestral
+              </option>
+              <option value="k_dpmpp_2s_ancestral">DPM++ 2S Ancestral</option>
+              <option value="k_dpmpp_2m">DPM++ 2M</option>
+              <option value="k_dpmpp_sde">DPM++ SDE</option>
+              <option value="ddim">DDIM</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label style="color: #333">随机种子 (Seed)</label>
+            <input
+              type="number"
+              id="nai-seed"
+              value="-1"
+              min="-1"
+              max="9999999999"
+              style="
+                background-color: #f8f9fa;
+                color: #333;
+                border: 1px solid #ccc;
+                padding: 8px;
+                width: 100%;
+                border-radius: 4px;
+              "
+            />
+            <small style="color: #666"
+              >-1 表示随机，固定种子可复现相同图像</small
+            >
+          </div>
+
+          <div class="form-group">
+            <label style="color: #333">负面提示词预设 (UC Preset)</label>
+            <select
+              id="nai-uc-preset"
+              style="
+                background-color: #f8f9fa;
+                color: #333;
+                border: 1px solid #ccc;
+                padding: 8px;
+                width: 100%;
+                border-radius: 4px;
+              "
+            >
+              <option value="0">Preset 0 - Heavy</option>
+              <option value="1" selected>Preset 1 - Light</option>
+              <option value="2">Preset 2 - Human Focus</option>
+              <option value="3">Preset 3 - None</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label style="color: #333">质量标签</label>
+            <div style="display: flex; align-items: center; gap: 10px">
+              <input
+                type="checkbox"
+                id="nai-quality-toggle"
+                checked
+                style="width: auto"
+              />
+              <span style="color: #666; font-size: 14px"
+                >自动添加质量提升标签</span
+              >
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label style="color: #333">SMEA (提升细节)</label>
+            <div style="display: flex; align-items: center; gap: 10px">
+              <input
+                type="checkbox"
+                id="nai-smea"
+                checked
+                style="width: auto"
+              />
+              <span style="color: #666; font-size: 14px">启用SMEA增强</span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label style="color: #333">SMEA DYN (动态优化)</label>
+            <div style="display: flex; align-items: center; gap: 10px">
+              <input type="checkbox" id="nai-smea-dyn" style="width: auto" />
+              <span style="color: #666; font-size: 14px">启用动态SMEA</span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label style="color: #333">默认正面提示词</label>
+            <textarea
+              id="nai-default-positive"
+              rows="3"
+              style="
+                background-color: #f8f9fa;
+                color: #333;
+                border: 1px solid #ccc;
+                padding: 8px;
+                width: 100%;
+                border-radius: 4px;
+                resize: vertical;
+              "
+              placeholder="masterpiece, best quality, 1girl, beautiful..."
+            >
+masterpiece, best quality, 1girl, beautiful, detailed face, detailed eyes, long hair, anime style</textarea
+            >
+            <small style="color: #666"
+              >此提示词将在生成时自动使用（如果测试弹窗中未填写）</small
+            >
+          </div>
+
+          <div class="form-group">
+            <label style="color: #333">默认负面提示词</label>
+            <textarea
+              id="nai-default-negative"
+              rows="3"
+              style="
+                background-color: #f8f9fa;
+                color: #333;
+                border: 1px solid #ccc;
+                padding: 8px;
+                width: 100%;
+                border-radius: 4px;
+                resize: vertical;
+              "
+              placeholder="lowres, bad anatomy, bad hands, text, error..."
+            >
+lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry</textarea
+            >
+          </div>
+
+          <div
+            class="form-group"
+            style="
+              border-top: 1px solid #ddd;
+              padding-top: 15px;
+              margin-top: 15px;
+            "
+          >
+            <label style="color: #333">🌐 CORS 代理设置</label>
+            <select
+              id="nai-cors-proxy"
+              style="
+                background-color: #f8f9fa;
+                color: #333;
+                border: 1px solid #ccc;
+                padding: 8px;
+                width: 100%;
+                border-radius: 4px;
+              "
+            >
+              <option value="">❌ 直连（无代理）</option>
+              <option value="https://corsproxy.io/?" selected>
+                ✅ corsproxy.io（推荐）
+              </option>
+              <option value="https://api.allorigins.win/raw?url=">
+                allorigins.win
+              </option>
+              <option value="https://cors-anywhere.herokuapp.com/">
+                cors-anywhere（需激活）
+              </option>
+              <option value="custom">🔧 自定义代理</option>
+            </select>
+            <small style="color: #e74c3c; display: block; margin-top: 8px">
+              ⚠️ 本地运行会遇到CORS跨域问题，需使用代理。推荐使用 corsproxy.io
+            </small>
+          </div>
+
+          <div
+            id="nai-custom-proxy-group"
+            class="form-group"
+            style="display: none"
+          >
+            <label style="color: #333">自定义代理地址</label>
+            <input
+              type="text"
+              id="nai-custom-proxy-url"
+              placeholder="https://your-proxy.com/?"
+              style="
+                background-color: #f8f9fa;
+                color: #333;
+                border: 1px solid #ccc;
+                padding: 8px;
+                width: 100%;
+                border-radius: 4px;
+              "
+            />
+            <small style="color: #666"
+              >代理URL应以 / 或 ? 结尾，例如：https://proxy.com/?</small
+            >
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button
+            id="reset-nai-settings-btn"
+            class="form-button form-button-secondary"
+            style="margin-right: 10px"
+          >
+            恢复默认
+          </button>
+          <button
+            id="save-nai-settings-btn"
+            class="form-button form-button-secondary"
+          >
+            保存设置
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- NovelAI 测试生成弹窗 -->
+    <div id="novelai-test-modal" class="modal" style="display: none">
+      <div
+        class="modal-content"
+        style="max-width: 700px; width: 90%; max-height: 90vh; overflow-y: auto"
+      >
+        <div class="modal-header">
+          <span>🖼️ NovelAI 测试生成</span>
+          <span
+            class="close"
+            id="close-novelai-test"
+            style="
+              cursor: pointer;
+              float: right;
+              font-size: 28px;
+              font-weight: bold;
+            "
+            >&times;</span
+          >
+        </div>
+        <div class="modal-body" style="padding: 20px">
+          <div class="form-group">
+            <label style="color: #333"
+              >正面提示词（此处提示词仅用于该弹窗测试）</label
+            >
+            <textarea
+              id="nai-test-prompt"
+              rows="4"
+              style="
+                background-color: #f8f9fa;
+                color: #333;
+                border: 1px solid #ccc;
+                padding: 10px;
+                width: 100%;
+                border-radius: 4px;
+                resize: vertical;
+              "
+              placeholder="1girl, solo, long hair, blue eyes, smile..."
+            >
+1girl, solo, long hair, blue eyes, smile, outdoors, cherry blossoms, spring</textarea
+            >
+          </div>
+
+          <div class="form-group">
+            <label style="color: #333">负面提示词（可选，留空使用默认）</label>
+            <textarea
+              id="nai-test-negative"
+              rows="3"
+              style="
+                background-color: #f8f9fa;
+                color: #333;
+                border: 1px solid #ccc;
+                padding: 10px;
+                width: 100%;
+                border-radius: 4px;
+                resize: vertical;
+              "
+              placeholder="留空将使用设置中的默认负面提示词"
+            ></textarea>
+          </div>
+
+          <div style="text-align: center; margin: 20px 0">
+            <button
+              id="nai-generate-btn"
+              style="
+                background-color: #007bff;
+                color: white;
+                border: none;
+                padding: 12px 30px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 16px;
+                font-weight: bold;
+              "
+            >
+              生成图像
+            </button>
+          </div>
+
+          <div
+            id="nai-test-status"
+            style="
+              text-align: center;
+              color: #666;
+              margin: 15px 0;
+              display: none;
+            "
+          >
+            正在生成中，请稍候...
+          </div>
+
+          <div id="nai-test-result" style="display: none; margin-top: 20px">
+            <div style="font-weight: bold; color: #333; margin-bottom: 10px">
+              生成结果：
+            </div>
+            <div
+              style="
+                text-align: center;
+                background: #f8f9fa;
+                padding: 15px;
+                border-radius: 8px;
+                border: 1px solid #e9ecef;
+              "
+            >
+              <img
+                id="nai-result-image"
+                style="
+                  max-width: 100%;
+                  border-radius: 8px;
+                  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+                "
+              />
+            </div>
+            <div style="margin-top: 10px; text-align: center">
+              <button
+                id="nai-download-btn"
+                class="form-button-secondary"
+                style="margin: 0"
+              >
+                下载图像
+              </button>
+            </div>
+          </div>
+
+          <div
+            id="nai-test-error"
+            style="
+              display: none;
+              margin-top: 15px;
+              padding: 12px;
+              background: #f8d7da;
+              color: #721c24;
+              border-radius: 6px;
+              border: 1px solid #f5c6cb;
+            "
+          ></div>
+        </div>
+        <div class="modal-footer">
+          <button id="close-nai-test-btn" class="form-button">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 角色专属NAI出图设置弹窗 -->
+    <div id="character-nai-prompts-modal" class="modal" style="display: none">
+      <div class="modal-content">
+        <div class="modal-header">
+          <span>角色专属NAI提示词配置</span>
+          <span
+            class="close"
+            id="close-character-nai-prompts"
+            style="
+              cursor: pointer;
+              float: right;
+              font-size: 28px;
+              font-weight: bold;
+            "
+            >&times;</span
+          >
+        </div>
+        <div class="modal-body">
+          <p
+            style="
+              font-size: 13px;
+              color: #666;
+              margin-bottom: 20px;
+              background-color: #f0f8ff;
+              padding: 12px;
+              border-radius: 6px;
+              border-left: 3px solid #007bff;
+            "
+          >
+            💡 这里配置的提示词仅用于当前角色的NAI出图，不影响其他角色或系统设置
+          </p>
+
+          <div class="form-group">
+            <label
+              for="character-nai-positive"
+              style="color: #333; font-weight: 600"
+            >
+              正面提示词 (Positive Prompt)
+            </label>
+            <textarea
+              id="character-nai-positive"
+              rows="4"
+              style="
+                background-color: #f8f9fa;
+                color: #333;
+                border: 1px solid #ccc;
+                padding: 10px;
+                width: 100%;
+                border-radius: 4px;
+                resize: vertical;
+                font-size: 13px;
+              "
+              placeholder="例如: masterpiece, best quality, 1girl, beautiful, detailed face, detailed eyes, long hair, anime style"
+            ></textarea>
+            <small
+              style="
+                display: block;
+                color: #666;
+                font-size: 12px;
+                margin-top: 5px;
+              "
+            >

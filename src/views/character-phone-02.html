@@ -1,0 +1,147 @@
+                      id="update-char-phone-preset-btn"
+                      class="preset-btn-capsule preset-btn-secondary"
+                      disabled
+                    >
+                      更新
+                    </button>
+                    <button
+                      id="rename-char-phone-preset-btn"
+                      class="preset-btn-capsule preset-btn-secondary"
+                      disabled
+                    >
+                      重命名
+                    </button>
+                    <button
+                      id="import-char-phone-preset-btn"
+                      class="preset-btn-capsule preset-btn-secondary"
+                    >
+                      导入
+                    </button>
+                    <button
+                      id="export-char-phone-preset-btn"
+                      class="preset-btn-capsule preset-btn-secondary"
+                      disabled
+                    >
+                      导出
+                    </button>
+                    <button
+                      id="delete-char-phone-preset-btn"
+                      class="preset-btn-capsule preset-btn-delete"
+                      disabled
+                    >
+                      删除
+                    </button>
+
+                    <input
+                      type="file"
+                      id="import-char-phone-preset-input"
+                      accept=".json"
+                      hidden
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- 隐藏的文件选择器，用于处理上传 -->
+          <input
+            type="file"
+            id="char-phone-wallpaper-upload-input"
+            accept="image/*"
+            hidden
+          />
+          <input
+            type="file"
+            id="char-phone-icon-upload-input"
+            accept="image/*"
+            hidden
+          />
+
+          <input
+            type="file"
+            id="char-phone-widget-1-upload-input"
+            accept="image/*"
+            hidden
+          />
+          <input
+            type="file"
+            id="char-phone-widget-2-upload-input"
+            accept="image/*"
+            hidden
+          />
+          <input
+            type="file"
+            id="char-phone-app-wallpaper-upload-input"
+            accept="image/*"
+            hidden
+          />
+        </div>
+      </div>
+    </div>
+    <!-- “查手机”功能-生成聊天对象选择弹窗 -->
+    <div id="chat-gen-selector-modal" class="modal">
+      <div class="modal-content" style="height: 70%">
+        <div class="modal-header">
+          <span>选择聊天对象</span>
+        </div>
+        <div
+          class="modal-body"
+          style="padding: 0; display: flex; flex-direction: column"
+        >
+          <!-- 顶部：随机选项 -->
+          <div
+            style="
+              padding: 15px;
+              border-bottom: 1px solid var(--border-color);
+              background: var(--secondary-bg);
+            "
+          >
+            <label class="toggle-switch-label" style="margin: 0">
+              <span class="toggle-switch-text" style="font-weight: bold"
+                >🎲 随机生成 (AI决定)</span
+              >
+              <input type="checkbox" id="chat-gen-random-checkbox" checked />
+              <span class="toggle-switch-slider"></span>
+            </label>
+            <p
+              style="
+                font-size: 12px;
+                color: var(--text-secondary);
+                margin-top: 5px;
+                margin-bottom: 0;
+              "
+            >
+              关闭后可指定下方特定角色/NPC。
+            </p>
+          </div>
+
+          <!-- 列表：特定角色选择 -->
+          <div
+            id="chat-gen-list"
+            class="contact-picker-list"
+            style="flex-grow: 1; opacity: 0.5; pointer-events: none"
+          >
+            <!-- 列表项由JS生成 -->
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="cancel-chat-gen-btn">取消</button>
+          <button class="save" id="confirm-chat-gen-btn">开始生成</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="generation-overlay" class="modal">
+      <div class="loading-content">
+        <!-- 这是一个粉色的猫爪爪 -->
+        <div class="cat-paw">
+          <div class="pad main"></div>
+          <div class="pad toe t1"></div>
+          <div class="pad toe t2"></div>
+          <div class="pad toe t3"></div>
+        </div>
+        <p id="generation-text">少女祈祷中...</p>
+      </div>
+    </div>
+
+    <!-- 选择联系人以创建群聊的屏幕 -->

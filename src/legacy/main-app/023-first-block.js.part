@@ -1,0 +1,948 @@
+              fullMessageObject.note = message.note;
+            }
+            initialContent = JSON.stringify(fullMessageObject, null, 2);
+          } else if (typeof message.content === "object") {
+            initialContent = JSON.stringify(message.content, null, 2);
+          } else {
+            if (
+              message.type === "sticker" ||
+              (typeof message.content === "string" &&
+                STICKER_REGEX.test(message.content))
+            ) {
+              initialContent = message.meaning
+                ? `[sticker:${message.meaning}]`
+                : message.content;
+            } else {
+              initialContent = message.content;
+            }
+          }
+
+          const firstBlock = createMessageEditorBlock(initialContent);
+          editorContainer.appendChild(firstBlock);
+
+          // 4. 动态绑定所有控制按钮的事件
+          // 为了防止事件重复绑定，我们使用克隆节点的方法来清除旧监听器
+          const addBtn = document.getElementById(
+            "add-message-editor-block-btn",
+          );
+          const newAddBtn = addBtn.cloneNode(true);
+          addBtn.parentNode.replaceChild(newAddBtn, addBtn);
+          newAddBtn.addEventListener("click", () => {
+            const newBlock = createMessageEditorBlock();
+            editorContainer.appendChild(newBlock);
+            newBlock.querySelector("textarea").focus();
+          });
+
+          const cancelBtn = document.getElementById(
+            "cancel-advanced-editor-btn",
+          );
+          const newCancelBtn = cancelBtn.cloneNode(true);
+          cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+          newCancelBtn.addEventListener("click", () => {
+            editorModal.classList.remove("visible");
+          });
+
+          const saveBtn = document.getElementById("save-advanced-editor-btn");
+          const newSaveBtn = saveBtn.cloneNode(true);
+          saveBtn.parentNode.replaceChild(newSaveBtn, saveBtn);
+          // 将捕获到的时间戳，直接绑定给这一次的保存点击事件
+          newSaveBtn.addEventListener("click", () => {
+            saveEditedMessage(timestampToEdit);
+          });
+
+          // 5. 最后，显示模态框
+          editorModal.classList.add("visible");
+        }
+
+        function parseEditedContent(text) {
+          const trimmedText = text.trim();
+          // 1. 优先检查是否是 [sticker:名字] 格式
+          const stickerNameMatch = trimmedText.match(/^\[sticker:(.+?)\]$/i);
+          if (stickerNameMatch) {
+            const name = stickerNameMatch[1];
+            // 尝试去所有表情库里找回这个名字对应的URL
+            const allStickers = [
+              ...(state.userStickers || []),
+              ...(state.charStickers || []),
+            ];
+            // 尝试获取当前聊天对象的专属表情(如果有)
+            if (
+              window.state &&
+              window.state.activeChatId &&
+              window.state.chats[window.state.activeChatId]
+            ) {
+              const currentChat = window.state.chats[window.state.activeChatId];
+              if (currentChat.settings.stickerLibrary) {
+                allStickers.push(...currentChat.settings.stickerLibrary);
+              }
+            }
+
+            const found = allStickers.find((s) => s.name === name);
+            if (found) {
+              // 如果找到了，这就还原成一个标准的表情包对象！
+              return [
+                { type: "sticker", content: found.url, meaning: found.name },
+              ];
+            }
+          }
+
+          // 优先检查是否匹配“借钱”格式
+          const borrowMatch = trimmedText.match(
+            /向你借钱(\d+(\.\d+)?)元，用于(.+)/,
+          );
+          if (borrowMatch) {
+            const amount = parseFloat(borrowMatch[1]);
+            const reason = borrowMatch[3].trim();
+
+            // 1. 创建文本消息对象
+            const textMessage = {
+              type: "text",
+              content: trimmedText,
+            };
+
+            // 2. 创建借条卡片对象
+            const cardMessage = {
+              type: "borrow_money_request",
+              payload: {
+                lenderName: "你", // 默认是向“你”借钱
+                amount: amount,
+                reason: reason,
+              },
+            };
+
+            // 3. 将两条消息打包成一个数组返回！
+            return [textMessage, cardMessage];
+          }
+
+          // 如果不是借钱格式，则执行原来的逻辑，但为了统一，也返回一个数组
+          if (trimmedText.startsWith("{") && trimmedText.endsWith("}")) {
+            try {
+              const parsed = JSON.parse(trimmedText);
+              if (parsed.type) {
+                return [parsed]; // 单个对象也包装成数组
+              }
+            } catch (e) {
+              /* 解析失败，继续往下走 */
+            }
+          }
+
+          if (STICKER_REGEX.test(trimmedText)) {
+            return [{ type: "sticker", content: trimmedText }];
+          }
+
+          // 默认返回一个只包含单条文本消息的数组
+          return [{ type: "text", content: trimmedText }];
+        }
+
+        async function saveEditedMessage(timestamp, simpleContent = null) {
+          if (!timestamp) return;
+
+          const chat = state.chats[state.activeChatId];
+          const messageIndex = chat.history.findIndex(
+            (m) => m.timestamp === timestamp,
+          );
+          if (messageIndex === -1) return;
+
+          const originalMessage = chat.history[messageIndex];
+          if (!originalMessage) return;
+
+          let newMessagesData = [];
+
+          if (simpleContent !== null) {
+            newMessagesData = parseEditedContent(simpleContent.trim());
+          } else {
+            // 高级编辑器的逻辑保持不变，但要确保它也返回数组
+            const editorContainer = document.getElementById(
+              "message-editor-container",
+            );
+            const editorBlocks = editorContainer.querySelectorAll(
+              ".message-editor-block",
+            );
+            for (const block of editorBlocks) {
+              const textarea = block.querySelector("textarea");
+              const rawContent = textarea.value.trim();
+              if (rawContent) {
+                // parseEditedContent 现在总是返回数组，我们用concat来合并
+                newMessagesData = newMessagesData.concat(
+                  parseEditedContent(rawContent),
+                );
+              }
+            }
+          }
+
+          if (newMessagesData.length === 0) {
+            document
+              .getElementById("message-editor-modal")
+              .classList.remove("visible");
+            return;
+          }
+
+          const messagesToInsert = newMessagesData.map((newMsgData) => ({
+            ...originalMessage, // 继承原消息的角色、发送者等信息
+            ...newMsgData, // 用新解析出的数据覆盖 type, content, payload 等
+          }));
+
+          chat.history.splice(messageIndex, 1, ...messagesToInsert);
+
+          // 后续的时间戳重新分配和UI刷新逻辑保持不变
+          let reassignTimestamp = timestamp;
+          for (let i = messageIndex; i < chat.history.length; i++) {
+            chat.history[i].timestamp = reassignTimestamp;
+            reassignTimestamp++;
+          }
+
+          await db.chats.put(chat);
+          document
+            .getElementById("message-editor-modal")
+            .classList.remove("visible");
+          renderChatInterface(state.activeChatId);
+          await showCustomAlert("成功", "消息已更新！");
+        }
+
+        /**
+         * 当点击“…”时，显示动态操作菜单
+         * @param {number} postId - 被操作的动态的ID
+         */
+        function showPostActions(postId) {
+          activePostId = postId;
+          document
+            .getElementById("post-actions-modal")
+            .classList.add("visible");
+        }
+
+        /**
+         * 隐藏动态操作菜单
+         */
+        function hidePostActions() {
+          document
+            .getElementById("post-actions-modal")
+            .classList.remove("visible");
+          activePostId = null;
+        }
+
+        async function openPostEditor() {
+          if (!activePostId) return;
+
+          const postIdToEdit = activePostId;
+          const post = await db.qzonePosts.get(postIdToEdit);
+          if (!post) return;
+
+          hidePostActions();
+
+          // 复用创建动态的模态框
+          const modal = document.getElementById("create-post-modal");
+          modal.dataset.mode = "edit"; // 设置一个编辑模式的标记
+          modal.dataset.editingPostId = postIdToEdit; // 保存正在编辑的ID
+
+          // 隐藏模式切换，因为不允许在编辑时更改动态类型
+          modal.querySelector(".post-mode-switcher").style.display = "none";
+
+          // 填充数据
+          document.getElementById("post-public-text").value =
+            post.publicText || (post.type === "shuoshuo" ? post.content : "");
+
+          // 根据动态类型显示不同的编辑区
+          if (post.type === "image_post") {
+            document
+              .getElementById("image-mode-content")
+              .classList.add("active");
+            document
+              .getElementById("text-image-mode-content")
+              .classList.remove("active");
+            document
+              .getElementById("post-image-preview-container")
+              .classList.add("visible");
+            document.getElementById("post-image-preview").src = post.imageUrl;
+            document.getElementById("post-image-desc-group").style.display =
+              "block";
+            document.getElementById("post-image-description").value =
+              post.imageDescription;
+          } else if (post.type === "text_image") {
+            document
+              .getElementById("image-mode-content")
+              .classList.remove("active");
+            document
+              .getElementById("text-image-mode-content")
+              .classList.add("active");
+            document.getElementById("post-hidden-text").value =
+              post.hiddenContent;
+          } else {
+            // 说说
+            document
+              .getElementById("image-mode-content")
+              .classList.remove("active");
+            document
+              .getElementById("text-image-mode-content")
+              .classList.remove("active");
+          }
+
+          document.getElementById("post-comments-toggle").checked =
+            post.areCommentsVisible !== false;
+
+          modal.classList.add("visible");
+        }
+
+        /**
+         * 保存编辑后的动态
+         * @param {number} postId - 要保存的动态ID
+         * @param {string} newRawContent - 从编辑器获取的新内容
+         */
+        async function saveEditedPost(postId, newRawContent) {
+          const post = await db.qzonePosts.get(postId);
+          if (!post) return;
+
+          const trimmedContent = newRawContent.trim();
+
+          // 尝试解析为JSON，如果失败，则认为是纯文本（说说）
+          try {
+            const parsed = JSON.parse(trimmedContent);
+            // 更新帖子属性
+            post.type = parsed.type || "image_post";
+            post.publicText = parsed.publicText || "";
+            post.imageUrl = parsed.imageUrl || "";
+            post.imageDescription = parsed.imageDescription || "";
+            post.hiddenContent = parsed.hiddenContent || "";
+            post.content = ""; // 清空旧的说说内容字段
+          } catch (e) {
+            // 解析失败，认为是说说
+            post.type = "shuoshuo";
+            post.content = trimmedContent;
+            // 清空其他类型的字段
+            post.publicText = "";
+            post.imageUrl = "";
+            post.imageDescription = "";
+            post.hiddenContent = "";
+          }
+
+          await db.qzonePosts.put(post);
+          await renderQzonePosts(); // 重新渲染列表
+          await showCustomAlert("成功", "动态已更新！");
+        }
+
+        /**
+         * 复制动态内容
+         */
+        async function copyPostContent() {
+          if (!activePostId) return;
+          const post = await db.qzonePosts.get(activePostId);
+          if (!post) return;
+
+          let textToCopy =
+            post.content ||
+            post.publicText ||
+            post.hiddenContent ||
+            post.imageDescription ||
+            "（无文字内容）";
+
+          try {
+            await navigator.clipboard.writeText(textToCopy);
+            await showCustomAlert("复制成功", "动态内容已复制到剪贴板。");
+          } catch (err) {
+            await showCustomAlert("复制失败", "无法访问剪贴板。");
+          }
+
+          hidePostActions();
+        }
+
+        // 创建群聊与拉人功能核心函数
+        let selectedContacts = new Set();
+
+        async function openContactPickerForGroupCreate() {
+          selectedContacts.clear(); // 清空上次选择
+
+          // 为“完成”按钮明确绑定“创建群聊”的功能
+          const confirmBtn = document.getElementById(
+            "confirm-contact-picker-btn",
+          );
+          // 使用克隆节点技巧，清除掉之前可能绑定的任何其他事件（比如“添加成员”）
+          const newConfirmBtn = confirmBtn.cloneNode(true);
+          confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+          // 重新绑定正确的“创建群聊”函数
+          newConfirmBtn.addEventListener("click", handleCreateGroup);
+
+          await renderContactPicker();
+          showScreen("contact-picker-screen");
+        }
+
+        async function renderContactPicker() {
+          const listEl = document.getElementById("contact-picker-list");
+          listEl.innerHTML = "";
+          selectedContacts.clear(); // 清空上次的选择
+
+          const allAvailablePeople = [];
+          // 1. 添加主要角色
+          Object.values(state.chats)
+            .filter((c) => !c.isGroup)
+            .forEach((c) => {
+              allAvailablePeople.push({
+                id: c.id,
+                name: c.name,
+                avatar: c.settings.aiAvatar || defaultAvatar,
+                isNpc: false, // 标记为非NPC
+                type: "角色",
+              });
+            });
+
+          // 2. 添加所有角色库里的NPC，并自动去重
+          const npcMap = new Map();
+          Object.values(state.chats).forEach((chat) => {
+            if (chat.npcLibrary) {
+              chat.npcLibrary.forEach((npc) => {
+                // 使用NPC的ID作为key，确保同一个NPC不会被重复添加
+                if (!npcMap.has(npc.id)) {
+                  npcMap.set(npc.id, {
+                    id: npc.id,
+                    name: npc.name,
+                    avatar: npc.avatar || defaultGroupMemberAvatar,
+                    isNpc: true, // 标记为NPC
+                    type: `NPC (${chat.name})`, // 显示该NPC所属的角色
+                  });
+                }
+              });
+            }
+          });
+          allAvailablePeople.push(...Array.from(npcMap.values()));
+
+          if (allAvailablePeople.length === 0) {
+            listEl.innerHTML =
+              '<p style="text-align:center; color:#8a8a8a; margin-top:50px;">还没有可以拉进群的联系人哦~</p>';
+            return;
+          }
+
+          // 3. 渲染整合后的列表
+          allAvailablePeople.forEach((contact) => {
+            const item = document.createElement("div");
+            item.className = "contact-picker-item";
+            item.dataset.contactId = contact.id;
+
+            // 核心修改：为NPC添加一个“(NPC)”的标签，方便区分
+            item.innerHTML = `
+			            <div class="checkbox"></div>
+			            <img src="${contact.avatar}" class="avatar">
+			            <span class="name">${contact.name} ${
+                    contact.isNpc
+                      ? '<span style="color: #888; font-size: 12px;">(NPC)</span>'
+                      : ""
+                  }</span>
+			        `;
+            listEl.appendChild(item);
+          });
+
+          updateContactPickerConfirmButton();
+        }
+
+        /**
+         * 更新“完成”按钮的计数
+         */
+        function updateContactPickerConfirmButton() {
+          const btn = document.getElementById("confirm-contact-picker-btn");
+          btn.textContent = `完成(${selectedContacts.size})`;
+          btn.disabled = selectedContacts.size < 2; // 至少需要2个人才能创建群聊
+        }
+
+        /**
+         * 处理创建群聊的最终逻辑
+         */
+        async function handleCreateGroup() {
+          if (selectedContacts.size < 2) {
+            alert("创建群聊至少需要选择2个联系人。");
+            return;
+          }
+
+          const groupName = await showCustomPrompt(
+            "设置群名",
+            "请输入群聊的名字",
+            "我们的群聊",
+          );
+          if (!groupName || !groupName.trim()) return;
+
+          const newChatId = "group_" + Date.now();
+          const members = [];
+
+          for (const contactId of selectedContacts) {
+            const contactChat = state.chats[contactId];
+            if (contactChat) {
+              // 这是原来的逻辑，用于处理普通角色(Char)
+              members.push({
+                id: contactId,
+                originalName: contactChat.name,
+                groupNickname: contactChat.name,
+                avatar: contactChat.settings.aiAvatar || defaultAvatar,
+                persona: contactChat.settings.aiPersona,
+                avatarFrame: contactChat.settings.aiAvatarFrame || "",
+                isAdmin: false,
+                groupTitle: "",
+              });
+            } else {
+              // 处理NPC的逻辑
+              let foundNpc = null;
+              // 遍历所有角色，查找他们各自的NPC库
+              for (const chat of Object.values(state.chats)) {
+                if (chat.npcLibrary) {
+                  const npc = chat.npcLibrary.find((n) => n.id === contactId);
+                  if (npc) {
+                    foundNpc = npc;
+                    break; // 找到了就跳出循环
+                  }
+                }
+              }
+              // 如果找到了这个NPC，就把它添加到成员列表里
+              if (foundNpc) {
+                members.push({
+                  id: foundNpc.id,
+                  originalName: foundNpc.name,
+                  groupNickname: foundNpc.name,
+                  avatar: foundNpc.avatar || defaultGroupMemberAvatar,
+                  persona: foundNpc.persona,
+                  avatarFrame: "", // NPC没有头像框
+                  isAdmin: false,
+                  groupTitle: "",
+                });
+              }
+            }
+          }
+
+          const newGroupChat = {
+            id: newChatId,
+            name: groupName.trim(),
+            isGroup: true,
+            // 设置群主为当前用户
+            ownerId: "user",
+            members: members,
+            settings: {
+              myPersona: "我是谁呀。",
+              myNickname: "我",
+              maxMemory: 10,
+              groupAvatar: defaultGroupAvatar,
+              myAvatar: defaultMyGroupAvatar,
+              myAvatarFrame: "", // 别忘了自己的头像框
+              background: "",
+              theme: "default",
+              fontSize: 13,
+              customCss: "",
+              linkedWorldBookIds: [],
+              stickerLibrary: [],
+              linkedMemories: [],
+              // 为用户自己也加上管理员和头衔的初始设置
+              isUserAdmin: false,
+              myGroupTitle: "",
+            },
+            history: [],
+            musicData: { totalTime: 0 },
+          };
+
+          state.chats[newChatId] = newGroupChat;
+          await db.chats.put(newGroupChat);
+
+          // 创建群聊后，发送一条系统通知
+          await logSystemMessage(
+            newChatId,
+            `你创建了群聊，并邀请了 ${members.map((m) => `“${m.groupNickname}”`).join("、")} 加入群聊。`,
+          );
+
+          // 后续逻辑不变
+          await renderChatList();
+          showScreen("chat-list-screen");
+          openChat(newChatId);
+        }
+
+        // 群成员管理核心函数
+
+        /**
+         * 打开群成员管理屏幕
+         */
+        function openMemberManagementScreen() {
+          if (!state.activeChatId || !state.chats[state.activeChatId].isGroup)
+            return;
+          renderMemberManagementList();
+          showScreen("member-management-screen");
+        }
+
+        /**
+         * 渲染群成员管理列表
+         */
+        function renderMemberManagementList() {
+          const listEl = document.getElementById("member-management-list");
+          const chat = state.chats[state.activeChatId];
+          if (!chat || !chat.isGroup) {
+            listEl.innerHTML = "<p>错误：非群聊无法管理成员。</p>";
+            return;
+          }
+          listEl.innerHTML = ""; // 清空
+
+          // 1. 创建一个包含所有人的完整列表
+          const allParticipants = [
+            // 把你自己(user)作为一个普通参与者对象放进去
+            {
+              id: "user",
+              avatar: chat.settings.myAvatar || defaultMyGroupAvatar,
+              groupNickname: chat.settings.myNickname || "我",
+              // 修复Bug 1：在这里正确地读取你自己的群头衔
+              groupTitle: chat.settings.myGroupTitle || "",
+            },
+            // 使用展开运算符(...)，把其他所有成员也加到这个列表里
+            ...(chat.members || []),
+          ];
+
+          // 2. (可选但推荐) 对列表进行排序，确保群主永远在最上面，其次是管理员
+          allParticipants.sort((a, b) => {
+            const isAOwner = a.id === chat.ownerId;
+            const isBOwner = b.id === chat.ownerId;
+            // 修复Bug 2：在这里正确地判断自己是不是管理员
+            const isAAdmin =
+              a.id === "user" ? chat.settings.isUserAdmin : a.isAdmin;
+            const isBAdmin =
+              b.id === "user" ? chat.settings.isUserAdmin : b.isAdmin;
+
+            if (isAOwner) return -1; // a是群主，排最前
+            if (isBOwner) return 1; // b是群主，排最前
+            if (isAAdmin && !isBAdmin) return -1; // a是管理员但b不是，a排前
+            if (!isAAdmin && isBAdmin) return 1; // b是管理员但a不是，b排前
+            return 0; // 其他情况保持原顺序
+          });
+
+          // 3. 遍历这个统一的列表，并渲染每一项
+          const isCurrentUserOwner = chat.ownerId === "user";
+          allParticipants.forEach((participant) => {
+            const participantItem = createMemberManagementItem(
+              participant,
+              chat,
+              isCurrentUserOwner,
+            );
+            listEl.appendChild(participantItem);
+          });
+        }
+
+        /**
+         * 创建一个成员管理列表项
+         * @param {object} member - 成员对象数据
+         * @param {object} chat - 当前群聊对象
+         * @returns {HTMLElement} - 创建好的DOM元素
+         */
+        function createMemberManagementItem(member, chat) {
+          const item = document.createElement("div");
+          item.className = "member-management-item";
+
+          // --- 权限判断 ---
+          const isCurrentUserOwner = chat.ownerId === "user";
+          const isCurrentUserAdmin = chat.settings.isUserAdmin;
+          const isThisMemberOwner = member.id === chat.ownerId;
+          const isThisMemberAdmin =
+            (member.id === "user" && chat.settings.isUserAdmin) ||
+            member.isAdmin;
+
+          // 权限计算：我能对TA做什么？
+          const canManageAdmin = isCurrentUserOwner && !isThisMemberOwner; // 只有群主能设置/取消管理员
+          const canManageTitle = isCurrentUserOwner || isCurrentUserAdmin; // 管理员和群主都能设置头衔
+          const canKick =
+            (isCurrentUserOwner && member.id !== "user") ||
+            (isCurrentUserAdmin &&
+              !isThisMemberOwner &&
+              !isThisMemberAdmin &&
+              member.id !== "user");
+          const canMute =
+            (isCurrentUserOwner && member.id !== "user") ||
+            (isCurrentUserAdmin &&
+              !isThisMemberOwner &&
+              !isThisMemberAdmin &&
+              member.id !== "user");
+
+          // --- 标签显示 ---
+          let roleTag = "";
+          if (isThisMemberOwner) {
+            roleTag = '<span class="role-tag owner">群主</span>';
+          } else if (isThisMemberAdmin) {
+            roleTag = '<span class="role-tag admin">管理员</span>';
+          }
+          const titleText =
+            member.id === "user"
+              ? chat.settings.myGroupTitle || ""
+              : member.groupTitle || "";
+          const titleTag = titleText
+            ? `<span class="title-tag">${titleText}</span>`
+            : "";
+          // 如果被禁言，显示一个特殊的标签
+          const muteTag = member.isMuted
+            ? '<span class="group-title-tag" style="color: #ff3b30; background-color: #ffe5e5;">🚫已禁言</span>'
+            : "";
+
+          // --- 动态生成按钮HTML ---
+          let actionsHtml = "";
+
+          // 用户自己的按钮
+          if (member.id === "user") {
+            actionsHtml += `<button class="action-btn" data-action="set-nickname" data-member-id="user">改名</button>`;
+            // 用户被禁言时，显示“解除禁言”按钮
+            if (member.isMuted) {
+              actionsHtml += `<button class="action-btn" data-action="unmute-self" data-member-id="user">解除禁言</button>`;
+            }
+          }
+
+          // 管理员和群主的操作按钮
+          if (canManageTitle) {
+            actionsHtml += `<button class="action-btn" data-action="set-title" data-member-id="${member.id}">头衔</button>`;
+          }
+          if (canManageAdmin) {
+            const adminActionText = isThisMemberAdmin ? "取消管理" : "设为管理";
+            actionsHtml += `<button class="action-btn" data-action="toggle-admin" data-member-id="${member.id}">${adminActionText}</button>`;
+          }
+          if (isCurrentUserOwner && member.id !== "user") {
+            actionsHtml += `<button class="action-btn" data-action="transfer-owner" data-member-id="${member.id}">转让</button>`;
+          }
+          // 禁言/解禁按钮
+          if (canMute) {
+            const muteButtonText = member.isMuted ? "解禁" : "禁言";
+            actionsHtml += `<button class="action-btn" data-action="mute-member" data-member-id="${member.id}">${muteButtonText}</button>`;
+          }
+          if (canKick) {
+            actionsHtml += `<button class="action-btn danger" data-action="remove-member" data-member-id="${member.id}">踢出</button>`;
+          }
+
+          // 最终拼接
+          item.innerHTML = `
+			        <img src="${member.avatar}" class="avatar">
+			        <div class="info">
+			            <span class="name">${member.groupNickname}</span>
+			            <div class="tags">
+			                ${roleTag}
+			                ${titleTag}
+			                ${muteTag}
+			            </div>
+			        </div>
+			        <div class="actions">${actionsHtml}</div>
+			    `;
+          return item;
+        }
+
+        /**
+         * 处理禁言/解禁群成员
+         * @param {string} memberId - 要操作的成员ID
+         */
+        async function handleMuteMember(memberId) {
+          const chat = state.chats[state.activeChatId];
+          if (!chat || !chat.isGroup) return;
+
+          // --- 权限检查 (和之前保持一致) ---
+          const isOwner = chat.ownerId === "user";
+          const isAdmin = chat.settings.isUserAdmin;
+          let targetMember, targetIsOwner, targetIsAdmin;
+
+          // 判断操作目标是普通成员还是用户自己
+          if (memberId === "user") {
+            targetMember = { id: "user", ...chat.settings }; // 构造一个临时的“成员”对象代表用户
+            targetIsOwner = isOwner;
+            targetIsAdmin = isAdmin;
+          } else {
+            targetMember = chat.members.find((m) => m.id === memberId);
+            if (!targetMember) return;
+            targetIsOwner = chat.ownerId === memberId;
+            targetIsAdmin = targetMember.isAdmin;
+          }
+
+          const canMute =
+            (isOwner && !targetIsOwner) ||
+            (isAdmin && !targetIsOwner && !targetIsAdmin);
+
+          if (!canMute) {
+            alert("你没有权限操作该成员！");
+            return;
+          }
+
+          // --- 切换禁言状态 ---
+          if (memberId === "user") {
+            // 如果操作的是用户自己，就更新 chat.settings.isUserMuted
+            if (typeof chat.settings.isUserMuted === "undefined")
+              chat.settings.isUserMuted = false;
+            chat.settings.isUserMuted = !chat.settings.isUserMuted;
+          } else {
+            // 如果操作的是其他成员，就更新成员对象
+            if (typeof targetMember.isMuted === "undefined")
+              targetMember.isMuted = false;
+            targetMember.isMuted = !targetMember.isMuted;
+          }
+
+          // 保存更新后的群聊数据到数据库
+          await db.chats.put(chat);
+
+          // 重新渲染成员管理列表，按钮文字会立刻更新
+          renderMemberManagementList();
+
+          // 发送系统通知
+          const myNickname = chat.settings.myNickname || "我";
+          const targetNickname =
+            memberId === "user"
+              ? chat.settings.myNickname || "我"
+              : targetMember.groupNickname;
+          const actionText = (
+            memberId === "user"
+              ? chat.settings.isUserMuted
+              : targetMember.isMuted
+          )
+            ? "禁言"
+            : "解除禁言";
+          await logSystemMessage(
+            chat.id,
+            `“${myNickname}”将“${targetNickname}”${actionText}。`,
+          );
+        }
+
+        /**
+         * 处理用户自己解除禁言
+         */
+        async function handleUserUnmute() {
+          const chat = state.chats[state.activeChatId];
+          if (!chat || !chat.settings.isUserMuted) return;
+
+          const confirmed = await showCustomConfirm(
+            "解除禁言",
+            "确定要为自己解除禁言吗？",
+          );
+          if (confirmed) {
+            chat.settings.isUserMuted = false;
+            await db.chats.put(chat);
+
+            await logSystemMessage(
+              chat.id,
+              `“${chat.settings.myNickname || "我"}”为自己解除了禁言。`,
+            );
+
+            renderMemberManagementList(); // 刷新列表
+          }
+        }
+
+        /**
+         * 处理拉人入群的逻辑（已添加系统消息）
+         */
+        async function handleAddMembersToGroup() {
+          if (selectedContacts.size === 0) {
+            alert("请至少选择一个要添加的联系人。");
+            return;
+          }
+
+          const chat = state.chats[state.activeChatId];
+          const addedNames = [];
+
+          for (const contactId of selectedContacts) {
+            const contactChat = state.chats[contactId];
+            if (contactChat) {
+              // 这是原来的逻辑，用于处理普通角色(Char)
+              chat.members.push({
+                id: contactId,
+                originalName: contactChat.name,
+                groupNickname: contactChat.name,
+                avatar: contactChat.settings.aiAvatar || defaultAvatar,
+                persona: contactChat.settings.aiPersona,
+                avatarFrame: contactChat.settings.aiAvatarFrame || "",
+                isAdmin: false,
+                groupTitle: "",
+              });
+              addedNames.push(`“${contactChat.name}”`);
+            } else {
+              // 处理NPC的逻辑
+              let foundNpc = null;
+              for (const c of Object.values(state.chats)) {
+                if (c.npcLibrary) {
+                  const npc = c.npcLibrary.find((n) => n.id === contactId);
+                  if (npc) {
+                    foundNpc = npc;
+                    break;
+                  }
+                }
+              }
+              if (foundNpc) {
+                chat.members.push({
+                  id: foundNpc.id,
+                  originalName: foundNpc.name,
+                  groupNickname: foundNpc.name,
+                  avatar: foundNpc.avatar || defaultGroupMemberAvatar,
+                  persona: foundNpc.persona,
+                  avatarFrame: "",
+                  isAdmin: false,
+                  groupTitle: "",
+                });
+                addedNames.push(`“${foundNpc.name}”`);
+              }
+            }
+          }
+
+          await db.chats.put(chat);
+
+          // 发送一条系统消息通知
+          const myNickname = chat.settings.myNickname || "我";
+          await logSystemMessage(
+            chat.id,
+            `“${myNickname}”邀请 ${addedNames.join("、")} 加入了群聊。`,
+          );
+
+          // 返回到群成员管理界面并刷新
+          openMemberManagementScreen();
+          renderGroupMemberSettings(chat.members); // 同时更新聊天设置里的头像
+        }
+
+        /**
+         * 处理设置用户自己的群昵称
+         */
+        async function handleSetUserNickname() {
+          const chat = state.chats[state.activeChatId];
+          const oldNickname = chat.settings.myNickname || "我";
+
+          const newNickname = await showCustomPrompt(
+            "修改我的群昵称",
+            "请输入新的昵称",
+            oldNickname,
+          );
+          if (newNickname !== null && newNickname.trim()) {
+            chat.settings.myNickname = newNickname.trim();
+            await db.chats.put(chat);
+
+            // 发送一条系统消息通知群友
+            await logSystemMessage(
+              chat.id,
+              `“${oldNickname}”将群昵称修改为“${newNickname.trim()}”`,
+            );
+
+            renderMemberManagementList(); // 刷新成员管理列表
+          }
+        }
+
+        /**
+         * 处理设置用户自己的群头衔
+         */
+        async function handleSetUserTitle() {
+          const chat = state.chats[state.activeChatId];
+          const oldTitle = chat.settings.myGroupTitle || "";
+
+          const newTitle = await showCustomPrompt(
+            "修改我的群头衔",
+            "留空则为取消头衔",
+            oldTitle,
+          );
+          if (newTitle !== null) {
+            chat.settings.myGroupTitle = newTitle.trim();
+            await db.chats.put(chat);
+
+            // 调用你已有的函数来发送系统通知
+            const myNickname = chat.settings.myNickname || "我";
+            await logTitleChange(
+              chat.id,
+              myNickname,
+              myNickname,
+              newTitle.trim(),
+            );
+
+            renderMemberManagementList();
+          }
+        }
+
+        /**
+         * 从群聊中移除一个成员
+         * @param {string} memberId - 要移除的成员ID
+         */
+        async function removeMemberFromGroup(memberId) {
+          const chat = state.chats[state.activeChatId];
+          const isOwner = chat.ownerId === "user";
+          const isAdmin = chat.settings.isUserAdmin;
+          const memberToRemove = chat.members.find((m) => m.id === memberId);
+
+          // 权限检查
+          if (

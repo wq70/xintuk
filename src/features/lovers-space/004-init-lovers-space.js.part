@@ -1,0 +1,929 @@
+function initLoversSpace() {
+  document
+    .getElementById("ls-change-bg-btn")
+    .addEventListener("click", handleChangeLoversSpaceBackground);
+
+  // 绑定主屏幕App图标的点击事件
+  document
+    .getElementById("lovers-space-app-icon")
+    .addEventListener("click", openLoversSpaceEntry);
+
+  document
+    .getElementById("ls-char-selector-list")
+    .addEventListener("click", async (e) => {
+      const item = e.target.closest(".chat-list-item");
+      if (item && item.dataset.chatId) {
+        const chatId = item.dataset.chatId;
+        const chat = state.chats[chatId];
+
+        // 关闭选择弹窗
+        document
+          .getElementById("ls-char-selector-modal")
+          .classList.remove("visible");
+
+        // 判断情侣空间状态
+        if (chat.loversSpaceData) {
+          // 如果已开通，直接进入
+          openLoversSpace(chatId);
+        } else {
+          // 如果未开通，弹窗确认是否发送邀请
+          const confirmed = await showCustomConfirm(
+            "邀请开启情侣空间",
+            `你和"${chat.name}"的情侣空间还未开启，要现在邀请Ta吗？`,
+          );
+          if (confirmed) {
+            // 如果用户确认，发送邀请并跳转到聊天界面
+            await sendLoversSpaceInvitation(chatId);
+            openChat(chatId);
+          }
+        }
+      }
+    });
+
+  document
+    .getElementById("ls-cancel-switch-char-btn")
+    .addEventListener("click", () => {
+      document
+        .getElementById("ls-char-selector-modal")
+        .classList.remove("visible");
+    });
+  document
+    .getElementById("ls-switch-char-btn")
+    .addEventListener("click", openCharSelectorForLoversSpace);
+
+  // 绑定页签切换事件
+  document.getElementById("ls-tab-bar").addEventListener("click", (e) => {
+    const tab = e.target.closest(".ls-tab-item");
+    if (tab && tab.dataset.view) {
+      const viewId = tab.dataset.view;
+      // 切换高亮和视图
+      document
+        .querySelectorAll(".ls-tab-item")
+        .forEach((t) => t.classList.remove("active"));
+      tab.classList.add("active");
+      switchLoversSpaceTab(viewId);
+
+      // 根据点击的页签，渲染对应的内容
+      const chat = state.chats[activeLoversSpaceCharId];
+      if (!chat) return;
+
+      if (viewId === "ls-moments-view") {
+        renderLSMoments(chat.loversSpaceData.moments, chat);
+      } else if (viewId === "ls-album-view") {
+        renderLSPhotos(chat.loversSpaceData.photos, chat);
+      } else if (viewId === "ls-letters-view") {
+        renderLSLetters(chat.loversSpaceData.loveLetters, chat);
+      } else if (viewId === "ls-questions-view") {
+        renderLSQuestions(chat.loversSpaceData.questions, chat);
+      } else if (viewId === "ls-diary-view") {
+        const now = new Date();
+        renderLSDiaryView(now.getFullYear(), now.getMonth() + 1);
+      } else if (viewId === "ls-shares-view") {
+        renderLSShares(chat.loversSpaceData.shares, chat);
+      } else if (viewId === "ls-pomodoro-view") {
+        openPomodoroScreen();
+      }
+    }
+  });
+
+  // 绑定"说说"功能的按钮
+  document
+    .getElementById("ls-add-moment-btn")
+    .addEventListener("click", openMomentCreator);
+  document
+    .getElementById("ls-cancel-moment-btn")
+    .addEventListener("click", () => {
+      document
+        .getElementById("ls-create-moment-modal")
+        .classList.remove("visible");
+    });
+  document
+    .getElementById("ls-confirm-moment-btn")
+    .addEventListener("click", handlePostMoment);
+
+  // 绑定"相册"功能的按钮
+  document
+    .getElementById("ls-add-album-btn")
+    .addEventListener("click", openAlbumCreator);
+  document
+    .getElementById("ls-select-photos-btn")
+    .addEventListener("click", () => {
+      document.getElementById("ls-photo-input").click();
+    });
+  document.getElementById("ls-photo-input").addEventListener("change", (e) => {
+    handlePhotoSelection(e.target.files);
+  });
+  // 绑定新弹窗里的模式切换按钮
+  const lsImageModeBtn = document.getElementById("ls-switch-to-image-mode");
+  const lsTextImageModeBtn = document.getElementById(
+    "ls-switch-to-text-image-mode",
+  );
+  const lsImageModeContent = document.getElementById("ls-image-mode-content");
+  const lsTextImageModeContent = document.getElementById(
+    "ls-text-image-mode-content",
+  );
+  lsImageModeBtn.addEventListener("click", () => {
+    lsImageModeBtn.classList.add("active");
+    lsTextImageModeBtn.classList.remove("active");
+    lsImageModeContent.classList.add("active");
+    lsTextImageModeContent.classList.remove("active");
+    lsImageModeContent.style.display = "block";
+    lsTextImageModeContent.style.display = "none";
+  });
+
+  lsTextImageModeBtn.addEventListener("click", () => {
+    lsTextImageModeBtn.classList.add("active");
+    lsImageModeBtn.classList.remove("active");
+    lsTextImageModeContent.classList.add("active");
+    lsImageModeContent.classList.remove("active");
+    lsTextImageModeContent.style.display = "block";
+    lsImageModeContent.style.display = "none";
+  });
+
+  document
+    .getElementById("ls-cancel-album-btn")
+    .addEventListener("click", () => {
+      document
+        .getElementById("ls-create-album-modal")
+        .classList.remove("visible");
+    });
+  document
+    .getElementById("ls-confirm-album-btn")
+    .addEventListener("click", handleConfirmAlbum);
+
+  // 情侣空间设置功能事件监听
+  document.getElementById("ls-settings-btn").addEventListener("click", () => {
+    const chat = state.chats[activeLoversSpaceCharId];
+    if (chat && chat.loversSpaceData) {
+      // 将已保存的日期加载到输入框中
+      document.getElementById("ls-start-date-input").value =
+        chat.loversSpaceData.relationshipStartDate || "";
+    }
+    document.getElementById("ls-settings-modal").classList.add("visible");
+  });
+
+  document
+    .getElementById("ls-settings-cancel-btn")
+    .addEventListener("click", () => {
+      document.getElementById("ls-settings-modal").classList.remove("visible");
+    });
+
+  document
+    .getElementById("ls-settings-save-btn")
+    .addEventListener("click", async () => {
+      const chat = state.chats[activeLoversSpaceCharId];
+      if (!chat) return;
+
+      const newDate = document.getElementById("ls-start-date-input").value;
+      chat.loversSpaceData.relationshipStartDate = newDate;
+
+      await db.chats.put(chat); // 保存到数据库
+
+      // 重新渲染整个空间以显示更新
+      await renderLoversSpace(chat);
+
+      document.getElementById("ls-settings-modal").classList.remove("visible");
+      alert("纪念日已保存！");
+    });
+
+  // 情侣空间相册事件监听
+  document.getElementById("ls-album-list").addEventListener("click", (e) => {
+    // 1. 查找被点击的项目
+    const item = e.target.closest(".ls-album-item");
+    if (!item) return;
+
+    const timestamp = parseInt(item.dataset.timestamp);
+    if (isNaN(timestamp)) return;
+
+    // 2. 检查点击的是否是删除按钮
+    if (e.target.classList.contains("ls-photo-delete-btn")) {
+      handleDeleteLSPhoto(timestamp);
+    } else {
+      // 3. 【修改点】点击图片本身，打开新的详情评论弹窗
+      openLSPhotoDetail(timestamp);
+    }
+  });
+
+  // 情侣空间说说互动功能事件监听
+  document
+    .getElementById("ls-moments-list")
+    .addEventListener("click", async (e) => {
+      const target = e.target;
+      const momentCard = target.closest(".ls-moment-card");
+      if (!momentCard) return;
+
+      // 从被点击的卡片上获取正确的索引
+      const momentIndex = parseInt(momentCard.dataset.momentIndex);
+      const chat = state.chats[activeLoversSpaceCharId];
+      // 安全检查，确保能找到对应的数据
+      if (
+        !chat ||
+        !chat.loversSpaceData ||
+        !chat.loversSpaceData.moments[momentIndex]
+      )
+        return;
+
+      const moment = chat.loversSpaceData.moments[momentIndex];
+
+      // 处理"发送评论"按钮
+      if (target.classList.contains("ls-comment-send-btn")) {
+        const input = momentCard.querySelector(".ls-comment-input-area input");
+        const commentText = input.value.trim();
+        if (!commentText) {
+          alert("评论内容不能为空！");
+          return;
+        }
+
+        const newComment = {
+          author: chat.settings.myNickname || "我",
+          text: commentText,
+        };
+
+        if (!moment.comments) {
+          moment.comments = [];
+        }
+        moment.comments.push(newComment);
+
+        await db.chats.put(chat); // 保存到数据库
+        renderLSMoments(chat.loversSpaceData.moments, chat); // 刷新界面
+      }
+
+      // 处理"删除说说"按钮
+      if (target.classList.contains("ls-moment-delete-btn")) {
+        const confirmed = await showCustomConfirm(
+          "删除说说",
+          "确定要删除这条说说吗？",
+          {
+            confirmButtonClass: "btn-danger",
+          },
+        );
+        if (confirmed) {
+          chat.loversSpaceData.moments.splice(momentIndex, 1);
+          await db.chats.put(chat);
+          renderLSMoments(chat.loversSpaceData.moments, chat);
+        }
+      }
+
+      // 处理"删除评论"按钮
+      if (target.classList.contains("ls-comment-delete-btn")) {
+        const commentIndex = parseInt(target.dataset.commentIndex);
+        const confirmed = await showCustomConfirm(
+          "删除评论",
+          "确定要删除这条评论吗？",
+          {
+            confirmButtonClass: "btn-danger",
+          },
+        );
+        if (confirmed) {
+          moment.comments.splice(commentIndex, 1);
+          await db.chats.put(chat);
+          renderLSMoments(chat.loversSpaceData.moments, chat);
+        }
+      }
+    });
+
+  // 情侣空间情书功能事件监听
+
+  // 绑定"写情书"的浮动按钮
+  document
+    .getElementById("ls-add-letter-btn")
+    .addEventListener("click", () => openLoveLetterEditor());
+
+  // 绑定写信弹窗的"取消"和"寄出"按钮
+  document
+    .getElementById("ls-cancel-letter-btn")
+    .addEventListener("click", () => {
+      document
+        .getElementById("ls-create-letter-modal")
+        .classList.remove("visible");
+    });
+  document
+    .getElementById("ls-confirm-letter-btn")
+    .addEventListener("click", handlePostLoveLetter);
+
+  // 使用事件委托，为情书列表中的所有卡片和按钮绑定点击事件
+  document
+    .getElementById("ls-letters-list")
+    .addEventListener("click", async (e) => {
+      const letterItem = e.target.closest(".ls-love-letter-item");
+      if (!letterItem) return;
+
+      // 检查点击的是否是删除按钮
+      if (e.target.classList.contains("ls-letter-delete-btn")) {
+        const letterId = letterItem.dataset.letterId;
+        const chat = state.chats[activeLoversSpaceCharId];
+        const letter = chat.loversSpaceData.loveLetters.find(
+          (l) => l.id === letterId,
+        );
+
+        const confirmed = await showCustomConfirm(
+          "删除情书",
+          `确定要删除这封写给"${letter.recipientName}"的情书吗？`,
+          {
+            confirmButtonClass: "btn-danger",
+          },
+        );
+
+        if (confirmed) {
+          chat.loversSpaceData.loveLetters =
+            chat.loversSpaceData.loveLetters.filter((l) => l.id !== letterId);
+          await db.chats.put(chat);
+          renderLSLetters(chat.loversSpaceData.loveLetters, chat);
+          alert("情书已删除。");
+        }
+      }
+      // 否则，就是点击了卡片本身，执行查看详情的逻辑
+      else if (letterItem.dataset.letterId) {
+        showLoveLetterDetail(letterItem.dataset.letterId);
+      }
+    });
+
+  // 情书查看器按钮事件监听
+  document
+    .getElementById("ls-close-letter-viewer-btn")
+    .addEventListener("click", () => {
+      document
+        .getElementById("ls-letter-viewer-modal")
+        .classList.remove("visible");
+      activeLoveLetter = null; // 关闭时清理暂存的数据
+    });
+
+  document
+    .getElementById("ls-reply-letter-btn")
+    .addEventListener("click", () => {
+      // 先关闭查看器
+      document
+        .getElementById("ls-letter-viewer-modal")
+        .classList.remove("visible");
+      // 然后打开回复编辑器
+      if (activeLoveLetter) {
+        openLoveLetterEditor(activeLoveLetter);
+      }
+      activeLoveLetter = null; // 清理
+    });
+
+  // 情侣空间-情侣提问功能事件监听
+
+  // 绑定"提问"的浮动按钮
+  document
+    .getElementById("ls-add-question-btn")
+    .addEventListener("click", openQuestionAsker);
+
+  // 绑定提问弹窗的按钮
+  document.getElementById("ls-cancel-ask-btn").addEventListener("click", () => {
+    document
+      .getElementById("ls-ask-question-modal")
+      .classList.remove("visible");
+  });
+  document
+    .getElementById("ls-confirm-ask-btn")
+    .addEventListener("click", handlePostQuestion);
+
+  // 绑定回答弹窗的按钮
+  document
+    .getElementById("ls-cancel-answer-btn")
+    .addEventListener("click", () => {
+      document
+        .getElementById("ls-answer-question-modal")
+        .classList.remove("visible");
+    });
+  document
+    .getElementById("ls-confirm-answer-btn")
+    .addEventListener("click", handlePostAnswer);
+
+  // 使用事件委托，为所有"回答"和"删除"按钮绑定点击事件
+  document
+    .getElementById("ls-questions-list")
+    .addEventListener("click", (e) => {
+      // 处理"回答"按钮的逻辑
+      if (e.target.classList.contains("ls-answer-btn")) {
+        const questionId = e.target.dataset.questionId;
+        if (questionId) {
+          openAnswerEditor(questionId);
+        }
+      }
+
+      // 处理"删除"按钮的逻辑
+      if (e.target.classList.contains("ls-question-delete-btn")) {
+        const questionId = e.target.dataset.questionId;
+        if (questionId) {
+          handleDeleteLSQuestion(questionId);
+        }
+      }
+    });
+
+  // 情侣空间专属播放器事件监听器
+
+  // 监听主播放器内的所有按钮
+  document
+    .getElementById("ls-close-player-btn")
+    .addEventListener("click", () => {
+      document
+        .getElementById("ls-music-player-overlay")
+        .classList.remove("visible");
+    });
+  document.getElementById("ls-playlist-btn").addEventListener("click", () => {
+    renderLSMusicPlaylist();
+    document.getElementById("ls-music-playlist-panel").classList.add("visible");
+  });
+  document
+    .getElementById("ls-play-pause-btn")
+    .addEventListener("click", toggleLSMusicPlayPause);
+  document
+    .getElementById("ls-next-btn")
+    .addEventListener("click", playNextLSSong);
+  document
+    .getElementById("ls-prev-btn")
+    .addEventListener("click", playPrevLSSong);
+
+  // 监听播放列表面板内的所有按钮
+  document
+    .getElementById("ls-close-playlist-btn")
+    .addEventListener("click", () => {
+      document
+        .getElementById("ls-music-playlist-panel")
+        .classList.remove("visible");
+    });
+  document
+    .getElementById("ls-clear-playlist-btn")
+    .addEventListener("click", async () => {
+      const confirmed = await showCustomConfirm(
+        "清空列表",
+        "确定要清空情侣空间的播放列表吗？",
+        {
+          confirmButtonClass: "btn-danger",
+        },
+      );
+      if (confirmed) {
+        clearLSMusicPlaylist();
+      }
+    });
+  document.getElementById("ls-playlist-body").addEventListener("click", (e) => {
+    if (e.target.classList.contains("delete-track-btn")) {
+      const index = parseInt(e.target.dataset.index);
+      lsMusicState.playlist.splice(index, 1);
+
+      // 如果删除的是正在播放的歌曲
+      if (index === lsMusicState.currentIndex) {
+        playNextLSSong();
+      } else if (index < lsMusicState.currentIndex) {
+        lsMusicState.currentIndex--; // 修正索引
+      }
+      renderLSMusicPlaylist();
+    }
+  });
+
+  // 监听音频播放器的状态
+  const lsAudioPlayer = document.getElementById("ls-audio-player");
+  lsAudioPlayer.addEventListener("timeupdate", updateLSProgressBar);
+  lsAudioPlayer.addEventListener("ended", playNextLSSong);
+  lsAudioPlayer.addEventListener("play", () => {
+    lsMusicState.isPlaying = true;
+    renderLSMusicPlayerUI();
+  });
+  lsAudioPlayer.addEventListener("pause", () => {
+    lsMusicState.isPlaying = false;
+    renderLSMusicPlayerUI();
+  });
+
+  // 监听进度条的点击
+  document.getElementById("ls-progress-bar").addEventListener("click", (e) => {
+    if (!lsAudioPlayer.duration) return;
+    const progressBar = e.currentTarget;
+    const barWidth = progressBar.clientWidth;
+    const clickX = e.offsetX;
+    lsAudioPlayer.currentTime = (clickX / barWidth) * lsAudioPlayer.duration;
+  });
+
+  // 拦截情侣空间分享列表的点击事件
+  document
+    .getElementById("ls-shares-list")
+    .addEventListener("click", async (e) => {
+      const item = e.target.closest(".ls-share-item");
+      if (!item || !item.dataset.shareData) return;
+
+      const shareData = JSON.parse(item.dataset.shareData);
+
+      // 如果是歌曲，保持原样，打开播放器
+      if (shareData.shareType === "song") {
+        openLoversSpaceMusicPlayer(shareData);
+      }
+      // 如果是电影、书籍、游戏，使用新的高级弹窗！
+      else if (["movie", "book", "game"].includes(shareData.shareType)) {
+        openAdvancedShareDetail(shareData); // <--- 这里调用新函数
+      }
+    });
+
+  // 绑定新弹窗的关闭按钮
+  const shareCloseBtn = document.getElementById("ls-share-detail-close-btn");
+  if (shareCloseBtn) {
+    shareCloseBtn.addEventListener("click", () => {
+      document
+        .getElementById("ls-share-detail-modal")
+        .classList.remove("visible");
+    });
+  }
+
+  // 点击新弹窗的遮罩层也能关闭
+  document
+    .getElementById("ls-share-detail-modal")
+    .addEventListener("click", (e) => {
+      if (e.target.id === "ls-share-detail-modal") {
+        e.target.classList.remove("visible");
+      }
+    });
+
+  // 情侣空间播放器封面/歌词切换事件
+  document.getElementById("ls-display-area").addEventListener("click", () => {
+    document.getElementById("ls-display-area").classList.toggle("show-lyrics");
+  });
+
+  // 情侣番茄钟事件监听器
+
+  // 绑定"开启新的专注时光"按钮
+  document
+    .getElementById("ls-pomodoro-start-btn-container")
+    .addEventListener("click", openPomodoroSetup);
+
+  // 绑定设置弹窗的按钮
+  document
+    .getElementById("pomodoro-cancel-setup-btn")
+    .addEventListener("click", () => {
+      document
+        .getElementById("ls-pomodoro-setup-modal")
+        .classList.remove("visible");
+    });
+  document
+    .getElementById("pomodoro-confirm-setup-btn")
+    .addEventListener("click", startPomodoroSession);
+
+  // 为我们新增的"本地上传"按钮绑定事件
+  document
+    .getElementById("pomodoro-bg-local-upload-btn")
+    .addEventListener("click", () => {
+      document.getElementById("pomodoro-bg-file-input").click();
+    });
+  document
+    .getElementById("pomodoro-bg-file-input")
+    .addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          pomodoroState.tempBgDataUrl = event.target.result; // 将本地图片转为DataURL暂存起来
+          document.getElementById("pomodoro-bg-url-input").value =
+            `[本地图片: ${file.name}]`; // 在输入框里给个提示
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+  // 绑定计时器界面上的元素
+  document
+    .getElementById("pomodoro-char-avatar")
+    .addEventListener("click", () => {
+      triggerPomodoroAIResponse("user_click");
+    });
+  document.getElementById("pomodoro-end-btn").addEventListener("click", () => {
+    endPomodoroSession(false); // false表示是用户手动中断
+  });
+
+  // 绑定历史详情弹窗的关闭按钮
+  document
+    .getElementById("pomodoro-close-history-viewer-btn")
+    .addEventListener("click", () => {
+      document
+        .getElementById("ls-pomodoro-history-viewer-modal")
+        .classList.remove("visible");
+    });
+
+  // 为番茄钟计时模式新增的交互代码
+  document
+    .querySelector("#ls-pomodoro-setup-modal")
+    .addEventListener("change", (e) => {
+      if (e.target.name === "pomodoro-mode") {
+        const durationGroup = document.getElementById(
+          "pomodoro-duration-input",
+        ).parentElement;
+        if (e.target.value === "countup") {
+          // 如果选择正计时，就隐藏时长输入框
+          durationGroup.style.display = "none";
+        } else {
+          // 否则（选择倒计时），就显示它
+          durationGroup.style.display = "block";
+        }
+      }
+    });
+
+  // 处理情侣空间邀请卡片的点击事件
+  document
+    .getElementById("chat-messages")
+    .addEventListener("click", async (e) => {
+      const card = e.target.closest(".waimai-card");
+      if (!card) return;
+      const messageBubble = card.closest(".message-bubble");
+      const invitationMsg = state.chats[state.activeChatId].history.find(
+        (m) => m.timestamp === parseInt(messageBubble.dataset.timestamp),
+      );
+
+      if (
+        invitationMsg &&
+        invitationMsg.type === "lovers_space_invitation" &&
+        invitationMsg.status === "pending"
+      ) {
+        const choice = e.target.dataset.choice; // 'accepted' or 'rejected'
+        if (choice) {
+          // 更新邀请卡片的状态
+          invitationMsg.status = choice;
+          const chat = state.chats[state.activeChatId];
+
+          // 判断用户的选择
+          if (choice === "accepted") {
+            // 如果同意，创建情侣空间数据
+            chat.loversSpaceData = {
+              background: "https://i.postimg.cc/k495F4W5/profile-banner.jpg",
+              relationshipStartDate: null,
+              moments: [],
+              albums: [],
+              photos: [],
+              loveLetters: [],
+              shares: [],
+              questions: [],
+            };
+
+            // 创建对用户可见的系统通知
+            const visibleNotice = {
+              role: "system",
+              type: "pat_message",
+              content: `[系统：你和"${chat.name}"的情侣空间已成功开启！]`,
+              timestamp: Date.now(),
+            };
+            chat.history.push(visibleNotice);
+
+            // 创建给AI看的隐藏指令
+            const hiddenMessage = {
+              role: "system",
+              content: `[系统指令：用户同意了你开启情侣空间的邀请。]`,
+              timestamp: Date.now() + 1,
+              isHidden: true,
+            };
+            chat.history.push(hiddenMessage);
+
+            await db.chats.put(chat);
+            renderChatInterface(state.activeChatId);
+          } else {
+            // 如果拒绝 (choice === 'rejected')
+
+            // 创建一条对用户可见的系统通知
+            const visibleNotice = {
+              role: "system",
+              type: "pat_message", // 复用灰色居中气泡样式
+              content: `[系统：你拒绝了"${chat.name}"的情侣空间邀请。]`,
+              timestamp: Date.now(),
+            };
+            chat.history.push(visibleNotice);
+
+            // 创建一条给AI看的隐藏指令，告诉它被拒绝了
+            const hiddenMessage = {
+              role: "system",
+              content: `[系统指令：用户拒绝了你开启情侣空间的邀请。]`,
+              timestamp: Date.now() + 1,
+              isHidden: true,
+            };
+            chat.history.push(hiddenMessage);
+
+            // 保存所有更改到数据库
+            await db.chats.put(chat);
+
+            // 刷新聊天界面，让卡片状态和新的系统通知都显示出来
+            renderChatInterface(state.activeChatId);
+          }
+        }
+      }
+    });
+
+  // 处理情侣空间邀请卡片的点击事件
+  document
+    .getElementById("chat-messages")
+    .addEventListener("click", async (e) => {
+      // 寻找被点击的元素是否在邀请卡片内
+      const card = e.target.closest(".waimai-card");
+      if (!card) return;
+      const messageBubble = card.closest(".message-bubble");
+      // 通过时间戳找到对应的消息数据
+      const invitationMsg = state.chats[state.activeChatId].history.find(
+        (m) => m.timestamp === parseInt(messageBubble.dataset.timestamp),
+      );
+
+      // 确保这是一条待处理的情侣空间邀请
+      if (
+        invitationMsg &&
+        invitationMsg.type === "lovers_space_invitation" &&
+        invitationMsg.status === "pending"
+      ) {
+        const choice = e.target.dataset.choice; // 获取点击的是 'accepted' 还是 'rejected'
+        if (choice) {
+          // 调用我们刚刚创建的处理器函数
+          handleLoversSpaceResponse(invitationMsg.timestamp, choice);
+        }
+      }
+    });
+
+  // 情侣空间-情绪日记事件监听
+  document
+    .getElementById("lovers-space-screen")
+    .addEventListener("click", (e) => {
+      const chat = state.chats[activeLoversSpaceCharId];
+      if (!chat) return;
+
+      // 日历月份切换
+      if (
+        e.target.id === "ls-prev-month-btn" ||
+        e.target.id === "ls-next-month-btn"
+      ) {
+        const currentDisplay = document.getElementById(
+          "ls-current-month-display",
+        ).textContent;
+        const [year, month] = currentDisplay.match(/\d+/g).map(Number);
+        let newDate = new Date(year, month - 1, 1);
+
+        if (e.target.id === "ls-prev-month-btn") {
+          newDate.setMonth(newDate.getMonth() - 1);
+        } else {
+          newDate.setMonth(newDate.getMonth() + 1);
+        }
+        renderLSDiaryView(newDate.getFullYear(), newDate.getMonth() + 1);
+        return;
+      }
+
+      // 点击日历格子
+      const dayCell = e.target.closest(".ls-calendar-day:not(.empty)");
+      if (dayCell) {
+        openDiaryModal(dayCell.dataset.date);
+      }
+    });
+
+  // 日记编辑弹窗事件
+  document
+    .getElementById("ls-emoji-selector")
+    .addEventListener("click", (e) => {
+      if (e.target.classList.contains("emoji-option")) {
+        document
+          .querySelectorAll("#ls-emoji-selector .emoji-option")
+          .forEach((el) => el.classList.remove("selected"));
+        e.target.classList.add("selected");
+      }
+    });
+  document
+    .getElementById("ls-cancel-diary-btn")
+    .addEventListener("click", () => {
+      document
+        .getElementById("ls-diary-editor-modal")
+        .classList.remove("visible");
+    });
+  document
+    .getElementById("ls-save-diary-btn")
+    .addEventListener("click", handleSaveUserDiary);
+
+  // 日记查看弹窗关闭按钮
+  document
+    .getElementById("ls-close-diary-viewer-btn")
+    .addEventListener("click", () => {
+      document
+        .getElementById("ls-diary-viewer-modal")
+        .classList.remove("visible");
+    });
+  // --- 绑定新增加的番茄钟事件 ---
+
+  // 1. 暂停按钮
+  const pauseBtn = document.getElementById("pomodoro-pause-btn");
+  if (pauseBtn) {
+    pauseBtn.addEventListener("click", togglePomodoroPause);
+  }
+
+  // 2. 休息聊天弹窗关闭按钮
+  document
+    .getElementById("close-pomodoro-break-btn")
+    .addEventListener("click", closePomodoroBreakChat);
+
+  // 3. 休息聊天发送按钮
+  document
+    .getElementById("pomodoro-break-send-btn")
+    .addEventListener("click", sendPomodoroBreakMessage);
+
+  // 4. 休息聊天输入框回车发送
+  document
+    .getElementById("pomodoro-break-input")
+    .addEventListener("keypress", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendPomodoroBreakMessage();
+      }
+    });
+
+  // 5. 修改结束按钮逻辑：如果暂停中结束，要确保清理状态
+  const originalEndBtn = document.getElementById("pomodoro-end-btn");
+  // 最好不要 removeEventListener，因为匿名函数很难移除。
+  // 我们在 endPomodoroSession 函数内部确保清理 isPaused 即可 (已在上方代码修改中隐式包含，因为 endPomodoroSession 会重置 state)
+  // --- 番茄钟 BGM 设置事件 ---
+  const bgmSourceSelect = document.getElementById("pomodoro-bgm-source-select");
+  const customPlaylistPanel = document.getElementById(
+    "pomodoro-custom-playlist-panel",
+  );
+
+  if (bgmSourceSelect) {
+    bgmSourceSelect.addEventListener("change", (e) => {
+      // 只有选择自定义时才显示面板
+      customPlaylistPanel.style.display =
+        e.target.value === "custom" ? "block" : "none";
+    });
+  }
+
+  // 绑定添加本地音乐按钮
+  const addBgmLocalBtn = document.getElementById("pomo-add-bgm-local");
+  const bgmFileInput = document.getElementById("pomo-bgm-file-input");
+  if (addBgmLocalBtn) {
+    addBgmLocalBtn.addEventListener("click", () => bgmFileInput.click());
+  }
+  if (bgmFileInput) {
+    bgmFileInput.addEventListener("change", (e) => {
+      const files = Array.from(e.target.files);
+      files.forEach((file) => {
+        // 存入自定义列表
+        pomodoroCustomPlaylist.push({
+          name: file.name,
+          src: file, // 这是一个 File 对象
+          isLocal: true,
+        });
+      });
+      renderPomodoroCustomListUI();
+      e.target.value = null;
+    });
+  }
+
+  // 绑定添加URL按钮
+  const addBgmUrlBtn = document.getElementById("pomo-add-bgm-url");
+  if (addBgmUrlBtn) {
+    addBgmUrlBtn.addEventListener("click", async () => {
+      const url = await showCustomPrompt(
+        "添加音乐",
+        "请输入音乐的网络链接 (URL):",
+      );
+      if (url && url.trim()) {
+        const name = await showCustomPrompt("音乐名称", "给这首歌起个名字:");
+        pomodoroCustomPlaylist.push({
+          name: name || "未知歌曲",
+          src: url.trim(),
+          isLocal: false,
+        });
+        renderPomodoroCustomListUI();
+      }
+    });
+  }
+
+  // 绑定清空按钮
+  const clearBgmBtn = document.getElementById("pomo-clear-bgm");
+  if (clearBgmBtn) {
+    clearBgmBtn.addEventListener("click", () => {
+      pomodoroCustomPlaylist = [];
+      renderPomodoroCustomListUI();
+    });
+  }
+  // --- 番茄钟 BGM 运行时控制事件 ---
+
+  // 1. 计时界面的音乐按钮
+  const musicMenuBtn = document.getElementById("pomodoro-music-btn");
+  if (musicMenuBtn) {
+    musicMenuBtn.addEventListener("click", openPomodoroMusicModal);
+  }
+
+  // 2. 音乐面板内的控制按钮
+  document
+    .getElementById("close-pomo-music-modal")
+    .addEventListener("click", () => {
+      document
+        .getElementById("pomodoro-music-modal")
+        .classList.remove("visible");
+    });
+  document
+    .getElementById("pomo-music-prev")
+    .addEventListener("click", playPrevPomoMusic);
+  document
+    .getElementById("pomo-music-next")
+    .addEventListener("click", playNextPomoMusic);
+  document
+    .getElementById("pomo-music-play")
+    .addEventListener("click", togglePomoMusic);
+  // --- 绑定照片详情弹窗事件 ---
+  document
+    .getElementById("ls-photo-detail-close-btn")
+    .addEventListener("click", () => {
+      document
+        .getElementById("ls-photo-detail-modal")
+        .classList.remove("visible");
+    });
+
+  document
+    .getElementById("ls-photo-comment-send-btn")
+    .addEventListener("click", handleSendLSPhotoComment);
+}

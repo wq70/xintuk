@@ -1,0 +1,841 @@
+              "click",
+              restoreBackupFromGitHubStream,
+            );
+          }
+
+          if (githubRestoreBtn) {
+            githubRestoreBtn.addEventListener("click", restoreBackupFromGitHub);
+          }
+          // --- KK查岗专用弹窗关闭事件 ---
+          document
+            .getElementById("kk-item-share-close-btn")
+            .addEventListener("click", () => {
+              document
+                .getElementById("kk-item-share-modal")
+                .classList.remove("visible");
+            });
+
+          // 点击遮罩层也可以关闭
+          document
+            .getElementById("kk-item-share-modal")
+            .addEventListener("click", (e) => {
+              if (e.target.id === "kk-item-share-modal") {
+                e.target.classList.remove("visible");
+              }
+            });
+
+          // 确保你在 HTML 里加了 id="kk-wardrobe-btn"
+          const wardrobeEntryBtn = document.getElementById("kk-wardrobe-btn");
+          if (wardrobeEntryBtn) {
+            wardrobeEntryBtn.addEventListener("click", openKkWardrobe);
+          }
+
+          // 2. 绑定衣柜内部的“返回”按钮
+          document
+            .getElementById("kk-back-from-wardrobe")
+            .addEventListener("click", () => {
+              // 返回到房屋总览
+              showScreen("kk-house-view-screen");
+            });
+
+          // 3. 绑定“重置衣柜”按钮
+          document
+            .getElementById("kk-wardrobe-refresh-btn")
+            .addEventListener("click", async () => {
+              const confirmed = await showCustomConfirm(
+                "重置衣柜",
+                "确定要清空并重新生成所有衣服吗？",
+                {
+                  confirmButtonClass: "btn-danger",
+                },
+              );
+              if (confirmed) {
+                await generateWardrobeData(activeKkCharId); // 重新生成
+                currentOutfit = {
+                  上装: null,
+                  下装: null,
+                  配饰: null,
+                  特殊: null,
+                };
+                renderWardrobeUI();
+              }
+            });
+
+          // 4. 绑定标签页切换 (使用事件委托)
+          document
+            .querySelector(".wardrobe-tabs")
+            .addEventListener("click", (e) => {
+              if (e.target.classList.contains("wardrobe-tab")) {
+                activeWardrobeCategory = e.target.dataset.cat;
+                renderWardrobeUI();
+              }
+            });
+
+          // 5. 绑定“试穿”按钮
+          document
+            .getElementById("wardrobe-try-on-btn")
+            .addEventListener("click", handleTryOn);
+          const sysNotifSwitch = document.getElementById(
+            "system-notification-switch",
+          );
+          if (sysNotifSwitch) {
+            sysNotifSwitch.addEventListener("change", (e) => {
+              if (e.target.checked) {
+                // 用户尝试开启
+                if (!("Notification" in window)) {
+                  alert("抱歉，你的设备或浏览器不支持系统通知。");
+                  e.target.checked = false;
+                } else if (Notification.permission === "granted") {
+                  // 已经是授权状态，无需操作
+                  new Notification("EPhone", {
+                    body: "测试通知：系统通知功能正常！",
+                  });
+                } else if (Notification.permission !== "denied") {
+                  // 请求权限
+                  Notification.requestPermission().then((permission) => {
+                    if (permission === "granted") {
+                      new Notification("EPhone", {
+                        body: "成功开启！以后收到消息会有弹窗哦。",
+                      });
+                    } else {
+                      e.target.checked = false;
+                      alert(
+                        "你拒绝了通知权限。如需开启，请在手机系统设置中允许本应用发送通知。",
+                      );
+                    }
+                  });
+                } else {
+                  // 之前被拒绝过
+                  alert(
+                    "权限已被拒绝。请前往手机【设置 -> 通知】中找到本应用，手动开启通知权限。",
+                  );
+                  e.target.checked = false;
+                }
+              }
+            });
+          }
+          // --- 情侣头像库功能事件 ---
+
+          // 1. 打开管理弹窗
+          document
+            .getElementById("manage-couple-avatar-library-btn")
+            .addEventListener("click", (e) => {
+              // 阻止冒泡防止关闭设置弹窗（视情况而定，这里建议先不关闭设置弹窗，或者层叠显示）
+              // 为了体验更好，我们可以先隐藏聊天设置弹窗
+              document
+                .getElementById("chat-settings-modal")
+                .classList.remove("visible");
+              openCoupleAvatarLibraryModal();
+            });
+
+          // 2. 关闭管理弹窗 (返回设置)
+          document
+            .getElementById("close-couple-avatar-library-btn")
+            .addEventListener("click", () => {
+              document
+                .getElementById("couple-avatar-library-modal")
+                .classList.remove("visible");
+              // 重新打开设置弹窗
+              document.getElementById("chat-settings-btn").click();
+            });
+
+          // 3. 打开添加弹窗
+          document
+            .getElementById("add-couple-avatar-btn")
+            .addEventListener("click", () => {
+              // 清空输入
+              document.getElementById("new-couple-my-avatar-preview").src =
+                "https://i.postimg.cc/pT2xKzPz/album-cover-placeholder.png";
+              document.getElementById("new-couple-char-avatar-preview").src =
+                "https://i.postimg.cc/pT2xKzPz/album-cover-placeholder.png";
+              document.getElementById("new-couple-desc-input").value = "";
+              document.getElementById("new-couple-my-avatar-input").value = "";
+              document.getElementById("new-couple-char-avatar-input").value =
+                "";
+
+              document
+                .getElementById("add-couple-avatar-modal")
+                .classList.add("visible");
+            });
+
+          // 4. 关闭添加弹窗
+          document
+            .getElementById("cancel-add-couple-avatar-btn")
+            .addEventListener("click", () => {
+              document
+                .getElementById("add-couple-avatar-modal")
+                .classList.remove("visible");
+            });
+
+          // 5. 保存新情头
+          document
+            .getElementById("save-couple-avatar-btn")
+            .addEventListener("click", async () => {
+              const myAvatarSrc = document.getElementById(
+                "new-couple-my-avatar-preview",
+              ).src;
+              const charAvatarSrc = document.getElementById(
+                "new-couple-char-avatar-preview",
+              ).src;
+              const desc = document
+                .getElementById("new-couple-desc-input")
+                .value.trim();
+
+              if (
+                myAvatarSrc.includes("placeholder") ||
+                charAvatarSrc.includes("placeholder")
+              ) {
+                alert("请上传两张头像！");
+                return;
+              }
+              if (!desc) {
+                alert("请输入描述，这很重要，AI靠它来选择头像！");
+                return;
+              }
+
+              const chat = state.chats[state.activeChatId];
+              if (!chat.settings.coupleAvatarLibrary)
+                chat.settings.coupleAvatarLibrary = [];
+
+              const newPair = {
+                id: "couple_" + Date.now(),
+                userAvatar: myAvatarSrc,
+                charAvatar: charAvatarSrc,
+                description: desc,
+              };
+
+              chat.settings.coupleAvatarLibrary.push(newPair);
+              await db.chats.put(chat);
+
+              document
+                .getElementById("add-couple-avatar-modal")
+                .classList.remove("visible");
+              renderCoupleAvatarLibraryList(); // 刷新列表
+              alert("情侣头像添加成功！");
+            });
+
+          // 6. 图片上传预览绑定 (复用通用的上传函数)
+          setupFileUpload("new-couple-my-avatar-input", (base64) => {
+            document.getElementById("new-couple-my-avatar-preview").src =
+              base64;
+          });
+          setupFileUpload("new-couple-char-avatar-input", (base64) => {
+            document.getElementById("new-couple-char-avatar-preview").src =
+              base64;
+          });
+
+          // 核心函数：打开管理弹窗
+          function openCoupleAvatarLibraryModal() {
+            if (!state.activeChatId) return;
+            renderCoupleAvatarLibraryList();
+            document
+              .getElementById("couple-avatar-library-modal")
+              .classList.add("visible");
+          }
+
+          // 核心函数：渲染列表
+          function renderCoupleAvatarLibraryList() {
+            const listEl = document.getElementById(
+              "couple-avatar-library-list",
+            );
+            const chat = state.chats[state.activeChatId];
+            const library = chat.settings.coupleAvatarLibrary || [];
+
+            listEl.innerHTML = "";
+
+            if (library.length === 0) {
+              listEl.innerHTML =
+                '<p style="text-align:center; color:#999; padding:20px;">这里空空如也，快去添加第一对情头吧！</p>';
+              return;
+            }
+
+            library.forEach((pair, index) => {
+              const item = document.createElement("div");
+              item.style.cssText = `
+            background: #fff; padding: 10px; border-radius: 12px; 
+            display: flex; flex-direction: column; gap: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        `;
+
+              item.innerHTML = `
+            <div style="display:flex; justify-content:center; gap: 15px; align-items:center;">
+                <div style="text-align:center;">
+                    <img src="${pair.userAvatar}" style="width:50px; height:50px; border-radius:50%; object-fit:cover; border:2px solid #eee;">
+                    <div style="font-size:10px; color:#666; margin-top:2px;">我</div>
+                </div>
+                <div style="font-size:20px;">❤️</div>
+                <div style="text-align:center;">
+                    <img src="${pair.charAvatar}" style="width:50px; height:50px; border-radius:50%; object-fit:cover; border:2px solid #eee;">
+                    <div style="font-size:10px; color:#666; margin-top:2px;">Ta</div>
+                </div>
+            </div>
+            <div style="font-size:13px; color:#333; background:#f9f9f9; padding:8px; border-radius:6px;">
+                <strong>描述：</strong>${pair.description}
+            </div>
+            <div style="display:flex; gap:10px; justify-content:flex-end;">
+                <button class="moe-btn-mini apply-pair-btn" style="background:#4caf50; color:white;">应用</button>
+                <button class="moe-btn-mini delete-pair-btn" style="background:#ff3b30; color:white;">删除</button>
+            </div>
+        `;
+
+              // 绑定删除
+              item.querySelector(".delete-pair-btn").onclick = async () => {
+                if (confirm("确定要删除这对情头吗？")) {
+                  chat.settings.coupleAvatarLibrary.splice(index, 1);
+                  await db.chats.put(chat);
+                  renderCoupleAvatarLibraryList();
+                }
+              };
+
+              // 绑定手动应用
+              item.querySelector(".apply-pair-btn").onclick = async () => {
+                chat.settings.aiAvatar = pair.charAvatar;
+                chat.settings.myAvatar = pair.userAvatar;
+                chat.settings.isCoupleAvatar = true;
+                chat.settings.coupleAvatarDescription = pair.description;
+                await db.chats.put(chat);
+
+                // 如果聊天界面开着，刷新它
+                if (
+                  document
+                    .getElementById("chat-interface-screen")
+                    .classList.contains("active")
+                ) {
+                  renderChatInterface(chat.id);
+                }
+                alert("已应用此情侣头像！");
+              };
+
+              listEl.appendChild(item);
+            });
+          }
+          // 1. 加载数据到内存
+          state.passerbyAvatars = await db.passerbyAvatars.toArray();
+
+          // 2. 绑定设置页面的按钮
+          document
+            .getElementById("manage-passerby-avatars-btn")
+            .addEventListener("click", openPasserbyManager);
+          document
+            .getElementById("add-passerby-avatar-btn")
+            .addEventListener("click", handleAddPasserbyAvatar);
+
+          // 3. 绑定弹窗内的按钮
+          document
+            .getElementById("close-passerby-manager-btn")
+            .addEventListener("click", () => {
+              document
+                .getElementById("passerby-avatar-manager-modal")
+                .classList.remove("visible");
+            });
+          document
+            .getElementById("bulk-add-passerby-btn")
+            .addEventListener("click", handleAddPasserbyAvatar);
+
+          // 4. 绑定文件输入框
+          document
+            .getElementById("passerby-upload-input")
+            .addEventListener("change", handlePasserbyFileChange);
+          initAuroraDrag(); // 初始化拖拽
+          initAuroraFontControl();
+          initAuroraResize();
+          initVideoBubbleDrag(); // 初始化视频悬浮球拖拽
+          initLoversSpace();
+          initTaobao();
+          initTukeyAccounting();
+          initDesktopManager();
+
+          // ===================================================================
+          // 5. 启动！
+
+          // 应用壁纸并更新所有时钟
+          applyLockscreenWallpaper();
+          updateLockClock();
+
+          // 1. 读取、应用并监听“启用锁屏”设置
+          const enableLockScreenToggle = document.getElementById(
+            "enable-lock-screen-toggle",
+          );
+          const lockScreenEnabled =
+            localStorage.getItem("lockScreenEnabled") !== "false";
+          enableLockScreenToggle.checked = lockScreenEnabled;
+
+          // 2. 读取、应用并监听“显示状态栏”设置
+          const showStatusBarToggle = document.getElementById(
+            "show-status-bar-toggle",
+          );
+          const statusBar = document.getElementById("status-bar");
+          // 读取保存的状态，如果没保存过，默认是 true (显示)
+          const showStatusBar =
+            localStorage.getItem("showStatusBar") !== "false";
+          // 让开关的状态和保存的状态同步
+          showStatusBarToggle.checked = showStatusBar;
+          // 根据保存的状态，决定一加载进来时是否显示状态栏
+          if (showStatusBar) {
+            statusBar.style.display = "flex";
+          } else {
+            statusBar.style.display = "none";
+          }
+
+          // 3. 给开关添加“变化”监听器，这样你每次点击它都会保存状态
+          showStatusBarToggle.addEventListener("change", (e) => {
+            const isEnabled = e.target.checked;
+            // a. 将新的开关状态 (true 或 false) 保存到浏览器的 localStorage 里
+            localStorage.setItem("showStatusBar", isEnabled);
+            // b. 立刻根据新的状态来显示或隐藏状态栏
+            statusBar.style.display = isEnabled ? "flex" : "none";
+          });
+
+          // 4. 根据最终的锁屏设置，决定应用启动时第一个显示的屏幕
+          if (lockScreenEnabled) {
+            lockPhone(); // 如果设置是“启用”，就锁定手机
+          } else {
+            showScreen("home-screen"); // 否则，直接进入主屏幕
+          }
+        }
+        function renderLoginOverlay() {
+          if (document.getElementById("login-overlay")) return;
+
+          // 1. 引入字体
+          if (!document.getElementById("pixel-font-link")) {
+            const fontLink = document.createElement("link");
+            fontLink.id = "pixel-font-link";
+            fontLink.href =
+              "https://fonts.googleapis.com/css2?family=VT323&display=swap";
+            fontLink.rel = "stylesheet";
+            document.head.appendChild(fontLink);
+          }
+
+          // 2. 样式定义
+          const style = document.createElement("style");
+          style.innerHTML = `
+            #login-overlay {
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                background-color: #dbc6c6; 
+                z-index: 99999;
+                display: flex; flex-direction: column;
+                justify-content: center; align-items: center;
+                font-family: 'VT323', monospace;
+                overflow: hidden;
+            }
+
+            /* --- 机身 --- */
+            .gameboy-body {
+                width: 360px; height: 640px;
+                background-color: #eed7d5; /* 枯玫瑰粉 */
+                border-radius: 60px;
+                box-shadow: 
+                    20px 20px 60px #c5b0ae, 
+                    -20px -20px 60px #fffaf8,
+                    inset 2px 2px 5px rgba(255,255,255,0.5);
+                border: 6px solid #e6cfcd;
+                display: flex; flex-direction: column;
+                align-items: center;
+                padding: 30px; box-sizing: border-box; position: relative;
+            }
+
+            /* --- 屏幕外框 --- */
+            .screen-bezel {
+                width: 100%;
+                background-color: #dcbdbb;
+                border-radius: 40px 40px 50px 40px;
+                padding: 20px; box-sizing: border-box;
+                box-shadow: inset 3px 3px 10px rgba(0,0,0,0.1);
+                display: flex; flex-direction: column; align-items: center;
+                margin-bottom: 30px; position: relative;
+            }
+            .bezel-dots { position: absolute; top: 12px; left: 25px; display: flex; gap: 6px; }
+            .dot { width: 6px; height: 6px; border-radius: 50%; background: #b09896; opacity: 0.5;}
+
+            /* --- 液晶屏幕 --- */
+            .screen-lcd {
+                width: 100%; height: 320px;
+                background-color: #4a3b3b;
+                border-radius: 20px;
+                box-shadow: inset 0 0 15px rgba(0,0,0,0.6);
+                background-image: 
+                    linear-gradient(rgba(255, 192, 203, 0.03) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(255, 192, 203, 0.03) 1px, transparent 1px);
+                background-size: 4px 4px;
+                display: flex; flex-direction: column; align-items: center; justify-content: center;
+                color: #fce4ec; text-shadow: 0 0 4px rgba(252, 228, 236, 0.6);
+                position: relative; overflow: hidden;
+            }
+            
+            .scanline {
+                width: 100%; height: 100%; position: absolute; left: 0; top: 0;
+                background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.1));
+                background-size: 100% 4px; pointer-events: none; z-index: 5; opacity: 0.3;
+            }
+
+            .game-logo { font-size: 28px; margin-bottom: 30px; letter-spacing: 4px; opacity: 0.9; }
+
+            /* --- 输入框组 (包含行走的小人) --- */
+            .input-group {
+                width: 85%;
+                position: relative;
+                margin-bottom: 25px; /* 增加间距给小人留位置 */
+            }
+
+            .pixel-input {
+                width: 100%; height: 40px;
+                background: rgba(255, 255, 255, 0.1);
+                border: 2px solid #8d7878;
+                border-radius: 10px;
+                color: #fff;
+                font-family: 'VT323', monospace;
+                font-size: 20px;
+                padding: 0 10px;
+                text-align: center;
+                outline: none;
+                transition: all 0.3s;
+                box-sizing: border-box; /* 确保padding不撑大宽度 */
+            }
+            .pixel-input:focus {
+                background: rgba(255, 255, 255, 0.2);
+                border-color: #f8a5c2;
+                box-shadow: 0 0 10px rgba(248, 165, 194, 0.4);
+            }
+            .pixel-input::placeholder { color: rgba(252, 228, 236, 0.3); font-size: 18px; }
+
+            /* --- 行走的小人动画 --- */
+            .walker {
+                position: absolute;
+                /* 放在输入框上方边框的位置 */
+                top: -38px; 
+                height: 40px; /* 稍微大一点点 */
+                width: auto;
+                z-index: 10;
+                pointer-events: none; /* 让鼠标点击穿透图片，不影响点输入框 */
+                image-rendering: pixelated; /* 保持像素清晰 */
+            }
+
+            /* 定义行走动画：从左跑到右，然后瞬间回到左边循环 */
+            @keyframes walkRight {
+                0% { left: -10px; }
+                100% { left: calc(100% - 30px); } 
+            }
+
+            .walker-uid {
+                animation: walkRight 8s linear infinite;
+            }
+            
+            .walker-pwd {
+                /* 稍微慢一点，并且有延迟，制造距离感 */
+                animation: walkRight 9s linear infinite; 
+                animation-delay: -4s; /* 负延迟表示动画一开始就在中间 */
+            }
+
+            #login-msg { height: 20px; font-size: 16px; color: #fab1a0; margin-top: 5px; }
+
+            /* --- 操控区 --- */
+            .controls-area { width: 100%; flex: 1; position: relative; }
+
+            .d-pad { position: absolute; top: 20px; left: 20px; width: 100px; height: 100px; }
+            .d-pad-h, .d-pad-v {
+                background: #b5a3a3; border-radius: 10px;
+                box-shadow: inset 2px 2px 5px rgba(255,255,255,0.2), 3px 3px 5px rgba(0,0,0,0.1);
+                position: absolute;
+            }
+            .d-pad-h { width: 100px; height: 34px; top: 33px; }
+            .d-pad-v { width: 34px; height: 100px; left: 33px; }
+            .d-pad-center {
+                width: 34px; height: 34px; background: #b5a3a3;
+                position: absolute; top: 33px; left: 33px; z-index: 2;
+                border-radius: 50%; box-shadow: inset 2px 2px 5px rgba(0,0,0,0.1);
+            }
+
+            .action-btns { position: absolute; top: 30px; right: 20px; display: flex; gap: 20px; transform: rotate(-10deg); }
+            .round-btn {
+                width: 55px; height: 55px; border-radius: 50%; border: none; cursor: pointer;
+                font-family: 'VT323', monospace; font-size: 24px; color: rgba(255,255,255,0.6);
+                display: flex; justify-content: center; align-items: center;
+                box-shadow: 0 6px 0 rgba(0,0,0,0.15), 0 10px 10px rgba(0,0,0,0.1);
+                transition: transform 0.1s; position: relative;
+            }
+            .btn-a { background: radial-gradient(circle at 30% 30%, #eababa, #cd8d8d); margin-top: -20px; }
+            .btn-b { background: radial-gradient(circle at 30% 30%, #c4d4c4, #8fa08f); margin-top: 20px; }
+            .round-btn:active { transform: translateY(6px); box-shadow: 0 0 0 rgba(0,0,0,0.15); }
+            .btn-label { position: absolute; bottom: -25px; width: 100%; text-align: center; color: #bcaaaa; font-size: 14px; font-weight: bold; }
+
+            .options-group { position: absolute; bottom: 20px; width: 100%; display: flex; justify-content: center; gap: 30px; }
+            .pill-btn { width: 60px; height: 16px; background: #cbbaba; border-radius: 20px; transform: rotate(-15deg); box-shadow: inset 1px 1px 3px rgba(0,0,0,0.1); border: 1px solid rgba(255,255,255,0.2); }
+            .speakers { position: absolute; bottom: 30px; right: 30px; display: flex; gap: 5px; transform: rotate(-15deg); }
+            .sp-slot { width: 6px; height: 6px; background: rgba(0,0,0,0.05); border-radius: 50%; box-shadow: inset 1px 1px 1px rgba(0,0,0,0.1); }
+          `;
+          document.head.appendChild(style);
+
+          // 3. HTML结构
+          const overlay = document.createElement("div");
+          overlay.id = "login-overlay";
+
+          overlay.innerHTML = `
+            <div class="gameboy-body">
+                <div class="screen-bezel">
+                    <div class="bezel-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+                    
+                    <div class="screen-lcd">
+                        <div class="scanline"></div>
+                        <div class="game-logo">E-PHONE TUKI</div>
+                        
+                        <!-- 账号输入框组 -->
+                        <div class="input-group">
+                            <img src="https://i.postimg.cc/bwyK9rVr/1000109644.png" class="walker walker-uid" alt="char1">
+                            <input type="text" id="login-uid" class="pixel-input" placeholder="ACCOUNT ID" spellcheck="false" autocomplete="off">
+                        </div>
+
+                        <!-- 密码输入框组 -->
+                        <div class="input-group">
+                            <img src="https://i.postimg.cc/NjsWkFCQ/test.png" class="walker walker-pwd" alt="char2">
+                            <input type="password" id="login-pwd" class="pixel-input" placeholder="PASSWORD" autocomplete="off">
+                        </div>
+                        
+                        <p id="login-msg">WAITING...</p>
+                        
+                        <div style="margin-top: 15px; font-size: 14px; color: rgba(252, 228, 236, 0.5);">● REC</div>
+                    </div>
+                    
+                    <div style="margin-top: 10px; color: #a69292; font-size: 12px; letter-spacing: 1px; font-weight: bold;">
+                        Ephone TUKI ^ ̳- ‧̫ • ̳^ฅ
+                    </div>
+                </div>
+
+                <div class="controls-area">
+                    <div class="d-pad">
+                        <div class="d-pad-h"></div><div class="d-pad-v"></div><div class="d-pad-center"></div>
+                    </div>
+                    <div class="action-btns">
+                        <div style="position:relative;">
+                             <button id="btn-login-reset" class="round-btn btn-b">B</button>
+                             <div class="btn-label">RESET</div>
+                        </div>
+                        <div style="position:relative;">
+                             <button id="btn-login-submit" class="round-btn btn-a">A</button>
+                             <div class="btn-label">START</div>
+                        </div>
+                    </div>
+                    <div class="options-group">
+                        <div class="pill-btn"></div><div class="pill-btn"></div>
+                    </div>
+                    <div class="speakers">
+                        <div class="sp-slot"></div><div class="sp-slot"></div><div class="sp-slot"></div>
+                        <div class="sp-slot"></div><div class="sp-slot"></div><div class="sp-slot"></div>
+                    </div>
+                </div>
+            </div>
+            <div style="margin-top: 25px; font-size: 14px; color: #7f6e6e;">
+                PRESS <span style="color:#cd8d8d; font-weight:bold;">( A )</span> TO LOGIN
+            </div>
+          `;
+
+          document.body.prepend(overlay);
+
+          // 4. 事件绑定
+          const submitBtn = document.getElementById("btn-login-submit");
+          const resetBtn = document.getElementById("btn-login-reset");
+          const uidInput = document.getElementById("login-uid");
+          const pwdInput = document.getElementById("login-pwd");
+
+          function handleLoginTrigger() {
+            const msg = document.getElementById("login-msg");
+            if (msg) msg.textContent = "CONNECTING...";
+            setTimeout(() => {
+              if (typeof tryLogin === "function") {
+                tryLogin();
+              } else {
+                console.error("tryLogin function missing");
+              }
+            }, 200);
+          }
+
+          submitBtn.onclick = handleLoginTrigger;
+          resetBtn.onclick = () => {
+            pwdInput.value = "";
+            const msg = document.getElementById("login-msg");
+            if (msg) msg.textContent = "CLEARED";
+            pwdInput.focus();
+          };
+          pwdInput.onkeypress = function (e) {
+            if (e.key === "Enter") handleLoginTrigger();
+          };
+
+          const bindVisualEffect = (btn) => {
+            const down = () => {
+              btn.style.transform = "translateY(6px)";
+              btn.style.boxShadow = "none";
+            };
+            const up = () => {
+              btn.style.transform = "translateY(0)";
+              btn.style.boxShadow =
+                "0 6px 0 rgba(0,0,0,0.15), 0 10px 10px rgba(0,0,0,0.1)";
+            };
+            btn.addEventListener("mousedown", down);
+            btn.addEventListener("mouseup", up);
+            btn.addEventListener("mouseleave", up);
+            btn.addEventListener("touchstart", down, { passive: true });
+            btn.addEventListener("touchend", up);
+          };
+          bindVisualEffect(submitBtn);
+          bindVisualEffect(resetBtn);
+        }
+
+        // 2. 验证与启动函数
+        async function tryLogin() {
+          // 获取元素
+          const uidEl = document.getElementById("login-uid");
+          const pwdEl = document.getElementById("login-pwd");
+          const msgEl = document.getElementById("login-msg");
+          const submitBtn = document.getElementById("btn-login-submit");
+
+          // 安全检查
+          if (!uidEl || !pwdEl) {
+            console.error("找不到登录输入框，请刷新页面");
+            return;
+          }
+
+          const uid = uidEl.value.trim();
+          const pwd = pwdEl.value.trim();
+
+          if (!uid || !pwd) {
+            msgEl.textContent = "请输入完整的账号和密码";
+            if (msgEl) msgEl.style.color = "#ff453a"; // 红色警告
+            return;
+          }
+
+          // 1. 设置加载状态
+          msgEl.style.color = "#fab1a0"; // 恢复默认颜色
+          msgEl.textContent = "VERIFYING...";
+          if (submitBtn) submitBtn.disabled = true; // 防止重复点击
+
+          try {
+            // 2. 发起网络请求 (你的新逻辑)
+            const res = await fetch(
+              "https://puppy-subscription-api.zeabur.app/api/verify",
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ account: uid, password: pwd }),
+              },
+            );
+
+            // 处理网络层面的错误 (如404, 500)
+            if (!res.ok) {
+              throw new Error(`HTTP error! status: ${res.status}`);
+            }
+
+            const data = await res.json();
+
+            // 3. 处理验证结果
+            if (data.success) {
+              // --- 验证成功 ---
+              msgEl.style.color = "#32d74b"; // 绿色成功
+              msgEl.textContent = "验证通过，正在进入...";
+
+              // 保存登录状态
+              localStorage.setItem("ephone_saved_uid", uid);
+              // 同时保存你的新验证标记
+              localStorage.setItem("ephone_auth", "true");
+
+              // 初始化数据库 (使用 uid 作为数据库标识)
+              initDatabase(uid);
+
+              // 移除遮罩动画
+              const overlay = document.getElementById("login-overlay");
+              if (overlay) {
+                overlay.style.transition = "opacity 0.5s ease";
+                overlay.style.opacity = "0";
+                setTimeout(() => overlay.remove(), 500);
+              }
+
+              // 启动 App
+              init();
+            } else {
+              // --- 验证失败 (业务逻辑拒绝，如密码错误) ---
+              throw new Error(data.message || "账号或密码错误");
+            }
+          } catch (error) {
+            // --- 错误处理 ---
+            console.error("登录出错:", error);
+            msgEl.style.color = "#ff453a"; // 红色警告
+            // 显示具体错误信息，如果是网络错误显示"网络连接失败"
+            msgEl.textContent = error.message.includes("fetch")
+              ? "网络连接失败"
+              : error.message || "验证失败";
+
+            // 按钮视觉反馈 (变红一下)
+            if (submitBtn) {
+              const originalBg = submitBtn.style.background;
+              submitBtn.style.background = "#ff453a";
+              setTimeout(
+                () => (submitBtn.style.background = originalBg || ""),
+                500,
+              );
+              submitBtn.disabled = false; // 恢复按钮可用
+            }
+          }
+        }
+
+        // ==========================================
+        // ▼▼▼ 自动登录判断 (主入口) ▼▼▼
+        // ==========================================
+
+        // 检查本地是否已登录
+        const savedUid = localStorage.getItem("ephone_saved_uid");
+
+        if (savedUid) {
+          console.log(`[Auto Login] 检测到已登录账号: ${savedUid}`);
+          try {
+            // 已登录：直接初始化数据库并启动，不显示登录框
+            initDatabase(savedUid);
+            init();
+          } catch (e) {
+            console.error("自动登录出错，重置状态:", e);
+            localStorage.removeItem("ephone_saved_uid");
+            renderLoginOverlay();
+          }
+        } else {
+          // 未登录：显示登录框
+          renderLoginOverlay();
+        }
+
+        // ==========================================
+        // ▼▼▼ 退出登录按钮事件绑定 ▼▼▼
+        // ==========================================
+        // 放在一个定时器里，确保 logout-btn 已经加载出来
+        setTimeout(() => {
+          const logoutBtn = document.getElementById("logout-btn");
+          if (logoutBtn) {
+            // 移除旧的监听器防止重复
+            const newBtn = logoutBtn.cloneNode(true);
+            logoutBtn.parentNode.replaceChild(newBtn, logoutBtn);
+
+            newBtn.addEventListener("click", async () => {
+              // 使用原生的 confirm，防止 showCustomConfirm 没加载
+              if (confirm("确定要退出登录吗？")) {
+                localStorage.removeItem("ephone_saved_uid");
+                window.location.reload();
+              }
+            });
+          }
+        }, 1000);
+
+        /*
+         * ===================================================================
+         * === 全局接口 (Public API for other scripts) ===
+         * ===================================================================
+         * 将主应用的核心功能暴露给其他脚本文件（如 game-hall.js）使用
+         */
+        window.openChat = openChat;
+        window.openChat = openChat;
+        // 【新增】把跳转函数暴露给全局，以便在弹窗中点击调用
+        window.jumpToMessage = async function (timestamp) {
+          // 1. 关闭所有可能挡住视线的模态框
+          document
+            .querySelectorAll(".modal")
+            .forEach((el) => el.classList.remove("visible"));
+          document
+            .getElementById("custom-modal-overlay")
+            .classList.remove("visible");
+          const chat = state.chats[state.activeChatId];
+          if (!chat) return;
+

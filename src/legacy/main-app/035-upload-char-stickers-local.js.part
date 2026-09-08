@@ -1,0 +1,946 @@
+              chat.settings.stickerLibrary.push(...newStickers);
+              await db.chats.put(chat);
+            } else {
+              await db.charStickers.bulkAdd(newStickers);
+            }
+            await renderCharStickers(type); // 在数据库操作后，统一重新渲染
+          }
+          await showCustomAlert(
+            "导入报告",
+            `成功导入：${successCount} 个表情。`,
+          );
+        }
+
+        /**
+         * 从本地上传表情到指定库
+         */
+        async function uploadCharStickersLocal(type) {
+          const input = document.getElementById("char-sticker-upload-input"); // 应该长这样
+          input.onchange = async (event) => {
+            const files = event.target.files;
+            if (!files.length) return;
+
+            const stickersToAdd = []; // 先收集所有要添加的表情
+
+            for (const file of files) {
+              const name = await showCustomPrompt(
+                "为表情命名",
+                "请输入表情名称",
+                file.name.replace(/\.[^/.]+$/, ""),
+              );
+              if (name && name.trim()) {
+                const base64Url = await new Promise((resolve) => {
+                  const reader = new FileReader();
+                  reader.onload = (e) => resolve(e.target.result);
+                  reader.readAsDataURL(file);
+                });
+
+                const stickerData = { name: name.trim(), url: base64Url };
+                if (type !== "exclusive") {
+                  stickerData.id = "char_sticker_" + Date.now() + Math.random();
+                }
+                stickersToAdd.push(stickerData);
+              }
+            }
+
+            if (stickersToAdd.length > 0) {
+              if (type === "exclusive") {
+                const chat = state.chats[state.activeChatId];
+                chat.settings.stickerLibrary.push(...stickersToAdd);
+                await db.chats.put(chat);
+              } else {
+                await db.charStickers.bulkAdd(stickersToAdd);
+              }
+              await renderCharStickers(type); // 在数据库操作后，统一重新渲染
+              alert(`已成功上传 ${stickersToAdd.length} 个表情！`);
+            }
+
+            event.target.value = null;
+          };
+          input.click();
+        }
+
+        /**
+         * 显示指定的角色表情包标签页
+         * 这是之前缺失的核心功能，用于控制显示哪个标签页（专属或通用）。
+         * @param {'exclusive' | 'common'} type - 要显示的标签页类型
+         */
+        function showCharStickerTab(type) {
+          // 1. 切换标签按钮的 'active' 状态
+          document.querySelectorAll(".char-sticker-tab-btn").forEach((btn) => {
+            btn.classList.toggle("active", btn.dataset.type === type);
+          });
+
+          // 2. 切换内容区域的显示
+          document
+            .querySelectorAll(".sticker-tab-content")
+            .forEach((content) => {
+              content.classList.toggle(
+                "active",
+                content.id === `${type}-sticker-content`,
+              );
+            });
+
+          // 3. 渲染对应标签页的表情
+          // (这一步确保每次切换标签时，表情都会刷新)
+          renderCharStickers(type);
+        }
+
+        /**
+         * 塔罗牌占卜功能核心
+         */
+        let activeTarotReading = null; // 用于暂存当前占卜的结果
+
+        // 牌阵信息
+        const TAROT_SPREADS = {
+          single: {
+            name: "单张牌 - 快速指引",
+            count: 1,
+            positions: ["核心指引"],
+          },
+          three_past_present_future: {
+            name: "三张牌 - 过去/现在/未来",
+            count: 3,
+            positions: ["过去", "现在", "未来"],
+          },
+          three_situation_challenge_advice: {
+            name: "三张牌 - 情境/挑战/建议",
+            count: 3,
+            positions: ["情境", "挑战", "建议"],
+          },
+          celtic_cross: {
+            name: "凯尔特十字 - 深度分析",
+            count: 10,
+            positions: [
+              "现状",
+              "挑战",
+              "根基",
+              "过去",
+              "目标",
+              "未来",
+              "自我认知",
+              "外部影响",
+              "希望与恐惧",
+              "最终结果",
+            ],
+          },
+        };
+
+        // 打开塔罗牌占卜主模态框
+        function openTarotModal() {
+          document
+            .getElementById("tarot-divination-modal")
+            .classList.add("visible");
+          // 默认显示设置界面
+          document.getElementById("tarot-setup-view").style.display = "block";
+          document.getElementById("tarot-result-view").style.display = "none";
+          document.getElementById("tarot-history-view").style.display = "none";
+          // 清空输入框
+          document.getElementById("tarot-question-input").value = "";
+        }
+
+        // 执行抽牌逻辑
+        function handleDrawCards() {
+          const question = document
+            .getElementById("tarot-question-input")
+            .value.trim();
+          const spreadType = document.getElementById(
+            "tarot-spread-select",
+          ).value;
+          const orientation = document.querySelector(
+            'input[name="tarot-orientation"]:checked',
+          ).value;
+
+          if (!question) {
+            alert("请输入您的问题或关注点。");
+            return;
+          }
+
+          const spreadInfo = TAROT_SPREADS[spreadType];
+          const deck = [...TAROT_DECK];
+
+          // 洗牌
+          for (let i = deck.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [deck[i], deck[j]] = [deck[j], deck[i]];
+          }
+
+          // 抽牌
+          const drawnCardsRaw = deck.slice(0, spreadInfo.count);
+          const drawnCards = drawnCardsRaw.map((card, index) => {
+            const isReversed =
+              orientation === "reversed" && Math.random() < 0.5;
+            return {
+              ...card,
+              isReversed: isReversed,
+              position: spreadInfo.positions[index],
+            };
+          });
+
+          activeTarotReading = {
+            question: question,
+            spread: spreadInfo,
+            cards: drawnCards,
+            timestamp: Date.now(),
+          };
+
+          displayTarotResults(activeTarotReading);
+        }
+
+        // 显示占卜结果 (纯文字版)
+        function displayTarotResults(reading) {
+          const displayEl = document.getElementById("tarot-result-display");
+          displayEl.innerHTML = ""; // 清空
+
+          // 显示问题
+          const questionEl = document.createElement("div");
+          questionEl.className = "tarot-result-question";
+          questionEl.textContent = `您的问题是：“${reading.question}”`;
+          displayEl.appendChild(questionEl);
+
+          const container = document.createElement("div");
+          container.className = "tarot-spread-container";
+
+          reading.cards.forEach((card) => {
+            const cardWrapper = document.createElement("div");
+            cardWrapper.className = "tarot-card-wrapper";
+
+            cardWrapper.innerHTML = `
+			            <div class="tarot-card-position">[${card.position}]</div>
+			            <div class="tarot-card-name">${card.name} ${card.isReversed ? "(逆位)" : "(正位)"}</div>
+			        `;
+            container.appendChild(cardWrapper);
+          });
+
+          displayEl.appendChild(container);
+
+          // 切换视图
+          document.getElementById("tarot-setup-view").style.display = "none";
+          document.getElementById("tarot-result-view").style.display = "flex";
+        }
+
+        async function sendTarotReadingToChat() {
+          if (!activeTarotReading || !state.activeChatId) return;
+
+          const chat = state.chats[state.activeChatId];
+          const { proxyUrl, apiKey, model } = state.apiConfig;
+
+          if (!proxyUrl || !apiKey || !model) {
+            alert("请先在API设置中配置好才能触发AI解读哦！");
+            return;
+          }
+
+          // 1. 关闭弹窗，并显示“正在解读”的提示
+          document
+            .getElementById("tarot-divination-modal")
+            .classList.remove("visible");
+          await showCustomAlert(
+            "请稍候...",
+            "塔罗师正在为你连接星辰，解读牌面...",
+          );
+
+          try {
+            const reading = activeTarotReading;
+
+            // 2. 给“塔罗师AI”一个更专业、更结构化的指令 (Prompt)
+            const cardDetails = reading.cards
+              .map((card) => {
+                const orientation = card.isReversed ? "逆位" : "正位";
+                const meaning = card.isReversed ? card.reversed : card.upright;
+                return `- ${card.position}: ${card.name} (${orientation})，象征: ${meaning}`;
+              })
+              .join("\n");
+
+            const tarotMasterPrompt = `
+			# 角色
+			你是一位世界级的塔罗牌解读大师，以深刻的洞察力、清晰的表达和富有同情心的指引而闻名。
+
+			# 核心任务
+			为用户提供一次全面、结构化且易于理解的塔罗牌解读。你的解读必须严格遵循下面的输出结构。
+
+			# 输出结构 (必须严格遵守)
+			你的回答必须包含以下三个部分，并使用Markdown加粗标题来分隔：
+
+			1.  **✨ 综合解读 (Overall Interpretation):**
+			    首先，根据所有牌面的整体感觉，给出一个高度概括的、1-2句话的核心结论或氛围描述。
+
+			2.  **🃏 牌面详解 (Card Details):**
+			    然后，逐一分析每一张牌。对于每一张牌，你必须：
+			    -   使用格式 \`**[牌位名称] - [牌名] ([正位/逆位])**\` 作为小标题。
+			    -   详细解释这张牌在这个特定牌位上，是如何回应用户的问题的。
+			    -   将牌的象征意义与用户的具体情境（问题）紧密结合起来进行分析。
+
+			3.  **💡 核心建议 (Key Advice):**
+			    最后，综合所有牌的信息，为用户提供一个明确、具体、可操作的行动建议或心态指引。
+
+			# 指导原则
+			- **故事性**: 将所有牌的含义编织成一个连贯的叙事，而不是简单地罗列关键词。
+			- **相关性**: 始终将解读直接与用户提出的具体问题联系起来。
+			- **清晰易懂**: 避免使用过于神秘或专业的术语。用平实的语言解释复杂的概念。
+			- **深度而非罗列**: 绝对不要只是重复我提供给你的“象征”关键词。你必须在这些关键词的基础上进行综合、提炼和深化，给出你作为大师的独特见解。
+
+			# 占卜信息
+			- **用户的问题**: "${reading.question}"
+			- **使用的牌阵**: ${reading.spread.name}
+			- **抽到的牌及基础含义**:
+			${cardDetails}
+
+			# 最终指令
+			你的最终输出【只能是】完整的、格式化后的解读文本。不要添加任何“好的，这是你的解读：”之类的对话性开场白。
+			`;
+
+            // 3. 发起API调用，让AI扮演塔罗师
+            let isGemini = proxyUrl === GEMINI_API_URL;
+            let messagesForApi = [{ role: "user", content: tarotMasterPrompt }];
+            let geminiConfig = toGeminiRequestData(
+              model,
+              apiKey,
+              tarotMasterPrompt,
+              messagesForApi,
+              isGemini,
+            );
+
+            const response = isGemini
+              ? await fetch(geminiConfig.url, geminiConfig.data)
+              : await fetch(`${proxyUrl}/v1/chat/completions`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${apiKey}`,
+                  },
+                  body: JSON.stringify({
+                    model: model,
+                    messages: messagesForApi,
+                    temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+                  }),
+                });
+
+            if (!response.ok) {
+              throw new Error(`API请求失败: ${await response.text()}`);
+            }
+
+            const data = await response.json();
+            const interpretation = (
+              isGemini
+                ? data.candidates[0].content.parts[0].text
+                : data.choices[0].message.content
+            ).trim();
+
+            // 4. 创建对用户可见的“系统解读”消息
+            const systemMessageVisible = {
+              role: "system",
+              type: "pat_message", // 复用居中灰色气泡样式
+              content: `🔮 **塔罗牌解读** 🔮\n\n**您的问题**：“${reading.question}”\n\n${interpretation}`,
+              timestamp: Date.now(),
+            };
+            chat.history.push(systemMessageVisible);
+            appendMessage(systemMessageVisible, chat);
+
+            // 5. 创建给角色Char看的隐藏指令
+            const hiddenInstruction = {
+              role: "system",
+              content: `[系统指令：刚刚系统为用户进行了一次塔罗牌占卜，解读结果是：“${interpretation}”。现在，请你以角色的身份，和用户一起讨论这个结果。]`,
+              timestamp: Date.now() + 1, // 确保时间戳在后
+              isHidden: true,
+            };
+            chat.history.push(hiddenInstruction);
+
+            // 6. 保存所有数据
+            await saveTarotReading(activeTarotReading);
+            await db.chats.put(chat);
+            renderChatList();
+
+            activeTarotReading = null;
+          } catch (error) {
+            console.error("塔罗牌AI解读失败:", error);
+            await showCustomAlert(
+              "解读失败",
+              `抱歉，连接塔罗师时出现了一点问题：\n\n${error.message}`,
+            );
+            activeTarotReading = null;
+          }
+        }
+
+        // 保存占卜记录到数据库
+        async function saveTarotReading(reading) {
+          // 为了节省空间，我们只保存解读文本，而不是整个牌组对象
+          const interpretationText =
+            `牌阵: ${reading.spread.name}\n` +
+            reading.cards
+              .map((card, index) => {
+                const orientationText = card.isReversed ? "逆位" : "正位";
+                const meaning = card.isReversed ? card.reversed : card.upright;
+                return `[${card.position}]: ${card.name} (${orientationText}) - ${meaning}`;
+              })
+              .join("\n");
+
+          await db.tarotReadings.add({
+            question: reading.question,
+            interpretation: interpretationText,
+            timestamp: reading.timestamp,
+          });
+        }
+
+        // 打开历史记录界面
+        async function openTarotHistory() {
+          const readings = await db.tarotReadings
+            .orderBy("timestamp")
+            .reverse()
+            .toArray();
+          renderTarotHistory(readings);
+          document.getElementById("tarot-setup-view").style.display = "none";
+          document.getElementById("tarot-history-view").style.display = "flex";
+        }
+
+        // 渲染历史记录列表
+        function renderTarotHistory(readings) {
+          const listEl = document.getElementById("tarot-history-list");
+          listEl.innerHTML = "";
+          if (readings.length === 0) {
+            listEl.innerHTML =
+              '<p style="text-align:center; color: #8a8a8a; margin-top: 50px;">还没有占卜历史哦</p>';
+            return;
+          }
+          readings.forEach((reading) => {
+            const item = document.createElement("div");
+            item.className = "tarot-history-item";
+            item.innerHTML = `
+			            <div class="question">${reading.question}</div>
+			            <div class="details">${new Date(reading.timestamp).toLocaleString()}</div>
+			            <button class="tarot-history-delete-btn" data-id="${reading.id}">×</button>
+			        `;
+            listEl.appendChild(item);
+          });
+        }
+
+        // 删除一条历史记录
+        async function deleteTarotReading(readingId) {
+          const confirmed = await showCustomConfirm(
+            "确认删除",
+            "确定要删除这条占卜历史吗？",
+            {
+              confirmButtonClass: "btn-danger",
+            },
+          );
+          if (confirmed) {
+            await db.tarotReadings.delete(readingId);
+            openTarotHistory(); // 重新加载历史记录
+          }
+        }
+
+        /**
+         * 应用主屏幕图标和小组件的文字颜色
+         * @param {string} color - 颜色代码, e.g., '#FFFFFF'
+         */
+        function applyHomeIconWidgetTextColor(color) {
+          const phoneScreen = document.getElementById("phone-screen");
+          if (phoneScreen && color) {
+            // 使用新的CSS变量名
+            phoneScreen.style.setProperty(
+              "--home-icon-widget-text-color",
+              color,
+            );
+          }
+        }
+        /**
+         * 将时长字符串（如“2.5小时”, "30m"）解析为分钟数
+         * @param {string} durationString - 时长描述文本
+         * @returns {number} - 对应的分钟数
+         */
+        function parseDurationToMinutes(durationString) {
+          if (!durationString || typeof durationString !== "string") return 0;
+
+          const text = durationString.toLowerCase();
+          const num = parseFloat(text.match(/(\d+(\.\d+)?)/)?.[0]) || 0;
+
+          if (text.includes("小时") || text.includes("h")) {
+            return num * 60;
+          }
+          if (text.includes("分钟") || text.includes("m")) {
+            return num;
+          }
+          // 如果没有单位，但数值大于等于10，我们猜测是分钟
+          if (num >= 10) {
+            return num;
+          }
+          // 其他情况（如数值很小且无单位），猜测是小时
+          return num * 60;
+        }
+
+        /**
+         * 将总分钟数格式化为 "X小时Y分钟" 的字符串
+         * @param {number} totalMinutes - 总分钟数
+         * @returns {string} - 格式化后的时长字符串
+         */
+        function formatMinutesToDuration(totalMinutes) {
+          if (totalMinutes < 1) return "不到1分钟";
+
+          const hours = Math.floor(totalMinutes / 60);
+          const minutes = Math.round(totalMinutes % 60);
+
+          if (hours > 0 && minutes > 0) {
+            return `${hours}小时${minutes}分钟`;
+          } else if (hours > 0) {
+            return `${hours}小时`;
+          } else {
+            return `${minutes}分钟`;
+          }
+        }
+
+        let currentPetData = null; // 用于暂存正在编辑的宠物数据
+        let isPetDragging = false; // 标记是否正在拖动宠物
+        let petDragOffset = { x: 0, y: 0 };
+
+        /**
+         * 打开宠物主面板（设置与互动）
+         */
+        async function openPetModal() {
+          if (!state.activeChatId || state.chats[state.activeChatId].isGroup) {
+            alert("只有在单人聊天中才能养宠物哦！");
+            return;
+          }
+          const chat = state.chats[state.activeChatId];
+
+          // 核心判断：检查是否已领养
+          if (!chat.settings.petAdopted) {
+            // 如果未领养，弹出确认框
+            const confirmed = await showCustomConfirm(
+              "领养新宠物",
+              `你还没有为“${chat.name}”领养宠物，要现在开启宠物系统吗？`,
+              { confirmText: "现在领养" },
+            );
+
+            if (confirmed) {
+              // 用户同意领养
+              chat.settings.petAdopted = true;
+              // 创建一个全新的默认宠物对象
+              chat.settings.pet = {
+                type: "无",
+                name: "",
+                image: "🥚",
+                persona: "一只可爱的小宠物，对世界充满好奇。",
+                petChatHistory: [],
+                isCustomImage: false,
+                display: { show: false, size: 100, top: "80%", left: "50%" },
+                status: {
+                  hunger: 100,
+                  happiness: 100,
+                  intimacyToUser: 50,
+                  intimacyToChar: 50,
+                  lastUpdated: Date.now(),
+                },
+              };
+              await db.chats.put(chat);
+              alert(
+                `恭喜！你已成功为“${chat.name}”开启宠物系统！现在来为它设置一下吧。`,
+              );
+              // 领养成功后，再次调用本函数，这次会直接进入设置界面
+              openPetModal();
+            }
+            // 如果用户取消，则什么也不做
+            return;
+          }
+
+          // --- 如果已经领养，则执行原来的显示逻辑 ---
+          currentPetData = JSON.parse(JSON.stringify(chat.settings.pet));
+
+          document.getElementById("pet-type-input").value =
+            currentPetData.type === "无" ? "" : currentPetData.type;
+          document.getElementById("pet-name-input").value = currentPetData.name;
+          document.getElementById("pet-image-input").value =
+            currentPetData.image;
+          document.getElementById("pet-display-toggle").checked =
+            currentPetData.display.show;
+          document.getElementById("pet-size-slider").value =
+            currentPetData.display.size;
+          document.getElementById("pet-size-value").textContent =
+            `${currentPetData.display.size}px`;
+          document.getElementById("pet-persona-input").value =
+            currentPetData.persona || "";
+
+          updatePetPreview();
+
+          if (currentPetData.type !== "无") {
+            document.getElementById("pet-stats-area").style.display = "flex";
+            updatePetStatusUI(currentPetData);
+          } else {
+            document.getElementById("pet-stats-area").style.display = "none";
+          }
+
+          const positionControls = document.getElementById(
+            "pet-position-controls",
+          );
+          positionControls.style.display = currentPetData.display.show
+            ? "block"
+            : "none";
+
+          document.getElementById("pet-modal").classList.add("visible");
+        }
+
+        /**
+         * 计算并应用宠物的数值衰减
+         * @param {object} pet - 宠物对象
+         * @returns {boolean} - 如果数值发生了变化，返回 true
+         */
+        function applyPetDecay(pet) {
+          if (!pet || !pet.status) return false;
+
+          const now = Date.now();
+          const lastUpdated = pet.status.lastUpdated || now;
+          const timeElapsed = now - lastUpdated;
+
+          // 计算过去了多少个衰减周期
+          const intervalsPassed = Math.floor(timeElapsed / PET_DECAY_INTERVAL);
+
+          if (intervalsPassed > 0) {
+            // 计算总共要衰减多少
+            const totalHungerDecay = intervalsPassed * PET_DECAY_AMOUNT.hunger;
+            const totalHappinessDecay =
+              intervalsPassed * PET_DECAY_AMOUNT.happiness;
+
+            // 应用衰减，确保不低于0
+            pet.status.hunger = Math.max(
+              0,
+              pet.status.hunger - totalHungerDecay,
+            );
+            pet.status.happiness = Math.max(
+              0,
+              pet.status.happiness - totalHappinessDecay,
+            );
+
+            // 更新最后更新时间，只加上已经计算过的周期的时间，避免丢失零头时间
+            pet.status.lastUpdated =
+              lastUpdated + intervalsPassed * PET_DECAY_INTERVAL;
+
+            console.log(
+              `宠物"${pet.name}"数值衰减: ${intervalsPassed}个周期, 饱食度-${totalHungerDecay}, 心情-${totalHappinessDecay}`,
+            );
+            return true; // 数值已改变
+          }
+
+          return false; // 数值未改变
+        }
+
+        /**
+         * 停止当前的宠物衰减计时器
+         */
+        function stopPetDecayTimer() {
+          if (petDecayTimer) {
+            clearInterval(petDecayTimer);
+            petDecayTimer = null;
+            // console.log("宠物衰减计时器已停止。");
+          }
+        }
+
+        /**
+         * 为当前聊天中的宠物启动衰减计时器
+         */
+        function startPetDecayTimer() {
+          stopPetDecayTimer(); // 先确保停止任何旧的计时器
+
+          const chat = state.chats[state.activeChatId];
+          if (!chat || !chat.settings.pet || chat.settings.pet.type === "无") {
+            return; // 如果当前聊天没有宠物，则不启动
+          }
+
+          // console.log(`为宠物"${chat.settings.pet.name}"启动衰减计时器。`);
+
+          // 使用 setInterval 定期检查并应用衰减
+          petDecayTimer = setInterval(async () => {
+            const currentChat = state.chats[state.activeChatId];
+            if (!currentChat) {
+              // 安全检查，如果聊天已关闭则停止计时器
+              stopPetDecayTimer();
+              return;
+            }
+            const pet = currentChat.settings.pet;
+
+            if (applyPetDecay(pet)) {
+              // 如果数值变化了，更新UI并保存到数据库
+              // 只有当宠物面板打开时才需要更新UI
+              if (
+                document
+                  .getElementById("pet-modal")
+                  .classList.contains("visible")
+              ) {
+                updatePetStatusUI(pet);
+              }
+              await db.chats.put(currentChat);
+            }
+          }, 60 * 1000); // 每分钟检查一次，是否到达了衰减周期
+        }
+
+        /**
+         * 更新宠物数值面板的UI显示
+         * @param {object} petData - 宠物的数据对象
+         */
+        function updatePetStatusUI(petData) {
+          const hunger = petData.status.hunger || 0;
+          const happiness = petData.status.happiness || 0;
+          // ★★★ 新增：获取亲密度数值 ★★★
+          const intimacyToUser = petData.status.intimacyToUser || 0;
+          const intimacyToChar = petData.status.intimacyToChar || 0;
+
+          const hungerFill = document.querySelector(
+            "#pet-hunger-bar .stat-bar-fill",
+          );
+          const happinessFill = document.querySelector(
+            "#pet-happiness-bar .stat-bar-fill",
+          );
+          // ★★★ 新增：获取亲密度进度条元素 ★★★
+          const intimacyUserFill = document.querySelector(
+            "#pet-intimacy-user-bar .stat-bar-fill",
+          );
+          const intimacyCharFill = document.querySelector(
+            "#pet-intimacy-char-bar .stat-bar-fill",
+          );
+
+          if (hungerFill) {
+            hungerFill.style.width = `${hunger}%`;
+            hungerFill.textContent = `${hunger}%`;
+          }
+          if (happinessFill) {
+            happinessFill.style.width = `${happiness}%`;
+            happinessFill.textContent = `${happiness}%`;
+          }
+          // ★★★ 新增：渲染亲密度进度条 ★★★
+          if (intimacyUserFill) {
+            intimacyUserFill.style.width = `${intimacyToUser}%`;
+            intimacyUserFill.textContent = `${intimacyToUser}%`;
+          }
+          if (intimacyCharFill) {
+            intimacyCharFill.style.width = `${intimacyToChar}%`;
+            intimacyCharFill.textContent = `${intimacyToChar}%`;
+          }
+        }
+
+        /**
+         * 在弹窗中更新宠物的预览
+         */
+        function updatePetPreview() {
+          const previewDisplay = document.getElementById("pet-preview-display");
+          const nameEl = document.getElementById("pet-preview-name");
+          const typeEl = document.getElementById("pet-preview-type");
+
+          const imageInput = document
+            .getElementById("pet-image-input")
+            .value.trim();
+
+          if (
+            imageInput.startsWith("http") ||
+            imageInput.startsWith("data:image")
+          ) {
+            previewDisplay.innerHTML = `<img src="${imageInput}" style="width: 60px; height: 60px; object-fit: contain;">`;
+          } else {
+            previewDisplay.textContent = imageInput || "🥚";
+          }
+
+          nameEl.textContent =
+            document.getElementById("pet-name-input").value.trim() ||
+            "(未命名)";
+          typeEl.textContent =
+            document.getElementById("pet-type-input").value.trim() || "物种";
+        }
+
+        /**
+         * 保存宠物设置
+         */
+        async function savePetSettings() {
+          const chat = state.chats[state.activeChatId];
+
+          // 从UI读取数据
+          const type =
+            document.getElementById("pet-type-input").value.trim() || "无";
+          const name = document.getElementById("pet-name-input").value.trim();
+          const image =
+            document.getElementById("pet-image-input").value.trim() || "🥚";
+
+          const newPetSettings = {
+            ...currentPetData, // 保留如位置等未在主面板修改的属性
+            type: type,
+            name: name,
+            image: image,
+            persona: document.getElementById("pet-persona-input").value.trim(),
+            isCustomImage:
+              image.startsWith("http") || image.startsWith("data:image"),
+            display: {
+              ...currentPetData.display,
+              show: document.getElementById("pet-display-toggle").checked,
+              size: parseInt(document.getElementById("pet-size-slider").value),
+            },
+          };
+
+          // 更新到 state 和数据库
+          chat.settings.pet = newPetSettings;
+          await db.chats.put(chat);
+
+          // 刷新聊天界面上的宠物
+          renderChatPet();
+
+          document.getElementById("pet-modal").classList.remove("visible");
+          currentPetData = null; // 清理临时数据
+          alert("宠物信息已保存！");
+        }
+
+        /**
+         * 在聊天界面上渲染宠物
+         */
+        function renderChatPet() {
+          const chat = state.chats[state.activeChatId];
+          const petContainer = document.getElementById("chat-pet-container");
+          const petEl = document.getElementById("chat-pet");
+
+          if (
+            !chat ||
+            chat.isGroup ||
+            !chat.settings.petAdopted ||
+            !chat.settings.pet ||
+            !chat.settings.pet.display.show
+          ) {
+            petEl.style.display = "none";
+            return;
+          }
+
+          const pet = chat.settings.pet;
+          petEl.style.display = "block";
+
+          if (pet.isCustomImage) {
+            petEl.innerHTML = `<img src="${pet.image}" alt="${pet.name}">`;
+          } else {
+            petEl.innerHTML = pet.image;
+          }
+
+          // 应用样式
+          petEl.style.fontSize = `${pet.display.size}px`;
+          petEl.style.width = `${pet.display.size}px`;
+          petEl.style.height = `${pet.display.size}px`;
+          petEl.style.top = pet.display.top;
+          petEl.style.left = pet.display.left;
+        }
+
+        /**
+         * 处理用户与宠物的互动
+         * @param {string} action - 互动类型, e.g., 'feed', 'play'
+         */
+        async function handlePetInteraction(action) {
+          const chat = state.chats[state.activeChatId];
+          if (
+            !chat ||
+            !chat.settings.petAdopted ||
+            !chat.settings.pet ||
+            chat.settings.pet.type === "无"
+          ) {
+            alert("你还没有宠物，或者还没有给它设定种类哦！");
+            return;
+          }
+
+          const pet = chat.settings.pet;
+          let actionText = "";
+          const myNickname = chat.settings.myNickname || "我";
+
+          switch (action) {
+            case "feed":
+              pet.status.hunger = Math.min(100, pet.status.hunger + 20);
+              pet.status.happiness = Math.min(100, pet.status.happiness + 5);
+              pet.status.intimacyToUser = Math.min(
+                100,
+                pet.status.intimacyToUser + 10,
+              );
+              actionText = `${myNickname} 喂了 ${pet.name} 一些食物。`;
+              break;
+            case "play":
+              pet.status.hunger = Math.max(0, pet.status.hunger - 10);
+              pet.status.happiness = Math.min(100, pet.status.happiness + 15);
+              pet.status.intimacyToUser = Math.min(
+                100,
+                pet.status.intimacyToUser + 15,
+              );
+              actionText = `${myNickname} 陪 ${pet.name} 玩了一会儿。`;
+              break;
+            case "touch":
+              pet.status.happiness = Math.min(100, pet.status.happiness + 10);
+              pet.status.intimacyToUser = Math.min(
+                100,
+                pet.status.intimacyToUser + 5,
+              );
+              actionText = `${myNickname} 轻轻地抚摸了 ${pet.name}。`;
+              break;
+            case "chat":
+              openPetChat();
+              return;
+          }
+
+          updatePetStatusUI(pet);
+          chat.settings.pet = pet;
+
+          // 创建对用户【可见】的系统消息
+          const visibleMessage = {
+            role: "system",
+            type: "pat_message",
+            content: `[系统：${actionText}]`,
+            timestamp: Date.now(),
+          };
+          chat.history.push(visibleMessage);
+
+          // 创建给AI看的【隐藏】指令
+          const hiddenMessageForAI = {
+            role: "system",
+            content: `[系统提示：用户刚刚和宠物“${pet.name}”进行了互动：${actionText}。]`,
+            timestamp: Date.now() + 1, // 确保时间戳在后
+            isHidden: true,
+          };
+          chat.history.push(hiddenMessageForAI);
+
+          await db.chats.put(chat);
+
+          if (
+            document
+              .getElementById("chat-interface-screen")
+              .classList.contains("active")
+          ) {
+            appendMessage(visibleMessage, chat);
+          }
+
+          document.getElementById("pet-modal").classList.remove("visible");
+        }
+
+        // 宠物对话功能核心函数
+
+        /**
+         * 打开宠物聊天模态框
+         */
+        function openPetChat() {
+          const chat = state.chats[state.activeChatId];
+          if (!chat || !chat.settings.pet || chat.settings.pet.type === "无") {
+            alert("先给你的宠物起个名字和种类吧！");
+            return;
+          }
+
+          // 关闭主设置面板，打开聊天面板
+          document.getElementById("pet-modal").classList.remove("visible");
+          const chatModal = document.getElementById("pet-chat-modal");
+          document.getElementById("pet-chat-title").textContent =
+            `和“${chat.settings.pet.name}”的对话`;
+          document.getElementById("pet-chat-input").value = "";
+
+          renderPetChatHistory(); // 渲染历史记录
+          chatModal.classList.add("visible");
+        }
+
+        /**
+         * 渲染宠物的聊天记录
+         */
+        function renderPetChatHistory() {
+          const chat = state.chats[state.activeChatId];
+          const pet = chat.settings.pet;
+          const messagesEl = document.getElementById("pet-chat-messages");
+          messagesEl.innerHTML = "";
+
+          if (!pet.petChatHistory || pet.petChatHistory.length === 0) {
+            messagesEl.innerHTML = `<p style="text-align:center; color: var(--text-secondary);">试着和它打个招呼吧！</p>`;
+            return;
+          }
+
+          // 获取用户头像
+          const myAvatar = chat.settings.myAvatar || defaultAvatar;
+

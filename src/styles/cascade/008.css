@@ -1,0 +1,1388 @@
+
+.ls-tab-item {
+  flex: 1;
+  text-align: center;
+  /* 核心修改：padding 从 12px 增加到 15px，让导航栏【拉长一点】(更高) */
+  padding: 15px 0;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  position: relative;
+  /* 新增：为图标的缩放和颜色变化添加平滑过渡 */
+  transition: color 0.2s ease;
+}
+
+/* 激活状态的页签 (V2) */
+.ls-tab-item.active {
+  color: var(--accent-color);
+}
+
+/* 激活状态的下划线指示器 (保持不变) */
+.ls-tab-item.active::after {
+  content: "";
+  position: absolute;
+  bottom: 8px; /* 微调位置以适应更高的导航栏 */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 28px;
+  height: 3px;
+  background-color: var(--accent-color);
+  border-radius: 1.5px;
+}
+
+/* ▲▲▲ 替换结束 ▲▲▲ */
+
+/* ▼▼▼ 【全新】这是为SVG图标新增的样式，请把它也粘贴到<style>里 ▼▼▼ */
+.ls-tab-item svg {
+  width: 24px;
+  height: 24px;
+  /* 为图标的大小和粗细变化添加平滑过渡 */
+  transition: all 0.2s ease-in-out;
+}
+
+/* 激活状态的图标，会变得更粗、更大一点，非常醒目 */
+.ls-tab-item.active svg {
+  stroke-width: 2.5;
+  transform: scale(1.1);
+}
+/* ▲▲▲ 新增样式结束 ▲▲▲ */
+
+/* 内容区域 */
+#ls-content-area {
+  flex-grow: 1;
+  position: relative;
+  overflow: hidden;
+}
+.ls-view {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  display: none;
+  padding: 15px;
+  box-sizing: border-box;
+}
+.ls-view.active {
+  display: block;
+}
+
+/* 浮动添加按钮 */
+/* ▼▼▼ 请用这块【终极居中修复版】代码，替换旧的 .ls-fab-btn 样式 ▼▼▼ */
+/* ▼▼▼ 这是SVG适配版的最终代码 ▼▼▼ */
+.ls-fab-btn {
+  position: fixed;
+  bottom: calc(30px + env(safe-area-inset-bottom));
+  right: 30px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background-color: var(--accent-color);
+  color: white;
+  border: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  z-index: 10;
+
+  /* 依然使用Flexbox来居中SVG图标 */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  /* 移除所有与字体相关的属性 */
+  /* font-size: 28px; (已移除) */
+  /* line-height: normal; (已移除) */
+}
+
+/* (可选) 如果你觉得SVG有点小或大，可以微调它的大小 */
+.ls-fab-btn svg {
+  width: 24px;
+  height: 24px;
+}
+/* ▲▲▲ 替换结束 ▲▲▲ */
+
+/* 说说卡片 */
+#ls-moments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+/* 说说卡片 */
+/* ... */
+.ls-moment-card {
+  position: relative; /* ★★★ 核心修复：就是加上这一行！ ★★★ */
+  background-color: var(--secondary-bg);
+  border-radius: 12px;
+  padding: 15px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+  display: flex;
+  gap: 12px;
+}
+/* ... */
+
+.ls-moment-card .avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.ls-moment-card .moment-main {
+  display: flex;
+  flex-direction: column;
+}
+.ls-moment-card .author {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.ls-moment-card .content {
+  margin-top: 5px;
+  font-size: 15px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.ls-moment-card .timestamp {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* 相册列表 */
+/* ▼▼▼ 用这块新样式替换旧的 #ls-album-list ▼▼▼ */
+#ls-album-list {
+  display: grid;
+  /* 核心修改：从2列变为3列，间距从15px缩小为5px */
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+}
+/* ▲▲▲ 替换结束 ▲▲▲ */
+.ls-album-item {
+  cursor: pointer;
+}
+.ls-album-item .cover {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background-color: #e9ecef;
+  background-size: cover;
+  background-position: center;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+.ls-album-item .name {
+  font-weight: 500;
+  text-align: center;
+}
+
+/* 照片上传预览 */
+#ls-photo-preview-container {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 15px;
+}
+.ls-photo-preview-item {
+  position: relative;
+  aspect-ratio: 1 / 1;
+}
+.ls-photo-preview-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 6px;
+}
+/* 情书和分享列表 */
+.ls-list-item {
+  background-color: var(--secondary-bg);
+  border-radius: 8px;
+  padding: 12px 15px;
+  margin-bottom: 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+}
+.ls-list-item .title {
+  font-weight: 500;
+  margin-bottom: 5px;
+}
+.ls-list-item .meta {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.ls-share-item .share-type {
+  display: inline-block;
+  padding: 2px 6px;
+  font-size: 10px;
+  border-radius: 4px;
+  margin-right: 8px;
+  color: white;
+}
+.share-type.song {
+  background-color: #28a745;
+}
+.share-type.movie {
+  background-color: #fd7e14;
+}
+.share-type.book {
+  background-color: #6f42c1;
+}
+/* ▼▼▼ 把这一整块全新的CSS，粘贴到 <style> 标签的最末尾 ▼▼▼ */
+
+/* 【核心修复】让标题绝对居中，不再受两边按钮数量影响 */
+#ls-header #ls-char-name {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60%; /* 限制最大宽度，防止与按钮重叠 */
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 【新增】头像和计数器的总容器，负责整体定位 */
+.ls-avatar-and-counter-wrapper {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  display: flex;
+  flex-direction: column; /* 让头像和计数器垂直排列 */
+  align-items: center; /* 水平居中 */
+  gap: 10px; /* 头像和计数器之间的垂直间距 */
+}
+
+/* 【修改】移除旧的头像绝对定位，因为它现在被新容器管理了 */
+.ls-header-avatars {
+  position: static; /* 改为静态定位 */
+  transform: none;
+  bottom: auto;
+  left: auto;
+  /* 其他样式（如头像大小、边框等）保持不变 */
+}
+
+/* 【修改】移除旧的计数器定位样式，让它在新容器里自然排列 */
+#ls-days-counter {
+  position: static;
+  margin-top: 0;
+  /* 其他样式（如字体颜色、阴影等）保持不变 */
+}
+
+/* ▲▲▲ 粘贴结束 ▲▲▲ */
+/* ▼▼▼ 请将这段新样式粘贴到 <style> 的末尾 ▼▼▼ */
+
+/* 1. 让相册项目成为删除按钮的定位参考点 */
+.ls-album-item .cover {
+  position: relative; /* 关键！ */
+  overflow: hidden; /* 防止删除按钮溢出圆角 */
+}
+
+/* 2. 删除按钮的样式 */
+.ls-photo-delete-btn {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 24px;
+  height: 24px;
+  background-color: rgba(0, 0, 0, 0.6);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  font-size: 18px;
+  line-height: 24px; /* 确保 "×" 垂直居中 */
+  text-align: center;
+  cursor: pointer;
+  opacity: 0; /* 默认隐藏 */
+  transition: opacity 0.2s ease;
+  z-index: 5; /* 确保在最上层 */
+}
+
+/* 3. 鼠标悬停在封面上时，显示删除按钮 */
+.ls-album-item .cover:hover .ls-photo-delete-btn {
+  opacity: 1;
+}
+
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+/* ▼▼▼ 这是为情侣空间“说说”新增的样式 ▼▼▼ */
+
+/* 说说卡片底部的互动区（评论输入、删除按钮等） */
+.ls-moment-footer {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #f0f0f0; /* 和内容区分隔开 */
+}
+
+/* 评论列表的容器 */
+.ls-moment-comments-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px; /* 每条评论之间的间距 */
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+/* 每一条评论的样式 */
+.ls-comment-item {
+  position: relative; /* 为了定位删除按钮 */
+  padding-right: 25px; /* 给删除按钮留出空间 */
+  line-height: 1.5;
+}
+
+.ls-comment-item .commenter-name {
+  font-weight: 600;
+  color: var(--accent-color); /* 使用主题色 */
+  margin-right: 5px;
+}
+
+/* 评论的删除按钮 */
+.ls-comment-delete-btn {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  line-height: 22px;
+  text-align: center;
+  border-radius: 50%;
+  color: var(--text-secondary);
+  font-size: 18px;
+  cursor: pointer;
+  opacity: 0; /* 默认隐藏 */
+  transition: all 0.2s ease;
+}
+
+/* 鼠标放上去才显示删除按钮 */
+.ls-comment-item:hover .ls-comment-delete-btn {
+  opacity: 1;
+}
+.ls-comment-delete-btn:hover {
+  background-color: #f0f0f0;
+  color: #ff3b30;
+}
+
+/* 评论输入区域的样式 */
+.ls-comment-input-area {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.ls-comment-input-area input {
+  flex-grow: 1;
+  border: none;
+  background-color: #f0f2f5;
+  border-radius: 15px;
+  padding: 8px 12px;
+  font-size: 14px;
+}
+
+.ls-comment-input-area button {
+  background-color: var(--accent-color);
+  color: white;
+  border: none;
+  border-radius: 15px;
+  padding: 8px 15px;
+  font-size: 14px;
+  cursor: pointer;
+  flex-shrink: 0; /* 防止按钮被压缩 */
+}
+
+/* 说说卡片本身的删除按钮 */
+.ls-moment-delete-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 24px;
+  height: 24px;
+  background-color: rgba(0, 0, 0, 0.08);
+  color: var(--text-secondary);
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 24px;
+  text-align: center;
+  opacity: 0; /* 默认隐藏 */
+  transition: all 0.2s ease;
+}
+.ls-moment-card:hover .ls-moment-delete-btn {
+  opacity: 1; /* 鼠标放上去才显示 */
+}
+.ls-moment-delete-btn:hover {
+  background-color: #ff3b30;
+  color: white;
+}
+
+/* ▲▲▲ 新增样式结束 ▲▲▲ */
+
+/* ▼▼▼ 把这一整块全新的CSS，粘贴到 <style> 标签的最末尾 ▼▼▼ */
+
+/* ▼▼▼ 用这块【信纸美化版】代码，完整替换掉上一版的所有情书CSS ▼▼▼ */
+
+/* --- 【全新美化版】情侣空间情书功能样式 --- */
+
+/* 1. 情书列表为空时的提示 (不变) */
+#ls-letters-list .ls-empty-placeholder {
+  text-align: center;
+  color: var(--text-secondary);
+  padding: 50px 0;
+}
+
+/* 2. 单个情书卡片的样式 (已修改) */
+.ls-love-letter-item {
+  background-color: var(--secondary-bg);
+  border-radius: 12px;
+  padding: 15px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
+  cursor: pointer;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.ls-love-letter-item:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* 3. 情书图标的样式 (不变) */
+.ls-love-letter-item .letter-icon {
+  flex-shrink: 0;
+  width: 45px;
+  height: 45px;
+  color: #ff8fab;
+}
+
+/* 4. 情书主要信息区 (已修改，加入头像) */
+.ls-love-letter-item .letter-info {
+  flex-grow: 1;
+  overflow: hidden;
+}
+/* 【核心修改】收件人区域现在包含头像和名字 */
+.ls-love-letter-item .letter-recipient {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 5px;
+}
+.ls-love-letter-item .letter-recipient .avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+}
+.ls-love-letter-item .letter-preview {
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 5. 发信人信息 (不变) */
+.ls-love-letter-item .letter-sender {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.ls-love-letter-item .letter-sender .avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+}
+
+/* 6. 【全新】情书详情查看器 (信纸样式) */
+#ls-letter-viewer-modal {
+  z-index: 1001; /* 确保在最上层 */
+}
+.ls-letter-viewer-content {
+  background-color: #fdfaef; /* 温馨的米黄色信纸背景 */
+  width: 90%;
+  max-width: 340px;
+  height: 75%;
+  border-radius: 15px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  font-family: "Kaiti", "STKaiti", serif; /* 使用更典雅的楷体 */
+}
+.letter-viewer-header {
+  padding: 15px;
+  border-bottom: 1px dashed #e0d9c7;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #5d4037;
+}
+.letter-viewer-header .meta-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+}
+.letter-viewer-header .recipient-info .label {
+  font-size: 13px;
+  color: #a1887f;
+}
+.letter-viewer-header .recipient-info .name {
+  font-size: 16px;
+  font-weight: 600;
+}
+.letter-viewer-body {
+  flex-grow: 1;
+  padding: 20px;
+  font-size: 16px;
+  line-height: 2; /* 更大的行高，模拟手写信的舒适感 */
+  color: #4a443b;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.letter-viewer-footer {
+  padding: 15px;
+  border-top: 1px dashed #e0d9c7;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+.letter-viewer-footer .sender-info {
+  font-size: 14px;
+  color: #5d4037;
+  font-weight: 600;
+}
+.letter-viewer-footer .sender-info .timestamp {
+  font-size: 11px;
+  color: #a1887f;
+  font-weight: normal;
+}
+.letter-viewer-footer .letter-actions {
+  display: flex;
+  gap: 10px;
+}
+.letter-viewer-footer .letter-actions button {
+  padding: 8px 15px;
+  border-radius: 15px;
+  border: 1px solid #d4bda5;
+  background-color: transparent;
+  color: #8c7b6c;
+  cursor: pointer;
+  font-size: 14px;
+}
+.letter-viewer-footer .letter-actions button.primary {
+  background-color: #ff8fab;
+  color: white;
+  border-color: #ff8fab;
+}
+
+/* Love letter viewer override – airy ribbon paper */
+#ls-letter-viewer-modal {
+  z-index: 1001;
+}
+.ls-letter-viewer-content {
+  position: relative;
+  background:
+    radial-gradient(
+      circle at 18% 12%,
+      rgba(255, 205, 220, 0.4),
+      transparent 45%
+    ),
+    radial-gradient(
+      circle at 85% 18%,
+      rgba(196, 228, 255, 0.32),
+      transparent 40%
+    ),
+    linear-gradient(150deg, #fffaf6 0%, #fff3f8 45%, #fff7ef 100%);
+  width: 92%;
+  max-width: 360px;
+  height: 76%;
+  border-radius: 18px;
+  border: 2px solid rgba(255, 190, 210, 0.7);
+  box-shadow:
+    0 16px 42px rgba(255, 155, 176, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  display: flex;
+  flex-direction: column;
+  font-family: "Kaiti", "STKaiti", serif;
+  overflow: hidden;
+}
+.ls-letter-viewer-content::after {
+  content: "";
+  position: absolute;
+  inset: 14px 12px 12px;
+  border-radius: 14px;
+  border: 1px dashed rgba(255, 170, 195, 0.55);
+  pointer-events: none;
+}
+.ls-letter-viewer-content::before {
+  content: "";
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 64%;
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #ffd8e6, #c7e7ff);
+  box-shadow: 0 8px 18px rgba(255, 169, 191, 0.35);
+  opacity: 0.75;
+}
+.letter-viewer-header {
+  padding: 16px 18px;
+  border-bottom: 1px dashed #f2c1d4;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #6a4a53;
+  background: linear-gradient(
+    120deg,
+    rgba(255, 232, 242, 0.95),
+    rgba(255, 247, 230, 0.92)
+  );
+}
+.letter-viewer-header .meta-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  border: 2px solid #fff;
+  box-shadow: 0 4px 10px rgba(255, 143, 171, 0.35);
+  object-fit: cover;
+}
+.letter-viewer-header .recipient-info .label {
+  font-size: 13px;
+  color: #b37b8c;
+  letter-spacing: 0.2px;
+}
+.letter-viewer-header .recipient-info .name {
+  font-size: 17px;
+  font-weight: 700;
+}
+.letter-viewer-body {
+  flex-grow: 1;
+  margin: 12px 14px;
+  padding: 18px 16px;
+  font-size: 16px;
+  line-height: 1.9;
+  color: #4f3f45;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(255, 232, 240, 0.62) 0,
+    rgba(255, 232, 240, 0.62) 28px,
+    rgba(255, 255, 255, 0.9) 28px,
+    rgba(255, 255, 255, 0.9) 56px
+  );
+  border-radius: 12px;
+  box-shadow: inset 0 1px 8px rgba(255, 170, 195, 0.18);
+}
+.letter-viewer-body em,
+.letter-viewer-body strong {
+  color: #d66c93;
+}
+.letter-viewer-footer {
+  padding: 14px 16px;
+  border-top: 1px dashed #f2c1d4;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 240, 245, 0.92),
+    rgba(255, 250, 240, 0.94)
+  );
+}
+.letter-viewer-footer .sender-info {
+  font-size: 14px;
+  color: #6a4a53;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.letter-viewer-footer .sender-info .timestamp {
+  font-size: 11px;
+  color: #b37b8c;
+  font-weight: normal;
+}
+.letter-viewer-footer .letter-actions {
+  display: flex;
+  gap: 10px;
+}
+.letter-viewer-footer .letter-actions button {
+  padding: 9px 16px;
+  border-radius: 18px;
+  border: 1px solid #ffcde0;
+  background: #fff;
+  color: #d36d93;
+  cursor: pointer;
+  font-size: 14px;
+  box-shadow: 0 6px 16px rgba(255, 143, 171, 0.2);
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.letter-viewer-footer .letter-actions button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(255, 143, 171, 0.28);
+}
+.letter-viewer-footer .letter-actions button.primary {
+  background: linear-gradient(135deg, #ff9ab3, #ffd2e4);
+  color: #fff;
+  border-color: transparent;
+}
+
+/* ▲▲▲ 样式替换结束 ▲▲▲ */
+/* ▼▼▼ 这是为情书新增的样式 ▼▼▼ */
+
+/* 1. 让情书卡片可以作为删除按钮的定位参考点 */
+.ls-love-letter-item {
+  position: relative; /* 关键！ */
+}
+
+/* 2. 删除按钮的样式 */
+.ls-letter-delete-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 24px;
+  height: 24px;
+  background-color: rgba(0, 0, 0, 0.1);
+  color: #888;
+  border: none;
+  border-radius: 50%;
+  font-size: 18px;
+  line-height: 24px;
+  text-align: center;
+  cursor: pointer;
+  opacity: 0; /* 默认隐藏 */
+  transition: all 0.2s ease;
+  z-index: 5; /* 确保在最上层 */
+}
+
+/* 3. 鼠标悬停在整张卡片上时，才显示删除按钮 */
+.ls-love-letter-item:hover .ls-letter-delete-btn {
+  opacity: 1;
+}
+
+/* 4. 鼠标悬停在删除按钮上时，给一点反馈效果 */
+.ls-letter-delete-btn:hover {
+  background-color: #ff3b30;
+  color: white;
+}
+/* ▼▼▼ 把这一整块全新的CSS，粘贴到 <style> 标签的最末尾 ▼▼▼ */
+
+/* --- 【全新】情侣空间-情侣提问样式 --- */
+
+#ls-questions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.ls-question-card {
+  background-color: var(--secondary-bg);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  overflow: hidden; /* 防止内部元素溢出圆角 */
+}
+
+.ls-question-section,
+.ls-answer-section {
+  padding: 15px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.ls-question-section {
+  border-bottom: 1px dashed var(--border-color);
+}
+
+.ls-question-card .qa-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.ls-question-card .qa-main {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.ls-question-card .qa-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.ls-question-card .qa-author {
+  font-weight: 600;
+}
+
+.ls-question-card .qa-timestamp {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.ls-question-card .qa-content {
+  font-size: 15px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ls-answer-placeholder {
+  padding: 20px;
+  text-align: center;
+}
+
+.ls-answer-btn {
+  padding: 8px 20px;
+  border: 1px solid var(--accent-color);
+  background-color: transparent;
+  color: var(--accent-color);
+  border-radius: 20px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+/* ▲▲▲ 新增CSS结束 ▲▲▲ */
+/* ▼▼▼ 【全新】这是为“情侣提问”新增的删除按钮样式 ▼▼▼ */
+
+/* 1. 让提问卡片可以作为删除按钮的定位参考点 */
+.ls-question-card {
+  position: relative; /* 关键！ */
+}
+
+/* 2. 删除按钮的样式 */
+.ls-question-delete-btn {
+  position: absolute; /* 绝对定位，让它浮动起来 */
+  top: 10px;
+  right: 10px;
+  width: 24px;
+  height: 24px;
+  background-color: rgba(0, 0, 0, 0.08); /* 半透明的背景 */
+  color: var(--text-secondary); /* 使用全局的次要文字颜色 */
+  border: none;
+  border-radius: 50%; /* 圆形 */
+  font-size: 18px; /* "×"号的大小 */
+  line-height: 24px; /* 让"×"号垂直居中 */
+  text-align: center;
+  cursor: pointer;
+  opacity: 0; /* 默认隐藏 */
+  transition: all 0.2s ease; /* 添加平滑的动画效果 */
+  z-index: 5; /* 确保在最上层 */
+}
+
+/* 3. 鼠标悬停在整张卡片上时，才显示删除按钮 */
+.ls-question-card:hover .ls-question-delete-btn {
+  opacity: 1;
+}
+
+/* 4. 鼠标悬停在删除按钮上时，给一点反馈效果 */
+.ls-question-delete-btn:hover {
+  background-color: #ff3b30;
+  color: white;
+}
+/* ▲▲▲ 新增样式结束 ▲▲▲ */
+/* ▼▼▼ 这是为“分享”功能新增的样式 ▼▼▼ */
+
+.ls-share-item .title {
+  font-weight: 600; /* 标题加粗 */
+}
+
+/* ▼▼▼ 用这块【已修复换行问题】的代码，替换掉旧的 .ls-share-item .summary 样式 ▼▼▼ */
+.ls-share-item .summary {
+  font-size: 14px;
+  color: #666;
+  margin-top: 8px;
+  line-height: 1.6;
+  /* --- 核心修改：允许文字自动换行 --- */
+  white-space: normal; /* <--- 允许换行 */
+  overflow: visible; /* <--- 允许内容溢出容器（即显示多行） */
+  text-overflow: clip; /* <--- 禁用省略号 */
+  word-break: break-word; /* <--- 防止超长单词或链接撑破布局 */
+}
+/* ▲▲▲ 替换结束 ▲▲▲ */
+
+#phone-screen.dark-mode .ls-share-item .summary {
+  color: #a0a0a0;
+}
+
+/* ▲▲▲ 新增样式结束 ▲▲▲ */
+/* ▼▼▼ 【全新】这是情侣空间专属音乐播放器的CSS样式 ▼▼▼ */
+
+/* 播放器主窗口的遮罩层 */
+#ls-music-player-overlay {
+  background-color: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+
+/* 播放列表面板的样式 (直接复用现有的) */
+#ls-music-playlist-panel {
+  /* 我们直接使用 .music-playlist-panel 的现有样式，省去重复代码 */
+}
+
+/* ▲▲▲ CSS样式粘贴结束 ▲▲▲ */
+/* 【新增】隐藏情侣空间播放器中不需要的按钮 */
+#ls-music-player-overlay #ls-playlist-btn,
+#ls-music-player-overlay #ls-prev-btn,
+#ls-music-player-overlay #ls-next-btn {
+  display: none;
+}
+
+/* 【新增】居中播放/暂停按钮 */
+#ls-music-player-overlay .music-controls {
+  justify-content: center; /* 让剩下的按钮居中 */
+}
+
+/* ▲▲▲ CSS代码替换结束 ▲▲▲ */
+/* 【新增】情侣空间播放器封面/歌词切换样式 */
+#ls-display-area.show-lyrics #ls-album-cover {
+  display: none; /* 当有 show-lyrics 类时，隐藏封面 */
+}
+#ls-display-area.show-lyrics #ls-lyrics-container {
+  display: block !important; /* 当有 show-lyrics 类时，显示歌词 */
+}
+
+/* 【新增】歌词行样式 */
+#ls-lyrics-container .lyric-line {
+  padding: 4px 0;
+  font-size: 14px;
+  color: #666;
+  opacity: 0.7;
+  transition: all 0.5s ease;
+}
+#ls-lyrics-container .lyric-line.active {
+  font-size: 16px;
+  color: #000;
+  opacity: 1;
+  font-weight: 600;
+}
+/* ▼▼▼ 把这一整块全新的CSS，粘贴到 <style> 标签的最末尾 ▼▼▼ */
+
+/* --- 【全新】情侣空间-情侣番茄钟样式 --- */
+
+/* 主页布局 */
+#ls-pomodoro-home {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+#ls-pomodoro-start-btn-container {
+  padding: 20px;
+  background-color: var(--secondary-bg);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  text-align: center;
+  cursor: pointer;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
+}
+#ls-pomodoro-start-btn-container:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.12);
+}
+#ls-pomodoro-start-icon {
+  font-size: 32px;
+  color: var(--accent-color);
+  line-height: 1;
+}
+#ls-pomodoro-start-btn-container p {
+  margin: 8px 0 0 0;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+/* 历史记录列表 */
+#ls-pomodoro-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pomodoro-history-item {
+  background-color: var(--secondary-bg);
+  border-radius: 8px;
+  padding: 12px 15px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+}
+.pomodoro-history-item:hover {
+  background-color: #f9f9f9;
+}
+.pomodoro-history-item .task {
+  font-weight: 500;
+  margin-bottom: 5px;
+}
+.pomodoro-history-item .meta {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* ▼▼▼ 把下面这整块【锁机全屏版】代码，替换掉你旧的 #ls-pomodoro-timer-active 样式 ▼▼▼ */
+#ls-pomodoro-timer-active {
+  /* 核心修改1：将定位方式从 absolute 改为 fixed */
+  /* 这会让计时器界面脱离原来的“情侣空间”页面，浮动在整个手机屏幕的最顶层！*/
+  position: fixed;
+
+  /* 核心修改2：用这四个属性让它撑满整个屏幕 */
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+
+  /* 核心修改3：设置一个超高的层级，确保它能盖住所有东西，实现“锁机”效果 */
+  z-index: 2000;
+
+  background-size: cover;
+  background-position: center;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: 50px 20px;
+  box-sizing: border-box;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+
+  /* (可选优化) 为iPhone的刘海和底部小黑条留出安全距离，让界面更美观 */
+  padding-top: calc(50px + env(safe-area-inset-top));
+  padding-bottom: calc(50px + env(safe-area-inset-bottom));
+}
+/* ▲▲▲ 替换结束 ▲▲▲ */
+
+/* ▼▼▼ 用这段新代码替换 ▼▼▼ */
+.pomodoro-char-avatar-container {
+  position: relative;
+  text-align: center;
+  width: 100%; /* <-- 就是新增了这一行！ */
+}
+/* ▲▲▲ 替换结束 ▲▲▲ */
+#pomodoro-char-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+#pomodoro-char-avatar:active {
+  transform: scale(0.9);
+}
+/* ▼▼▼ 用这段【最终修复版】代码完整替换旧的 #pomodoro-char-log 样式 ▼▼▼ */
+#pomodoro-char-log {
+  position: absolute;
+  top: 100%;
+  margin-top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(0, 0, 0, 0.65);
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  max-width: 80%; /* <-- 核心修改在这里！让气泡可以变得更宽 */
+  width: max-content; /* <-- 新增！确保气泡宽度根据内容自适应，但不会超过80% */
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.3s,
+    visibility 0.3s,
+    margin-top 0.3s; /* margin-top让动画更平滑 */
+  pointer-events: none;
+  white-space: pre-wrap;
+  box-sizing: border-box; /* 新增！防止内边距导致布局问题 */
+}
+/* ▲▲▲ 替换结束 ▲▲▲ */
+
+#pomodoro-char-log::after {
+  content: "";
+  position: absolute;
+  bottom: 100%; /* <-- 修改这里 */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border: 6px solid transparent;
+  border-bottom-color: rgba(0, 0, 0, 0.65); /* <-- 修改这里 */
+}
+
+#pomodoro-char-log.visible {
+  opacity: 1;
+  visibility: visible; /* 新增 */
+  margin-bottom: 22px; /* 核心修复3: 显示时向上移动一点，有一个“冒出来”的动画效果 */
+}
+/* ▲▲▲ 替换结束 ▲▲▲ */
+
+/* 时间和任务显示 */
+.pomodoro-timer-display {
+  text-align: center;
+}
+#pomodoro-current-task {
+  font-size: 20px;
+  font-weight: 500;
+  margin-bottom: 10px;
+}
+#pomodoro-time {
+  font-size: 72px;
+  font-weight: 200;
+  letter-spacing: 2px;
+}
+
+/* 结束按钮 */
+#pomodoro-end-btn {
+  padding: 12px 30px;
+  font-size: 16px;
+  font-weight: 600;
+  border: 2px solid white;
+  background-color: rgba(255, 255, 255, 0.2);
+  color: white;
+  border-radius: 25px;
+  cursor: pointer;
+}
+
+/* 历史详情弹窗内的聊天气泡 */
+#pomodoro-history-viewer-content {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+.pomodoro-log-bubble {
+  padding: 8px 12px;
+  border-radius: 12px;
+  max-width: 80%;
+  background-color: #f0f0f0;
+  align-self: flex-start;
+  line-height: 1.5;
+}
+#phone-screen.dark-mode .pomodoro-log-bubble {
+  background-color: #2c2c2e;
+}
+
+/* ▲▲▲ 新增CSS结束 ▲▲▲ */
+
+/* --- 修复新增功能导致的滚动条问题 --- */
+
+/* 1. 强制隐藏你不要的“情侣空间播放列表” */
+#ls-music-playlist-panel {
+  display: none !important;
+}
+
+/* 2. 确保主屏幕容器绝对不会出现滚动条，实现固定效果 */
+#phone-screen {
+  overflow: hidden !important;
+}
+
+/* === 【圈子评论区终极修复 - 覆盖继承版】 === */
+
+/* 
+   问题根源：圈子评论区(#post-comment-input-area)错误地继承了
+   主聊天输入区(.chat-input-area)的样式，导致布局错乱。
+   以下代码将针对圈子屏幕(#post-screen)下的评论区进行强制覆盖。
+*/
+
+/* 1. 强制重置评论区容器的布局，让它水平排列、垂直居中 */
+#post-screen #post-comment-input-area {
+  display: flex !important;
+  flex-direction: row !important; /* 强制横向排列 */
+  align-items: center !important; /* 强制垂直居中，实现平行 */
+  gap: 10px !important; /* 设置输入框和按钮的间距 */
+}
+
+/* 2. 确保内层容器也正确伸展 */
+#post-screen #post-comment-input-area .chat-input-main-row {
+  flex-grow: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+
+/* 3. 强制输入框的样式，并让它填满空间 */
+#post-screen #post-comment-input {
+  flex-grow: 1 !important; /* 解决右侧空白的关键！ */
+  min-height: 40px;
+  background-color: #f0f2f5 !important;
+  border-radius: 20px !important;
+  border: none !important;
+  padding: 10px 15px !important;
+  font-size: 14px !important;
+  line-height: 1.5;
+  resize: none;
+  box-sizing: border-box;
+}
+
+/* 4. 强制发送按钮的样式 */
+#post-screen #send-post-comment-btn {
+  height: 40px !important;
+  padding: 0 20px !important;
+  border-radius: 20px !important;
+  background-color: var(--accent-color) !important;
+  color: white !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  border: none !important;
+  flex-shrink: 0; /* 防止按钮被压缩 */
+}
+
+/* 夜间模式适配 */
+#phone-screen.dark-mode #post-screen #post-comment-input {
+  background-color: #2c2c2e !important;
+}
+/* ▼▼▼ 这是新增的主屏幕滑动样式 ▼▼▼ */
+
+/* 主屏幕滑动容器 */
+.home-screen-slider {
+  width: 100%;
+  height: 100%; /* 确保它能撑满父容器 */
+  display: flex; /* 让两页并排站好 */
+  overflow-x: auto; /* 允许水平滚动 */
+  overflow-y: hidden; /* 禁止垂直滚动 */
+  scroll-snap-type: x mandatory; /* 这就是滑动的魔法！让它自动吸附到每一页 */
+  -webkit-overflow-scrolling: touch; /* 在iOS上实现更平滑的滚动 */
+  scrollbar-width: none; /* 隐藏滚动条 (Firefox) */
+  -ms-overflow-style: none; /* 隐藏滚动条 (IE) */
+}
+.home-screen-slider::-webkit-scrollbar {
+  display: none; /* 隐藏滚动条 (Chrome, Safari) */
+}
+
+.home-page {
+  width: 100%; /* 每一页都占满整个屏幕宽度 */
+  height: 100%;
+  flex-shrink: 0; /* 防止页面被压缩变形 */
+  scroll-snap-align: start; /* 确保每次都对齐页面的开始位置 */
+
+  /* 让页面内部的内容可以滚动 */
+  overflow-y: auto;
+  padding: 0 20px; /* 保持和你原来一样的左右边距 */
+  box-sizing: border-box;
+  position: relative !important;
+}
+
+/* 分页小圆点的容器 */
+.pagination-dots {
+  position: absolute;
+  bottom: calc(100px + env(safe-area-inset-bottom)); /* 放在Dock栏上方 */
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px; /* 圆点之间的间距 */
+}
+
+/* 单个小圆点 */
+.pagination-dots .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.4); /* 未选中时的颜色 */
+  transition: background-color 0.3s ease; /* 添加一个平滑的颜色过渡动画 */
+}
+
+/* 被选中的小圆点 */
+.pagination-dots .dot.active {
+  background-color: rgba(255, 255, 255, 0.9); /* 选中时变得更亮 */
+}
+
+/* ▲▲▲ 新增样式结束 ▲▲▲ */
+/* ▼▼▼ 把这段新样式粘贴到 <style> 标签的最末尾 ▼▼▼ */
+
+/* 这是第二页布局的全新样式 (V2 美化版) */
+
+/* 1. 把头像小组件定位到左半屏的中间 */
+#second-page-left-widget {
+  position: absolute;
+  top: 50px;
+  left: 25%;
+  transform: translateX(-50%);
+}
+
+/* ★★★ 这是为头像小组件新增的放大和细边框样式 ★★★ */
+#second-page-left-widget .widget-circle-uploader {
+  width: 65px; /* 头像宽度从 65px 放大到 80px */
+  height: 65px; /* 头像高度从 65px 放大到 80px */
+  border-width: 1px; /* 轮廓线从 2px 减小到 1px，变得很细 */
+  padding: 1px; /* ★★★ 在这里添加这一行，把缝隙减小到1像素 ★★★ */
+}
+/* 2. 把右上角的图标改为并排排列 */
+#second-page-top-right-apps {
+  position: absolute;
+  top: 50px;
+  right: 30px;
+  display: flex;
+  gap: 30px; /* ★★★ 图标间距从 25px 增加到 30px，拉开距离 ★★★ */
+}
+
+/* 3. 文字颜色样式保持不变 */
+#second-page-top-right-apps .desktop-app-icon .label {
+  color: white;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+/* ▼▼▼ 把这段新样式粘贴到 <style> 标签的最末尾 ▼▼▼ */
+
+/* ▼▼▼ 请用这【一整块新代码】完整替换掉你上次添加的、关于第二页头像的所有CSS ▼▼▼ */
+
+/* 1. 容器：移除元素间距，让头像和气泡靠拢 (保持不变) */
+#second-page-left-widget {
+  /* ★★★ 在这里新增一个宽度，作为“主宽度” ★★★ */
+  width: 150px;
+  gap: 0;
+}
+
+#second-page-bubble {
+  margin-top: -10px;
+  padding: 10px 15px;
+  border-radius: 30px;
+  /* ★★★ 修改点1：移除 min-width 和 display: inline-block ★★★ */
+  /* min-width: 140px; */
+  /* display: inline-block; */
+
+  /* ★★★ 修改点2：添加下面这三行，让它占满父容器宽度并居中 ★★★ */
+  width: 100%;
+  box-sizing: border-box; /* 确保 padding 不会撑破布局 */
+  text-align: center; /* 让文字在变宽的容器里居中 */
+
+  background-color: rgba(255, 255, 255, 0.4);
+  color: #1c1c1e;
+  text-shadow: none;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  position: relative;
+  z-index: 1;
+}
+
+/* ★★★ 修改点2：在这里明确移除那个不想要的尖角 ★★★ */
+#second-page-bubble::after {
+  content: none; /* 强制移除继承自 .widget-bubble 的尖角伪元素 */
+}
+
+/* 3. 提升头像层级 (保持不变) */
+#second-page-left-widget .widget-circle-uploader {
+  position: relative;
+  z-index: 2;
+}
+
+/* ▲▲▲ 替换结束 ▲▲▲ */
+/* ▼▼▼ 把这一整块全新的CSS，粘贴到 <style> 标签的最末尾 ▼▼▼ */
+
+/* 1. 新增气泡的容器，负责整体布局和宽度 */
+#new-bubbles-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* ★★★ 核心修改：将固定的 180px 改为 100%，让它自动跟随父容器 ★★★ */
+  width: 100%;
+  margin-top: 8px;
+}
+
+/* ▼▼▼ 用这块【全新的代码】替换旧的 #flat-capsule-bubble 样式 ▼▼▼ */
+/* ▼▼▼ 用这块【修改后】的代码替换旧的 #flat-capsule-bubble 样式 ▼▼▼ */

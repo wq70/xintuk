@@ -1,0 +1,926 @@
+              await saveSummaryAsMemory(state.activeChatId, summaryText);
+              await showCustomAlert("总结完成", "新的对话记忆已生成！");
+              if (
+                document
+                  .getElementById("summary-viewer-modal")
+                  .classList.contains("visible")
+              ) {
+                openSummaryViewer();
+              }
+            }
+          } catch (e) {
+            console.error("手动总结过程中发生未捕获的错误:", e);
+            await showCustomAlert(
+              "错误",
+              "手动总结时发生错误，详情请查看控制台。",
+            );
+          } finally {
+            isSummarizing = false; // 别忘了无论成功失败都要解锁
+          }
+        }
+
+        /**
+         * 更新角色手机钱包的余额和交易记录
+         * @param {string} charId - 要更新钱包的角色ID
+         * @param {number} amount - 交易金额 (正数为收入, 负数为支出)
+         * @param {string} description - 交易描述 (例如: "转账给 XX", "收到 XX 的红包")
+         */
+        async function updateCharacterBankBalance(charId, amount, description) {
+          // 安全检查：如果缺少关键信息，则直接返回
+          if (!charId || !amount || isNaN(amount)) {
+            console.warn(
+              "updateCharacterBankBalance 调用失败：缺少charId或有效的amount。",
+            );
+            return;
+          }
+
+          // 从全局状态中获取角色对象
+          const chat = state.chats[charId];
+          // 安全检查：确保角色存在且不是群聊
+          if (!chat || chat.isGroup) {
+            console.warn(
+              `updateCharacterBankBalance 跳过：找不到ID为 ${charId} 的角色或该ID为群聊。`,
+            );
+            return;
+          }
+
+          // --- 确保数据结构完整，兼容旧数据 ---
+          if (!chat.characterPhoneData) {
+            chat.characterPhoneData = {};
+          }
+          if (!chat.characterPhoneData.bank) {
+            chat.characterPhoneData.bank = { balance: 0, transactions: [] };
+          }
+          // 如果旧数据的余额不是数字，则强制设为0
+          if (typeof chat.characterPhoneData.bank.balance !== "number") {
+            chat.characterPhoneData.bank.balance = 0;
+          }
+          // 如果旧数据的交易记录不是数组，则创建一个空数组
+          if (!Array.isArray(chat.characterPhoneData.bank.transactions)) {
+            chat.characterPhoneData.bank.transactions = [];
+          }
+
+          // --- 核心逻辑 ---
+          // 1. 创建一条新的交易记录
+          const newTransaction = {
+            type: amount > 0 ? "收入" : "支出",
+            amount: Math.abs(amount), // 交易记录里的金额总是正数
+            description: description,
+            timestamp: Date.now(), // 记录交易发生的时间
+          };
+
+          // 2. 更新余额
+          chat.characterPhoneData.bank.balance += amount;
+
+          // 3. 将新交易记录添加到列表的开头（让最新的显示在最前面）
+          chat.characterPhoneData.bank.transactions.unshift(newTransaction);
+
+          // 4. 将更新后的角色数据保存回数据库
+          await db.chats.put(chat);
+
+          console.log(
+            `✅ 钱包同步成功: 角色[${chat.name}], 交易[${description}], 金额[${amount.toFixed(
+              2,
+            )}], 新余额[${chat.characterPhoneData.bank.balance.toFixed(2)}]`,
+          );
+        }
+
+        /**
+         * 打开角色手机的外观设置页面
+         */
+        function openCharPhoneAppearanceSettings() {
+          renderCharPhoneAppearanceScreen(); // 渲染页面内容
+          showCharacterPhonePage("character-phone-appearance-screen"); // 显示页面
+          loadCharPhonePresetsToDropdown();
+        }
+
+        /**
+         * 渲染角色手机的外观设置页面
+         */
+        function renderCharPhoneAppearanceScreen() {
+          if (!activeCharacterPhoneId) return;
+          const chat = state.chats[activeCharacterPhoneId];
+          if (!chat) return;
+
+          // --- 渲染壁纸预览 ---
+          const wallpaperPreview = document.getElementById(
+            "char-phone-wallpaper-preview",
+          );
+          const wallpaperUrl = chat.characterPhoneData.wallpaper || "";
+          if (wallpaperUrl) {
+            wallpaperPreview.style.backgroundImage = `url(${wallpaperUrl})`;
+            wallpaperPreview.textContent = "";
+          } else {
+            wallpaperPreview.style.backgroundImage = "none";
+            wallpaperPreview.textContent = "暂无壁纸";
+          }
+          // --- 渲染App内壁纸预览 ---
+          const appWallpaperPreview = document.getElementById(
+            "char-phone-app-wallpaper-preview",
+          );
+          const appWallpaperUrl =
+            newAppWallpaperBase64 || chat.characterPhoneData.appWallpaper || "";
+          if (appWallpaperUrl) {
+            appWallpaperPreview.style.backgroundImage = `url(${appWallpaperUrl})`;
+            appWallpaperPreview.textContent = "";
+          } else {
+            appWallpaperPreview.style.backgroundImage = "none";
+            appWallpaperPreview.textContent = "点击下方上传";
+          }
+          // --- 渲染App图标设置列表 ---
+          const iconGrid = document.getElementById(
+            "char-phone-icon-settings-grid",
+          );
+          iconGrid.innerHTML = "";
+          const customIcons = chat.characterPhoneData.appIcons || {};
+
+          CHAR_PHONE_APPS.forEach((app) => {
+            const customIconUrl = customIcons[app.id];
+            // 使用默认图标作为备用
+            const currentIconUrl =
+              customIconUrl || DEFAULT_APP_ICONS[app.id] || "";
+            const currentIconHtml = currentIconUrl
+              ? `<img src="${currentIconUrl}" style="width:100%; height:100%; object-fit:cover;">`
+              : app.svg;
+
+            const itemEl = document.createElement("div");
+            itemEl.className = "icon-setting-item";
+            itemEl.dataset.iconId = app.id;
+            itemEl.innerHTML = `
+			            <div class="icon-preview" style="width: 50px; height: 50px; border-radius: 12px; display: flex; justify-content: center; align-items: center; padding: 8px; background: #f0f2f5;">
+			                ${currentIconHtml}
+			            </div>
+			            <span style="font-size: 13px;">${app.name}</span>
+			            <button class="change-icon-btn" data-icon-id="${app.id}" style="padding: 4px 10px; font-size: 12px; border: 1px solid #ccc; background-color: #f0f0f0; border-radius: 5px; cursor: pointer;">更换</button>
+			        `;
+            iconGrid.appendChild(itemEl);
+          });
+
+          // --- 渲染小组件预览 (逻辑不变) ---
+          const widgets = chat.characterPhoneData.widgets || {};
+          const widgetPreview1 = document.getElementById(
+            "char-phone-widget-preview-1",
+          );
+          const widgetPreview2 = document.getElementById(
+            "char-phone-widget-preview-2",
+          );
+
+          if (widgets.widget1_url) {
+            widgetPreview1.style.backgroundImage = `url(${widgets.widget1_url})`;
+            widgetPreview1.textContent = "";
+          } else {
+            widgetPreview1.style.backgroundImage = "none";
+            widgetPreview1.textContent = "点击上传";
+          }
+
+          if (widgets.widget2_url) {
+            widgetPreview2.style.backgroundImage = `url(${widgets.widget2_url})`;
+            widgetPreview2.textContent = "";
+          } else {
+            widgetPreview2.style.backgroundImage = "none";
+            widgetPreview2.textContent = "点击上传";
+          }
+        }
+
+        /**
+         * 处理角色手机壁纸的更换和移除
+         * @param {string} newUrl - 新的壁纸URL，如果为空字符串则表示移除
+         */
+        async function handleCharPhoneWallpaperChange(newUrl) {
+          if (!activeCharacterPhoneId) return;
+          const chat = state.chats[activeCharacterPhoneId];
+
+          chat.characterPhoneData.wallpaper = newUrl;
+          await db.chats.put(chat);
+
+          // 立即应用壁纸到角色手机主屏幕
+          const phoneScreen = document.getElementById("character-phone-screen");
+          if (newUrl) {
+            phoneScreen.style.backgroundImage = `url(${newUrl})`;
+            phoneScreen.style.backgroundColor = "transparent";
+          } else {
+            phoneScreen.style.backgroundImage = "none";
+            const isDarkMode = document
+              .getElementById("phone-screen")
+              .classList.contains("dark-mode");
+            phoneScreen.style.backgroundColor = isDarkMode ? "#000" : "#f0f2f5";
+          }
+
+          // 刷新设置页面的预览
+          renderCharPhoneAppearanceScreen();
+          alert(newUrl ? "壁纸已更新！" : "壁纸已移除！");
+        }
+
+        /**
+         * 处理角色手机App图标的更换
+         * @param {string} iconId - 要更换的App的ID
+         */
+        async function handleChangeCharPhoneIcon(iconId) {
+          if (!activeCharacterPhoneId) return;
+
+          const choice = await showChoiceModal("更换图标", [
+            { text: "📁 从本地上传", value: "local" },
+            { text: "🌐 使用网络URL", value: "url" },
+            { text: "🔄 恢复默认", value: "reset" },
+          ]);
+
+          let newIconUrl = null;
+
+          if (choice === "local") {
+            newIconUrl = await uploadImageLocally();
+          } else if (choice === "url") {
+            newIconUrl = await showCustomPrompt("图标URL", "请输入图片链接");
+          } else if (choice === "reset") {
+            const chat = state.chats[activeCharacterPhoneId];
+            if (
+              chat.characterPhoneData.appIcons &&
+              chat.characterPhoneData.appIcons[iconId]
+            ) {
+              delete chat.characterPhoneData.appIcons[iconId];
+              await db.chats.put(chat);
+              renderCharPhoneAppearanceScreen();
+              renderCharacterAppGrid();
+              alert("图标已恢复默认。");
+            }
+            return;
+          }
+
+          if (newIconUrl && newIconUrl.trim()) {
+            const chat = state.chats[activeCharacterPhoneId];
+            if (!chat.characterPhoneData.appIcons) {
+              chat.characterPhoneData.appIcons = {};
+            }
+            chat.characterPhoneData.appIcons[iconId] = newIconUrl.trim();
+            await db.chats.put(chat);
+
+            renderCharPhoneAppearanceScreen(); // 刷新设置页面
+            renderCharacterAppGrid(); // 刷新主屏幕
+            alert("图标已更新！");
+          }
+        }
+
+        let isIntentionalStop = false;
+        let isTtsPlaying = false;
+        let currentTtsAudioBubble = null;
+
+        /**
+         * 查找从指定位置开始的所有连续AI语音消息
+         * @param {Array} history - 完整的聊天历史记录数组
+         * @param {number} startIndex - 开始查找的索引位置
+         * @returns {Array} - 一个包含所有连续AI语音消息对象的数组
+         */
+        function findConsecutiveAiVoiceMessages(history, startIndex) {
+          const messagesToPlay = [];
+          if (startIndex < 0 || startIndex >= history.length) {
+            return messagesToPlay;
+          }
+
+          // 从点击的那条消息开始，向后遍历
+          for (let i = startIndex; i < history.length; i++) {
+            const msg = history[i];
+            // 检查这条消息是否是AI发送的，并且类型是语音
+            if (msg.role === "assistant" && msg.type === "voice_message") {
+              messagesToPlay.push(msg); // 如果是，就把它加入待播放列表
+            } else {
+              // 一旦遇到不是AI语音的消息（比如用户的回复，或AI的图片/文字消息），就立刻停止查找
+              break;
+            }
+          }
+          return messagesToPlay;
+        }
+        /**
+         * 停止当前正在播放的Minimax TTS语音
+         */
+        function stopMinimaxAudio() {
+          if (!isTtsPlaying) return;
+
+          isIntentionalStop = true;
+          const ttsPlayer = document.getElementById("tts-audio-player");
+          ttsPlayer.pause();
+          ttsPlayer.src = ""; // 这会触发 onerror 事件，从而执行清理
+
+          if (window.currentAnimatingBubbles) {
+            window.currentAnimatingBubbles.forEach((b) => {
+              const spinner = b.querySelector(".loading-spinner");
+              if (spinner) spinner.style.display = "none";
+              b.classList.remove("playing");
+            });
+          }
+
+          isTtsPlaying = false;
+          currentTtsAudioBubble = null;
+          window.currentAnimatingBubbles = null;
+
+          setTimeout(() => {
+            isIntentionalStop = false;
+          }, 100);
+        }
+
+        /**
+         * 【辅助函数】将Hex字符串转换为可播放的Blob URL
+         * @param {string} hex - 十六进制编码的音频数据
+         * @returns {string|null} - Blob URL 或 null
+         */
+        function hexToBlobUrl(hex) {
+          if (!hex) return null;
+          const cleanHex = hex.replace(/[^0-9a-fA-F]/g, "");
+          const length = cleanHex.length;
+          if (length % 2 !== 0) {
+            console.error("Hex string has an odd length.");
+            return null;
+          }
+          const buffer = new Uint8Array(length / 2);
+          for (let i = 0; i < length; i += 2) {
+            buffer[i / 2] = parseInt(cleanHex.substr(i, 2), 16);
+          }
+          // 根据文档，推荐使用 mp3 格式
+          const blob = new Blob([buffer], { type: "audio/mpeg" });
+          return URL.createObjectURL(blob);
+        }
+
+        /**
+         * 调用 Minimax TTS API 生成语音并播放
+         * @param {string} text - 要转换为语音的合并后的文本
+         * @param {string} voiceId - Minimax 的语音 ID
+         * @param {Array<HTMLElement>} bubblesToAnimate - 需要播放动画的所有语音气泡元素的数组
+         */
+        async function playMinimaxAudio(text, voiceId, bubblesToAnimate) {
+          stopMinimaxAudio();
+          await new Promise((resolve) => setTimeout(resolve, 50));
+
+          const ttsPlayer = document.getElementById("tts-audio-player");
+          const firstBubble = bubblesToAnimate[0];
+          if (!firstBubble) return;
+
+          isTtsPlaying = true;
+          currentTtsAudioBubble = firstBubble;
+          window.currentAnimatingBubbles = bubblesToAnimate;
+          bubblesToAnimate.forEach((b) => {
+            const spinner = b.querySelector(".loading-spinner");
+            if (spinner) spinner.style.display = "block";
+          });
+
+          const mainAudioPlayer = document.getElementById("audio-player");
+          if (mainAudioPlayer && !mainAudioPlayer.paused) {
+            mainAudioPlayer.pause();
+            state.musicState.isPlaying = false;
+            updatePlayerUI();
+          }
+
+          const groupId = state.apiConfig.minimaxGroupId;
+          const apiKey = state.apiConfig.minimaxApiKey;
+          if (!groupId || !apiKey) {
+            await showCustomAlert(
+              "语音播放失败",
+              "尚未配置Minimax的Group ID和API Key。",
+            );
+            stopMinimaxAudio();
+            return;
+          }
+
+          const chat = state.chats[state.activeChatId];
+          if (!chat) {
+            stopMinimaxAudio();
+            return;
+          }
+
+          const provider = state.apiConfig.minimaxProvider || "cn";
+          const speechModel =
+            state.apiConfig.minimaxSpeechModel || "speech-01-turbo";
+          const baseUrl =
+            provider === "cn"
+              ? "https://api.minimaxi.com"
+              : "https://api.minimax.io";
+          const requestUrl = `${baseUrl}/v1/t2a_v2`;
+          // 1. 从当前角色的设置中读取语速和语言增强
+          const speed = chat.settings.speed ?? 1.0;
+          const langBoost = chat.settings.language_boost; // 如果是null或undefined, 就让它是null/undefined
+
+          const textForTts = text
+            .replace(/\(.*?\)|（.*?）|【.*?】/g, "")
+            .trim();
+
+          // 2. 构建包含新参数的请求体
+          const requestBody = {
+            model: speechModel,
+            text: textForTts, // <--- 核心修改在这里！使用过滤后的文本
+            voice_setting: {
+              voice_id: voiceId,
+              speed: speed, // ★ 在这里加入语速
+            },
+          };
+
+          // 3. 如果 language_boost 有效，才将它添加到请求体中
+          if (langBoost) {
+            requestBody.language_boost = langBoost;
+          }
+
+          console.log(`[Minimax TTS] Request to ${requestUrl}`, requestBody);
+
+          try {
+            const response = await fetch(`${requestUrl}?GroupId=${groupId}`, {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${apiKey}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(requestBody),
+            });
+
+            const result = await response.json();
+
+            if (
+              !response.ok ||
+              (result.base_resp && result.base_resp.status_code !== 0)
+            ) {
+              throw new Error(
+                `API错误码 ${
+                  result.base_resp?.status_code || response.status
+                }: ${result.base_resp?.status_msg || response.statusText}`,
+              );
+            }
+
+            if (!result.data || !result.data.audio) {
+              throw new Error("API响应中未找到有效的音频数据。");
+            }
+
+            const audioUrl = hexToBlobUrl(result.data.audio);
+            if (!audioUrl) {
+              throw new Error("Hex音频数据转换失败。");
+            }
+
+            bubblesToAnimate.forEach((b) => {
+              const spinner = b.querySelector(".loading-spinner");
+              if (spinner) spinner.style.display = "none";
+              b.classList.add("playing");
+            });
+
+            ttsPlayer.src = audioUrl;
+
+            const cleanupAndReset = () => {
+              if (isTtsPlaying) {
+                isTtsPlaying = false;
+                URL.revokeObjectURL(audioUrl);
+                if (window.currentAnimatingBubbles) {
+                  window.currentAnimatingBubbles.forEach((b) =>
+                    b.classList.remove("playing"),
+                  );
+                }
+                currentTtsAudioBubble = null;
+                window.currentAnimatingBubbles = null;
+              }
+            };
+
+            ttsPlayer.onended = cleanupAndReset;
+
+            ttsPlayer.onerror = (e) => {
+              if (!isIntentionalStop) {
+                console.error("TTS音频播放时发生错误:", e);
+              }
+              cleanupAndReset();
+            };
+
+            await ttsPlayer.play();
+          } catch (error) {
+            console.error("Minimax TTS 调用失败:", error);
+            await showCustomAlert("语音合成失败", `错误信息: ${error.message}`);
+            stopMinimaxAudio();
+          }
+        }
+
+        // 角色手机外观预设功能核心函数
+
+        /**
+         * 启用或禁用角色手机预设管理按钮
+         * @param {boolean} isEnabled - 是否启用
+         */
+        function toggleCharPhonePresetButtons(isEnabled) {
+          document.getElementById("apply-char-phone-preset-btn").disabled =
+            !isEnabled;
+          document.getElementById("update-char-phone-preset-btn").disabled =
+            !isEnabled;
+          document.getElementById("rename-char-phone-preset-btn").disabled =
+            !isEnabled;
+          document.getElementById("delete-char-phone-preset-btn").disabled =
+            !isEnabled;
+          document.getElementById("export-char-phone-preset-btn").disabled =
+            !isEnabled;
+        }
+
+        /**
+         * 加载角色手机外观预设到下拉框
+         */
+        async function loadCharPhonePresetsToDropdown() {
+          const selector = document.getElementById(
+            "char-phone-preset-selector",
+          );
+          if (!selector) return;
+          selector.innerHTML = '<option value="">-- 请选择一个预设 --</option>';
+          const presets = await db.charPhonePresets.toArray();
+          presets.forEach((preset) => {
+            const option = document.createElement("option");
+            option.value = preset.id;
+            option.textContent = preset.name;
+            selector.appendChild(option);
+          });
+          activeCharPhonePresetId = null;
+          toggleCharPhonePresetButtons(false);
+        }
+
+        /**
+         * 当用户从下拉框选择一个预设时触发
+         */
+        function handleCharPhonePresetSelection() {
+          const selector = document.getElementById(
+            "char-phone-preset-selector",
+          );
+          activeCharPhonePresetId = selector.value
+            ? parseInt(selector.value)
+            : null;
+          toggleCharPhonePresetButtons(!!activeCharPhonePresetId);
+        }
+
+        async function applySelectedCharPhonePreset() {
+          if (!activeCharPhonePresetId) {
+            alert("请先从下拉框中选择一个要应用的预设。");
+            return;
+          }
+          if (!activeCharacterPhoneId) {
+            alert("错误：没有找到当前正在操作的角色手机。");
+            return;
+          }
+          const preset = await db.charPhonePresets.get(activeCharPhonePresetId);
+          const chat = state.chats[activeCharacterPhoneId];
+
+          if (preset && preset.data && chat) {
+            // 将预设数据深拷贝一份，应用到角色的手机数据上
+            chat.characterPhoneData.wallpaper = preset.data.wallpaper || "";
+            chat.characterPhoneData.appIcons = {
+              ...DEFAULT_APP_ICONS,
+              ...(preset.data.appIcons || {}),
+            };
+            chat.characterPhoneData.widgets = {
+              ...(preset.data.widgets || {}),
+            };
+
+            // ★★★ 这就是我们新增的一行！★★★
+            chat.characterPhoneData.appWallpaper =
+              preset.data.appWallpaper || "";
+
+            await db.chats.put(chat);
+
+            // 刷新手机界面以显示新外观
+            openCharacterPhone(activeCharacterPhoneId);
+
+            // 刷新外观设置页面，以便预览和数据同步
+            renderCharPhoneAppearanceScreen();
+
+            alert(`已成功为“${chat.name}”应用预设: "${preset.name}"！`);
+          } else {
+            alert("应用预设失败，找不到预设或角色数据。");
+          }
+        }
+
+        /**
+         * 保存当前角色手机的外观设置为一个新的预设
+         */
+        async function saveCurrentCharPhonePreset() {
+          if (!activeCharacterPhoneId) return;
+
+          const presetName = await showCustomPrompt(
+            "保存预设",
+            "请为这个外观方案起个名字：",
+          );
+          if (!presetName || !presetName.trim()) {
+            if (presetName !== null) alert("名字不能为空！");
+            return;
+          }
+
+          const chat = state.chats[activeCharacterPhoneId];
+          // 从当前角色的数据中提取外观设置
+          const presetData = {
+            wallpaper: chat.characterPhoneData.wallpaper || "",
+            appIcons: { ...(chat.characterPhoneData.appIcons || {}) },
+            widgets: { ...(chat.characterPhoneData.widgets || {}) },
+            appWallpaper: chat.characterPhoneData.appWallpaper || "",
+          };
+
+          await db.charPhonePresets.add({
+            name: presetName.trim(),
+            data: presetData,
+          });
+          await loadCharPhonePresetsToDropdown();
+          alert(`外观预设 "${presetName.trim()}" 已保存！`);
+        }
+
+        /**
+         * 更新当前选中的预设
+         */
+        async function updateSelectedCharPhonePreset() {
+          if (!activeCharPhonePresetId || !activeCharacterPhoneId) return;
+
+          const currentPreset = await db.charPhonePresets.get(
+            activeCharPhonePresetId,
+          );
+          if (!currentPreset) return;
+
+          const confirmed = await showCustomConfirm(
+            "确认更新",
+            `确定要用当前手机的外观覆盖预设 "${currentPreset.name}" 吗？`,
+            { confirmButtonClass: "btn-danger" },
+          );
+
+          if (confirmed) {
+            const chat = state.chats[activeCharacterPhoneId];
+            const presetData = {
+              wallpaper: chat.characterPhoneData.wallpaper || "",
+              appIcons: { ...(chat.characterPhoneData.appIcons || {}) },
+              widgets: { ...(chat.characterPhoneData.widgets || {}) },
+              appWallpaper: chat.characterPhoneData.appWallpaper || "",
+            };
+            await db.charPhonePresets.update(activeCharPhonePresetId, {
+              data: presetData,
+            });
+            await showCustomAlert(
+              "成功",
+              `预设 "${currentPreset.name}" 已更新！`,
+            );
+          }
+        }
+
+        /**
+         * 重命名选中的预设
+         */
+        async function renameSelectedCharPhonePreset() {
+          if (!activeCharPhonePresetId) return;
+          const currentPreset = await db.charPhonePresets.get(
+            activeCharPhonePresetId,
+          );
+          const newName = await showCustomPrompt(
+            "重命名",
+            "请输入新的名称：",
+            currentPreset.name,
+          );
+          if (newName && newName.trim()) {
+            await db.charPhonePresets.update(activeCharPhonePresetId, {
+              name: newName.trim(),
+            });
+            await loadCharPhonePresetsToDropdown();
+            document.getElementById("char-phone-preset-selector").value =
+              activeCharPhonePresetId;
+            alert("重命名成功！");
+          }
+        }
+
+        /**
+         * 删除选中的预设
+         */
+        async function deleteSelectedCharPhonePreset() {
+          if (!activeCharPhonePresetId) return;
+          const currentPreset = await db.charPhonePresets.get(
+            activeCharPhonePresetId,
+          );
+          const confirmed = await showCustomConfirm(
+            "确认删除",
+            `确定要删除预设 "${currentPreset.name}" 吗？`,
+            {
+              confirmButtonClass: "btn-danger",
+            },
+          );
+          if (confirmed) {
+            await db.charPhonePresets.delete(activeCharPhonePresetId);
+            await loadCharPhonePresetsToDropdown();
+            alert("预设已删除。");
+          }
+        }
+
+        /**
+         * 导出选中的预设
+         */
+        async function exportCharPhonePreset() {
+          if (!activeCharPhonePresetId) return;
+          const preset = await db.charPhonePresets.get(activeCharPhonePresetId);
+          const blob = new Blob([JSON.stringify(preset, null, 2)], {
+            type: "application/json",
+          });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `[CharPhone]${preset.name}.json`;
+          a.click();
+          URL.revokeObjectURL(url);
+        }
+
+        /**
+         * 导入预设文件
+         */
+        function importCharPhonePreset(file) {
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = async (e) => {
+            try {
+              const data = JSON.parse(e.target.result);
+              if (data.name && data.data) {
+                await db.charPhonePresets.add({
+                  name: `${data.name} (导入)`,
+                  data: data.data,
+                });
+                await loadCharPhonePresetsToDropdown();
+                alert(`预设 "${data.name}" 导入成功！`);
+              } else {
+                alert("导入失败：文件格式不正确。");
+              }
+            } catch (error) {
+              alert(`导入失败：文件解析错误。${error.message}`);
+            }
+          };
+          reader.readAsText(file);
+        }
+
+        /**
+         * 在外观设置页面渲染出所有App的名称设置项
+         */
+        function renderAppNameSettings() {
+          const grid = document.getElementById("icon-rename-grid");
+          if (!grid) return;
+          grid.innerHTML = "";
+
+          const appLabels = state.globalSettings.appLabels || {};
+
+          // 遍历默认标签对象，以确保所有app都有设置项
+          for (const appId in DEFAULT_APP_LABELS) {
+            if (DEFAULT_APP_LABELS.hasOwnProperty(appId)) {
+              const defaultName = DEFAULT_APP_LABELS[appId];
+              const currentName = appLabels[appId] || defaultName;
+
+              const item = document.createElement("div");
+              item.className = "form-group";
+              item.style.marginBottom = "0"; // 让布局更紧凑
+              item.innerHTML = `
+			                <label for="rename-input-${appId}">${defaultName}</label>
+			                <input type="text" id="rename-input-${appId}" class="app-rename-input" data-appid="${appId}" value="${currentName}">
+			            `;
+              grid.appendChild(item);
+            }
+          }
+        }
+
+        /**
+         * 将保存的App名称应用到主屏幕的图标上
+         */
+        function applyAppLabels() {
+          const appLabels = state.globalSettings.appLabels || {};
+
+          for (const appId in DEFAULT_APP_LABELS) {
+            if (DEFAULT_APP_LABELS.hasOwnProperty(appId)) {
+              const defaultName = DEFAULT_APP_LABELS[appId];
+              const customName = appLabels[appId] || defaultName;
+
+              // 这个选择器会同时找到主屏幕和Dock栏上的所有图标
+              const icons = document.querySelectorAll(
+                `.desktop-app-icon [id="icon-img-${appId}"]`,
+              );
+
+              icons.forEach((iconImg) => {
+                const appIconContainer = iconImg.closest(".desktop-app-icon");
+                if (appIconContainer) {
+                  const labelElement = appIconContainer.querySelector(".label");
+                  if (labelElement) {
+                    labelElement.textContent = customName;
+                  }
+                }
+              });
+            }
+          }
+        }
+
+        /**
+         * 从输入框读取并保存用户修改的App名称
+         */
+        function saveAppLabels() {
+          const appNameInputs = document.querySelectorAll(".app-rename-input");
+          if (!state.globalSettings.appLabels) {
+            state.globalSettings.appLabels = {};
+          }
+
+          appNameInputs.forEach((input) => {
+            const appId = input.dataset.appid;
+            const newName = input.value.trim();
+            const defaultName = DEFAULT_APP_LABELS[appId];
+
+            // 如果用户输入了新名字，且和默认名字不一样，就保存
+            if (newName && newName !== defaultName) {
+              state.globalSettings.appLabels[appId] = newName;
+            } else {
+              // 如果用户清空了输入框，或者改回了默认名字，就删除保存记录，以恢复默认
+              delete state.globalSettings.appLabels[appId];
+            }
+          });
+        }
+
+        /**
+         * 处理导入的SillyTavern世界书文件
+         * @param {File} file - 用户选择的JSON文件
+         */
+        async function handleImportSillyTavernWorldBook(file) {
+          // 使用FileReader来读取文件内容
+          const reader = new FileReader();
+          reader.onload = async (e) => {
+            try {
+              const text = e.target.result;
+              const data = JSON.parse(text);
+
+              // 验证文件格式是否正确，确保包含'entries'对象
+              if (!data.entries || typeof data.entries !== "object") {
+                throw new Error(
+                  "文件格式无效。SillyTavern世界书应包含'entries'对象。",
+                );
+              }
+
+              // 从文件名提取名称，作为新的分类名
+              let categoryName = file.name
+                .replace(/\.(json|jsonl)$/i, "")
+                .trim();
+              if (!categoryName) categoryName = "导入的世界书";
+
+              // 检查该分类是否已存在，如果不存在则创建
+              let category = await db.worldBookCategories
+                .where("name")
+                .equals(categoryName)
+                .first();
+              if (!category) {
+                const newCategoryId = await db.worldBookCategories.add({
+                  name: categoryName,
+                });
+                category = { id: newCategoryId, name: categoryName };
+                console.log(
+                  `创建了新的世界书分类: ${categoryName} (ID: ${newCategoryId})`,
+                );
+              } else {
+                console.log(
+                  `将条目添加到已存在的分类: ${categoryName} (ID: ${category.id})`,
+                );
+              }
+
+              const newBooks = [];
+              // 遍历SillyTavern worldbook中的所有条目
+              for (const key in data.entries) {
+                const entry = data.entries[key];
+
+                if (entry) {
+                  // 使用entry.comment作为书名，如果为空则使用"条目 key"作为备用
+                  const entryName = (entry.comment || `条目 ${key}`).trim();
+                  const entryContent = (entry.content || "").trim();
+                  // 确保书名和内容都不为空
+                  if (entryName && entryContent) {
+                    newBooks.push({
+                      id: "wb_" + Date.now() + Math.random(), // 创建唯一ID
+                      name: entryName,
+                      content: entryContent,
+                      categoryId: category.id, // 归属到新的分类
+                    });
+                  }
+                }
+              }
+
+              if (newBooks.length === 0) {
+                alert("没有找到任何可导入的有效条目。");
+                return;
+              }
+
+              // 批量将新书添加到数据库，效率更高
+              await db.worldBooks.bulkAdd(newBooks);
+              // 更新内存中的state，以便UI能立即刷新
+              state.worldBooks.push(...newBooks);
+
+              // 重新渲染世界书列表，显示新内容
+              await renderWorldBookScreen();
+              await showCustomAlert(
+                "导入成功",
+                `成功将《${categoryName}》中的 ${newBooks.length} 个条目导入到世界书！`,
+              );
+            } catch (error) {
+              console.error("导入世界书失败:", error);
+              await showCustomAlert(
+                "导入失败",
+                `无法解析文件，请确保它是有效的SillyTavern世界书JSON文件。\n\n错误: ${error.message}`,
+              );
+            }
+          };
+          // 以UTF-8编码读取文件内容
+          reader.readAsText(file, "UTF-8");
+        }
+
+        // 心声背景更换功能核心函数
+
+        /**
+         * 当用户点击“更换背景”按钮时，弹出操作菜单
+         */
+        async function handleInnerVoiceBgChange() {
+          const choice = await showChoiceModal("更换心声背景", [
+            { text: "上传新背景", value: "upload" },
+            { text: "恢复默认", value: "reset" },
+          ]);
+
+          if (choice === "upload") {
+            // 触发隐藏的文件选择器

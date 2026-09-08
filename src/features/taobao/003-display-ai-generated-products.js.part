@@ -1,0 +1,1215 @@
+function displayAiGeneratedProducts(products, title) {
+  const modal = document.getElementById("ai-generated-products-modal");
+  const titleEl = document.getElementById("ai-products-modal-title");
+  const gridEl = document.getElementById("ai-product-results-grid");
+
+  titleEl.textContent = title;
+  gridEl.innerHTML = "";
+
+  products.forEach((product, index) => {
+    const card = document.createElement("div");
+    card.className = "product-card";
+    card.id = `ai-product-${index}`;
+
+    // 在放入HTML属性前，先对JSON字符串进行转义，防止引号冲突
+    // 1. 将商品对象转换为JSON字符串
+    const productJsonString = JSON.stringify(product);
+    // 2. 将字符串中的单引号替换为HTML实体编码
+    const safeProductJsonString = productJsonString.replace(/'/g, "&#39;");
+
+    card.innerHTML = `
+        <div class="product-image-container">
+            <div class="loading-spinner"></div>
+        </div>
+        <div class="product-info">
+            <div class="product-name">${product.name}</div>
+            <div class="product-price">${product.price.toFixed(2)}</div>
+        </div>
+        <button class="add-to-my-page-btn" data-product='${safeProductJsonString}'>+ 添加到我的桃宝</button>
+    `;
+    gridEl.appendChild(card);
+
+    // 调用异步函数加载图片
+    // 这个函数会在后台默默生图，成功后再更新这张卡片
+    loadAndDisplayAiProductImage(product, card);
+  });
+
+  modal.classList.add("visible");
+}
+
+/**
+ * 为AI生成的单个商品卡片加载图片
+ * @param {object} productData - 商品数据，包含 imagePrompt
+ * @param {HTMLElement} cardElement - 对应的商品卡片DOM元素
+ */
+async function loadAndDisplayAiProductImage(productData, cardElement) {
+  const imageContainer = cardElement.querySelector(".product-image-container");
+  if (!imageContainer) return;
+
+  try {
+    // 1. 调用全局统一的生图函数
+    const imageUrl = await window.generatePollinationsImage(
+      productData.imagePrompt,
+      {
+        width: 1024,
+        height: 1024,
+        model: "flux",
+        nologo: true,
+      },
+    );
+
+    // 2. 将生成好的图片URL【回写】到商品数据中，方便“添加到主页”时使用
+    productData.imageUrl = imageUrl;
+    const addButton = cardElement.querySelector(".add-to-my-page-btn");
+    if (addButton) {
+      addButton.dataset.product = JSON.stringify(productData);
+    }
+
+    // 3. 更新卡片UI，用生成的图片替换掉加载动画
+    //    再次检查卡片是否还存在于页面上，防止用户过早关闭弹窗导致错误
+    if (document.body.contains(imageContainer)) {
+      imageContainer.innerHTML = `<img src="${imageUrl}" class="product-image" alt="${productData.name}">`;
+    }
+  } catch (error) {
+    // 理论上，因为 generateAndLoadImage 是无限重试，这里很难被触发
+    // 但为了代码健壮性，我们仍然处理这个万一
+    console.error(`为商品 "${productData.name}" 生成图片失败:`, error);
+    if (document.body.contains(imageContainer)) {
+      imageContainer.innerHTML = `<span>图片加载失败</span>`;
+    }
+  }
+}
+
+/**
+ * 触发AI【随机】生成商品，并在弹窗中显示
+ */
+async function handleGenerateProductsAI() {
+  await showCustomAlert("请稍候...", "正在请求AI生成一批有趣的商品...");
+  const { proxyUrl, apiKey, model } = state.apiConfig;
+  if (!proxyUrl || !apiKey || !model) {
+    alert("请先配置API！");
+    return;
+  }
+
+  const prompt = `
+# 任务
+你是一个虚拟购物App“桃宝”的商品策划师。请你创作一个包含5-8件商品的列表。
+
+# 核心规则
+1.  **商品多样性**: 商品必须有趣、多样，可以包含服装、零食、家居用品、虚拟物品等。
+2.  **分类清晰**: 为每件商品设置一个合理的分类。
+3.  **格式铁律**: 你的回复【必须且只能】是一个严格的JSON数组，每个对象代表一件商品，【必须】包含以下字段:
+    -   \`"name"\`: 商品名称 (字符串)
+    -   \`"price"\`: 价格 (数字)
+    -   \`"category"\`: 商品分类 (字符串)
+    -   \`"imagePrompt"\`: 一个详细的、用于文生图AI的【英文提示词】，描述这张商品的【产品展示图 (product shot)】。风格要求【干净、简约、纯色或渐变背景 (clean, minimalist, solid color background)】。
+
+# JSON输出格式示例:
+[
+  {
+    "name": "会发光的蘑菇小夜灯",
+    "price": 49.9,
+    "category": "家居",
+    "imagePrompt": "A glowing mushroom-shaped night light, minimalist, product shot, studio lighting, simple gradient background, high detail, photorealistic"
+  }
+]`;
+
+  try {
+    const messagesForApi = [{ role: "user", content: prompt }];
+
+    // 恢复对 Gemini 和 OpenAI 的兼容判断逻辑
+    const isGemini = proxyUrl === GEMINI_API_URL;
+    const requestData = isGemini
+      ? toGeminiRequestData(model, apiKey, prompt, messagesForApi, isGemini)
+      : {
+          url: `${proxyUrl}/v1/chat/completions`,
+          options: {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+              model: model,
+              messages: messagesForApi,
+              temperature: 1.1,
+              response_format: { type: "json_object" },
+            }),
+          },
+        };
+
+    const response = await fetch(requestData.url, requestData.options);
+
+    if (!response.ok) throw new Error(`API请求失败: ${await response.text()}`);
+
+    const data = await response.json();
+    const rawContent = isGemini
+      ? data.candidates[0].content.parts[0].text
+      : data.choices[0].message.content;
+    const cleanedContent = rawContent.replace(/^```json\s*|```$/g, "").trim();
+    const newProducts = JSON.parse(cleanedContent);
+
+    if (Array.isArray(newProducts) && newProducts.length > 0) {
+      displayAiGeneratedProducts(newProducts, "AI随机生成了以下宝贝");
+    } else {
+      throw new Error("AI返回的数据格式不正确。");
+    }
+  } catch (error) {
+    console.error("AI生成商品失败:", error);
+    await showCustomAlert("生成失败", `发生错误: ${error.message}`);
+  }
+}
+
+/**
+ * 处理用户点击商品卡片的逻辑（购买）
+ */
+async function handleBuyProduct(productId) {
+  const product = await db.taobaoProducts.get(productId);
+  if (!product) return;
+
+  const currentBalance = state.globalSettings.userBalance || 0;
+  if (currentBalance < product.price) {
+    alert("余额不足，先去“我的”页面充点钱吧！");
+    return;
+  }
+
+  const confirmed = await showCustomConfirm(
+    "确认购买",
+    `确定要花费 ¥${product.price.toFixed(2)} 购买“${product.name}”吗？`,
+    { confirmText: "立即支付" },
+  );
+
+  if (confirmed) {
+    // 1. 扣除余额
+    state.globalSettings.userBalance -= product.price;
+    await db.globalSettings.put(state.globalSettings);
+
+    // 2. 创建订单
+    const newOrder = {
+      productId: productId,
+      timestamp: Date.now(),
+      status: "已付款，等待发货",
+    };
+    await db.taobaoOrders.add(newOrder);
+
+    // 模拟物流更新
+    setTimeout(async () => {
+      const orderToUpdate = await db.taobaoOrders
+        .where({ timestamp: newOrder.timestamp })
+        .first();
+      if (orderToUpdate) {
+        await db.taobaoOrders.update(orderToUpdate.id, {
+          status: "已发货，运输中",
+        });
+      }
+    }, 1000 * 10); // 10秒后更新为已发货
+
+    alert("购买成功！你可以在“我的订单”中查看物流信息。");
+    renderTaobaoBalance(); // 刷新余额显示
+  }
+}
+
+/**
+ * 长按商品时显示操作菜单
+ */
+async function showProductActions(productId) {
+  const choice = await showChoiceModal("商品操作", [
+    { text: "✏️ 编辑商品", value: "edit" },
+    { text: "🗑️ 删除商品", value: "delete" },
+  ]);
+
+  if (choice === "edit") {
+    openProductEditor(productId);
+  } else if (choice === "delete") {
+    const product = await db.taobaoProducts.get(productId);
+    const confirmed = await showCustomConfirm(
+      "确认删除",
+      `确定要删除商品“${product.name}”吗？`,
+      {
+        confirmButtonClass: "btn-danger",
+      },
+    );
+    if (confirmed) {
+      await db.taobaoProducts.delete(productId);
+      await renderTaobaoProducts();
+      alert("商品已删除。");
+    }
+  }
+}
+
+/**
+ * 长按饿了么美食时显示操作菜单
+ * @param {number} foodId - 美食的ID
+ */
+async function showFoodActions(foodId) {
+  const choice = await showChoiceModal("操作", [
+    { text: "✏️ 编辑", value: "edit" },
+    { text: "🗑️ 删除", value: "delete" },
+  ]);
+
+  if (choice === "edit") {
+    // 调用我们即将修改的、支持编辑的函数
+    openFoodEditor(foodId);
+  } else if (choice === "delete") {
+    const food = await db.elemeFoods.get(foodId);
+    if (!food) return;
+    const confirmed = await showCustomConfirm(
+      "确认删除",
+      `确定要删除“${food.name}”吗？`,
+      {
+        confirmButtonClass: "btn-danger",
+      },
+    );
+    if (confirmed) {
+      await db.elemeFoods.delete(foodId);
+      await renderElemeFoods(); // 重新渲染列表
+      await showCustomAlert("删除成功", "该美食已从列表中移除。");
+    }
+  }
+}
+
+/**
+ * 核心函数：更新用户余额并记录一笔交易
+ * @param {number} amount - 交易金额 (正数为收入, 负数为支出)
+ * @param {string} description - 交易描述 (例如: "转账给 XX", "收到 XX 的红包")
+ */
+async function updateUserBalanceAndLogTransaction(amount, description) {
+  if (isNaN(amount)) return; // 安全检查
+
+  // 确保余额是数字
+  state.globalSettings.userBalance =
+    (state.globalSettings.userBalance || 0) + amount;
+
+  const newTransaction = {
+    type: amount > 0 ? "income" : "expense",
+    amount: Math.abs(amount),
+    description: description,
+    timestamp: Date.now(),
+  };
+
+  // 使用数据库事务，确保两步操作要么都成功，要么都失败
+  await db.transaction(
+    "rw",
+    db.globalSettings,
+    db.userWalletTransactions,
+    async () => {
+      await db.globalSettings.put(state.globalSettings);
+      await db.userWalletTransactions.add(newTransaction);
+    },
+  );
+
+  console.log(
+    `用户钱包已更新: 金额=${amount.toFixed(2)}, 新余额=${state.globalSettings.userBalance.toFixed(2)}`,
+  );
+}
+/**
+ * 处理删除单条交易记录（收入或支出）
+ * @param {number} transactionId - 要删除的交易记录的ID
+ */
+async function handleDeleteTransaction(transactionId) {
+  // 1. 在弹出确认框之前，先从数据库获取这条记录的详细信息
+  const transaction = await db.userWalletTransactions.get(transactionId);
+  if (!transaction) {
+    await showCustomAlert("错误", "找不到该条交易记录，可能已被删除。");
+    return;
+  }
+
+  // 根据记录类型，生成动态的、更清晰的提示信息
+  const actionText = transaction.type === "income" ? "扣除" : "返还";
+  const confirmMessage = `确定要删除这条【${
+    transaction.type === "income" ? "收入" : "支出"
+  }】记录吗？<br><br>此操作会将 <strong>¥${transaction.amount.toFixed(2)}</strong> 从您的余额中**${actionText}**。`;
+
+  const confirmed = await showCustomConfirm("确认删除", confirmMessage, {
+    confirmButtonClass: "btn-danger",
+  });
+
+  if (!confirmed) {
+    return; // 如果用户取消，则不执行任何操作
+  }
+
+  try {
+    // 2. 使用数据库事务来保证数据安全
+    await db.transaction(
+      "rw",
+      db.globalSettings,
+      db.userWalletTransactions,
+      async () => {
+        // 根据记录类型，决定是加余额还是减余额
+        if (transaction.type === "income") {
+          // 如果删除的是一笔收入，那么总余额应该减少
+          state.globalSettings.userBalance -= transaction.amount;
+        } else if (transaction.type === "expense") {
+          // 如果删除的是一笔支出，那么总余额应该增加（钱被“退回”了）
+          state.globalSettings.userBalance += transaction.amount;
+        }
+
+        // 3. 更新全局设置
+        await db.globalSettings.put(state.globalSettings);
+
+        // 4. 从交易记录表中删除这条记录
+        await db.userWalletTransactions.delete(transactionId);
+      },
+    );
+
+    // 5. 操作成功后，刷新UI
+    await renderBalanceDetails();
+
+    await showCustomAlert("操作成功", "该条记录已删除，余额已更新。");
+  } catch (error) {
+    console.error("删除交易记录时出错:", error);
+    await showCustomAlert("操作失败", `发生错误: ${error.message}`);
+  }
+}
+
+/**
+ * 渲染“我的”页面的余额和交易明细 (支持删除所有记录)
+ */
+async function renderBalanceDetails() {
+  // 1. 渲染当前余额
+  const balance = state.globalSettings.userBalance || 0;
+  document.getElementById("user-balance-display").textContent =
+    `¥ ${balance.toFixed(2)}`;
+
+  // 2. 渲染交易明细列表
+  const listEl = document.getElementById("balance-details-list");
+  listEl.innerHTML = ""; // 清空旧列表
+
+  const transactions = await db.userWalletTransactions
+    .reverse()
+    .sortBy("timestamp");
+
+  if (transactions.length === 0) {
+    listEl.innerHTML =
+      '<p style="text-align: center; color: var(--text-secondary); margin-top: 20px;">还没有任何明细记录</p>';
+    return;
+  }
+
+  // 给列表加个标题
+  listEl.innerHTML =
+    '<h3 style="margin-bottom: 10px; color: var(--text-secondary);">余额明细</h3>';
+
+  transactions.forEach((item) => {
+    const itemEl = document.createElement("div");
+    itemEl.className = "transaction-item";
+    const sign = item.type === "income" ? "+" : "-";
+
+    // 移除了 if 判断，现在为每一条记录都生成删除按钮
+    const deleteButtonHtml = `<button class="delete-transaction-btn" data-transaction-id="${item.id}">×</button>`;
+
+    itemEl.innerHTML = `
+            <div class="transaction-info">
+                <div class="description">${item.description}</div>
+                <div class="timestamp">${new Date(item.timestamp).toLocaleString()}</div>
+            </div>
+            <div class="transaction-amount-wrapper">
+                <div class="transaction-amount ${item.type}">
+                    ${sign} ${item.amount.toFixed(2)}
+                </div>
+                ${deleteButtonHtml} 
+            </div>
+        `;
+    listEl.appendChild(itemEl);
+  });
+}
+
+/**
+ * 打开物流详情页面
+ * @param {number} orderId - 被点击的订单ID
+ */
+async function openLogisticsView(orderId) {
+  const order = await db.taobaoOrders.get(orderId);
+  if (!order) {
+    alert("找不到该订单！");
+    return;
+  }
+
+  // 每次打开都先清空旧的计时器
+  logisticsUpdateTimers.forEach((timerId) => clearTimeout(timerId));
+  logisticsUpdateTimers = [];
+
+  // 显示物流页面，并开始渲染
+  showScreen("logistics-screen");
+  await renderLogisticsView(order);
+}
+
+/**
+ * 渲染物流详情页面的所有内容
+ * @param {object} order - 订单对象
+ */
+async function renderLogisticsView(order) {
+  const contentArea = document.getElementById("logistics-content-area");
+  contentArea.innerHTML = "加载中...";
+
+  const product = await db.taobaoProducts.get(order.productId);
+  if (!product) {
+    contentArea.innerHTML = "无法加载商品信息。";
+    return;
+  }
+
+  // 渲染顶部的商品信息卡片
+  contentArea.innerHTML = `
+        <div class="logistics-product-summary">
+            <img src="${product.imageUrl}" class="product-image">
+            <div class="info">
+                <div class="name">${product.name} (x${order.quantity})</div>
+                <div class="status" id="logistics-main-status">查询中...</div>
+            </div>
+        </div>
+        <div class="logistics-timeline" id="logistics-timeline-container"></div>
+    `;
+
+  const timelineContainer = document.getElementById(
+    "logistics-timeline-container",
+  );
+  const mainStatusEl = document.getElementById("logistics-main-status");
+  const creationTime = order.timestamp; // 使用订单的创建时间作为起点
+
+  // 准备一些随机城市名，让物流看起来更真实
+  const cities = [
+    "东莞",
+    "广州",
+    "长沙",
+    "武汉",
+    "郑州",
+    "北京",
+    "上海",
+    "成都",
+    "西安",
+  ];
+  const startCity = getRandomItem(cities);
+  let nextCity = getRandomItem(cities.filter((c) => c !== startCity));
+  const userCity =
+    getRandomItem(cities.filter((c) => c !== startCity && c !== nextCity)) ||
+    "您的城市";
+
+  // --- 这就是模拟物流的核心 ---
+  let cumulativeDelay = 0;
+  logisticsTimelineTemplate.forEach((stepInfo) => {
+    cumulativeDelay += stepInfo.delay;
+    const eventTime = creationTime + cumulativeDelay; // 计算出这个步骤“应该”发生的时间
+    const now = Date.now();
+
+    // 替换文本中的占位符
+    const stepText = stepInfo.text
+      .replace(/{city}/g, startCity)
+      .replace("{next_city}", nextCity)
+      .replace("{user_city}", userCity);
+
+    // 如果这个步骤的发生时间已经过去或就是现在
+    if (now >= eventTime) {
+      // 就立即把它渲染到页面上
+      addLogisticsStep(
+        timelineContainer,
+        mainStatusEl,
+        stepText,
+        eventTime,
+        true,
+      );
+    } else {
+      // 否则，它就是一个“未来”的步骤
+      const delayUntilEvent = eventTime - now; // 计算还有多久才发生
+      // 设置一个定时器，在未来的那个时间点执行
+      const timerId = setTimeout(() => {
+        // 执行前再次检查用户是否还停留在物流页面
+        if (
+          document
+            .getElementById("logistics-screen")
+            .classList.contains("active")
+        ) {
+          addLogisticsStep(
+            timelineContainer,
+            mainStatusEl,
+            stepText,
+            eventTime,
+            true,
+          );
+        }
+      }, delayUntilEvent);
+      // 把这个定时器的ID存起来，方便离开页面时清除
+      logisticsUpdateTimers.push(timerId);
+    }
+  });
+
+  // 如果订单刚刚创建，可能还没有任何步骤满足时间条件，此时手动显示第一条
+  if (timelineContainer.children.length === 0) {
+    const firstStep = logisticsTimelineTemplate[0];
+    const stepText = firstStep.text
+      .replace(/{city}/g, startCity)
+      .replace("{next_city}", nextCity)
+      .replace("{user_city}", userCity);
+    addLogisticsStep(
+      timelineContainer,
+      mainStatusEl,
+      stepText,
+      creationTime,
+      true,
+    );
+  }
+}
+
+/**
+ * 在时间轴上添加一个物流步骤的辅助函数
+ * @param {HTMLElement} container - 时间轴的DOM容器
+ * @param {HTMLElement} mainStatusEl - 顶部主状态的DOM元素
+ * @param {string} text - 物流信息文本
+ * @param {number} timestamp - 该步骤发生的时间戳
+ * @param {boolean} prepend - 是否添加到最前面（最新的步骤放前面）
+ */
+function addLogisticsStep(
+  container,
+  mainStatusEl,
+  text,
+  timestamp,
+  prepend = false,
+) {
+  const stepEl = document.createElement("div");
+  stepEl.className = "logistics-step";
+  stepEl.innerHTML = `
+        <div class="logistics-step-content">
+            <div class="status-text">${text}</div>
+            <div class="timestamp">${new Date(timestamp).toLocaleString("zh-CN")}</div>
+        </div>
+    `;
+
+  if (prepend) {
+    container.prepend(stepEl); // 插入到最前面
+    mainStatusEl.textContent = text; // 更新顶部的状态
+  } else {
+    container.appendChild(stepEl);
+  }
+}
+
+/**
+ * 处理角色手机钱包余额和交易记录的通用函数
+ * @param {string} charId - 要更新钱包的角色ID
+ * @param {number} amount - 交易金额 (正数为收入, 负数为支出)
+ * @param {string} description - 交易描述
+ */
+async function updateCharacterPhoneBankBalance(charId, amount, description) {
+  const chat = state.chats[charId];
+  if (!chat || chat.isGroup) return;
+
+  if (!chat.characterPhoneData) chat.characterPhoneData = {};
+  if (!chat.characterPhoneData.bank)
+    chat.characterPhoneData.bank = { balance: 0, transactions: [] };
+  if (typeof chat.characterPhoneData.bank.balance !== "number")
+    chat.characterPhoneData.bank.balance = 0;
+
+  chat.characterPhoneData.bank.balance += amount;
+
+  const newTransaction = {
+    type: amount > 0 ? "收入" : "支出",
+    amount: Math.abs(amount),
+    description: description,
+    timestamp: Date.now(),
+  };
+
+  // 让最新的交易记录显示在最前面
+  if (!Array.isArray(chat.characterPhoneData.bank.transactions)) {
+    chat.characterPhoneData.bank.transactions = [];
+  }
+  chat.characterPhoneData.bank.transactions.unshift(newTransaction);
+
+  await db.chats.put(chat);
+  console.log(
+    `✅ 角色[${chat.name}]钱包已更新: 金额=${amount.toFixed(2)}, 新余额=${chat.characterPhoneData.bank.balance.toFixed(
+      2,
+    )}`,
+  );
+}
+
+/**
+ * 打开一个单选的角色选择器，让用户选择一个代付对象
+ * @returns {Promise<string|null>} - 返回选中的角色ID，如果取消则返回null
+ */
+async function openCharSelectorForCart() {
+  return new Promise((resolve) => {
+    // 复用分享功能的弹窗，很方便
+    const modal = document.getElementById("share-target-modal");
+    const listEl = document.getElementById("share-target-list");
+    const titleEl = document.getElementById("share-target-modal-title");
+    const confirmBtn = document.getElementById("confirm-share-target-btn");
+    const cancelBtn = document.getElementById("cancel-share-target-btn");
+
+    titleEl.textContent = "分享给谁代付？";
+    listEl.innerHTML = "";
+
+    const singleChats = Object.values(state.chats).filter((c) => !c.isGroup);
+
+    if (singleChats.length === 0) {
+      alert("你还没有任何可以分享的好友哦。");
+      modal.classList.remove("visible");
+      resolve(null);
+      return;
+    }
+
+    // 使用 radio 单选按钮
+    singleChats.forEach((chat) => {
+      const item = document.createElement("div");
+      item.className = "contact-picker-item";
+      item.innerHTML = `
+                <input type="radio" name="cart-share-target" value="${chat.id}" id="target-${
+                  chat.id
+                }" style="margin-right: 15px;">
+                <label for="target-${chat.id}" style="display:flex; align-items:center; width:100%; cursor:pointer;">
+                    <img src="${chat.settings.aiAvatar || defaultAvatar}" class="avatar">
+                    <span class="name">${chat.name}</span>
+                </label>
+            `;
+      listEl.appendChild(item);
+    });
+
+    modal.classList.add("visible");
+
+    const newConfirmBtn = confirmBtn.cloneNode(true);
+    confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+    const newCancelBtn = cancelBtn.cloneNode(true);
+    cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+
+    const cleanup = () => modal.classList.remove("visible");
+
+    newConfirmBtn.onclick = () => {
+      const selectedRadio = document.querySelector(
+        'input[name="cart-share-target"]:checked',
+      );
+      if (selectedRadio) {
+        cleanup();
+        resolve(selectedRadio.value);
+      } else {
+        alert("请选择一个代付对象！");
+      }
+    };
+
+    newCancelBtn.onclick = () => {
+      cleanup();
+      resolve(null);
+    };
+  });
+}
+
+/**
+ * 清空桃宝购物车
+ */
+async function clearTaobaoCart() {
+  await db.taobaoCart.clear();
+  await renderTaobaoCart();
+  updateCartBadge();
+}
+
+/**
+ * 根据购物车内容创建订单
+ * @param {Array} cartItems - 购物车项目数组
+ */
+async function createOrdersFromCart(cartItems) {
+  if (!cartItems || cartItems.length === 0) return;
+  const newOrders = cartItems.map((item, index) => ({
+    productId: item.productId,
+    quantity: item.quantity,
+    timestamp: Date.now() + index, // 防止时间戳完全相同
+    status: "已付款，等待发货",
+  }));
+  await db.taobaoOrders.bulkAdd(newOrders);
+  // 简单模拟物流更新
+  setTimeout(async () => {
+    const ordersToUpdate = await db.taobaoOrders
+      .where("status")
+      .equals("已付款，等待发货")
+      .toArray();
+    for (const order of ordersToUpdate) {
+      await db.taobaoOrders.update(order.id, { status: "已发货，运输中" });
+    }
+  }, 1000 * 10);
+}
+
+/**
+ * 处理“分享给Ta代付”的全部逻辑
+ */
+async function handleShareCart() {
+  const cartItems = await db.taobaoCart.toArray();
+  if (cartItems.length === 0) {
+    alert("购物车是空的，先去加点宝贝吧！");
+    return;
+  }
+
+  const targetChatId = await openCharSelectorForCart();
+  if (!targetChatId) return;
+
+  const char = state.chats[targetChatId];
+  if (!char) return;
+
+  let totalPrice = 0;
+  const productPromises = cartItems.map((item) =>
+    db.taobaoProducts.get(item.productId),
+  );
+  const products = await Promise.all(productPromises);
+  cartItems.forEach((item, index) => {
+    const product = products[index];
+    if (product) {
+      totalPrice += product.price * item.quantity;
+    }
+  });
+
+  const charBalance = char.characterPhoneData?.bank?.balance || 0;
+  if (charBalance < totalPrice) {
+    await showCustomAlert(
+      "代付失败",
+      `“${char.name}”的钱包余额不足！\n需要 ¥${totalPrice.toFixed(2)}，但余额只有 ¥${charBalance.toFixed(2)}。`,
+    );
+    return;
+  }
+
+  const confirmed = await showCustomConfirm(
+    "确认代付",
+    `将分享购物车给“${char.name}”并请求代付，共计 ¥${totalPrice.toFixed(
+      2,
+    )}。\n这将会清空你的购物车，并从Ta的钱包扣款。确定吗？`,
+    { confirmText: "确定" },
+  );
+
+  if (!confirmed) return;
+
+  await showCustomAlert("处理中...", "正在通知Ta代付并下单...");
+
+  // 1. 获取角色的手机数据，准备查找备注名
+  const characterPhoneData = char.characterPhoneData || { chats: {} };
+
+  // 2. 在角色的联系人中，找到代表“用户”的那个联系人对象
+  //    （通常是那个没有聊天记录的特殊联系人条目）
+  const userContactInData = Object.values(characterPhoneData.chats || {}).find(
+    (c) => !c.history || c.history.length === 0,
+  );
+
+  // 3. 获取角色给用户的备注名，如果没设置，就默认用“我”
+  const remarkForUser = userContactInData ? userContactInData.remarkName : "我";
+
+  // 4. 使用这个新的备注名来创建交易记录
+  const description = `为“${remarkForUser}”的桃宝购物车买单`;
+  await updateCharacterPhoneBankBalance(targetChatId, -totalPrice, description);
+
+  await createOrdersFromCart(cartItems);
+
+  const itemsSummary = products
+    .map((p, i) => `${p.name} x${cartItems[i].quantity}`)
+    .join("、 ");
+
+  // 给AI看的隐藏指令，告诉它发生了什么
+  const hiddenMessage = {
+    role: "system",
+    content: `[系统提示：用户刚刚与你分享了TA的购物车，并请求你为总价为 ¥${totalPrice.toFixed(
+      2,
+    )} 的商品付款。你已经同意并支付了，你的钱包余额已被扣除。商品包括：${itemsSummary}。请根据你的人设对此作出回应，例如表示宠溺、抱怨花钱太多或者询问买了什么。]`,
+    timestamp: Date.now(),
+    isHidden: true,
+  };
+  char.history.push(hiddenMessage);
+  await db.chats.put(char);
+
+  await clearTaobaoCart();
+
+  await showCustomAlert("操作成功", `“${char.name}”已成功为你买单！`);
+  renderChatList();
+
+  openChat(targetChatId); // 跳转到聊天界面
+  triggerAiResponse(); // 让AI回应这次代付
+}
+
+/**
+ * 处理“为Ta购买”的全部逻辑
+ */
+async function handleBuyForChar() {
+  const cartItems = await db.taobaoCart.toArray();
+  if (cartItems.length === 0) {
+    alert("购物车是空的，先去加点宝贝吧！");
+    return;
+  }
+
+  const targetChatId = await openCharSelectorForCart();
+  if (!targetChatId) return; // 用户取消选择
+
+  const char = state.chats[targetChatId];
+  if (!char) return;
+
+  let totalPrice = 0;
+  const productPromises = cartItems.map((item) =>
+    db.taobaoProducts.get(item.productId),
+  );
+  const products = await Promise.all(productPromises);
+  products.forEach((product, index) => {
+    if (product) {
+      totalPrice += product.price * cartItems[index].quantity;
+    }
+  });
+
+  // 检查用户余额
+  if ((state.globalSettings.userBalance || 0) < totalPrice) {
+    alert(
+      `余额不足！本次需要 ¥${totalPrice.toFixed(2)}，但你的余额只有 ¥${(
+        state.globalSettings.userBalance || 0
+      ).toFixed(2)}。`,
+    );
+    return;
+  }
+
+  const confirmed = await showCustomConfirm(
+    "确认赠送",
+    `确定要花费 ¥${totalPrice.toFixed(2)} 为“${char.name}”购买购物车中的所有商品吗？`,
+    { confirmText: "为Ta买单" },
+  );
+
+  if (confirmed) {
+    await showCustomAlert("正在处理...", "正在为你心爱的Ta下单...");
+
+    // 1. 扣除用户余额
+    await updateUserBalanceAndLogTransaction(
+      -totalPrice,
+      `为 ${char.name} 购买商品`,
+    );
+
+    // 2. 将购物车内容转化为订单（记录在你的订单里）
+    await createOrdersFromCart(cartItems);
+
+    // 3. 发送礼物通知给对方
+    await sendGiftNotificationToChar(
+      targetChatId,
+      products,
+      cartItems,
+      totalPrice,
+    );
+
+    // 4. 清空购物车
+    await clearTaobaoCart();
+
+    await showCustomAlert(
+      "赠送成功！",
+      `你为“${char.name}”购买的礼物已下单，并已通过私信通知对方啦！`,
+    );
+    renderChatList(); // 刷新列表，显示未读消息
+  }
+}
+
+/**
+ * 处理“为Ta购买”的全部逻辑
+ */
+async function handleBuyForChar() {
+  const cartItems = await db.taobaoCart.toArray();
+  if (cartItems.length === 0) {
+    alert("购物车是空的，先去加点宝贝吧！");
+    return;
+  }
+
+  const targetChatId = await openCharSelectorForCart();
+  if (!targetChatId) return; // 用户取消选择
+
+  const char = state.chats[targetChatId];
+  if (!char) return;
+
+  let totalPrice = 0;
+  const productPromises = cartItems.map((item) =>
+    db.taobaoProducts.get(item.productId),
+  );
+  const products = await Promise.all(productPromises);
+  products.forEach((product, index) => {
+    if (product) {
+      totalPrice += product.price * cartItems[index].quantity;
+    }
+  });
+
+  // 检查用户余额
+  if ((state.globalSettings.userBalance || 0) < totalPrice) {
+    alert(
+      `余额不足！本次需要 ¥${totalPrice.toFixed(2)}，但你的余额只有 ¥${(
+        state.globalSettings.userBalance || 0
+      ).toFixed(2)}。`,
+    );
+    return;
+  }
+
+  const confirmed = await showCustomConfirm(
+    "确认赠送",
+    `确定要花费 ¥${totalPrice.toFixed(2)} 为“${char.name}”购买购物车中的所有商品吗？`,
+    { confirmText: "为Ta买单" },
+  );
+
+  if (confirmed) {
+    await showCustomAlert("正在处理...", "正在为你心爱的Ta下单...");
+
+    // 1. 扣除用户余额
+    await updateUserBalanceAndLogTransaction(
+      -totalPrice,
+      `为 ${char.name} 购买商品`,
+    );
+
+    // 2. 将购物车内容转化为订单（记录在你的订单里）
+    await createOrdersFromCart(cartItems);
+
+    // 3. 发送礼物通知给对方
+    await sendGiftNotificationToChar(
+      targetChatId,
+      products,
+      cartItems,
+      totalPrice,
+    );
+
+    // 4. 清空购物车
+    await clearTaobaoCart();
+
+    await showCustomAlert(
+      "赠送成功！",
+      `你为“${char.name}”购买的礼物已下单，并已通过私信通知对方啦！`,
+    );
+    renderChatList(); // 刷新列表，显示未读消息
+  }
+}
+
+/**
+ * 发送礼物通知到指定角色的聊天
+ * 效果：发送一条本质是文本、但外观是卡片的消息。
+ *      - 用户界面显示为漂亮的礼物卡片。
+ *      - 消息数据中包含完整的文本信息。
+ *      - AI 仍然通过隐藏的系统指令接收信息。
+ */
+async function sendGiftNotificationToChar(
+  targetChatId,
+  products,
+  cartItems,
+  totalPrice,
+) {
+  const chat = state.chats[targetChatId];
+  if (!chat) return;
+
+  const itemsSummary = products
+    .map((p, i) => `${p.name} x${cartItems[i].quantity}`)
+    .join("、");
+
+  // 1. 先准备好这条消息的“文本内容”
+  const messageTextContent = `我给你买了新礼物，希望你喜欢！\n商品清单：${itemsSummary}\n合计：¥${totalPrice.toFixed(
+    2,
+  )}`;
+
+  // 2. 创建对用户【可见】的消息对象。现在它同时拥有 “文本内容” 和 “卡片样式指令”
+  const visibleMessage = {
+    role: "user",
+
+    // 为这条消息添加一个 content 属性，这就是它的“文本本体”
+    // 当你复制这条消息时，复制出来的内容就是这个。
+    content: messageTextContent,
+
+    // 同时保留 type 和 payload，它们告诉渲染器“把这条消息画成卡片”
+    type: "gift_notification",
+    timestamp: Date.now(),
+    payload: {
+      senderName: state.qzoneSettings.nickname || "我",
+      itemSummary: itemsSummary,
+      totalPrice: totalPrice,
+      itemCount: cartItems.length,
+    },
+  };
+  chat.history.push(visibleMessage);
+
+  // 3. 创建一条给AI看的【隐藏】指令，确保AI能理解并回应
+  const hiddenMessage = {
+    role: "system",
+    content: `[系统指令：用户刚刚为你购买了${cartItems.length}件商品，总价值为${totalPrice.toFixed(
+      2,
+    )}元。商品包括：${itemsSummary}。请根据你的人设对此表示感谢或作出其他反应。]`,
+    timestamp: Date.now() + 1,
+    isHidden: true,
+  };
+  chat.history.push(hiddenMessage);
+
+  // 4. 未读消息只增加1条
+  chat.unreadCount = (chat.unreadCount || 0) + 1;
+  await db.chats.put(chat);
+
+  // 5. 发送横幅通知
+  if (state.activeChatId !== targetChatId) {
+    showNotification(targetChatId, "你收到了一份礼物！");
+  }
+}
+
+/**
+ * 处理用户点击“分享给Ta代付”按钮的逻辑
+ */
+async function handleShareCartRequest() {
+  const cartItems = await db.taobaoCart.toArray();
+  if (cartItems.length === 0) {
+    alert("购物车是空的，先去加点宝贝吧！");
+    return;
+  }
+
+  const targetChatId = await openCharSelectorForCart();
+  if (!targetChatId) return;
+
+  const chat = state.chats[targetChatId];
+  if (!chat) return;
+
+  let totalPrice = 0;
+  const productPromises = cartItems.map((item) =>
+    db.taobaoProducts.get(item.productId),
+  );
+  const products = await Promise.all(productPromises);
+  const itemsSummary = products
+    .map((p, i) => {
+      if (p) {
+        totalPrice += p.price * cartItems[i].quantity;
+        return `${p.name} x${cartItems[i].quantity}`;
+      }
+      return "";
+    })
+    .filter(Boolean)
+    .join("、 ");
+
+  const charBalance = chat.characterPhoneData?.bank?.balance || 0;
+
+  const confirmed = await showCustomConfirm(
+    "确认代付请求",
+    `将向“${chat.name}”发起购物车代付请求，共计 ¥${totalPrice.toFixed(2)}。`,
+    { confirmText: "发送请求" },
+  );
+
+  if (!confirmed) return;
+
+  // 1. 直接将所有信息都放入 content 字段，让用户也能看到
+  const requestContent = `[购物车代付请求]
+总金额: ¥${totalPrice.toFixed(2)}
+商品: ${itemsSummary}
+(你的当前余额: ¥${charBalance.toFixed(2)})
+请使用 'cart_payment_response' 指令回应。`;
+
+  // 2. 创建一条普通的用户消息，不再有 isHidden 标记
+  const requestMessage = {
+    role: "user", // 由用户发出
+    type: "cart_share_request", // 类型保持不变，用于UI渲染
+    timestamp: Date.now(),
+    content: requestContent, // 将包含所有信息的文本作为内容
+    payload: {
+      // payload 依然保留，用于UI渲染卡片
+      totalPrice: totalPrice,
+      itemCount: cartItems.length,
+      status: "pending",
+    },
+  };
+
+  // 3. 将这条【单一的】消息添加到历史记录
+  chat.history.push(requestMessage);
+
+  await db.chats.put(chat);
+
+  await showCustomAlert(
+    "请求已发送",
+    `已将代付请求发送给“${chat.name}”，请在聊天中查看TA的回应。`,
+  );
+
+  openChat(targetChatId);
+}
+
+/**
+ * 【辅助函数】打开一个单选的角色选择器，让用户选择代付对象
+ * (这个函数复用了分享功能的弹窗，稍作修改)
+ */
+async function openCharSelectorForCart() {
+  return new Promise((resolve) => {
+    const modal = document.getElementById("share-target-modal");
+    const listEl = document.getElementById("share-target-list");
+    const titleEl = document.getElementById("share-target-modal-title");
+    const confirmBtn = document.getElementById("confirm-share-target-btn");
+    const cancelBtn = document.getElementById("cancel-share-target-btn");
+
+    titleEl.textContent = "分享给谁代付？";
+    listEl.innerHTML = "";
+
+    const singleChats = Object.values(state.chats).filter((c) => !c.isGroup);
+
+    if (singleChats.length === 0) {
+      alert("你还没有任何可以分享的好友哦。");
+      modal.classList.remove("visible");
+      resolve(null);
+      return;
+    }
+
+    // 使用 radio 单选按钮
+    singleChats.forEach((chat) => {
+      const item = document.createElement("div");
+      item.className = "contact-picker-item";
+      item.innerHTML = `
+                <input type="radio" name="cart-share-target" value="${chat.id}" id="target-${
+                  chat.id
+                }" style="margin-right: 15px;">
+                <label for="target-${chat.id}" style="display:flex; align-items:center; width:100%; cursor:pointer;">
+                    <img src="${chat.settings.aiAvatar || defaultAvatar}" class="avatar">
+                    <span class="name">${chat.name}</span>
+                </label>
+            `;
+      listEl.appendChild(item);
+    });
+
+    modal.classList.add("visible");
+
+    const newConfirmBtn = confirmBtn.cloneNode(true);
+    confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+    const newCancelBtn = cancelBtn.cloneNode(true);
+    cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+
+    const cleanup = () => modal.classList.remove("visible");
+
+    newConfirmBtn.onclick = () => {
+      const selectedRadio = document.querySelector(
+        'input[name="cart-share-target"]:checked',
+      );
+      if (selectedRadio) {
+        cleanup();
+        resolve(selectedRadio.value);
+      } else {
+        alert("请选择一个代付对象！");
+      }
+    };
+
+    newCancelBtn.onclick = () => {
+      cleanup();
+      resolve(null);
+    };
+  });
+}
+
+/**
+ * 【辅助函数】清空用户的桃宝购物车
+ */
+async function clearTaobaoCart() {
+  await db.taobaoCart.clear();
+  updateCartBadge();
+  // 如果用户正好在看购物车，就刷新一下
+  if (document.getElementById("cart-view").classList.contains("active")) {
+    renderTaobaoCart();
+  }
+}
+
+/**
+ * 【辅助函数】根据购物车内容创建订单
+ * @param {Array} cartItems - 从数据库读出的购物车项目数组
+ */
+async function createOrdersFromCart(cartItems) {
+  if (!cartItems || cartItems.length === 0) return;
+  const newOrders = cartItems.map((item, index) => ({
+    productId: item.productId,
+    quantity: item.quantity,
+    timestamp: Date.now() + index, // 防止时间戳完全相同
+    status: "已付款，等待发货",
+  }));
+  await db.taobaoOrders.bulkAdd(newOrders);
+
+  // 模拟10秒后自动发货
+  setTimeout(async () => {
+    const orderIds = newOrders.map((order) => order.timestamp);
+    const ordersToUpdate = await db.taobaoOrders
+      .where("timestamp")
+      .anyOf(orderIds)
+      .toArray();
+    for (const order of ordersToUpdate) {
+      await db.taobaoOrders.update(order.id, { status: "已发货，运输中" });
+    }
+    console.log(`${ordersToUpdate.length} 个新订单状态已更新为“已发货”。`);
+  }, 1000 * 10);
+}
+
+/* --- “桃宝”App 功能函数结束 --- */

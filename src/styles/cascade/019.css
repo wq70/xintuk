@@ -1,0 +1,1257 @@
+
+/* --- 1. 暂停/继续按钮 (像果冻一样Q弹) --- */
+#pomodoro-pause-btn {
+  /* 基础形状 */
+  border: none;
+  border-radius: 25px; /* 大圆角 */
+  padding: 0 25px;
+  height: 44px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 1px;
+
+  /* 默认颜色 (JS会修改背景色，这里设置通用特效) */
+  color: white;
+  /* 给JS设置的背景色加一个渐变滤镜，增加质感 */
+  background-image: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.15),
+    rgba(0, 0, 0, 0.05)
+  );
+
+  /* 阴影和光泽 */
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.15),
+    inset 0 2px 0 rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+
+  /* Q弹动画过渡 */
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+
+  /* 布局 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#pomodoro-pause-btn:hover {
+  transform: translateY(-3px) scale(1.02); /* 悬停上浮变大 */
+  box-shadow:
+    0 6px 15px rgba(0, 0, 0, 0.2),
+    inset 0 2px 0 rgba(255, 255, 255, 0.3);
+}
+
+#pomodoro-pause-btn:active {
+  transform: translateY(1px) scale(0.95); /* 点击下压变小 */
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+/* 同步美化旁边的“结束专注”按钮，保持风格一致 */
+#pomodoro-end-btn {
+  border-radius: 25px;
+  height: 44px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+/* --- 2. 休息聊天弹窗整体 (圆润卡片风) --- */
+
+/* 弹窗容器 */
+#pomodoro-break-modal .modal-content {
+  border-radius: 24px; /* 更大的圆角 */
+  border: 4px solid #fff; /* 白边框，像拍立得照片 */
+  box-shadow: 0 10px 40px rgba(255, 182, 193, 0.4); /* 粉色氛围光晕 */
+  background-color: #fff;
+  overflow: hidden;
+}
+
+/* 顶部标题栏 */
+#pomodoro-break-modal .modal-header {
+  /* 樱花粉渐变背景 */
+  background: linear-gradient(135deg, #fff0f5 0%, #ffe4e1 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+  padding: 15px 20px;
+  color: #db7093; /* 玫瑰红文字 */
+}
+
+#pomodoro-break-modal .modal-header span:first-child {
+  font-weight: 800;
+  font-size: 18px;
+  letter-spacing: 1px;
+}
+
+/* 关闭按钮 */
+#close-pomodoro-break-btn {
+  background: #fff;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ff9a9e;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s;
+}
+#close-pomodoro-break-btn:hover {
+  transform: rotate(90deg);
+}
+
+/* --- 3. 聊天内容区域 (温馨背景) --- */
+#pomodoro-break-messages {
+  /* 暖白色背景，带一点点纹理感 */
+  background-color: #fffafb;
+  /* 可选：加一点点可爱的圆点背景图 */
+  background-image: radial-gradient(#ffe4e1 1px, transparent 1px);
+  background-size: 20px 20px;
+
+  padding: 20px;
+}
+
+/* 滚动条美化 (Chrome/Safari) */
+#pomodoro-break-messages::-webkit-scrollbar {
+  width: 6px;
+}
+#pomodoro-break-messages::-webkit-scrollbar-thumb {
+  background-color: #ffc2d1;
+  border-radius: 10px;
+}
+#pomodoro-break-messages::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+
+/* --- 4. 气泡与头像深度美化 --- */
+
+/* 头像：增加白边和投影 */
+.break-avatar {
+  width: 40px; /*稍微大一点*/
+  height: 40px;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s;
+}
+.break-avatar:hover {
+  transform: scale(1.1) rotate(-5deg); /* 悬停时歪头杀 */
+}
+
+/* AI 气泡 (左侧) */
+.pomodoro-break-bubble.ai {
+  background: #fff;
+  color: #555;
+  border-radius: 18px; /* 圆润 */
+  border-top-left-radius: 4px; /* 尖角指向头像 */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+  border: 1px solid #fff0f5; /* 淡淡的粉边 */
+}
+
+/* 用户 气泡 (右侧) */
+.pomodoro-break-bubble.user {
+  /* 渐变粉色背景 */
+  background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+  color: white;
+  border-radius: 18px;
+  border-top-right-radius: 4px; /* 尖角指向头像 */
+  box-shadow: 0 4px 10px rgba(255, 154, 158, 0.25);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
+}
+
+/* 顶部提示语 (累了吗...) */
+#pomodoro-break-messages div[style*="text-align: center"] {
+  background: rgba(255, 255, 255, 0.8);
+  padding: 5px 15px;
+  border-radius: 15px;
+  display: inline-block;
+  margin: 10px auto;
+  align-self: center; /* Flex布局居中 */
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+  color: #ffb7b2 !important;
+}
+
+/* 底部输入框容器微调 (配合之前的胶囊代码) */
+#pomodoro-break-modal .chat-input-area {
+  background: #fff;
+  box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.02); /* 向上投射淡淡的阴影 */
+  z-index: 10;
+}
+/* 1. 强制覆盖 JS 中的内联样式，重塑按钮外观 */
+.pomodoro-delete-btn {
+  /* 定位调整 */
+  position: absolute !important;
+  right: 15px !important; /* 稍微往里挪一点，呼吸感更好 */
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+
+  /* 尺寸与形状：可爱的胶囊 */
+  width: auto !important;
+  height: 26px !important;
+  border-radius: 13px !important; /* 高度的一半，圆圆的 */
+  padding: 0 12px !important;
+
+  /* 视觉风格：默认低调灰色 */
+  border: none !important; /* 去掉那个突兀的红框 */
+  background-color: rgba(0, 0, 0, 0.05) !important; /* 浅浅的灰色背景 */
+  color: #999 !important; /* 浅灰色文字 */
+  font-size: 12px !important;
+  font-weight: 600 !important;
+
+  /* 交互体验 */
+  cursor: pointer !important;
+  box-shadow: none !important;
+
+  /* 动画：添加Q弹的过渡效果 */
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+
+  /* 核心：默认隐藏，保持界面整洁 */
+  opacity: 0 !important;
+  pointer-events: none !important; /* 隐藏时不可点击 */
+  transform: translateY(-50%) scale(0.8) !important; /* 缩小的初始状态 */
+}
+
+/* 2. 当鼠标悬停在整条记录上时，让按钮浮现 */
+.pomodoro-history-item:hover .pomodoro-delete-btn {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  transform: translateY(-50%) scale(1) !important; /* 恢复正常大小 */
+}
+
+/* 3. 当鼠标悬停在按钮本身时，变成萌萌的粉色 */
+.pomodoro-delete-btn:hover {
+  background-color: #ffeff2 !important; /* 樱花粉背景 */
+  color: #ff6b81 !important; /* 珊瑚粉文字 */
+  box-shadow: 0 2px 8px rgba(255, 107, 129, 0.3) !important; /* 粉色光晕 */
+  transform: translateY(-50%) scale(1.05) !important; /* 微微放大 */
+}
+
+/* 4. 点击时的按压效果 */
+.pomodoro-delete-btn:active {
+  transform: translateY(-50%) scale(0.95) !important;
+  box-shadow: none !important;
+}
+
+/* 5. 夜间模式适配 */
+#phone-screen.dark-mode .pomodoro-delete-btn {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  color: #777 !important;
+}
+#phone-screen.dark-mode .pomodoro-delete-btn:hover {
+  background-color: #4a2a30 !important; /* 深红色背景 */
+  color: #ff8fab !important; /* 亮粉色文字 */
+}
+/* === Cute viewer refresh: letter, diary, pomodoro history === */
+#ls-letter-viewer-modal .ls-letter-viewer-content {
+  position: relative;
+  width: 92%;
+  max-width: 360px;
+  height: 76%;
+  background:
+    radial-gradient(
+      circle at 12% 10%,
+      rgba(255, 205, 220, 0.35),
+      transparent 50%
+    ),
+    radial-gradient(
+      circle at 88% 18%,
+      rgba(189, 224, 255, 0.3),
+      transparent 45%
+    ),
+    linear-gradient(145deg, rgba(255, 251, 255, 0.9), rgba(255, 242, 248, 0.96));
+  border: 2px solid rgba(255, 190, 210, 0.7);
+  border-radius: 18px;
+  box-shadow:
+    0 16px 40px rgba(255, 155, 176, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  overflow: hidden;
+}
+#ls-letter-viewer-modal .ls-letter-viewer-content::before {
+  content: "";
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60%;
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #ffd8e6, #c7e7ff);
+  opacity: 0.6;
+}
+#ls-letter-viewer-modal .ls-letter-viewer-content::after {
+  content: "";
+  position: absolute;
+  inset: 14px 12px 12px;
+  border: 1px dashed rgba(255, 170, 195, 0.5);
+  border-radius: 14px;
+  pointer-events: none;
+}
+#ls-letter-viewer-modal .letter-viewer-header {
+  background: linear-gradient(
+    120deg,
+    rgba(255, 232, 242, 0.95),
+    rgba(255, 247, 230, 0.92)
+  );
+  border-bottom: 1px dashed #f3c5d8;
+  color: #754b55;
+  padding: 16px 18px;
+  gap: 12px;
+}
+#ls-letter-viewer-modal .letter-viewer-header .meta-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  border: 2px solid #fff;
+  box-shadow: 0 4px 10px rgba(255, 143, 171, 0.35);
+}
+#ls-letter-viewer-modal .letter-viewer-body {
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(255, 232, 240, 0.6) 0,
+    rgba(255, 232, 240, 0.6) 28px,
+    rgba(255, 255, 255, 0.85) 28px,
+    rgba(255, 255, 255, 0.85) 56px
+  );
+  border-radius: 12px;
+  margin: 12px 14px;
+  padding: 18px 16px;
+  box-shadow: inset 0 1px 8px rgba(255, 170, 195, 0.18);
+  color: #514349;
+  line-height: 1.9;
+}
+#ls-letter-viewer-modal .letter-viewer-footer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 240, 245, 0.9),
+    rgba(255, 250, 240, 0.92)
+  );
+  border-top: 1px dashed #f3c5d8;
+  padding: 14px 16px;
+}
+#ls-letter-viewer-modal .letter-actions button {
+  border-radius: 18px;
+  border: 1px solid #ffcde0;
+  background: #fff;
+  color: #d36d93;
+  box-shadow: 0 6px 16px rgba(255, 143, 171, 0.2);
+}
+#ls-letter-viewer-modal .letter-actions button.primary {
+  background: linear-gradient(135deg, #ff9ab3, #ffd2e4);
+  color: #fff;
+  border-color: transparent;
+}
+#ls-letter-viewer-modal .letter-actions button:hover {
+  transform: translateY(-1px);
+}
+
+/* Diary viewer */
+#ls-diary-viewer-modal .modal-content {
+  position: relative;
+  background: linear-gradient(135deg, #fff6fb 0%, #f7f9ff 55%, #fffaf2 100%);
+  border: 2px solid #ffe0ed;
+  border-radius: 18px;
+  box-shadow: 0 16px 42px rgba(255, 156, 193, 0.2);
+  overflow: hidden;
+}
+#ls-diary-viewer-modal .modal-content::before,
+#ls-diary-viewer-modal .modal-content::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(0.5px);
+}
+#ls-diary-viewer-modal .modal-content::before {
+  width: 160px;
+  height: 160px;
+  right: -40px;
+  top: -50px;
+  background: radial-gradient(
+    circle,
+    rgba(255, 208, 224, 0.35),
+    rgba(255, 208, 224, 0)
+  );
+}
+#ls-diary-viewer-modal .modal-content::after {
+  width: 140px;
+  height: 140px;
+  left: -30px;
+  bottom: -30px;
+  background: radial-gradient(
+    circle,
+    rgba(185, 222, 255, 0.3),
+    rgba(185, 222, 255, 0)
+  );
+}
+#ls-diary-viewer-modal .modal-header {
+  background: transparent;
+  color: #e07fb0;
+  border-bottom: 1px dashed #ffd6e8;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+}
+#ls-diary-viewer-body {
+  padding: 18px 16px 22px;
+  background:
+    radial-gradient(
+      circle at 14% 18%,
+      rgba(255, 225, 239, 0.4),
+      transparent 45%
+    ),
+    radial-gradient(
+      circle at 85% 24%,
+      rgba(192, 228, 255, 0.3),
+      transparent 40%
+    );
+  gap: 16px !important;
+}
+#ls-diary-viewer-modal .ls-diary-entry-block {
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 14px;
+  border-left: 5px solid #ffb7ce;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+  padding: 16px;
+  backdrop-filter: blur(4px);
+}
+#ls-diary-viewer-modal .ls-diary-entry-block + .ls-diary-entry-block {
+  border-left-color: #a6d8ff;
+}
+#ls-diary-viewer-modal .ls-diary-entry-block .entry-header .author {
+  color: #e07fb0;
+}
+#ls-diary-viewer-modal .ls-diary-entry-block .entry-content {
+  color: #524454;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 240, 246, 0.7),
+    rgba(255, 255, 255, 0.9)
+  );
+  padding: 12px 14px;
+  border-radius: 10px;
+  line-height: 1.8;
+}
+
+/* Pomodoro history */
+#ls-pomodoro-history-viewer-modal .modal-content {
+  background: linear-gradient(135deg, #fff4f8 0%, #fef6ff 55%, #fffaf2 100%);
+  border: 2px solid #ffd8e6;
+  border-radius: 18px;
+  box-shadow: 0 14px 36px rgba(255, 149, 180, 0.22);
+}
+#ls-pomodoro-history-viewer-modal .modal-header {
+  background: transparent;
+  color: #ff7aa2;
+  border-bottom: 1px dashed #ffd6e8;
+  font-weight: 800;
+}
+#pomodoro-history-viewer-content {
+  position: relative;
+  gap: 16px;
+  padding: 14px 16px 18px 16px;
+}
+#pomodoro-history-viewer-content::before {
+  content: "";
+  position: absolute;
+  left: 20px;
+  top: 12px;
+  bottom: 12px;
+  width: 2px;
+  background: linear-gradient(#ffd6e8, #b7e0ff);
+  opacity: 0.6;
+}
+.pomodoro-log-bubble {
+  position: relative;
+  margin-left: 32px;
+  background: rgba(255, 255, 255, 0.94);
+  border-radius: 14px;
+  border: 1px solid #ffd6e8;
+  box-shadow: 0 8px 18px rgba(255, 143, 171, 0.16);
+  padding: 10px 14px;
+  color: #524454;
+}
+.pomodoro-log-bubble::before {
+  content: "";
+  position: absolute;
+  left: -18px;
+  top: 16px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ff9ab3;
+  box-shadow: 0 0 0 6px rgba(255, 154, 179, 0.25);
+}
+
+/* Dark mode tweaks */
+#phone-screen.dark-mode #ls-letter-viewer-modal .ls-letter-viewer-content,
+#phone-screen.dark-mode #ls-diary-viewer-modal .modal-content,
+#phone-screen.dark-mode #ls-pomodoro-history-viewer-modal .modal-content {
+  background: linear-gradient(135deg, #2f2a35, #2a2731);
+  border-color: #4d3c55;
+  box-shadow: none;
+}
+#phone-screen.dark-mode .letter-viewer-body,
+#phone-screen.dark-mode .ls-diary-entry-block,
+#phone-screen.dark-mode .pomodoro-log-bubble {
+  background: rgba(48, 43, 56, 0.9);
+  color: #f4e8f7;
+  border-color: #5a4566;
+  box-shadow: none;
+}
+#phone-screen.dark-mode #pomodoro-history-viewer-content::before {
+  background: linear-gradient(#5a4566, #3d3345);
+  opacity: 0.8;
+}
+/* ================================================================= */
+/* === 💌 情书查看器 V3.0 (梦幻·高级·软萌限定版) === */
+/* ================================================================= */
+
+/* 1. 遮罩层：加一点粉色的氛围光 */
+#ls-letter-viewer-modal {
+  z-index: 2000 !important;
+  background-color: rgba(20, 0, 10, 0.3); /* 深色微红背景 */
+  backdrop-filter: blur(8px); /* 背景模糊 */
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* 2. 信纸主体：像一张厚实的高级卡纸 */
+#ls-letter-viewer-modal .ls-letter-viewer-content {
+  position: relative;
+  width: 88%;
+  max-width: 350px;
+  height: 78%;
+
+  /* 背景：极光般的柔和渐变，模拟高级纸张的反光 */
+  background:
+    radial-gradient(
+      circle at 0% 0%,
+      rgba(255, 235, 240, 0.8) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      circle at 100% 100%,
+      rgba(255, 218, 224, 0.6) 0%,
+      transparent 50%
+    ),
+    #fffafb; /* 底色是温暖的樱花白 */
+
+  /* 边框：双层边框设计，内实外虚，增加精致感 */
+  border: 4px solid #fff;
+  outline: 1px dashed #ffc2d1; /* 外圈虚线，像缝纫线 */
+  outline-offset: -10px; /* 虚线在内部 */
+
+  border-radius: 24px; /* 更大的圆角 */
+
+  /* 阴影：多层阴影营造悬浮感和光晕 */
+  box-shadow:
+    0 10px 40px rgba(255, 143, 171, 0.25),
+    /* 粉色氛围光 */ 0 0 0 8px rgba(255, 255, 255, 0.4); /* 外圈半透明白边 */
+
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-family: "Kaiti", "STKaiti", "Georgia", serif; /* 字体保持书卷气 */
+}
+
+/* 装饰：顶部的小爱心夹子 (拟物化) */
+#ls-letter-viewer-modal .ls-letter-viewer-content::before {
+  content: "♥";
+  position: absolute;
+  top: -15px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 40px;
+  color: #ff8fab;
+  z-index: 10;
+  text-shadow: 0 4px 5px rgba(0, 0, 0, 0.1);
+}
+
+/* 3. 头部：像信纸的抬头 */
+#ls-letter-viewer-modal .letter-viewer-header {
+  padding: 30px 25px 15px 25px; /* 顶部留多点空间给夹子 */
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex-shrink: 0;
+  border-bottom: 1px solid rgba(255, 182, 193, 0.3);
+}
+
+/* 对方头像：像个小徽章 */
+#ls-letter-viewer-modal .letter-viewer-header .meta-avatar {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: 3px solid #fff;
+  box-shadow: 0 4px 12px rgba(255, 182, 193, 0.4);
+  object-fit: cover;
+}
+
+#ls-letter-viewer-modal .recipient-info {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+#ls-letter-viewer-modal .recipient-info .label {
+  font-size: 10px;
+  color: #ffb7c5;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  font-weight: 800;
+}
+#ls-letter-viewer-modal .recipient-info .name {
+  font-size: 20px;
+  color: #6d4c41; /* 摩卡棕色 */
+  font-weight: 700;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+/* 4. 正文：信纸线条与手写感 */
+#ls-letter-viewer-modal .letter-viewer-body {
+  flex-grow: 1;
+  padding: 20px 30px;
+  overflow-y: auto;
+
+  /* 核心：更细腻的信纸横线 */
+  background-image: linear-gradient(
+    rgba(200, 100, 100, 0.1) 1px,
+    transparent 1px
+  );
+  background-size: 100% 30px; /* 行高控制 */
+  background-attachment: local;
+
+  font-size: 16px;
+  line-height: 30px; /* 严格对齐横线 */
+  color: #5d4037; /* 深咖啡色 */
+  white-space: pre-wrap;
+  word-break: break-word;
+
+  /* 增加底部留白 */
+  mask-image: linear-gradient(to bottom, black 90%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 90%, transparent 100%);
+}
+
+/* 5. 底部：精致的落款与按钮 */
+#ls-letter-viewer-modal .letter-viewer-footer {
+  padding: 15px 25px 25px 25px;
+  background: linear-gradient(to top, #fff0f5 0%, rgba(255, 255, 255, 0) 100%);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end; /* 底部对齐 */
+  flex-shrink: 0;
+}
+
+/* 发信人信息 */
+#ls-letter-viewer-modal .sender-info {
+  text-align: left;
+  font-size: 14px;
+  color: #8d6e63;
+  font-family: sans-serif; /* 用无衬线体做对比 */
+}
+#ls-letter-viewer-modal .sender-info .timestamp {
+  display: block;
+  font-size: 10px;
+  color: #bcaaa4;
+  margin-top: 3px;
+  font-weight: 500;
+}
+
+/* 按钮组 */
+#ls-letter-viewer-modal .letter-actions {
+  display: flex;
+  gap: 12px;
+}
+
+/* 通用按钮样式 */
+#ls-letter-viewer-modal .letter-actions button {
+  border: none;
+  border-radius: 20px;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* "关闭" 按钮 */
+#ls-letter-viewer-modal #ls-close-letter-viewer-btn {
+  background: #fff;
+  color: #999;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+  border: 1px solid #eee;
+}
+#ls-letter-viewer-modal #ls-close-letter-viewer-btn:hover {
+  background: #f5f5f5;
+  transform: translateY(-2px);
+}
+
+/* "回信" 按钮 (高光重点) */
+#ls-letter-viewer-modal #ls-reply-letter-btn {
+  /* 糖果渐变色 */
+  background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+  color: white;
+  box-shadow: 0 6px 15px rgba(255, 154, 158, 0.4);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+#ls-letter-viewer-modal #ls-reply-letter-btn::before {
+  content: "✎";
+  font-size: 14px;
+}
+#ls-letter-viewer-modal #ls-reply-letter-btn:hover {
+  transform: translateY(-3px) scale(1.05);
+  box-shadow: 0 8px 20px rgba(255, 154, 158, 0.6);
+}
+#ls-letter-viewer-modal #ls-reply-letter-btn:active {
+  transform: scale(0.95);
+}
+
+/* --- 6. 夜间模式适配 (保持暗色高级感) --- */
+#phone-screen.dark-mode #ls-letter-viewer-modal .ls-letter-viewer-content {
+  background: #231e1e; /* 深红褐底色 */
+  border-color: #3e2723;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+  outline-color: #4e342e;
+}
+#phone-screen.dark-mode #ls-letter-viewer-modal .letter-viewer-body {
+  background-image: linear-gradient(
+    rgba(255, 255, 255, 0.05) 1px,
+    transparent 1px
+  );
+  color: #d7ccc8; /* 浅米色文字 */
+}
+#phone-screen.dark-mode #ls-letter-viewer-modal .letter-viewer-header {
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+#phone-screen.dark-mode #ls-letter-viewer-modal .recipient-info .name {
+  color: #ef9a9a; /* 浅粉色名字 */
+}
+#phone-screen.dark-mode #ls-letter-viewer-modal .sender-info {
+  color: #a1887f;
+}
+#phone-screen.dark-mode #ls-letter-viewer-modal .letter-viewer-footer {
+  background: linear-gradient(to top, #1a1a1a 0%, transparent 100%);
+}
+#phone-screen.dark-mode #ls-letter-viewer-modal #ls-close-letter-viewer-btn {
+  background: #333;
+  color: #ccc;
+  border-color: #444;
+}
+/* ================================================================= */
+/* === 📚 圈子书架 & 目录 - 实体书信息流版 (V6.0 Fixed) === */
+/* ================================================================= */
+
+/* --- 1. 背景：柔和的高级灰/纸张色 --- */
+#forum-bookshelf-screen {
+  background-color: #f7f9fc !important;
+  background-image: none !important;
+}
+
+#forum-series-detail-screen {
+  background-color: #ffffff !important;
+}
+
+/* --- 2. 书架列表容器 --- */
+#forum-bookshelf-list {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 16px !important;
+  padding: 20px 16px !important;
+
+  /* 清除旧样式 */
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  grid-template-columns: none !important;
+}
+
+/* --- 3. 书籍卡片：左图右文布局 --- */
+.forum-bookshelf-card {
+  position: relative !important;
+  display: flex !important;
+  flex-direction: column !important; /* 保持内部垂直排列，但我们用padding腾出位置 */
+  justify-content: center !important;
+
+  background: #ffffff !important;
+  border-radius: 16px !important;
+  padding: 16px !important;
+  padding-left: 100px !important; /* ★★★ 核心：左侧留出 100px 给封面 */
+
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05) !important;
+  border: 1px solid rgba(0, 0, 0, 0.02) !important;
+  min-height: 110px !important; /* 保证高度足够放封面 */
+  overflow: visible !important; /* 允许封面稍微突出一点点立体感 */
+  transition: transform 0.2s ease !important;
+}
+
+.forum-bookshelf-card:active {
+  transform: scale(0.98);
+}
+
+/* --- 4. CSS 绘制的拟真封面 (左侧) --- */
+/* 使用伪元素 ::before 制作封面，不再占用 DOM 结构 */
+.forum-bookshelf-card::before {
+  content: "BOOK"; /* 默认装饰文字 */
+  position: absolute !important;
+  left: 16px !important;
+  top: 16px !important;
+  width: 70px !important;
+  height: 100px !important; /* 3:4 比例 */
+
+  /* 封面外观：渐变色 + 阴影 */
+  background: linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%) !important;
+  border-radius: 6px 10px 10px 6px !important; /* 书脊左侧直角，右侧圆角 */
+
+  /* 核心：书本的光影质感 */
+  box-shadow:
+    inset 4px 0 10px rgba(255, 255, 255, 0.3),
+    /* 书脊高光 */ inset -2px 0 5px rgba(0, 0, 0, 0.1),
+    /* 书口阴影 */ 5px 5px 15px rgba(0, 0, 0, 0.15) !important; /* 外部投影 */
+
+  /* 封面上的文字装饰 */
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 900;
+  font-size: 12px;
+  letter-spacing: 2px;
+  writing-mode: vertical-rl; /* 竖排文字 */
+  z-index: 1;
+}
+
+/* 书脊装饰线 (伪元素 ::after) */
+.forum-bookshelf-card::after {
+  content: "";
+  position: absolute !important;
+  left: 22px !important; /* 距离左边缘一点距离 */
+  top: 16px !important;
+  width: 1px !important;
+  height: 100px !important;
+  background: rgba(255, 255, 255, 0.4) !important;
+  z-index: 2;
+}
+
+/* 给不同的书随机分配封面颜色 */
+.forum-bookshelf-card:nth-child(4n + 1)::before {
+  background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%) !important;
+}
+.forum-bookshelf-card:nth-child(4n + 2)::before {
+  background: linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%) !important;
+}
+.forum-bookshelf-card:nth-child(4n + 3)::before {
+  background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%) !important;
+}
+.forum-bookshelf-card:nth-child(4n + 4)::before {
+  background: linear-gradient(135deg, #fccb90 0%, #d57eeb 100%) !important;
+}
+
+/* --- 5. 右侧信息区域 (Header) --- */
+.series-card-header {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  margin-bottom: 10px !important;
+  width: 100% !important;
+  /* 恢复可见性 */
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* 书名 */
+.series-card-title {
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  color: #333 !important;
+  line-height: 1.4 !important;
+  margin: 0 !important;
+
+  /* 限制显示两行 */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* 第一行 Meta：CP信息 (胶囊标签) */
+.series-card-meta:nth-of-type(1) {
+  display: inline-flex !important;
+  align-self: flex-start !important;
+  font-size: 11px !important;
+  color: var(--accent-color) !important;
+  background-color: rgba(0, 123, 255, 0.08) !important;
+  padding: 3px 8px !important;
+  border-radius: 6px !important;
+  font-weight: 600 !important;
+}
+
+/* 第二行 Meta：进度信息 (灰色小字) */
+.series-card-meta:nth-of-type(2) {
+  font-size: 12px !important;
+  color: #999 !important;
+  margin-top: 2px !important;
+}
+
+/* --- 6. 按钮操作区 (Actions) --- */
+.series-card-actions {
+  display: flex !important;
+  gap: 8px !important;
+  margin-top: auto !important; /* 推到底部 */
+  padding-top: 5px !important;
+}
+
+/* 按钮统一样式 */
+.series-card-actions .mini-btn {
+  padding: 6px 12px !important;
+  font-size: 12px !important;
+  border-radius: 14px !important; /* 椭圆按钮 */
+  border: 1px solid #eee !important;
+  background-color: #fff !important;
+  color: #666 !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  white-space: nowrap !important;
+  flex: 1; /* 按钮均分宽度 */
+  text-align: center;
+}
+
+/* 主按钮 (阅读/追更) */
+.series-card-actions .mini-btn.primary {
+  background-color: var(--accent-color) !important;
+  color: white !important;
+  border-color: var(--accent-color) !important;
+  box-shadow: 0 2px 5px rgba(0, 123, 255, 0.25) !important;
+  flex: 1.5; /* 主按钮宽一点 */
+}
+/* 1. 详情页主容器：确保是垂直 Flex 布局，且禁止整体滚动 */
+#forum-series-detail-screen {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  overflow: hidden !important; /* 禁止整个屏幕滚动 */
+}
+
+/* 2. 顶部书籍信息区域 (Meta) */
+/* 让它根据内容自动撑开高度，不许伸展，不许滚动 */
+#forum-series-meta {
+  flex-grow: 0 !important; /* 不要抢占剩余空间 */
+  flex-shrink: 0 !important; /* 防止被下面的列表挤扁 */
+  overflow: visible !important; /* 不需要滚动条 */
+  height: auto !important; /* 高度自适应 */
+  min-height: 0 !important;
+  background: transparent !important; /* 保持透明，显示背景色 */
+  padding-bottom: 0 !important;
+}
+
+/* 3. 底部目录列表 (Chapter List) */
+/* 让它吃掉所有剩下的空间，并且内容溢出时自己内部滚动 */
+#forum-series-chapter-list {
+  flex-grow: 1 !important; /* 占据所有剩余空间 */
+  height: 0 !important; /* 【关键】配合flex-grow，强制触发滚动计算 */
+  min-height: 0 !important; /* 【关键】防止Flex子项溢出 */
+  overflow-y: auto !important; /* 开启垂直滚动条 */
+
+  /* 美化一下列表的间距 */
+  padding: 10px 15px 30px 15px !important;
+  gap: 10px !important;
+
+  /* 移除之前可能设置的 max-height */
+  max-height: none !important;
+  background: transparent !important;
+}
+
+/* 4. 单个章节条目的样式微调 (防止太挤) */
+.forum-chapter-item {
+  flex-shrink: 0 !important; /* 防止在列表里被挤扁 */
+}
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 52px;
+  height: 28px;
+  margin-left: auto; /* 靠右对齐 */
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc; /* 默认灰色 */
+  transition: 0.4s;
+  border-radius: 34px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  transition: 0.4s;
+  border-radius: 50%;
+  z-index: 2;
+}
+
+/* 开启状态：背景变绿 */
+input:checked + .slider {
+  background-color: #34c759; /* iOS 绿色 */
+}
+
+/* 开启状态：圆球右移 */
+input:checked + .slider:before {
+  transform: translateX(24px);
+}
+
+/* ★★★ 核心：开启时显示对勾 ★★★ */
+input:checked + .slider::after {
+  content: "✔";
+  position: absolute;
+  color: white;
+  font-size: 16px;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+}
+
+/* ================================================================= */
+/* === 💎 情侣空间 V12.0 终极重构：杂志封面·沉浸式布局 💎 === */
+/* ================================================================= */
+
+/* --- 1. 头部容器调整：给背景图留出展示空间 --- */
+#ls-header {
+  height: 320px !important; /* 不需要过高，320px 是展示背景图的黄金高度 */
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: flex-end; /* 关键：让内容沉底，留出上方空间看图 */
+  padding-bottom: 50px !important; /* 底部留白，给Tab栏腾位置 */
+  box-sizing: border-box !important;
+
+  /* 添加底部渐变遮罩，保证白色文字在浅色背景上也清晰 */
+  background: transparent !important;
+}
+
+/* --- 2. 顶部操作栏：保持在最上方 --- */
+.ls-header-top-bar {
+  position: absolute !important;
+  top: 0;
+  left: 0;
+  width: 100%;
+  box-sizing: border-box;
+  /* 增加一点顶部渐变，防止白色按钮看不清 */
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.3),
+    transparent
+  ) !important;
+  padding-bottom: 20px !important;
+}
+
+/* --- 3. 头像与计数器：居中沉底布局 --- */
+/* 这是最核心的改动：不再绝对定位，而是自然流式布局 */
+.ls-avatar-and-counter-wrapper {
+  position: static !important; /* 取消固定坐标 */
+  transform: none !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 12px !important;
+
+  /* 给左右留出余地，防止在大屏iPad上太散 */
+  width: 100% !important;
+  margin-bottom: 10px !important; /* 和下方Tab栏的间距 */
+}
+
+/* --- 4. 头像组：精致重叠风 --- */
+.ls-header-avatars {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  position: relative !important; /* 为爱心图标定位 */
+}
+
+.ls-header-avatars img {
+  width: 68px !important;
+  height: 68px !important;
+  border-radius: 50% !important;
+  object-fit: cover !important;
+
+  /* 精致白边 + 柔光阴影 */
+  border: 3px solid rgba(255, 255, 255, 0.95) !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2) !important;
+
+  /* 稍微分开一点，显得大气 */
+  margin: 0 15px !important;
+}
+
+/* 中间的爱心/音波图标：悬浮正中 */
+.ls-header-avatars .heart-icon {
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  transform: translate(-50%, -50%) !important;
+
+  /* 调整尺寸，让它连接两个头像 */
+  width: 100px !important;
+  height: 30px !important;
+  background-size: contain !important;
+  z-index: 10 !important; /* 在头像上面 */
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3)); /* 增加立体感 */
+}
+
+/* --- 5. 天数计数器：精致胶囊风格 --- */
+#ls-days-counter {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: #fff !important;
+  letter-spacing: 1px;
+
+  /* 胶囊背景：半透明磨砂黑/白混合 */
+  background: rgba(255, 255, 255, 0.2) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+
+  padding: 6px 16px !important;
+  border-radius: 20px !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1) !important;
+
+  /* 移除之前的左边框样式，改为纯净胶囊 */
+  border-left: 1px solid rgba(255, 255, 255, 0.3) !important;
+  margin: 0 !important;
+}
+
+/* --- 6. Tab导航栏：嵌入式悬浮 --- */
+#ls-tab-bar {
+  /* 使用 margin-top 把它往上拉，卡在 Header 背景图的边缘 */
+  margin-top: -35px !important;
+
+  /* 左右边距 */
+  margin-left: 15px !important;
+  margin-right: 15px !important;
+  margin-bottom: 15px !important;
+
+  /* 视觉升级：更加清透 */
+  background: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.6) !important;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08) !important;
+
+  /* 圆角 */
+  border-radius: 22px !important;
+  padding: 6px !important;
+  z-index: 20 !important;
+}
+
+/* 激活的 Tab 按钮 */
+.ls-tab-item.active {
+  background: #fff !important;
+  border-radius: 16px !important;
+  box-shadow: 0 4px 12px rgba(255, 105, 180, 0.15) !important;
+  color: #ff6b81 !important; /* 珊瑚粉 */
+  transform: translateY(-1px); /* 微微浮起 */
+}
+
+/* 未激活的 Tab 图标颜色 */
+.ls-tab-item:not(.active) svg {
+  color: #888 !important;
+}
+
+/* --- 7. 下方内容区：微调顶部间距 --- */
+#ls-content-area,
+.ls-view {
+  padding-top: 5px !important; /* 不需要太多，紧凑一点更好看 */
+}
+/* === 修复记忆互通下拉框样式 === */
+
+/* 1. 列表容器：设置为绝对定位的浮层，限制高度并允许滚动 */
+#memory-link-checkboxes-container {
+  display: none; /* 默认隐藏 */
+  position: absolute;
+  width: 100%;
+  max-height: 200px;
+  overflow-y: auto;
+  background: #fff; /* 背景色 */
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  z-index: 1000; /* 确保浮在最上层 */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  margin-top: 5px;
+  box-sizing: border-box;
+}
+
+/* 当 JS 添加 .visible 类时显示 */
+#memory-link-checkboxes-container.visible {
+  display: block;
+}
+
+/* 2. 列表项（每一行）：使用 Flex 布局垂直居中 */
+#memory-link-checkboxes-container label {
+  display: flex;
+  align-items: center; /* 关键：让勾选框、头像、文字垂直居中 */
+  padding: 8px 12px;
+  border-bottom: 1px solid #f5f5f5;
+  cursor: pointer;
+  transition: background 0.2s;
+  color: #333;
+}
+
+#memory-link-checkboxes-container label:hover {
+  background-color: #f0f2f5;
+}
+
+#memory-link-checkboxes-container label:last-child {
+  border-bottom: none;
+}
+
+/* 3. ★★★ 核心修复：限制头像图片的大小 ★★★ */
+#memory-link-checkboxes-container .avatar-preview {
+  width: 32px !important; /* 强制宽度 */
+  height: 32px !important; /* 强制高度 */
+  border-radius: 50%; /* 圆形头像 */
+  object-fit: cover; /* 防止图片变形 */
+  margin: 0 10px; /* 头像左右的间距 */
+  flex-shrink: 0; /* 防止头像被挤扁 */
+  border: 1px solid #eee;
+}
+
+/* 微调复选框样式 */
+#memory-link-checkboxes-container input[type="checkbox"] {
+  margin: 0;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent-color, #007bff);
+}
+/* --- 微博评论区头像样式 --- */
+.weibo-comment-item {
+  display: flex; /* 使用 Flex 布局 */
+  align-items: flex-start; /* 顶部对齐 */
+  gap: 8px; /* 头像和文字的间距 */
+  padding: 6px 0;
+}
+
+.weibo-comment-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0; /* 防止头像被挤压 */
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.weibo-comment-content-wrapper {
+  flex: 1; /* 文字占据剩余空间 */
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+/* 调整原来的删除按钮位置 */

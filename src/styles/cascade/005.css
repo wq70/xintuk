@@ -1,0 +1,1304 @@
+
+.bubble-preset-manager .action-btn {
+  flex-shrink: 0; /* 防止按钮被压缩 */
+  padding: 8px 10px;
+  font-size: 13px;
+  background-color: #e9ecef;
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 500;
+}
+/* ▲▲▲ 新CSS粘贴结束 ▲▲▲ */
+
+/* ▼▼▼ 把这一整块全新的CSS，粘贴到 <style> 的末尾 ▼▼▼ */
+
+/* 1. 让锁屏和主屏幕可以堆叠 */
+/* 核心：把锁屏和主屏幕都设为绝对定位，这样它们才能重叠 */
+#lock-screen,
+#home-screen {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* 2. 定义毛玻璃背景层的样式 */
+#lock-screen-background-blur {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1; /* 【核心修改1】它的层级现在和主屏幕一样低 */
+
+  background-size: cover;
+  background-position: center;
+
+  /* 【核心修改2】魔法在这里！我们直接模糊这个元素本身 */
+  filter: blur(20px);
+  -webkit-filter: blur(20px);
+
+  /* (可选但推荐) 轻微放大可以避免模糊后边缘变暗，效果更好 */
+  transform: scale(1.1);
+
+  /* 【核心修改3】默认隐藏，且带有淡入淡出效果 */
+  display: none;
+  opacity: 0;
+  transition: opacity 0.3s ease-out;
+}
+
+/* ▲▲▲ 新CSS粘贴结束 ▲▲▲ */
+
+/* ▼▼▼ 从这里开始复制 ▼▼▼ */
+
+/* === 【最终修复版】世界书选择器列表样式 === */
+
+/* 1. 分类文件夹行样式：用flex和gap创建固定间距，非常稳定 */
+.wb-category-header {
+  display: flex;
+  align-items: center;
+  gap: 8px; /* 箭头、复选框、文字之间的固定间距 */
+  padding: 10px 12px;
+  cursor: pointer;
+  background-color: #f0f2f5;
+  font-weight: 600;
+  overflow: hidden; /* 防止任何意外溢出 */
+}
+
+/* 2. 分类文件夹里的文字样式：只负责截断，不负责布局 */
+.wb-category-header > span:last-of-type {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 1; /* 允许文字部分在空间不足时被压缩 */
+}
+
+/* 3. 【核心修复】为分类和书目里的复选框“解绑”全局样式！ */
+.wb-category-header input[type="checkbox"],
+.wb-book-container input[type="checkbox"] {
+  width: auto !important; /* 让它恢复自己的天然大小，!important确保最高优先级 */
+  flex-shrink: 0; /* 防止它被压缩，保持完整 */
+}
+
+/* 4. 具体书目行的样式：强制从左边开始排列，解决不同设备的显示差异 */
+.wb-book-container label {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start; /* 强制所有内容从左边开始对齐 */
+  padding: 8px 12px;
+  gap: 10px; /* 复选框和文字的间距 */
+  overflow: hidden;
+}
+
+/* 5. 具体书目的文字样式 */
+.wb-book-container label .wb-book-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+  flex-shrink: 1; /* 同样允许它被压缩 */
+}
+
+/* 6. 夜间模式适配 (保持不变) */
+#phone-screen.dark-mode .wb-category-header {
+  background-color: #2c2c2e;
+}
+
+/* 7. 小箭头的样式 (保持不变) */
+.wb-category-header .arrow {
+  font-size: 12px;
+  transition: transform 0.2s ease;
+  flex-shrink: 0; /* 防止箭头被压缩 */
+}
+.wb-category-header.collapsed .arrow {
+  transform: rotate(-90deg);
+}
+
+/* 8. 书籍容器的样式 (保持不变) */
+.wb-book-container {
+  padding-left: 20px;
+  max-height: 1000px;
+  overflow: hidden;
+  transition: max-height 0.3s ease-in-out;
+}
+.wb-book-container.collapsed {
+  max-height: 0;
+}
+
+/* ▼▼▼ 【全新】鼠标拖动工具栏时的手势样式 ▼▼▼ */
+#chat-input-actions-top.grabbing {
+  cursor: grabbing;
+  cursor: -webkit-grabbing;
+  user-select: none; /* 防止拖动时选中文本 */
+}
+/* ▲▲▲ 新CSS粘贴结束 ▲▲▲ */
+
+/* ▼▼▼ 【SVG终极版】发送定位功能样式 ▼▼▼ */
+
+/* 1. 基础卡片和气泡样式 (保持不变) */
+.message-bubble.is-location .content {
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  border: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.location-card {
+  width: 230px;
+  background-color: #f7f7f7;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+}
+
+/* 2. 【核心升级】地图区域现在直接用于容纳SVG */
+.location-map-area {
+  height: 90px;
+  background-color: #f0f2f5;
+  background-image:
+    linear-gradient(rgba(0, 0, 0, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.05) 1px, transparent 1px);
+  background-size: 20px 20px;
+  padding: 5px; /* 给SVG一点呼吸空间 */
+  box-sizing: border-box;
+}
+.location-map-area svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* 3. 【全新】SVG内部元素的样式 */
+/* 轨迹曲线 */
+.svg-trajectory-path {
+  stroke-width: 2px;
+  stroke: rgba(180, 180, 180, 0.8);
+  stroke-dasharray: 3 3; /* 虚线效果 */
+  fill: none;
+}
+/* 定位点 (起点/终点) */
+.svg-pin {
+  stroke-width: 2px;
+  stroke: white;
+}
+.svg-pin.user-pin {
+  fill: #4caf50;
+} /* 绿色用户点 */
+.svg-pin.ai-pin {
+  fill: #ff5252;
+} /* 红色AI点 */
+
+/* 脚印图标 */
+.svg-footprint {
+  font-size: 14px;
+  fill: rgba(0, 0, 0, 0.4);
+}
+/* 途经点地名标签 */
+.svg-location-label {
+  font-size: 10px;
+  font-weight: 500;
+  fill: #555;
+  /* 给文字一点白色的描边，让它在复杂背景下更清晰 */
+  stroke: white;
+  stroke-width: 2px;
+  paint-order: stroke;
+}
+
+/* 4. 卡片底部信息区域 (已升级) */
+.location-info {
+  padding: 12px;
+}
+.location-address {
+  font-size: 13px;
+  line-height: 1.6;
+  margin-bottom: 8px;
+  color: #333;
+}
+.location-address .name-tag {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.location-address p.hidden {
+  display: none;
+}
+.location-distance {
+  font-size: 12px;
+  color: var(--text-secondary);
+  border-top: 1px solid #e9e9e9;
+  padding-top: 8px;
+  text-align: center;
+}
+/* ▲▲▲ 升级版CSS粘贴结束 ▲▲▲ */
+
+/* ▼▼▼ 【全新 | 修复版】“一键重roll”按钮样式 ▼▼▼ */
+#reroll-btn {
+  /* --- 直接复用其他按钮的样式，确保外观统一 --- */
+  font-size: 24px;
+  padding: 0;
+  width: 38px;
+  height: 38px;
+  line-height: 38px;
+  text-align: center;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.5);
+  color: var(--text-primary);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  /* 核心修复：边框颜色和其他按钮统一 */
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  /* 移除导致差异的阴影 */
+  box-shadow: none;
+
+  /* 保留原有的交互动效 */
+  transition:
+    opacity 0.2s,
+    transform 0.1s;
+}
+
+#reroll-btn:hover {
+  opacity: 0.8;
+}
+
+#reroll-btn:active {
+  transform: scale(0.9);
+}
+
+#reroll-btn svg {
+  width: 20px;
+  height: 20px;
+}
+/* ▲▲▲ 替换结束 ▲▲▲ */
+
+/* ▼▼▼ 【最终美化版】悬浮歌词栏样式 ▼▼▼ */
+#floating-lyrics-bar {
+  position: absolute;
+  /* 【问题1修复】默认位置改为顶部 */
+  top: 50px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 10px; /* 在歌词和按钮间增加间距 */
+
+  width: 90%;
+  max-width: 320px; /* 同时设一个最大像素宽度，避免在宽屏上过长 */
+  padding: 8px 12px; /* 稍微增加一点内边距以适应新宽度 */
+  background-color: rgba(0, 0, 0, 0);
+
+  /* 【问题3需要】为字体颜色和背景透明度添加过渡动画 */
+  transition:
+    background-color 0.3s,
+    opacity 0.3s;
+
+  color: white;
+  font-size: 14px;
+  font-weight: 500; /* 字体稍微加粗 */
+  text-align: center;
+  border-radius: 12px;
+
+  /* 文字阴影，让它在任何背景下都清晰 */
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+
+  cursor: pointer;
+  user-select: none;
+
+  /* 【问题4需要】为关闭按钮准备 */
+  overflow: visible; /* 允许按钮超出范围 */
+}
+
+/* 【问题4需要】关闭按钮的样式 */
+#floating-lyrics-bar .close-btn,
+#floating-lyrics-bar #lyrics-settings-btn {
+  position: absolute;
+  top: -8px;
+  width: 20px;
+  height: 20px;
+  background-color: rgba(0, 0, 0, 0.6);
+  color: white;
+  border-radius: 50%;
+  border: 1px solid white;
+  cursor: pointer;
+  opacity: 0; /* 默认隐藏 */
+  transition: opacity 0.2s;
+  display: flex; /* 确保SVG能居中 */
+  align-items: center;
+  justify-content: center;
+}
+
+/* 把关闭按钮和设置按钮分开放置 */
+#floating-lyrics-bar .close-btn {
+  right: -8px;
+  line-height: 18px;
+  font-size: 14px;
+}
+#floating-lyrics-bar #lyrics-settings-btn {
+  right: 22px;
+} /* 放在关闭按钮旁边 */
+
+/* 鼠标悬停在整个歌词栏上时，一起显示它们 */
+#floating-lyrics-bar:hover .close-btn,
+#floating-lyrics-bar:hover #lyrics-settings-btn {
+  opacity: 1;
+}
+
+#floating-lyrics-bar.dragging {
+  cursor: grabbing;
+  cursor: -webkit-grabbing;
+}
+/* ▲▲▲ 新CSS粘贴结束 ▲▲▲ */
+
+/* ▼▼▼ 【全新】“查角色手机”功能相关样式 ▼▼▼ */
+
+/* 角色选择列表项 */
+.character-select-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 15px;
+  border-bottom: 1px solid var(--border-color);
+  cursor: pointer;
+}
+.character-select-item:hover {
+  background-color: #f5f5f5;
+}
+.character-select-item img {
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  margin-right: 12px;
+}
+.character-select-item .name {
+  font-weight: 500;
+}
+
+/* 角色手机的聊天气泡 (简化版) */
+.character-chat-bubble {
+  padding: 8px 12px;
+  border-radius: 12px;
+  max-width: 80%;
+  word-break: break-word;
+  line-height: 1.5;
+}
+.character-chat-bubble.sent {
+  background-color: #dcf8c6;
+  align-self: flex-end; /* 自己发的靠右 */
+}
+.character-chat-bubble.received {
+  background-color: #ffffff;
+  align-self: flex-start; /* 收到的靠左 */
+}
+
+/* ▼▼▼ 【美化版】角色手机数据列表项样式 ▼▼▼ */
+.character-data-item {
+  padding: 12px 15px;
+  border-bottom: 1px solid #f0f0f0; /* 边框颜色变浅 */
+  margin: 8px 10px; /* 增加外边距，形成卡片感 */
+  border-radius: 8px; /* 增加圆角 */
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05); /* 增加非常淡的阴影 */
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s; /* 增加悬浮动画 */
+  background-color: var(--secondary-bg);
+}
+
+.character-data-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+}
+
+.character-data-item .title {
+  font-weight: 600;
+  margin-bottom: 5px;
+  color: #333; /* 标题颜色加深 */
+}
+.character-data-item .content {
+  font-size: 14px;
+  color: #555;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+.character-data-item .meta {
+  font-size: 12px;
+  color: #888;
+  margin-top: 10px;
+  padding-top: 8px; /* 在meta上方增加一点距离和分割线 */
+  border-top: 1px solid #f5f5f5;
+  display: flex;
+  justify-content: space-between;
+}
+/* ▲▲▲ 替换结束 ▲▲▲ */
+
+/* ▼▼▼ 【V3修正版】角色手机“画中画”样式修正 ▼▼▼ */
+
+/* 1. 【核心修正1】让手机外壳容器占据整个屏幕，并用内边距把手机框“推”下来 */
+#character-phone-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #ffffff; /* ★★★ 把这里改为纯白色 ★★★ */
+  padding-top: 50px;
+  box-sizing: border-box; /* 确保内边距计算正确 */
+}
+
+/* 2. 手机边框样式 (修改后) */
+.character-phone-frame {
+  width: 95%;
+  height: 98%;
+  background-color: #111;
+  border-radius: 30px;
+  padding: 10px;
+  box-shadow: none; /* ★★★ 就是修改这里 ★★★ */
+  box-sizing: border-box;
+  position: relative;
+  display: flex;
+}
+
+/* ▼▼▼ 用下面这块【已修复】的代码替换旧的 #character-app-grid .app-icon .icon-bg 规则 ▼▼▼ */
+#character-app-grid .app-icon .icon-bg {
+  width: 65px; /* 恢复原来的尺寸 */
+  height: 65px; /* 恢复原来的尺寸 */
+  border-radius: 18px; /* 恢复原来的圆角 */
+  background-color: #fff5f7; /* 设置为你想要的淡粉色背景 */
+}
+/* ▲▲▲ 替换结束 ▲▲▲ */
+
+/* 3. 【核心修正2】缩小APP图标内的SVG */
+#character-app-grid .app-icon .icon-bg svg {
+  width: 60%; /* ★★★ 将SVG的宽度缩小到其容器的60% ★★★ */
+  height: 60%; /* ★★★ 高度也同步缩小 ★★★ */
+}
+
+/* 4. 其余样式保持不变 */
+.character-phone-inner-screen {
+  flex-grow: 1;
+  border-radius: 20px;
+  overflow: hidden;
+  position: relative;
+  background-color: var(--secondary-bg) !important; /* 使用变量 */
+}
+.character-phone-notch {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100px;
+  height: 20px;
+  border-radius: 0 0 10px 10px;
+  z-index: 10;
+}
+.character-phone-page {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.3s,
+    visibility 0.3s;
+}
+.character-phone-page.active {
+  opacity: 1;
+  visibility: visible;
+  z-index: 5;
+}
+/* ▼▼▼ 用这块【透明毛玻璃版】代码，完整替换掉旧的 .character-phone-header 样式 ▼▼▼ */
+
+/* ▼▼▼ 用这块【透明毛玻璃版】代码，完整替换掉旧的 .character-phone-header 样式 ▼▼▼ */
+
+.character-phone-header {
+  flex-shrink: 0;
+  margin: 10px 12px 10px; /* ★ 修改点1: 将上边距 35px 改为 0，让它贴顶 */
+  height: 50px; /* ★ 修改点2: 将高度从 48px 增加到 56px，让它更高一点 */
+
+  /* ★ 核心修改1：变成一个更圆润的胶囊形状 */
+  border-radius: 24px; /* 将圆角从16px增加到24px，看起来更圆润 */
+
+  /* ★ 核心修改2：设置一个几乎透明的、带有毛玻璃效果的背景 */
+  background-color: rgba(180, 180, 180, 0.2); /* 降低不透明度，营造透明感 */
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+
+  /* ★ 核心修改3：让边框和阴影更精致，以适应透明感 */
+  border: 1px solid rgba(255, 255, 255, 0.2); /* 边框也调得更透明 */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); /* 阴影稍微调整，更柔和 */
+
+  /* ★ 核心修改4：强制文字和图标颜色变为白色，并加上阴影以保证清晰 */
+  color: #ffffff; /* 标题文字变为白色 */
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3); /* 给文字加一点阴影，防止背景太亮看不清 */
+
+  /* 布局部分保持不变 */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 12px;
+  box-sizing: border-box;
+  font-size: 16px;
+}
+
+/* ★★★【重要】为了确保所有图标都变成白色，请把下面这段新代码也加到<style>里 ★★★ */
+.character-phone-header .action-btn svg,
+.character-phone-header .back-btn svg {
+  color: #ffffff !important;
+}
+
+/* ▲▲▲ 替换结束 ▲▲▲ */
+
+/* ★★★【重要】为了确保所有图标都变成白色，请把下面这段新代码也加到<style>里 ★★★ */
+.character-phone-header .action-btn svg,
+.character-phone-header .back-btn svg {
+  color: #ffffff !important;
+}
+
+/* ▲▲▲ 替换结束 ▲▲▲ */
+
+.character-phone-header .action-btn svg,
+.character-phone-header .back-btn svg {
+  color: var(--accent-color);
+}
+#character-chat-history-messages {
+  background-color: var(
+    --secondary-bg
+  ) !important; /* 使用变量 */ /* ★★★ 移除背景图片 ★★★ */
+}
+/* ▲▲▲ 样式修正结束 ▲▲▲ */
+
+/* ▲▲▲ 样式修正结束 ▲▲▲ */
+
+/* ▼▼▼ 【全新】角色手机微信风格聊天气泡样式 ▼▼▼ */
+
+/* 1. 聊天记录界面的背景色 */
+#character-chat-history-messages {
+  /* 移除之前版本可能存在的背景图片 */
+  background-image: none;
+}
+
+/* 2. 消息气泡的通用容器样式 */
+.character-chat-bubble-container {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+  max-width: 80%; /* 限制气泡最大宽度 */
+}
+
+/* 3. 气泡的内容区域 */
+.character-chat-bubble {
+  position: relative;
+  padding: 8px 12px;
+  line-height: 1.5;
+  word-break: break-word;
+  border-radius: 6px;
+  font-size: 15px;
+}
+
+/* 4. 头像样式 */
+.character-chat-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px; /* 微信风格的圆角矩形头像 */
+  flex-shrink: 0;
+}
+
+/* --- 我方（角色自己）的气泡 --- */
+.character-chat-bubble-container.sent {
+  align-self: flex-end; /* 整体靠右 */
+  flex-direction: row-reverse; /* 布局反转：内容 -> 头像 */
+}
+.character-chat-bubble-container.sent .character-chat-bubble {
+  background-color: #95ec69; /* 微信绿 */
+  color: #000;
+}
+/* 我方气泡的小尾巴 */
+.character-chat-bubble-container.sent .character-chat-bubble::after {
+  content: "";
+  position: absolute;
+  right: -4px;
+  top: 10px;
+  width: 0;
+  height: 0;
+  border: 4px solid transparent;
+  border-left-color: #95ec69;
+  border-right: 0;
+}
+
+/* --- 对方（NPC或用户）的气泡 --- */
+.character-chat-bubble-container.received {
+  align-self: flex-start; /* 整体靠左 */
+}
+/* 对方气泡的小尾巴 */
+.character-chat-bubble-container.received .character-chat-bubble::before {
+  content: "";
+  position: absolute;
+  left: -4px;
+  top: 10px;
+  width: 0;
+  height: 0;
+  border: 4px solid transparent;
+  border-right-color: #ffffff;
+  border-left: 0;
+}
+/* ▼▼▼ 在这里添加下面这块新代码 ▼▼▼ */
+.character-chat-bubble-container.received .character-chat-bubble {
+  background-color: #ffffff; /* 微信白 */
+  color: #000;
+}
+/* ▲▲▲ 添加结束 ▲▲▲ */
+.sticker-image {
+  /* 核心修改：将最大宽高从 100px 增加到 140px，让聊天中的表情包变大 */
+  max-width: 140px;
+  max-height: 140px;
+  display: block;
+  object-fit: contain;
+}
+.sticker-item {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border-radius: 10px;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  cursor: pointer;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+/* --- 功能性重置：针对图片/表情包，让气泡“消失” --- */
+.character-chat-bubble-container .character-chat-bubble:has(img.sticker-image) {
+  background: transparent !important;
+  padding: 0 !important;
+  border-radius: 0;
+}
+.character-chat-bubble-container
+  .character-chat-bubble:has(img.sticker-image)::before,
+.character-chat-bubble-container
+  .character-chat-bubble:has(img.sticker-image)::after {
+  content: none !important;
+}
+/* ▲▲▲ 样式添加结束 ▲▲▲ */
+/* ▼▼▼ 【全新】角色手机新增APP页面样式 ▼▼▼ */
+
+/* 1. 相册页面的网格布局 */
+#character-album-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr); /* 每行3张图 */
+  gap: 4px;
+  padding: 4px;
+}
+.character-album-item {
+  aspect-ratio: 1 / 1; /* 保持正方形 */
+  background-color: #e0e0e0;
+  cursor: pointer;
+}
+.character-album-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 2. 银行页面的余额显示 */
+.character-bank-balance-card {
+  margin: 15px;
+  padding: 20px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  border-radius: 12px;
+  text-align: center;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+.character-bank-balance-card .label {
+  font-size: 14px;
+  opacity: 0.8;
+}
+.character-bank-balance-card .amount {
+  font-size: 32px;
+  font-weight: 600;
+  margin-top: 5px;
+}
+
+/* 3. 银行交易记录的颜色 */
+.character-data-item .transaction-amount {
+  font-weight: 600;
+}
+.character-data-item .transaction-amount.income {
+  color: #4caf50; /* 收入为绿色 */
+}
+.character-data-item .transaction-amount.expense {
+  color: #f44336; /* 支出为红色 */
+}
+
+/* ▲▲▲ 样式添加结束 ▲▲▲ */
+
+/* ▼▼▼ 【V5修正版】角色手机相册网格布局 ▼▼▼ */
+#character-album-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr); /* 每行3张图 */
+  gap: 4px;
+  padding: 4px;
+}
+.character-album-item {
+  aspect-ratio: 1 / 1; /* 保持正方形 */
+  background-color: #e0e0e0;
+  cursor: pointer;
+}
+.character-album-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* ▲▲▲ 样式修正结束 ▲▲▲ */
+
+/* ▼▼▼ 【全新】Markdown渲染增强样式 ▼▼▼ */
+
+/* 1. 为角色手机里的所有Markdown内容设置基础样式 */
+.character-data-item .content h1,
+.character-data-item .content h2,
+.character-data-item .content h3,
+.character-data-item .content p {
+  margin: 0 0 10px 0; /* 统一标题和段落的下边距 */
+}
+.character-data-item .content h1 {
+  font-size: 1.5em;
+  font-weight: 600;
+}
+.character-data-item .content h2 {
+  font-size: 1.3em;
+  font-weight: 600;
+}
+.character-data-item .content h3 {
+  font-size: 1.1em;
+  font-weight: 600;
+}
+
+/* 2. 删除线样式 */
+.character-data-item .content del {
+  color: #8a8a8a;
+}
+
+/* 3. 遮挡/剧透效果 */
+.character-data-item .content .spoiler {
+  background-color: #333;
+  color: #333; /* 文字和背景一个色，实现隐藏 */
+  padding: 0 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+/* 点击或鼠标悬停时显示内容 */
+.character-data-item .content .spoiler:hover,
+.character-data-item .content .spoiler:active {
+  background-color: #f0f0f0;
+  color: #000;
+}
+
+/* ▲▲▲ 样式添加结束 ▲▲▲ */
+
+/* ▼▼▼ 【全新】角色手机日记美化与删除功能样式 ▼▼▼ */
+
+/* 1. 让日记列表有更好的边距 */
+#character-diary-list {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px; /* 增加日记之间的间距 */
+}
+
+/* 2. 美化单篇日记卡片 */
+#character-diary-list .character-data-item {
+  background-color: #fffaf0; /* 温暖的米黄色背景 */
+  border-left: 4px solid #ffc107; /* 左侧加一条装饰线 */
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+  position: relative; /* 为了定位删除按钮 */
+  padding-bottom: 35px; /* 为底部的日期留出空间 */
+}
+
+/* 3. 美化日期显示，把它放到右下角 */
+#character-diary-list .character-data-item .meta {
+  position: absolute;
+  bottom: 8px;
+  right: 12px;
+  border-top: none; /* 移除原来的上边框 */
+  padding-top: 0;
+  font-size: 11px;
+  color: #bfa87a;
+}
+
+/* ▼▼▼ 【V6最终修复版】角色手机相册布局防溢出 ▼▼▼ */
+
+/* 1. 【核心】为相册网格的容器强制禁止水平滚动 */
+#character-album-grid.list-container {
+  overflow-x: hidden;
+}
+
+/* 2. 重新定义网格布局 */
+#character-album-grid {
+  display: grid;
+  /* 【核心】每行3个，但这次我们用calc()精确计算宽度 */
+  grid-template-columns: repeat(3, calc(33.333% - 4px));
+  gap: 6px; /* 稍微增大间隙，让calc有计算空间 */
+  padding: 6px; /* 内边距和间隙保持一致 */
+  box-sizing: border-box; /* 确保内边距和边框被包含在总宽度内 */
+  align-content: start; /* <--- 就是加上这一行！ */
+}
+
+/* 3. 稍微缩小图片，确保它们不会撑破容器 */
+.character-album-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block; /* 移除图片下方的微小空隙 */
+}
+
+/* ▲▲▲ 样式修正结束 ▲▲▲ */
+
+/* ▼▼▼ 【V6独家定制】角色手机信纸风格日记样式 ▼▼▼ */
+
+/* 1. 【核心】重塑日记卡片，让它像一张信纸 */
+#character-diary-list .character-data-item {
+  background-color: #fdfaf2; /* 温暖、柔和的米白/浅黄色，模拟信纸 */
+  border: 1px solid #eaddc7; /* 淡淡的纸张边缘色 */
+  border-left: 3px solid #d4bda5; /* 左侧加一条稍深的线，像装订线 */
+  box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.06); /* 更柔和的阴影 */
+  position: relative;
+  padding: 20px 15px 15px 20px; /* 调整内边距，给“小东西”留出空间 */
+  font-family:
+    Georgia, "Times New Roman", "Kaiti TC", "STKaiti", serif; /* 使用更典雅的衬线字体 */
+}
+
+/* 2. 【小东西】用伪元素在左上角添加一个精致的纸夹 */
+#character-diary-list .character-data-item::before {
+  content: "📎"; /* 这是一个Emoji纸夹，简单又有效 */
+  position: absolute;
+  top: -12px;
+  left: 15px;
+  font-size: 24px;
+  transform: rotate(-25deg); /* 让纸夹有一个随意的角度 */
+  opacity: 0.8;
+}
+
+/* 3. 【核心】重置Markdown内容的字体，确保它们继承信纸的字体 */
+#character-diary-list .character-data-item .content,
+#character-diary-list .character-data-item .content h1,
+#character-diary-list .character-data-item .content h2,
+#character-diary-list .character-data-item .content h3 {
+  font-family: inherit; /* 强制继承父元素的字体 */
+  color: #4a443b; /* 使用深棕色文字，更有质感 */
+}
+
+#character-diary-list .character-data-item .content p {
+  margin: 0 0 12px 0;
+}
+
+/* 4. 将日期移动到右上角，像信纸的落款日期 */
+#character-diary-list .character-data-item .meta {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  font-size: 11px;
+  color: #ae9c82; /* 匹配信纸风格的日期颜色 */
+  font-style: italic; /* 斜体更有手写感 */
+  border-top: none;
+  padding-top: 0;
+}
+
+/* ▲▲▲ 样式添加结束 ▲▲▲ */
+
+/* ▼▼▼ 【全新】角色手机全APP美化样式 ▼▼▼ */
+
+/* --- 1. 购物车样式 --- */
+.character-cart-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 15px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.character-cart-item:last-child {
+  border-bottom: none;
+}
+.cart-item-icon {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  background-color: #f0f2f5;
+  border-radius: 8px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: var(--text-secondary);
+}
+.cart-item-info {
+  flex-grow: 1;
+}
+.cart-item-info .title {
+  font-weight: 500;
+}
+.cart-item-info .store {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.cart-item-price {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+/* --- 2. 浏览器历史样式 --- */
+.character-browser-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 15px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.character-browser-item:hover {
+  background-color: #f9f9f9;
+}
+.browser-item-icon {
+  font-size: 20px;
+  color: var(--text-secondary);
+}
+
+/* --- 3. 银行交易明细样式 --- */
+.character-bank-transaction {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 15px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.transaction-details {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.transaction-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 18px;
+  color: white;
+}
+
+/* --- 4. 行动轨迹 (时间线) 样式 --- */
+.character-trajectory-list {
+  padding: 20px 15px 20px 30px; /* 左侧留出时间线的空间 */
+}
+.character-trajectory-item {
+  position: relative;
+  padding-bottom: 25px;
+}
+/* 时间轴的竖线 */
+.character-trajectory-item::before {
+  content: "";
+  position: absolute;
+  top: 5px;
+  left: -18px;
+  width: 2px;
+  height: 100%;
+  background-color: #e0e0e0;
+}
+.character-trajectory-item:last-child::before {
+  display: none; /* 最后一个条目没有线 */
+}
+/* 时间轴的圆点 */
+.character-trajectory-item::after {
+  content: "";
+  position: absolute;
+  top: 5px;
+  left: -23px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: var(--accent-color);
+  border: 2px solid white;
+  box-shadow: 0 0 0 2px var(--accent-color);
+}
+.trajectory-item-content .meta {
+  margin-top: 4px; /* 让时间和地点离标题近一点 */
+}
+
+/* --- 5. APP使用记录 (进度条) 样式 --- */
+.character-app-usage-item {
+  padding: 15px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.app-usage-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+.app-usage-header .name {
+  font-weight: 500;
+}
+.app-usage-header .duration {
+  color: var(--text-secondary);
+}
+.app-usage-bar-container {
+  width: 100%;
+  height: 6px;
+  background-color: #e9ecef;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.app-usage-bar {
+  height: 100%;
+  background-color: var(--accent-color);
+  border-radius: 3px;
+  transition: width 0.5s ease-in-out;
+}
+/* ▼▼▼ 【全新】后台活动设置界面样式 ▼▼▼ */
+.char-list-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 5px;
+  border-bottom: 1px solid #eee;
+}
+.char-list-item:last-child {
+  border-bottom: none;
+}
+.char-list-item input[type="checkbox"] {
+  margin-right: 10px;
+  width: 18px;
+  height: 18px;
+}
+.char-list-item .char-name {
+  flex-grow: 1;
+}
+.char-list-item .char-freq-badge {
+  font-size: 11px;
+  font-weight: bold;
+  padding: 3px 8px;
+  border-radius: 10px;
+  color: white;
+}
+.char-freq-badge.low {
+  background-color: #28a745;
+}
+.char-freq-badge.medium {
+  background-color: #fd7e14;
+}
+.char-freq-badge.high {
+  background-color: #dc3545;
+}
+/* ▲▲▲ 新CSS粘贴结束 ▲▲▲ */
+/* ▼▼▼ 把这一整块全新的CSS，粘贴到 <style> 的末尾 ▼▼▼ */
+
+/* === 【全新】视频通话可视化界面样式 === */
+
+/* 1. 可视化界面的总容器，确保它能覆盖整个屏幕 */
+#visual-call-interface {
+  width: 100%;
+  height: 100%;
+  position: relative; /* 让内部元素可以相对于它定位 */
+  overflow: hidden; /* 防止内容溢出 */
+  background-color: #1c1c1e; /* 深色背景 */
+  display: flex; /* 使用flex布局，方便内容排列 */
+  flex-direction: column;
+}
+
+/* 2. 视频背景层，用于放置大小图 */
+.video-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1; /* 确保它在最底层 */
+}
+
+/* 3. 大小图的通用容器样式 */
+.video-container {
+  position: absolute;
+  background-color: #000;
+  overflow: hidden;
+  transition: all 0.3s ease-in-out; /* 为切换镜头添加动画 */
+}
+.video-container img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* 保证图片填满容器且不变形 */
+}
+
+/* 4. 大图样式 (默认占满全屏) */
+#video-main-view {
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* 5. 小图样式 (画中画) */
+#video-pip-view {
+  top: 60px; /* 距离顶部一段距离 */
+  right: 15px;
+  width: 100px; /* 小窗宽度 */
+  height: 178px; /* 小窗高度 (保持竖屏比例) */
+  border-radius: 10px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  cursor: pointer; /* 提示用户可以点击 */
+}
+
+/* 6. 聊天气泡区域 (覆盖在视频之上) */
+#video-call-messages-visual {
+  position: relative;
+  z-index: 5; /* 层级比视频高 */
+  flex-grow: 1; /* 占据除了顶部和底部栏之外的所有空间 */
+  padding: 15px;
+  overflow-y: auto; /* 内容多了可以滚动 */
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  /* 关键：为了不让滚动条影响美观，把它隐藏掉 */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE 10+ */
+}
+#video-call-messages-visual::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera*/
+}
+
+/* ▼▼▼ 用这【一小块】代码，替换掉旧的气泡样式，实现【无模糊】效果 ▼▼▼ */
+
+/* 7. 【无模糊】高清透明聊天气泡 */
+.visual-call-bubble {
+  padding: 8px 12px;
+  border-radius: 18px;
+  max-width: 80%;
+  line-height: 1.5;
+  word-break: break-word;
+  color: white;
+
+  /* ★ 核心修改：彻底移除 backdrop-filter (模糊) 效果 */
+
+  /* ★ 核心修改：提供一个简单的半透明黑色背景，以衬托文字 */
+  background-color: rgba(
+    0,
+    0,
+    0,
+    0.3
+  ); /* 这是一个关键值，可以在 0.2 (更透) 到 0.4 (更深) 之间微调 */
+
+  /* ★ 核心修改：使用更清晰的边框来定义气泡轮廓 */
+  border: 1px solid rgba(255, 255, 255, 0.25);
+
+  /* ★ 核心修改：强化文字阴影，确保在任何清晰背景下都绝对可读 */
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+}
+
+.visual-call-bubble.user {
+  align-self: flex-end;
+  /* ★ 核心修改：用户气泡也使用无模糊的半透明背景 */
+  background-color: rgba(40, 160, 70, 0.3); /* 使用一个更深的绿色来保证对比度 */
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* ▲▲▲ 替换结束 ▲▲▲ */
+
+.visual-call-bubble.ai {
+  align-self: flex-start; /* AI的发言靠左 */
+}
+
+/* 8. 顶部和底部栏的层级要最高 */
+#visual-call-interface .video-call-top-bar,
+#visual-call-interface .video-call-controls {
+  z-index: 10;
+}
+
+/* 9. 新增的控制按钮图标 (使用SVG) */
+.control-btn.reroll-btn {
+  background-color: rgba(255, 255, 255, 0.2);
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>');
+  background-size: 50%;
+}
+.control-btn.switch-camera-btn {
+  background-color: rgba(255, 255, 255, 0.2);
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>');
+  background-size: 50%;
+}
+
+/* 10. 挂断按钮需要一个新ID来区分 */
+#hang-up-btn-visual {
+  /* 样式继承自 .hangup-btn，无需额外添加 */
+}
+
+/* ▲▲▲ 新CSS粘贴结束 ▲▲▲ */
+/* ▼▼▼ 【最终修复版】世界书选择器列表样式 ▼▼▼ */
+
+/* 1. 分类文件夹行样式：用gap创建固定间距，超稳定 */
+.wb-category-header {
+  display: flex;
+  align-items: center;
+  gap: 8px; /* 箭头、复选框、文字之间的固定间距 */
+  padding: 10px 12px;
+  cursor: pointer;
+  background-color: #f0f2f5;
+  font-weight: 600;
+  overflow: hidden; /* 防止任何意外 */
+}
+
+/* 2. 分类文件夹里的文字样式：只负责截断，不负责布局 */
+.wb-category-header > span:last-of-type {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 3. 【核心修复】为分类文件夹和书目里的复选框“解绑”全局样式！ */
+.wb-category-header input[type="checkbox"],
+.wb-book-container input[type="checkbox"] {
+  width: auto !important; /* 让它恢复自己的天然大小，!important确保最高优先级 */
+  flex-shrink: 0; /* 防止它被压缩 */
+}
+
+/* 4. 具体书目行的样式：强制从左边开始排列，解决iOS问题 */
+.wb-book-container label {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start; /* 强制所有内容从左边开始！*/
+  padding: 8px 12px;
+  gap: 10px; /* 复选框和文字的间距 */
+  overflow: hidden;
+}
+
+/* 5. 具体书目的文字样式 */
+.wb-book-container label .wb-book-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+
+/* 6. 夜间模式适配 */
+#phone-screen.dark-mode .wb-category-header {
+  background-color: #2c2c2e;
+}
+
+/* 7. 小箭头的样式（保持不变） */
+.wb-category-header .arrow {
+  font-size: 12px;
+  transition: transform 0.2s ease;
+}
+.wb-category-header.collapsed .arrow {
+  transform: rotate(-90deg);
+}
+
+/* 8. 书籍容器的样式（保持不变） */

@@ -1,0 +1,952 @@
+            statusText = "你们刚刚点燃了聊天火花，要继续保持哦！";
+          }
+
+          // 4. 拼接成最终的上下文格式
+          return `\n- **聊天火花状态**: ${statusText}`;
+        }
+
+        // 用户表情包批量删除核心函数
+
+        function toggleUserStickerSelectionMode() {
+          isUserStickerSelectionMode = !isUserStickerSelectionMode;
+          const stickerPanel = document.getElementById("sticker-panel");
+
+          selectedUserStickers.clear();
+          // 在这里给父容器添加/移除一个class
+          stickerPanel.classList.toggle(
+            "selection-mode",
+            isUserStickerSelectionMode,
+          );
+
+          document.getElementById("edit-user-stickers-btn").style.display =
+            isUserStickerSelectionMode ? "none" : "block";
+          document.getElementById("done-user-stickers-btn").style.display =
+            isUserStickerSelectionMode ? "block" : "none";
+          document.getElementById("sticker-panel-footer").style.display =
+            isUserStickerSelectionMode ? "flex" : "none";
+
+          const deleteBtn = document.getElementById(
+            "delete-selected-user-stickers-btn",
+          );
+          deleteBtn.textContent = `删除已选 (0)`;
+          deleteBtn.disabled = true;
+
+          const moveBtn = document.getElementById("move-selected-stickers-btn");
+          moveBtn.disabled = true;
+
+          renderStickerPanel(); // 这一步会调用 renderStickerCategories，并根据新的模式重新渲染
+        }
+
+        /**
+         * 退出用户表情包的选择模式
+         */
+        function exitUserStickerSelectionMode() {
+          if (isUserStickerSelectionMode) {
+            toggleUserStickerSelectionMode();
+          }
+        }
+
+        // 角色表情包批量删除核心函数
+
+        /**
+         * 切换角色表情包的选择模式
+         */
+        function toggleCharStickerSelectionMode() {
+          isCharStickerSelectionMode = !isCharStickerSelectionMode;
+          const screen = document.getElementById("char-sticker-manager-screen");
+
+          // 清空选择集并更新UI
+          selectedCharStickers.clear();
+          screen.classList.toggle("selection-mode", isCharStickerSelectionMode);
+
+          document.getElementById("edit-char-stickers-btn").style.display =
+            isCharStickerSelectionMode ? "none" : "block";
+          document.getElementById("done-char-stickers-btn").style.display =
+            isCharStickerSelectionMode ? "block" : "none";
+          document.getElementById("char-sticker-footer").style.display =
+            isCharStickerSelectionMode ? "block" : "none";
+          document.getElementById(
+            "delete-selected-char-stickers-btn",
+          ).textContent = `删除已选 (0)`;
+          document.getElementById(
+            "delete-selected-char-stickers-btn",
+          ).disabled = true;
+
+          // 重新渲染当前激活的页签
+          const activeTab = document.querySelector(
+            "#char-sticker-manager-screen .frame-tab.active",
+          );
+          if (activeTab) {
+            renderCharStickers(
+              activeTab.id === "sticker-tab-exclusive" ? "exclusive" : "common",
+            );
+          }
+        }
+
+        /**
+         * 退出角色表情包的选择模式
+         */
+        function exitCharStickerSelectionMode() {
+          if (isCharStickerSelectionMode) {
+            toggleCharStickerSelectionMode();
+          }
+        }
+
+        /**
+         * 当用户点击心声面板的编辑按钮时，打开操作菜单
+         */
+        async function showInnerVoiceEditOptions() {
+          const chat = state.chats[state.activeChatId];
+          if (!chat) return;
+
+          const borderHidden =
+            chat.settings.innerVoiceHideHeaderBorder || false;
+          const borderOptionText = borderHidden ? "显示分割线" : "隐藏分割线";
+
+          // 选项数组里新增 'editStyles'
+          const choice = await showChoiceModal("编辑心声面板", [
+            { text: "🎨 编辑面板样式", value: "editStyles" },
+            { text: borderOptionText, value: "toggleBorder" },
+            { text: "修改领养人", value: "editAdopter" },
+          ]);
+
+          if (choice === "editStyles") {
+            openInnerVoiceStyleEditor(); // 调用我们新写的函数来打开样式编辑器
+          } else if (choice === "toggleBorder") {
+            await toggleInnerVoiceHeaderBorder();
+          } else if (choice === "editAdopter") {
+            await editInnerVoiceAdopterName();
+          }
+        }
+
+        /**
+         * 切换心声面板头部分割线的显示/隐藏
+         */
+        async function toggleInnerVoiceHeaderBorder() {
+          const chat = state.chats[state.activeChatId];
+          if (!chat) return;
+
+          // 确保 chat.settings 存在
+          if (!chat.settings) chat.settings = {};
+
+          // 切换布尔值
+          chat.settings.innerVoiceHideHeaderBorder = !(
+            chat.settings.innerVoiceHideHeaderBorder || false
+          );
+
+          // 保存到数据库
+          await db.chats.put(chat);
+
+          // 更新UI
+          const header = document.querySelector(
+            "#inner-voice-main-panel .modal-header",
+          );
+          if (header) {
+            header.classList.toggle(
+              "no-border",
+              chat.settings.innerVoiceHideHeaderBorder,
+            );
+          }
+
+          await showCustomAlert(
+            "操作成功",
+            `分割线已${chat.settings.innerVoiceHideHeaderBorder ? "隐藏" : "显示"}。`,
+          );
+        }
+
+        /**
+         * 修改“领养人”的标签模板
+         */
+        async function editInnerVoiceAdopterName() {
+          const chat = state.chats[state.activeChatId];
+          if (!chat) return;
+
+          // 获取当前的标签模板，如果没有设置过，就使用默认值
+          const currentFormat =
+            chat.settings.innerVoiceAdopterLabelFormat || "领养人: {{user}}";
+
+          // 弹出输入框，让用户编辑整个模板字符串
+          const newFormat = await showCustomPrompt(
+            "修改领养人标签",
+            "你可以修改整个标签，其中 {{user}} 会被自动替换为你的昵称。",
+            currentFormat,
+          );
+
+          // 如果用户输入了新内容（不是取消）
+          if (newFormat !== null) {
+            // 保存新模板，如果输入为空则恢复默认
+            chat.settings.innerVoiceAdopterLabelFormat =
+              newFormat.trim() || "领养人: {{user}}";
+            await db.chats.put(chat);
+
+            // 重新渲染心声面板以显示新标签
+            openInnerVoiceModal();
+            await showCustomAlert("修改成功", "领养人标签已更新！");
+          }
+        }
+
+        /* ▼▼▼ 心声面板样式编辑功能的核心函数 ▼▼▼ */
+
+        /**
+         * 将十六进制颜色(#FFFFFF)转换为 "R, G, B" 字符串 (255, 255, 255)
+         * @param {string} hex - 十六进制颜色代码
+         * @returns {string} - RGB字符串
+         */
+        function hexToRgb(hex) {
+          if (!hex || hex.length < 4) return "255, 255, 255";
+          let result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+          return result
+            ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}`
+            : "255, 255, 255";
+        }
+
+        /**
+         * 将保存的样式应用到心声面板
+         */
+        function applySavedInnerVoiceStyles() {
+          if (!state.activeChatId) return;
+          const chat = state.chats[state.activeChatId];
+          if (!chat || !chat.settings.innerVoiceStyles) return;
+
+          const styles = chat.settings.innerVoiceStyles;
+          const panel = document.getElementById("inner-voice-main-panel");
+
+          panel.style.setProperty("--iv-color-clothing", styles.clothingColor);
+          panel.style.setProperty("--iv-color-behavior", styles.behaviorColor);
+          panel.style.setProperty("--iv-color-thoughts", styles.thoughtsColor);
+          panel.style.setProperty("--iv-color-naughty", styles.naughtyColor);
+          panel.style.setProperty(
+            "--iv-card-bg-rgb",
+            hexToRgb(styles.cardBgColor),
+          );
+          panel.style.setProperty("--iv-card-opacity", styles.cardOpacity);
+
+          // 应用保存的图标颜色
+          panel.style.setProperty(
+            "--iv-icon-color",
+            styles.iconColor || "#ff8a80",
+          );
+        }
+
+        /**
+         * 打开心声面板样式编辑器
+         */
+        function openInnerVoiceStyleEditor() {
+          if (!state.activeChatId) return;
+          const chat = state.chats[state.activeChatId];
+          if (!chat || !chat.settings.innerVoiceStyles) return;
+
+          document
+            .getElementById("inner-voice-edit-options-modal")
+            ?.classList.remove("visible");
+
+          const styles = chat.settings.innerVoiceStyles;
+          // === 【修复重点】：安全获取标签配置 ===
+          const tags = chat.settings.innerVoiceTags || {};
+          const modal = document.getElementById("inner-voice-editor-modal");
+
+          // 加载标签名和指令（如果为空则显示默认值）
+          document.getElementById("iv-label-clothing").value =
+            tags.clothing_label || "服装";
+          document.getElementById("iv-prompt-clothing").value =
+            tags.clothing_prompt || "详细描述你当前从头到脚的全身服装。";
+
+          document.getElementById("iv-label-behavior").value =
+            tags.behavior_label || "行为";
+          document.getElementById("iv-prompt-behavior").value =
+            tags.behavior_prompt || "描述你当前符合聊天情景的细微动作或表情。";
+
+          document.getElementById("iv-label-thoughts").value =
+            tags.thoughts_label || "心声";
+          document.getElementById("iv-prompt-thoughts").value =
+            tags.thoughts_prompt ||
+            "描述你此刻丰富、细腻的内心真实想法（50字左右）。";
+
+          document.getElementById("iv-label-naughty").value =
+            tags.naughty_label || "坏心思";
+          document.getElementById("iv-prompt-naughty").value =
+            tags.naughty_prompt ||
+            "描述你此刻与情境相关的腹黑或色色的坏心思，必须符合人设。";
+
+          // 加载当前样式到编辑器
+          document.getElementById("iv-color-clothing").value =
+            styles.clothingColor;
+          document.getElementById("iv-color-behavior").value =
+            styles.behaviorColor;
+          document.getElementById("iv-color-thoughts").value =
+            styles.thoughtsColor;
+          document.getElementById("iv-color-naughty").value =
+            styles.naughtyColor;
+          document.getElementById("iv-card-bg-color").value =
+            styles.cardBgColor;
+          document.getElementById("iv-opacity-slider").value =
+            styles.cardOpacity;
+          document.getElementById("iv-opacity-value").textContent =
+            `${Math.round(styles.cardOpacity * 100)}%`;
+
+          // 加载保存的图标颜色
+          document.getElementById("iv-icon-color").value =
+            styles.iconColor || "#ff8a80";
+
+          modal.classList.add("visible");
+        }
+
+        /**
+         * 保存用户修改的样式、标签和指令
+         */
+        async function saveInnerVoiceStyles() {
+          if (!state.activeChatId) return;
+          const chat = state.chats[state.activeChatId];
+
+          // 1. 保存样式 (保持不变)
+          const newStyles = {
+            clothingColor: document.getElementById("iv-color-clothing").value,
+            behaviorColor: document.getElementById("iv-color-behavior").value,
+            thoughtsColor: document.getElementById("iv-color-thoughts").value,
+            naughtyColor: document.getElementById("iv-color-naughty").value,
+            cardBgColor: document.getElementById("iv-card-bg-color").value,
+            cardOpacity: parseFloat(
+              document.getElementById("iv-opacity-slider").value,
+            ),
+            iconColor: document.getElementById("iv-icon-color").value,
+          };
+
+          // 2. 保存标签名和指令 (新增)
+          // 如果用户留空，就使用默认值兜底
+          const newTags = {
+            clothing_label:
+              document.getElementById("iv-label-clothing").value.trim() ||
+              "服装",
+            clothing_prompt:
+              document.getElementById("iv-prompt-clothing").value.trim() ||
+              "详细描述你当前从头到脚的全身服装。",
+
+            behavior_label:
+              document.getElementById("iv-label-behavior").value.trim() ||
+              "行为",
+            behavior_prompt:
+              document.getElementById("iv-prompt-behavior").value.trim() ||
+              "描述你当前符合聊天情景的细微动作或表情。",
+
+            thoughts_label:
+              document.getElementById("iv-label-thoughts").value.trim() ||
+              "心声",
+            thoughts_prompt:
+              document.getElementById("iv-prompt-thoughts").value.trim() ||
+              "描述你此刻丰富、细腻的内心真实想法（50字左右）。",
+
+            naughty_label:
+              document.getElementById("iv-label-naughty").value.trim() ||
+              "坏心思",
+            naughty_prompt:
+              document.getElementById("iv-prompt-naughty").value.trim() ||
+              "描述你此刻与情境相关的腹黑或色色的坏心思，必须符合人设。",
+          };
+
+          // 更新到state和数据库
+          chat.settings.innerVoiceStyles = newStyles;
+          chat.settings.innerVoiceTags = newTags;
+
+          await db.chats.put(chat);
+
+          // 关闭弹窗
+          document
+            .getElementById("inner-voice-editor-modal")
+            .classList.remove("visible");
+
+          // 重新应用样式
+          applySavedInnerVoiceStyles();
+
+          // 如果面板开着，重新打开一下以刷新标签文字
+          if (
+            document
+              .getElementById("inner-voice-modal")
+              .classList.contains("visible")
+          ) {
+            openInnerVoiceModal();
+          }
+
+          await showCustomAlert(
+            "保存成功",
+            "心声配置已更新！\nAI将在下次回复时遵循你的新指令。",
+          );
+        }
+
+        /**
+         * 打开AI生成群成员的模态框
+         */
+        function openAiGenerateMembersModal() {
+          // 清空上次的输入
+          document.getElementById("ai-member-count-input").value = "3";
+          document.getElementById("ai-member-prompt-input").value = "";
+          // 显示弹窗
+          document
+            .getElementById("ai-generate-members-modal")
+            .classList.add("visible");
+        }
+
+        /**
+         * 处理用户点击“开始生成”按钮的逻辑
+         */
+        async function handleGenerateMembers() {
+          if (!state.activeChatId) return;
+          const chat = state.chats[state.activeChatId];
+          if (!chat || !chat.isGroup) return;
+
+          const count = parseInt(
+            document.getElementById("ai-member-count-input").value,
+          );
+          const requirements = document
+            .getElementById("ai-member-prompt-input")
+            .value.trim();
+
+          if (isNaN(count) || count < 1 || count > 20) {
+            alert("请输入1到20之间的有效人数！");
+            return;
+          }
+
+          document
+            .getElementById("ai-generate-members-modal")
+            .classList.remove("visible");
+          await showCustomAlert(
+            "请稍候...",
+            `AI正在为“${chat.name}”创造 ${count} 位新朋友...`,
+          );
+
+          const systemPrompt = `
+			# 任务
+			你是一个群聊成员生成器。请根据用户的要求，为群聊“${chat.name}”创建${count}个新成员。
+
+			# 用户要求:
+			${requirements || "无特殊要求，请自由发挥。"}
+
+			# 核心规则
+			1.  你生成的每个成员都必须有独特的名字(name)和鲜明的性格人设(persona)。
+			2.  人设描述要生动、具体，能体现出角色的特点。
+			3.  【格式铁律】: 你的回复【必须且只能】是一个严格的JSON数组，直接以'['开头, 以']'结尾。数组中的每个元素都是一个代表成员的JSON对象。
+
+			# JSON输出格式示例:
+			[
+			  {
+			    "name": "林风",
+			    "persona": "一个阳光开朗的运动系少年，热爱篮球，性格直爽，是团队里的气氛担当。"
+			  },
+			  {
+			    "name": "陈雪",
+			    "persona": "文静内向的学霸少女，喜欢读书和画画，心思细腻，不善言辞但观察力敏锐。"
+			  }
+			]
+			`;
+
+          try {
+            const { proxyUrl, apiKey, model } = state.apiConfig;
+            let isGemini = proxyUrl === GEMINI_API_URL;
+            let messagesForApi = [{ role: "user", content: systemPrompt }];
+            let geminiConfig = toGeminiRequestData(
+              model,
+              apiKey,
+              systemPrompt,
+              messagesForApi,
+              isGemini,
+            );
+
+            const response = isGemini
+              ? await fetch(geminiConfig.url, geminiConfig.data)
+              : await fetch(`${proxyUrl}/v1/chat/completions`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${apiKey}`,
+                  },
+                  body: JSON.stringify({
+                    model: model,
+                    messages: messagesForApi,
+                    temperature: 1.0,
+                  }),
+                });
+
+            if (!response.ok)
+              throw new Error(
+                `API请求失败: ${response.status} - ${await response.text()}`,
+              );
+
+            const data = await response.json();
+            const rawContent = (
+              isGemini
+                ? data.candidates[0].content.parts[0].text
+                : data.choices[0].message.content
+            )
+              .replace(/^```json\s*|```$/g, "")
+              .trim();
+            const newMembersData = JSON.parse(rawContent);
+
+            if (Array.isArray(newMembersData) && newMembersData.length > 0) {
+              const addedNames = [];
+              newMembersData.forEach((memberData, index) => {
+                if (memberData.name && memberData.persona) {
+                  const newMember = {
+                    id: "npc_" + (Date.now() + index),
+                    originalName: memberData.name.trim(),
+                    groupNickname: memberData.name.trim(),
+                    avatar: defaultGroupMemberAvatar,
+                    persona: memberData.persona.trim(),
+                    avatarFrame: "",
+                    isAdmin: false,
+                    groupTitle: "",
+                  };
+                  chat.members.push(newMember);
+                  addedNames.push(`“${newMember.groupNickname}”`);
+                }
+              });
+
+              if (addedNames.length > 0) {
+                await db.chats.put(chat);
+                await logSystemMessage(
+                  chat.id,
+                  `邀请了 ${addedNames.length} 位新成员: ${addedNames.join("、")}加入了群聊。`,
+                );
+                await showCustomAlert(
+                  "生成成功！",
+                  `${addedNames.length} 位新成员已加入群聊！`,
+                );
+                renderMemberManagementList(); // 刷新成员管理列表
+              } else {
+                throw new Error(
+                  "AI返回的数据格式不正确，缺少name或persona字段。",
+                );
+              }
+            } else {
+              throw new Error("AI返回的数据不是有效的数组。");
+            }
+          } catch (error) {
+            console.error("AI生成群成员失败:", error);
+            await showCustomAlert(
+              "生成失败",
+              `发生了一个错误：\n${error.message}`,
+            );
+          }
+        }
+
+        async function renderStickerCategories() {
+          const tabsContainer = document.getElementById(
+            "sticker-category-tabs",
+          );
+          if (!tabsContainer) return;
+
+          tabsContainer.innerHTML = ""; // 清空旧的标签
+          const categories = await db.userStickerCategories
+            .orderBy("name")
+            .toArray();
+          userStickerCategories = categories; // 更新全局缓存
+
+          // 1. 渲染“未分类”按钮（这个按钮没有删除功能）
+          const uncategorizedBtn = document.createElement("button");
+          uncategorizedBtn.className = "sticker-category-btn";
+          uncategorizedBtn.textContent = "未分类";
+          uncategorizedBtn.dataset.categoryId = "uncategorized";
+          if (activeStickerCategoryId === "uncategorized") {
+            uncategorizedBtn.classList.add("active");
+          }
+          tabsContainer.appendChild(uncategorizedBtn);
+
+          // 2. 渲染所有自定义分类
+          for (const category of categories) {
+            const btn = document.createElement("button");
+            btn.className = "sticker-category-btn";
+            // 将ID和名称都存储在父按钮上，方便事件委托获取
+            btn.dataset.categoryId = category.id;
+            btn.dataset.categoryName = category.name;
+
+            const nameSpan = document.createElement("span");
+            nameSpan.textContent = category.name;
+            btn.appendChild(nameSpan);
+
+            // 如果是当前激活的分类，添加高亮
+            if (activeStickerCategoryId === category.id) {
+              btn.classList.add("active");
+            }
+
+            // 只在编辑模式下，才创建和添加删除按钮
+            if (isUserStickerSelectionMode) {
+              const deleteBtn = document.createElement("span");
+              deleteBtn.className = "sticker-category-delete-btn";
+              deleteBtn.textContent = "×";
+              deleteBtn.title = `删除分类 "${category.name}"`; // 增加悬浮提示
+              btn.appendChild(deleteBtn);
+            }
+
+            tabsContainer.appendChild(btn);
+          }
+        }
+
+        /**
+         * 打开移动表情到分类的模态框
+         */
+        async function openStickerCategoryModal() {
+          if (selectedUserStickers.size === 0) {
+            alert("请先选择要移动的表情包！");
+            return;
+          }
+
+          const modal = document.getElementById("sticker-category-modal");
+          const listEl = document.getElementById("sticker-category-list");
+          const inputEl = document.getElementById("new-sticker-category-input");
+          listEl.innerHTML = "";
+          inputEl.value = "";
+
+          const categories = await db.userStickerCategories.toArray();
+          if (categories.length > 0) {
+            categories.forEach((cat) => {
+              const label = document.createElement("label");
+              label.innerHTML = `<input type="radio" name="sticker_category_select" value="${cat.id}"> ${cat.name}`;
+              listEl.appendChild(label);
+            });
+          } else {
+            listEl.innerHTML =
+              '<p style="text-align: center; color: var(--text-secondary);">还没有任何分类。</p>';
+          }
+
+          modal.classList.add("visible");
+        }
+
+        /**
+         * 处理“确认移动”按钮的点击逻辑
+         */
+        async function handleMoveStickers() {
+          const newCategoryName = document
+            .getElementById("new-sticker-category-input")
+            .value.trim();
+          const selectedRadio = document.querySelector(
+            'input[name="sticker_category_select"]:checked',
+          );
+
+          let targetCategoryId = null;
+
+          if (newCategoryName) {
+            try {
+              // 检查分类是否已存在
+              let existingCategory = await db.userStickerCategories
+                .where("name")
+                .equalsIgnoreCase(newCategoryName)
+                .first();
+              if (existingCategory) {
+                targetCategoryId = existingCategory.id;
+              } else {
+                targetCategoryId = await db.userStickerCategories.add({
+                  name: newCategoryName,
+                });
+              }
+            } catch (error) {
+              alert("创建新分类失败，可能是名称重复或数据库错误。");
+              return;
+            }
+          } else if (selectedRadio) {
+            targetCategoryId = parseInt(selectedRadio.value);
+          } else {
+            alert("请选择一个分类或创建一个新分类！");
+            return;
+          }
+
+          try {
+            const stickerIdsToMove = Array.from(selectedUserStickers);
+            const stickers = await db.userStickers.bulkGet(stickerIdsToMove);
+
+            stickers.forEach((sticker) => {
+              if (sticker) {
+                sticker.categoryId = targetCategoryId;
+              }
+            });
+
+            await db.userStickers.bulkPut(stickers);
+
+            // 更新内存中的 state.userStickers
+            stickers.forEach((updatedSticker) => {
+              const index = state.userStickers.findIndex(
+                (s) => s.id === updatedSticker.id,
+              );
+              if (index > -1) {
+                state.userStickers[index].categoryId = targetCategoryId;
+              }
+            });
+
+            document
+              .getElementById("sticker-category-modal")
+              .classList.remove("visible");
+            exitUserStickerSelectionMode(); // 退出编辑模式
+            alert(`成功移动 ${stickerIdsToMove.length} 个表情！`);
+          } catch (error) {
+            console.error("移动表情失败:", error);
+            alert("移动表情时发生错误。");
+          }
+        }
+
+        // 视频通话控制按钮的事件委托
+        // 这个函数用于统一处理所有通话控制按钮的点击
+        function handleCallControls(event) {
+          // 找到被点击的那个按钮元素
+          const button = event.target.closest(".control-btn");
+          if (!button) return; // 如果点击的不是按钮，就什么也不做
+
+          // 根据按钮的ID来执行不同的操作
+          switch (button.id) {
+            case "user-speak-btn":
+            case "user-speak-btn-visual":
+              // 这里调用你原本处理“用户发言”的函数
+              handleUserSpeakInCall(); // 假设你的函数名叫这个
+              break;
+            case "hang-up-btn":
+            case "hang-up-btn-visual":
+              // 调用你原本处理“挂断”的函数
+              endVideoCall();
+              break;
+            case "join-call-btn":
+              // 调用你原本处理“加入通话”的函数
+              handleUserJoinCall();
+              break;
+            case "reroll-call-btn":
+            case "reroll-call-btn-text":
+              // 调用你原本处理“重roll”的函数
+              handleVideoCallReroll();
+              break;
+            case "flip-real-camera-btn":
+              handleCameraFlip();
+              break;
+            case "switch-camera-btn":
+              // 调用你原本处理“切换镜头”的函数
+              switchVideoViews();
+              break;
+          }
+        }
+
+        // 在init()函数中，为两个控制栏容器绑定事件
+        // 注意：因为你的HTML中有两个 controls div，所以我们需要分别绑定
+        const textModeControls = document.querySelector(
+          "#text-call-interface .video-call-controls",
+        );
+        if (textModeControls) {
+          textModeControls.addEventListener("click", handleCallControls);
+        }
+
+        const visualModeControls = document.querySelector(
+          "#visual-call-interface .video-call-controls",
+        );
+        if (visualModeControls) {
+          visualModeControls.addEventListener("click", handleCallControls);
+        }
+
+        /**
+         * 处理用户在通话中点击“发言”按钮的逻辑
+         */
+        async function handleUserSpeakInCall() {
+          // 安全检查，如果通话未激活则不执行
+          if (!videoCallState.isActive) return;
+
+          // 找到用户头像并添加“正在发言”的高亮效果，提升交互感
+          const userAvatar = document.querySelector(
+            '.participant-avatar-wrapper[data-participant-id="user"] .participant-avatar',
+          );
+          if (userAvatar) {
+            userAvatar.classList.add("speaking");
+          }
+
+          // 弹出你已经写好的自定义输入框
+          const userInput = await showCustomPrompt(
+            "你说",
+            "请输入你想说的话...",
+          );
+
+          // 无论用户是否输入，只要输入框关闭，就立刻移除头像的高亮效果
+          if (userAvatar) {
+            userAvatar.classList.remove("speaking");
+          }
+
+          // 如果用户确实输入了内容，就调用你已有的函数来触发AI响应
+          if (userInput && userInput.trim()) {
+            triggerAiInCallAction(userInput.trim());
+          }
+        }
+
+        /**
+         * 初始化默认的小组
+         */
+        async function initializeDefaultGroups() {
+          const groupCount = await db.forumGroups.count();
+          if (groupCount === 0) {
+            const defaultGroups = [
+              { name: "娱乐小组", description: "分享八卦和快乐", icon: "🍿" },
+              { name: "灵异小组", description: "分享你的灵异经历", icon: "👻" },
+              {
+                name: "今天我crush了吗",
+                description: "记录心动瞬间",
+                icon: "💖",
+              },
+              {
+                name: "请帮我选择小组",
+                description: "选择困难症患者互助",
+                icon: "🤔",
+              },
+              {
+                name: "同人文小组",
+                description: "为爱发电，创作故事",
+                icon: "✍️",
+              },
+
+              {
+                name: "梦角小组",
+                description: "Char们分享关于user的梦境",
+                icon: "🌙",
+              },
+            ];
+            await db.forumGroups.bulkAdd(defaultGroups);
+            console.log("已成功创建默认小组（包含梦角小组）。");
+          }
+        }
+
+        /**
+         * 打开高级导入导出模态框，并动态生成选项列表
+         */
+        async function openAdvancedTransferModal() {
+          const appsListEl = document.getElementById("export-apps-list");
+          const charactersListEl = document.getElementById(
+            "export-characters-list",
+          );
+          appsListEl.innerHTML = "";
+          charactersListEl.innerHTML = "";
+
+          // 1. 定义可独立导出的App数据及其关联的数据库表
+          const appsToExport = [
+            {
+              id: "weibo",
+              name: "微博 (全部帖子/角色资料/粉丝数等)",
+              tables: ["weiboPosts", "qzoneSettings"],
+            },
+            {
+              id: "forum",
+              name: "圈子 (小组/帖子/评论/分类/连载)",
+              tables: [
+                "forumGroups",
+                "forumPosts",
+                "forumComments",
+                "forumCategories",
+                "forumSeries",
+                "forumChapters",
+              ],
+            },
+            {
+              id: "taobao",
+              name: "桃宝 (所有商品/订单/购物车/余额记录)",
+              tables: [
+                "taobaoProducts",
+                "taobaoOrders",
+                "taobaoCart",
+                "userWalletTransactions",
+              ],
+            },
+            {
+              id: "worldBooks",
+              name: "世界书 (全部书籍及分类)",
+              tables: ["worldBooks", "worldBookCategories"],
+            },
+
+            {
+              id: "dateALive",
+              name: "约会大作战 (场景/预设/立绘/历史)",
+              tables: [
+                "datingScenes",
+                "datingPresets",
+                "datingSpriteGroups",
+                "datingSprites",
+                "datingHistory",
+              ],
+            },
+
+            {
+              id: "tukeyAccounting",
+              name: "兔k记账 (账户/群聊/账单/设置)",
+              tables: [
+                "tukeyAccounts",
+                "tukeyAccountingGroups",
+                "tukeyAccountingRecords",
+                "tukeyAccountingReplies",
+                "tukeyUserSettings",
+                "tukeyCustomConfig",
+              ],
+            },
+
+            {
+              id: "studio",
+              name: "小剧场 (所有剧本/演绎记录)",
+              tables: ["studioScripts", "studioHistory"],
+            },
+
+            {
+              id: "userStickers",
+              name: "我的表情包 (包含分类)",
+              tables: ["userStickers", "userStickerCategories"],
+            },
+            {
+              id: "charStickers",
+              name: "角色通用表情包",
+              tables: ["charStickers"],
+            },
+            {
+              id: "gameData",
+              name: "游戏大厅数据 (剧本杀/飞行棋题库等)",
+              tables: [
+                "scriptKillScripts",
+                "ludoQuestionBanks",
+                "ludoQuestions",
+              ],
+            },
+            {
+              id: "appearance",
+              name: "通用外观预设 (主题/字体/头像框等)",
+              tables: [
+                "themes",
+                "fontPresets",
+                "homeScreenPresets",
+                "customAvatarFrames",
+                "apiPresets",
+                "bubbleStylePresets",
+              ],
+            },
+          ];
+
+          appsToExport.forEach((app) => {
+            appsListEl.innerHTML += `
+			            <label style="display: block; margin-bottom: 5px;">
+			                <input type="checkbox" class="export-app-checkbox" value="${app.id}"> ${app.name}
+			            </label>
+			        `;
+          });
+
+          // 2. 加载所有单聊角色
+          const characters = Object.values(state.chats).filter(
+            (chat) => !chat.isGroup,
+          );
+          if (characters.length === 0) {
+            charactersListEl.innerHTML = "<p>没有可导出的角色</p>";
+          } else {
+            characters.forEach((char) => {
+              charactersListEl.innerHTML += `
+			                <label style="display: block; margin-bottom: 5px;">
+			                    <input type="checkbox" class="export-char-checkbox" value="${char.id}"> ${char.name}
+			                </label>
+			            `;
+            });
+          }
+
+          // 重置并绑定全选框
+          const selectAllCheckbox = document.getElementById(
+            "select-all-characters-checkbox",
+          );
+          selectAllCheckbox.checked = false;
+
+          // 使用克隆节点技巧，防止事件重复绑定
+          const newSelectAllCheckbox = selectAllCheckbox.cloneNode(true);
+          selectAllCheckbox.parentNode.replaceChild(
+            newSelectAllCheckbox,
+            selectAllCheckbox,
+          );
+          newSelectAllCheckbox.addEventListener("change", (e) => {
+            document.querySelectorAll(".export-char-checkbox").forEach((cb) => {

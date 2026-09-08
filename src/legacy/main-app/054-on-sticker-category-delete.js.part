@@ -1,0 +1,917 @@
+                  handleSetMemberTitle(memberId);
+                  break;
+                case "transfer-owner":
+                  handleTransferOwnership(memberId);
+                  break;
+                case "remove-member":
+                  removeMemberFromGroup(memberId);
+                  break;
+                case "mute-member": // 禁言/解禁统一走这里
+                  handleMuteMember(memberId);
+                  break;
+              }
+            });
+
+          // 群公告功能事件绑定
+          document
+            .getElementById("group-announcement-btn")
+            .addEventListener("click", openGroupAnnouncementModal);
+
+          // 绑定用户表情面板的批量删除按钮
+          document
+            .getElementById("edit-user-stickers-btn")
+            .addEventListener("click", toggleUserStickerSelectionMode);
+          document
+            .getElementById("done-user-stickers-btn")
+            .addEventListener("click", toggleUserStickerSelectionMode);
+          document
+            .getElementById("delete-selected-user-stickers-btn")
+            .addEventListener("click", handleBulkDeleteUserStickers);
+
+          // 关闭面板时，也要退出选择模式
+          document
+            .getElementById("close-sticker-panel-btn")
+            .addEventListener("click", () => {
+              exitUserStickerSelectionMode();
+              stickerPanel.classList.remove("visible");
+            });
+
+          // 辅助函数：处理删除分类按钮的点击
+          function onStickerCategoryDelete(deleteButtonElement) {
+            const categoryId = parseInt(deleteButtonElement.dataset.categoryId);
+            const categoryName = deleteButtonElement.dataset.categoryName;
+
+            // *** 调试关键点 (Debugging Point) ***
+            // 请在浏览器中按 F12 打开开发者工具，切换到 "Console" (控制台) 标签页。
+            // 点击删除按钮后，在这里查看输出的ID和名称是否是您点击的那一个。
+            console.log(
+              `[调试] 准备删除分类: ID=${categoryId}, 名称='${categoryName}'`,
+            );
+
+            if (!isNaN(categoryId) && categoryName) {
+              handleDeleteStickerCategory(categoryId, categoryName);
+            } else {
+              console.error(
+                "[错误] 无法从按钮获取有效的分类ID或名称。",
+                deleteButtonElement.dataset,
+              );
+              alert("删除失败：无法获取分类信息，请检查代码或刷新页面。");
+            }
+          }
+
+          // 辅助函数：处理切换分类按钮的点击
+          function onStickerCategorySelect(categoryButtonElement) {
+            const categoryIdStr = categoryButtonElement.dataset.categoryId;
+            activeStickerCategoryId =
+              categoryIdStr === "uncategorized"
+                ? "uncategorized"
+                : parseInt(categoryIdStr);
+            renderStickerPanel(); // 切换分类并重新渲染表情列表
+          }
+
+          // 绑定角色表情管理页的批量删除按钮
+          document
+            .getElementById("edit-char-stickers-btn")
+            .addEventListener("click", toggleCharStickerSelectionMode);
+          document
+            .getElementById("done-char-stickers-btn")
+            .addEventListener("click", toggleCharStickerSelectionMode);
+          document
+            .getElementById("delete-selected-char-stickers-btn")
+            .addEventListener("click", handleBulkDeleteCharStickers);
+
+          // 返回聊天设置时，也要退出选择模式
+          document
+            .getElementById("back-from-sticker-manager")
+            .addEventListener("click", () => {
+              exitCharStickerSelectionMode();
+              showScreen("chat-interface-screen");
+              document.getElementById("chat-settings-btn").click();
+            });
+
+          // 心声面板编辑按钮事件监听
+          document
+            .getElementById("inner-voice-modal")
+            .addEventListener("click", (e) => {
+              if (e.target.closest("#inner-voice-edit-btn")) {
+                showInnerVoiceEditOptions();
+              }
+            });
+
+          // 心声样式编辑器事件绑定
+          const ivEditorModal = document.getElementById(
+            "inner-voice-editor-modal",
+          );
+          const ivPanel = document.getElementById("inner-voice-main-panel");
+
+          // 实时预览功能
+          ivEditorModal.addEventListener("input", (e) => {
+            const targetId = e.target.id;
+            const value = e.target.value;
+
+            switch (targetId) {
+              case "iv-color-clothing":
+                ivPanel.style.setProperty("--iv-color-clothing", value);
+                break;
+              case "iv-color-behavior":
+                ivPanel.style.setProperty("--iv-color-behavior", value);
+                break;
+              case "iv-color-thoughts":
+                ivPanel.style.setProperty("--iv-color-thoughts", value);
+                break;
+              case "iv-color-naughty":
+                ivPanel.style.setProperty("--iv-color-naughty", value);
+                break;
+              case "iv-card-bg-color":
+                ivPanel.style.setProperty("--iv-card-bg-rgb", hexToRgb(value));
+                break;
+              case "iv-opacity-slider":
+                document.getElementById("iv-opacity-value").textContent =
+                  `${Math.round(value * 100)}%`;
+                ivPanel.style.setProperty("--iv-card-opacity", value);
+                break;
+
+              case "iv-icon-color":
+                ivPanel.style.setProperty("--iv-icon-color", value);
+                break;
+            }
+          });
+
+          // 保存按钮
+          document
+            .getElementById("iv-editor-save-btn")
+            .addEventListener("click", saveInnerVoiceStyles);
+
+          // 取消按钮
+          document
+            .getElementById("iv-editor-cancel-btn")
+            .addEventListener("click", () => {
+              ivEditorModal.classList.remove("visible");
+              // 取消时，重新应用一下保存好的样式，以撤销预览改动
+              applySavedInnerVoiceStyles();
+            });
+
+          // AI生成群成员功能事件绑定
+          document
+            .getElementById("ai-generate-members-btn")
+            .addEventListener("click", openAiGenerateMembersModal);
+          document
+            .getElementById("cancel-ai-generate-members-btn")
+            .addEventListener("click", () => {
+              document
+                .getElementById("ai-generate-members-modal")
+                .classList.remove("visible");
+            });
+          document
+            .getElementById("confirm-ai-generate-members-btn")
+            .addEventListener("click", handleGenerateMembers);
+
+          // 预设功能按钮
+          document
+            .getElementById("dating-preset-select")
+            .addEventListener("change", handleDatingPresetSelect);
+          document
+            .getElementById("manage-dating-presets-btn")
+            .addEventListener("click", openDatingPresetManager);
+
+          // --- 表情分类功能事件绑定 ---
+          document
+            .getElementById("move-selected-stickers-btn")
+            .addEventListener("click", openStickerCategoryModal);
+          document
+            .getElementById("cancel-sticker-category-btn")
+            .addEventListener("click", () => {
+              document
+                .getElementById("sticker-category-modal")
+                .classList.remove("visible");
+            });
+          document
+            .getElementById("confirm-sticker-category-btn")
+            .addEventListener("click", handleMoveStickers);
+          // 高级导入/导出功能事件监听器
+          document
+            .getElementById("advanced-transfer-btn")
+            .addEventListener("click", openAdvancedTransferModal);
+
+          document
+            .getElementById("close-advanced-transfer-btn")
+            .addEventListener("click", () => {
+              document
+                .getElementById("advanced-transfer-modal")
+                .classList.remove("visible");
+            });
+
+          document
+            .getElementById("export-selected-data-btn")
+            .addEventListener("click", exportChunkedData);
+
+          document
+            .getElementById("import-chunked-data-btn")
+            .addEventListener("click", () => {
+              document.getElementById("import-chunked-data-input").click();
+            });
+
+          document
+            .getElementById("import-chunked-data-input")
+            .addEventListener("change", (e) => {
+              const file = e.target.files[0];
+              if (file) {
+                importChunkedData(file);
+              }
+              e.target.value = null; // 清空以便下次选择
+            });
+          document
+            .getElementById("export-for-330-btn")
+            .addEventListener("click", exportDataFor330);
+
+          // 为“兼容330格式导入”按钮绑定事件
+          document
+            .getElementById("import-from-330-btn")
+            .addEventListener("click", () => {
+              // 点击按钮时，触发隐藏的文件选择器
+              document.getElementById("import-from-330-input").click();
+            });
+
+          // 为隐藏的文件选择器绑定change事件
+          document
+            .getElementById("import-from-330-input")
+            .addEventListener("change", (e) => {
+              const file = e.target.files[0];
+              if (file) {
+                // 当用户选择了文件后，调用我们的核心导入函数
+                importFrom330Format(file);
+              }
+              // 每次用完后清空，这样用户下次还能选择同一个文件
+              e.target.value = null;
+            });
+
+          document
+            .getElementById("compress-all-images-btn")
+            .addEventListener("click", compressAllImagesInDB);
+          document
+            .getElementById("export-data-stream-btn")
+            .addEventListener("click", exportDataStream);
+          // 在 init() 函数的事件监听器区域末尾，粘贴下面这行代码
+          document
+            .getElementById("reset-app-names-btn")
+            .addEventListener("click", resetAppNamesToDefault);
+          document.addEventListener("DOMContentLoaded", function () {
+            const toggleCheckbox = document.getElementById("dark-mode-toggle");
+            const storageKey = "darkModeManualPref";
+            const darkReaderOptions = {
+              brightness: 100,
+              contrast: 90,
+              sepia: 10,
+            };
+            const manualPref = localStorage.getItem(storageKey);
+            if (manualPref === "true") {
+              DarkReader.enable(darkReaderOptions);
+              toggleCheckbox.checked = true;
+            } else if (manualPref === "false") {
+              DarkReader.disable();
+              toggleCheckbox.checked = false;
+            } else {
+              DarkReader.auto(darkReaderOptions);
+              setTimeout(() => {
+                toggleCheckbox.checked = DarkReader.isEnabled();
+              }, 100);
+            }
+            toggleCheckbox.addEventListener("change", function () {
+              if (this.checked) {
+                DarkReader.enable(darkReaderOptions);
+                localStorage.setItem(storageKey, "true");
+              } else {
+                DarkReader.disable();
+                localStorage.setItem(storageKey, "false");
+              }
+            });
+          });
+
+          document
+            .getElementById("sticker-category-tabs")
+            .addEventListener("click", (event) => {
+              const target = event.target;
+
+              // --- 委托处理【删除】按钮的点击 ---
+              if (target.classList.contains("sticker-category-delete-btn")) {
+                event.stopPropagation();
+
+                const parentBtn = target.closest(".sticker-category-btn");
+                if (parentBtn) {
+                  const categoryId = parseInt(parentBtn.dataset.categoryId);
+                  const categoryName = parentBtn.dataset.categoryName;
+
+                  if (!isNaN(categoryId) && categoryName) {
+                    handleDeleteStickerCategory(categoryId, categoryName);
+                  }
+                }
+                return;
+              }
+
+              // --- 委托处理【切换分类】按钮的点击 ---
+              const categoryBtn = target.closest(".sticker-category-btn");
+              if (categoryBtn) {
+                const categoryIdStr = categoryBtn.dataset.categoryId;
+                activeStickerCategoryId =
+                  categoryIdStr === "uncategorized"
+                    ? "uncategorized"
+                    : parseInt(categoryIdStr);
+                renderStickerPanel(); // 切换分类并重新渲染表情列表
+              }
+            });
+
+          // --- 亲密值面板事件绑定 ---
+
+          // 1. 使用事件委托，为整个聊天列表绑定点击事件
+          document
+            .getElementById("chat-list")
+            .addEventListener("click", (e) => {
+              // 检查被点击的是否是我们的亲密值按钮
+              const intimacyBtn = e.target.closest(".intimacy-btn");
+              if (intimacyBtn) {
+                const chatId = intimacyBtn.dataset.chatId;
+                if (chatId) {
+                  openIntimacyPanel(chatId);
+                }
+              }
+            });
+
+          // 2. 为面板的关闭按钮绑定事件
+          document
+            .getElementById("close-intimacy-panel")
+            .addEventListener("click", () => {
+              document
+                .getElementById("intimacy-panel")
+                .classList.remove("visible");
+            });
+
+          document
+            .getElementById("open-intimacy-panel-btn")
+            .addEventListener("click", () =>
+              openIntimacyPanel(state.activeChatId),
+            );
+
+          // 使用事件委托，为动态页面的头部按钮绑定事件
+          document
+            .getElementById("qzone-screen")
+            .addEventListener("click", (e) => {
+              // 检查点击的是否是清空按钮
+              const clearBtn = e.target.closest("#clear-qzone-posts-btn");
+              if (clearBtn) {
+                clearAllQzonePosts(); // 如果是，就调用我们刚刚创建的函数
+                return;
+              }
+            });
+
+          // 1. 绑定主屏幕上的“兔k记账”图标点击事件
+          document
+            .getElementById("tukey-accounting-app-icon")
+            .addEventListener("click", () => {
+              // 打开时，确保默认显示记账群聊
+              switchTukeyView("tukey-group-chat-view");
+              showScreen("tukey-accounting-screen");
+            });
+
+          // 2. 为“兔k记账”的底部导航栏绑定事件委托
+          document
+            .getElementById("tukey-bottom-nav")
+            .addEventListener("click", (e) => {
+              const navItem = e.target.closest(".tukey-nav-item");
+              if (navItem && navItem.dataset.view) {
+                switchTukeyView(navItem.dataset.view);
+              }
+            });
+
+          // 报表页面的点击事件（处理删除）
+          document
+            .getElementById("tukey-reports-view")
+            .addEventListener("click", (e) => {
+              // 检查是否点击了删除按钮
+              const deleteBtn = e.target.closest(".delete-record-btn");
+              if (deleteBtn) {
+                const recordId = parseInt(deleteBtn.dataset.id);
+                if (!isNaN(recordId)) {
+                  deleteTukeyAccountingRecord(recordId);
+                }
+              }
+            });
+
+          // “kk查岗”功能事件监听器
+          document
+            .getElementById("kk-checkin-app-icon")
+            .addEventListener("click", openKkCheckin);
+
+          document
+            .getElementById("kk-char-selection-list")
+            .addEventListener("click", (e) => {
+              const item = e.target.closest(".character-select-item");
+              if (item && item.dataset.chatId) {
+                openKkHouseView(item.dataset.chatId);
+              }
+            });
+
+          document
+            .getElementById("kk-back-from-house-view")
+            .addEventListener("click", () =>
+              showScreen("kk-char-selection-screen"),
+            );
+          document
+            .getElementById("kk-back-from-area-view")
+            .addEventListener("click", () =>
+              showScreen("kk-house-view-screen"),
+            );
+          document
+            .getElementById("close-kk-computer-modal")
+            .addEventListener("click", () =>
+              document
+                .getElementById("kk-computer-modal")
+                .classList.remove("visible"),
+            );
+
+          document
+            .getElementById("close-file-explorer-modal-btn")
+            .addEventListener("click", () =>
+              document
+                .getElementById("kk-file-explorer-modal")
+                .classList.remove("visible"),
+            );
+          document
+            .getElementById("kk-reset-search-btn")
+            .addEventListener("click", handleResetKkHouse);
+          document
+            .getElementById("kk-continue-search-btn")
+            .addEventListener("click", handleContinueKkSearch);
+
+          document
+            .getElementById("close-kk-computer-modal")
+            .addEventListener("click", () =>
+              document
+                .getElementById("kk-computer-modal")
+                .classList.remove("visible"),
+            );
+
+          // 使用事件委托处理电脑桌面所有图标的点击
+          document
+            .getElementById("kk-computer-desktop")
+            .addEventListener("click", (e) => {
+              const icon = e.target.closest(".kk-desktop-icon");
+              if (!icon) return;
+
+              const computerData =
+                state.chats[activeKkCharId]?.houseData?.computer;
+              if (!computerData) {
+                showCustomAlert("错误", "找不到电脑数据。");
+                return;
+              }
+
+              switch (icon.id) {
+                case "kk-browser-icon":
+                  const history = computerData.browser_history || [];
+                  // 【修改】不再用 showCustomAlert，改用新写的列表展示函数
+                  showComputerContentList(
+                    "浏览器历史 (点击分享)",
+                    history,
+                    "浏览器",
+                  );
+                  break;
+
+                case "kk-movies-icon":
+                  const movies = computerData.movies || [];
+                  // 【修改】同上
+                  showComputerContentList("D盘电影 (点击分享)", movies, "D盘");
+                  break;
+
+                case "kk-files-icon":
+                  // 保持原样，打开文件浏览器
+                  // 注意：如果你想让文件也能分享，需要去 openFileExplorer 函数里改，
+                  // 但文件目前是点击查看内容，建议保持现状或在查看器里加分享按钮
+                  openFileExplorer();
+                  break;
+
+                case "kk-secret-folder-icon":
+                  const secretFolder = computerData.secret_folder;
+                  if (secretFolder) {
+                    showCustomConfirm(
+                      "加密访问",
+                      `你尝试打开文件 "${secretFolder.fileName}"。<br><br>这是一个加密文件夹，是否继续访问？`,
+                    ).then((confirmed) => {
+                      if (confirmed) {
+                        // 【修改】解密后直接弹出分享确认框，而不是只显示 Alert
+                        openComputerItemShareModal(
+                          secretFolder.fileName,
+                          secretFolder.content,
+                          "加密文件夹",
+                        );
+                      }
+                    });
+                  } else {
+                    showCustomAlert("未发现", "没有找到隐秘文件夹。");
+                  }
+                  break;
+
+                case "kk-steam-icon":
+                  openSteamScreen();
+                  break;
+              }
+            });
+
+          document
+            .getElementById("close-kk-file-viewer-btn")
+            .addEventListener("click", closeFileViewer);
+          document
+            .getElementById("kk-file-viewer-modal")
+            .addEventListener("click", (e) => {
+              if (e.target.id === "kk-file-viewer-modal") {
+                closeFileViewer();
+              }
+            });
+
+          document
+            .getElementById("close-file-explorer-modal-btn")
+            .addEventListener("click", () =>
+              document
+                .getElementById("kk-file-explorer-modal")
+                .classList.remove("visible"),
+            );
+
+          // 1. 使用事件委托处理文件列表的点击事件
+          document
+            .getElementById("kk-file-list")
+            .addEventListener("click", (e) => {
+              // 检查被点击的是否是一个文件项
+              const fileItem = e.target.closest(".kk-file-item");
+              if (fileItem) {
+                // 从data-*属性中安全地读取数据
+                const fileName = fileItem.dataset.fileName;
+                const fileContent = fileItem.dataset.fileContent;
+                if (fileName && fileContent) {
+                  openFileViewer(fileName, fileContent);
+                }
+              }
+            });
+
+          // 2. 绑定新弹窗的关闭按钮
+          document
+            .getElementById("close-kk-file-viewer-btn")
+            .addEventListener("click", closeFileViewer);
+          document
+            .getElementById("kk-file-viewer-modal")
+            .addEventListener("click", (e) => {
+              // 点击遮罩层也可以关闭
+              if (e.target.id === "kk-file-viewer-modal") {
+                closeFileViewer();
+              }
+            });
+
+          // Steam游戏库弹窗的事件
+          document
+            .getElementById("close-kk-steam-modal-btn")
+            .addEventListener("click", () => {
+              document
+                .getElementById("kk-steam-modal")
+                .classList.remove("visible");
+            });
+          document
+            .getElementById("kk-generate-more-games-btn")
+            .addEventListener("click", generateMoreSteamGames);
+
+          // 为Steam游戏列表添加删除按钮的事件委托
+          document
+            .getElementById("kk-steam-games-list")
+            .addEventListener("click", async (e) => {
+              const deleteBtn = e.target.closest(".item-delete-btn");
+              if (deleteBtn) {
+                const index = parseInt(deleteBtn.dataset.index);
+                const confirmed = await showCustomConfirm(
+                  "删除记录",
+                  "确定要删除这条游戏记录吗？",
+                  {
+                    confirmButtonClass: "btn-danger",
+                  },
+                );
+                if (confirmed) {
+                  const chat = state.chats[activeKkCharId];
+                  chat.houseData.computer.steam_games.splice(index, 1);
+                  await db.chats.put(chat);
+                  renderSteamScreen();
+                }
+              }
+            });
+
+          /* --- kk查岗-监控功能事件监听器 --- */
+          document
+            .getElementById("kk-house-view-screen")
+            .addEventListener("click", (e) => {
+              // 点击“查看监控”图标
+              if (e.target.closest("#kk-surveillance-icon")) {
+                openSurveillanceView(activeKkCharId);
+              }
+            });
+
+          document
+            .getElementById("kk-back-from-monitor")
+            .addEventListener("click", () => {
+              // 从监控界面返回到房屋总览界面
+              showScreen("kk-house-view-screen");
+            });
+
+          // 点击监控中心的“刷新”按钮
+          document
+            .getElementById("kk-refresh-monitor-btn")
+            .addEventListener("click", async () => {
+              if (!activeKkCharId) return;
+              const chat = state.chats[activeKkCharId];
+              if (chat && chat.houseData) {
+                // 调用新的“更新”函数
+                const newSurveillanceData =
+                  await generateSurveillanceUpdate(activeKkCharId);
+                if (newSurveillanceData) {
+                  chat.houseData.surveillanceData = {
+                    timestamp: Date.now(),
+                    characterLocation: newSurveillanceData.characterLocation,
+                    feeds: newSurveillanceData.feeds,
+                  };
+                  await db.chats.put(chat);
+                  renderSurveillanceView(chat.houseData.surveillanceData);
+                  alert("所有监控画面已刷新！");
+                }
+              }
+            });
+
+          // 使用事件委托，统一处理所有监控画面的点击事件
+          document
+            .getElementById("kk-monitor-grid")
+            .addEventListener("click", (e) => {
+              const monitorItem = e.target.closest(".kk-monitor-item");
+              if (!monitorItem) return;
+
+              const areaName = monitorItem.dataset.areaName;
+              const interactionButton = e.target.closest(".monitor-btn");
+
+              // 如果点击的是互动按钮
+              if (interactionButton) {
+                e.stopPropagation(); // 阻止事件冒泡到卡片本身
+                const action = interactionButton.dataset.action;
+                handleMonitorInteraction(areaName, action, monitorItem);
+              }
+              // 否则，点击的是卡片的其他区域
+              else {
+                openKkAreaView(areaName);
+              }
+            });
+
+          // 查手机-生成聊天选择器事件绑定
+          document
+            .getElementById("cancel-chat-gen-btn")
+            .addEventListener("click", () => {
+              document
+                .getElementById("chat-gen-selector-modal")
+                .classList.remove("visible");
+            });
+
+          // 随机开关切换时，启用/禁用列表
+          document
+            .getElementById("chat-gen-random-checkbox")
+            .addEventListener("change", (e) => {
+              const list = document.getElementById("chat-gen-list");
+              if (e.target.checked) {
+                list.style.opacity = "0.5";
+                list.style.pointerEvents = "none";
+                // 清空所有勾选
+                list
+                  .querySelectorAll('input[type="checkbox"]')
+                  .forEach((cb) => (cb.checked = false));
+              } else {
+                list.style.opacity = "1";
+                list.style.pointerEvents = "auto";
+              }
+            });
+
+          document
+            .getElementById("confirm-chat-gen-btn")
+            .addEventListener("click", () => {
+              const isRandom = document.getElementById(
+                "chat-gen-random-checkbox",
+              ).checked;
+              let selectedTargets = null;
+
+              if (!isRandom) {
+                // 如果不是随机，收集选中的对象
+                selectedTargets = [];
+                document
+                  .querySelectorAll("#chat-gen-list input:checked")
+                  .forEach((checkbox) => {
+                    selectedTargets.push({
+                      name: checkbox.dataset.name,
+                      persona: checkbox.dataset.persona,
+                    });
+                  });
+
+                if (selectedTargets.length === 0) {
+                  alert("请至少选择一个聊天对象，或者开启随机模式。");
+                  return;
+                }
+              }
+
+              document
+                .getElementById("chat-gen-selector-modal")
+                .classList.remove("visible");
+              // 调用生成函数，传入选中的目标（如果是随机则为null）
+              generateCharacterPhoneDataSegment("chats", selectedTargets);
+            });
+          // 快捷回复事件绑定
+          document
+            .getElementById("quick-reply-btn")
+            .addEventListener("click", openQuickReplyModal);
+
+          document
+            .getElementById("add-quick-reply-btn")
+            .addEventListener("click", addNewQuickReply);
+
+          document
+            .getElementById("close-quick-reply-btn")
+            .addEventListener("click", () => {
+              document
+                .getElementById("quick-reply-modal")
+                .classList.remove("visible");
+            });
+
+          document
+            .getElementById("export-quick-reply-btn")
+            .addEventListener("click", exportQuickReplies);
+
+          document
+            .getElementById("import-quick-reply-btn")
+            .addEventListener("click", () => {
+              document.getElementById("import-quick-reply-input").click();
+            });
+
+          document
+            .getElementById("import-quick-reply-input")
+            .addEventListener("change", (e) => {
+              importQuickReplies(e.target.files[0]);
+              e.target.value = null;
+            });
+
+          // 时间轴功能事件绑定 (更新版)
+          // 注意 ID 变成了 timeline-branch-btn
+          document
+            .getElementById("timeline-branch-btn")
+            .addEventListener("click", openBranchingModal);
+
+          document
+            .getElementById("create-branch-btn")
+            .addEventListener("click", createBranchCheckpoint);
+          document
+            .getElementById("restart-chat-btn")
+            .addEventListener("click", restartChatBranch);
+          document
+            .getElementById("close-branching-modal-btn")
+            .addEventListener("click", () => {
+              document
+                .getElementById("branching-modal")
+                .classList.remove("visible");
+            });
+
+          // 在 init() 内部添加：
+          document
+            .getElementById("aurora-media-btn")
+            .addEventListener("click", openAuroraSetupModal);
+          document
+            .getElementById("cancel-aurora-setup")
+            .addEventListener("click", () => {
+              document
+                .getElementById("aurora-setup-modal")
+                .classList.remove("visible");
+            });
+          document
+            .getElementById("confirm-aurora-setup")
+            .addEventListener("click", confirmAuroraSetup);
+          document
+            .getElementById("aurora-close-player")
+            .addEventListener("click", closeAuroraPlayer);
+          // 极光模式切换事件绑定
+          // 辅助函数：去掉文件后缀
+          const autoFillAuroraTitle = (file) => {
+            if (file) {
+              // 获取文件名，去掉最后一个点之后的内容
+              const fileName = file.name.replace(/\.[^/.]+$/, "");
+              document.getElementById("aurora-title-input").value = fileName;
+            }
+          };
+
+          // 监听视频文件选择
+          document
+            .getElementById("aurora-video-file")
+            .addEventListener("change", (e) => {
+              if (e.target.files.length > 0) {
+                autoFillAuroraTitle(e.target.files[0]);
+              }
+            });
+
+          // 监听文本文件选择
+          document
+            .getElementById("aurora-text-file")
+            .addEventListener("change", (e) => {
+              if (e.target.files.length > 0) {
+                autoFillAuroraTitle(e.target.files[0]);
+              }
+            });
+
+          // ---------------- [修改开始] 修复文本错位问题 ----------------
+          // 漫游阅读进度自动保存 & 实时上下文更新功能
+          const textViewer = document.getElementById("aurora-text-viewer");
+          let saveProgressTimer = null;
+
+          // 辅助函数：获取当前可视区域的文本
+          function updateCurrentReadingContext() {
+            if (!auroraState.textContent) return;
+
+            const scrollHeight =
+              textViewer.scrollHeight - textViewer.clientHeight;
+            const scrollTop = textViewer.scrollTop;
+
+            // 防止除以0
+            const scrollPercentage =
+              scrollHeight > 0 ? scrollTop / scrollHeight : 0;
+            const totalLength = auroraState.textContent.length;
+
+            // 计算中心点索引
+            const centerIndex = Math.floor(totalLength * scrollPercentage);
+
+            // 截取前后各 500 字，保证上下文足够
+            const start = Math.max(0, centerIndex - 500);
+            const end = Math.min(totalLength, centerIndex + 500);
+
+            // ★★★ 核心修复：直接把这段文字存进全局状态，供AI随时读取 ★★★
+            auroraState.currentSegmentText = auroraState.textContent.substring(
+              start,
+              end,
+            );
+
+            return scrollPercentage; // 返回进度给下面保存用
+          }
+
+          textViewer.addEventListener("scroll", () => {
+            // 1. 实时更新当前阅读片段（无论是否在书架模式）
+            const currentProgress = updateCurrentReadingContext();
+
+            // 2. 检查当前是否处于书架阅读模式（用于保存进度到数据库）
+            if (
+              !auroraState.active ||
+              auroraState.mode !== "text" ||
+              !auroraState.currentBookId
+            ) {
+              return;
+            }
+
+            // 3. 防抖处理：用户停止滚动 0.5 秒后才保存数据库，避免卡顿
+            if (saveProgressTimer) clearTimeout(saveProgressTimer);
+
+            saveProgressTimer = setTimeout(async () => {
+              // 确保进度在 0 到 1 之间
+              const progress = Math.max(0, Math.min(1, currentProgress));
+
+              try {
+                await db.auroraBooks.update(auroraState.currentBookId, {
+                  progress: progress,
+                });
+              } catch (error) {
+                console.error("保存阅读进度失败:", error);
+              }
+            }, 500);
+          });
+          // ---------------- [修改结束] ----------------
+
+          document
+            .querySelectorAll('input[name="aurora-mode"]')
+            .forEach((radio) => {
+              radio.addEventListener("change", toggleAuroraInputs);
+            });
+
+          // 绑定 GitHub 手动上传按钮
+          const githubBtn = document.getElementById("manual-github-backup-btn");
+          if (githubBtn) {
+            githubBtn.addEventListener("click", () =>
+              uploadBackupToGitHub(false),
+            );
+          }
+          // 绑定 GitHub 恢复按钮
+          const githubRestoreBtn = document.getElementById(
+            "manual-github-restore-btn",
+          );
+          const gitStreamUploadBtn = document.getElementById(
+            "git-stream-upload-btn",
+          );
+          if (gitStreamUploadBtn) {
+            gitStreamUploadBtn.addEventListener(
+              "click",
+              uploadBackupToGitHubStream,
+            );
+          }
+
+          const gitStreamRestoreBtn = document.getElementById(
+            "git-stream-restore-btn",
+          );
+          if (gitStreamRestoreBtn) {
+            gitStreamRestoreBtn.addEventListener(

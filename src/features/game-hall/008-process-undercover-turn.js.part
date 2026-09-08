@@ -1,0 +1,823 @@
+  // ▼▼▼ 【最终流程修复版】请用这整块代码，完整替换旧的 processUndercoverTurn 函数 ▼▼▼
+  /**
+   * 【卧底】游戏主循环/引擎 (V3 - 已修复轮次卡死问题)
+   */
+  async function processUndercoverTurn() {
+    if (!undercoverGameState.isActive) return;
+
+    renderUndercoverGameScreen();
+
+    switch (undercoverGameState.gamePhase) {
+      case 'reveal_words': {
+        logToUndercoverGame(`游戏开始，第 ${undercoverGameState.dayNumber} 轮。请查看自己的词语。`, 'system');
+        const me = undercoverGameState.players.find(p => p.isUser);
+        const roleName = { undercover: '卧底', civilian: '平民', whiteboard: '白板' }[me.role] || '未知';
+        const wordText = me.word ? `你的词语是：【${me.word}】` : '你是一个白板，需要根据他人描述猜测平民词语。';
+        await showCustomAlert(`你的身份是：【${roleName}】`, wordText);
+
+        undercoverGameState.gamePhase = 'description_round';
+        await sleep(1000);
+        await processUndercoverTurn();
+        break;
+      }
+
+      case 'description_round': {
+        logToUndercoverGame(`第 ${undercoverGameState.dayNumber} 轮发言开始，请依次描述自己的词语。`, 'system');
+
+        const alivePlayers = undercoverGameState.players.filter(p => p.isAlive);
+        for (const player of alivePlayers) {
+          renderUndercoverGameScreen({ speakingPlayerId: player.id });
+          let description;
+          if (player.isUser) {
+            description = await waitForUserUndercoverAction('轮到你发言', 'speak', {
+              placeholder: '请用一句话描述你的词语...',
+            });
+          } else {
+            description = await triggerUndercoverAiAction(player.id, 'describe');
+          }
+          logToUndercoverGame({ player: player, speech: description }, 'speech');
+          await sleep(1000);
+        }
+        renderUndercoverGameScreen();
+        undercoverGameState.gamePhase = 'voting_round';
+        await sleep(1000);
+        await processUndercoverTurn();
+        break;
+      }
+
+      case 'voting_round': {
+        logToUndercoverGame('描述结束，现在开始投票。', 'system');
+        undercoverGameState.votes = {}; // 清空上一轮的票
+        const alivePlayers = undercoverGameState.players.filter(p => p.isAlive);
+        for (const voter of alivePlayers) {
+          let voteResult;
+          if (voter.isUser) {
+            voteResult = await waitForUserUndercoverAction('请投票', 'vote');
+          } else {
+            voteResult = await triggerUndercoverAiAction(voter.id, 'vote');
+          }
+
+          if (voteResult && voteResult.voteForId) {
+            const targetId = voteResult.voteForId;
+            const reason = voteResult.reason || '未说明理由';
+            const targetPlayer = undercoverGameState.players.find(p => p.id === targetId);
+
+            if (targetPlayer) {
+              logToUndercoverGame(
+                `<strong>${voter.name}</strong> 投票给了 <strong>${targetPlayer.name}</strong>，理由是：“${reason}”`,
+              );
+              undercoverGameState.votes[targetId] = (undercoverGameState.votes[targetId] || 0) + 1;
+            }
+          } else {
+            const reason = voteResult ? voteResult.reason || '信息不足，无法判断。' : '信息不足，无法判断。';
+            logToUndercoverGame(`<strong>${voter.name}</strong> 弃票了，理由是：“${reason}”`);
+          }
+          await sleep(500);
+        }
+
+        undercoverGameState.gamePhase = 'elimination';
+        await sleep(2000);
+        await processUndercoverTurn();
+        break;
+      }
+
+      case 'elimination': {
+        logToUndercoverGame('投票结束，正在计票...', 'system');
+        await sleep(2000);
+
+        const voteCounts = undercoverGameState.votes;
+        let maxVotes = 0;
+        let playersToEliminate = [];
+
+        for (const playerId in voteCounts) {
+          if (voteCounts[playerId] > maxVotes) {
+            maxVotes = voteCounts[playerId];
+            playersToEliminate = [playerId];
+          } else if (voteCounts[playerId] === maxVotes) {
+            playersToEliminate.push(playerId);
+          }
+        }
+
+        if (playersToEliminate.length > 1) {
+          // 处理平票
+          logToUndercoverGame(
+            `出现平票: ${playersToEliminate
+              .map(id => undercoverGameState.players.find(p => p.id === id).name)
+              .join('、 ')}。`,
+            'system',
+          );
+          logToUndercoverGame('平票玩家将进行补充发言，之后再次投票。', 'system');
+          undercoverGameState.tiedPlayers = playersToEliminate;
+          undercoverGameState.gamePhase = 'tie_vote_speech';
+          await sleep(2000);
+          await processUndercoverTurn();
+          return;
+        } else if (playersToEliminate.length === 1) {
+          // 唯一最高票，淘汰
+          const eliminatedPlayerId = playersToEliminate[0];
+          const eliminatedPlayer = undercoverGameState.players.find(p => p.id === eliminatedPlayerId);
+          eliminatedPlayer.isAlive = false;
+          undercoverGameState.votedOutPlayers.push(eliminatedPlayer);
+          const roleName =
+            { undercover: '卧底', civilian: '平民', whiteboard: '白板' }[eliminatedPlayer.role] || '未知';
+          logToUndercoverGame(`【${eliminatedPlayer.name}】被淘汰！他/她的身份是【${roleName}】。`, 'system');
+        } else {
+          // 无人被投
+          logToUndercoverGame('本轮无人被投，无人出局。', 'system');
+        }
+
+        renderUndercoverGameScreen();
+        if (checkUndercoverGameOver()) return;
+
+        // ★★★ 核心修改：无论是否有人淘汰，都正确进入下一轮 ★★★
+        undercoverGameState.dayNumber++;
+        undercoverGameState.gamePhase = 'description_round';
+        logToUndercoverGame('游戏继续...', 'system');
+        await sleep(3000);
+        await processUndercoverTurn();
+        break;
+      }
+
+      case 'tie_vote_speech': {
+        logToUndercoverGame('现在请平票玩家依次进行补充发言。', 'system');
+        const tiedPlayers = undercoverGameState.players.filter(p => undercoverGameState.tiedPlayers.includes(p.id));
+        for (const player of tiedPlayers) {
+          if (!player.isAlive) continue;
+          renderUndercoverGameScreen({ speakingPlayerId: player.id });
+          let speech;
+          if (player.isUser) {
+            speech = await waitForUserUndercoverAction('请进行补充发言', 'speak', {
+              placeholder: '为自己辩解，说服大家不要投你...',
+            });
+          } else {
+            speech = await triggerUndercoverAiAction(player.id, 'tie_speak');
+          }
+          logToUndercoverGame({ player: player, speech: speech }, 'speech');
+          await sleep(1000);
+        }
+        renderUndercoverGameScreen();
+        undercoverGameState.gamePhase = 'tie_vote_re-vote';
+        await processUndercoverTurn();
+        break;
+      }
+
+      case 'tie_vote_re-vote': {
+        logToUndercoverGame('补充发言结束，请在平票玩家中投票。', 'system');
+
+        const voters = undercoverGameState.players.filter(
+          p => p.isAlive && !undercoverGameState.tiedPlayers.includes(p.id),
+        );
+        const targets = undercoverGameState.players.filter(p => undercoverGameState.tiedPlayers.includes(p.id));
+        undercoverGameState.votes = {};
+
+        for (const voter of voters) {
+          let voteResult;
+          if (voter.isUser) {
+            voteResult = await waitForUserUndercoverAction('请投票', 'vote', { targets: targets });
+          } else {
+            voteResult = await triggerUndercoverAiAction(voter.id, 'vote', { targets: targets });
+          }
+
+          if (voteResult && voteResult.voteForId) {
+            const targetId = voteResult.voteForId;
+            const reason = voteResult.reason || '未说明理由';
+            const targetPlayer = targets.find(p => p.id === targetId);
+            if (targetPlayer) {
+              logToUndercoverGame(
+                `<strong>${voter.name}</strong> 投票给了 <strong>${targetPlayer.name}</strong>，理由是：“${reason}”`,
+              );
+              undercoverGameState.votes[targetId] = (undercoverGameState.votes[targetId] || 0) + 1;
+            }
+          } else {
+            const reason = voteResult ? voteResult.reason || '信息不足，无法判断。' : '信息不足，无法判断。';
+            logToUndercoverGame(`<strong>${voter.name}</strong> 弃票了，理由是：“${reason}”`);
+          }
+          await sleep(500);
+        }
+
+        const voteCounts = undercoverGameState.votes;
+        let maxVotes = 0;
+        let playersToEliminate = [];
+        for (const playerId in voteCounts) {
+          if (voteCounts[playerId] > maxVotes) {
+            maxVotes = voteCounts[playerId];
+            playersToEliminate = [playerId];
+          } else if (voteCounts[playerId] === maxVotes) {
+            playersToEliminate.push(playerId);
+          }
+        }
+
+        if (playersToEliminate.length !== 1) {
+          logToUndercoverGame('再次平票，本轮无人出局。', 'system');
+        } else {
+          const eliminatedPlayerId = playersToEliminate[0];
+          const eliminatedPlayer = undercoverGameState.players.find(p => p.id === eliminatedPlayerId);
+          eliminatedPlayer.isAlive = false;
+          undercoverGameState.votedOutPlayers.push(eliminatedPlayer);
+          const roleName =
+            { undercover: '卧底', civilian: '平民', whiteboard: '白板' }[eliminatedPlayer.role] || '未知';
+          logToUndercoverGame(
+            `PK投票结果：【${eliminatedPlayer.name}】被淘汰！他/她的身份是【${roleName}】。`,
+            'system',
+          );
+        }
+
+        renderUndercoverGameScreen();
+        if (checkUndercoverGameOver()) return;
+
+        undercoverGameState.tiedPlayers = [];
+        undercoverGameState.dayNumber++;
+        undercoverGameState.gamePhase = 'description_round';
+        await sleep(3000);
+        await processUndercoverTurn();
+        break;
+      }
+    }
+  }
+  // ▲▲▲ 替换结束 ▲▲▲
+  // ▼▼▼ 【全新】这是“谁是卧底”的重roll功能核心函数 ▼▼▼
+  /**
+   * 【卧底】处理AI发言的重roll请求
+   * @param {number} logIndex - 要重roll的发言在gameLog中的索引
+   */
+  async function handleUndercoverReroll(logIndex) {
+    const logEntry = undercoverGameState.gameLog[logIndex];
+    if (!logEntry || logEntry.type !== 'speech' || !logEntry.message.player || logEntry.message.player.isUser) {
+      return;
+    }
+
+    const playerToReroll = logEntry.message.player;
+
+    const speechTextElement = document
+      .querySelector(`button.uc-reroll-btn[data-log-index="${logIndex}"]`)
+      .closest('.speech-content')
+      .querySelector('.speech-text');
+    if (speechTextElement) {
+      speechTextElement.innerHTML = '<i>重新描述中...</i>';
+    }
+
+    try {
+      // 判断当前游戏阶段来决定AI的行动
+      const actionType = undercoverGameState.gamePhase === 'tie_vote_speech' ? 'tie_speak' : 'describe';
+
+      const newSpeech = await triggerUndercoverAiAction(playerToReroll.id, actionType);
+      undercoverGameState.gameLog[logIndex].message.speech = newSpeech;
+      renderUndercoverGameScreen();
+    } catch (error) {
+      console.error('卧底发言重roll失败:', error);
+      if (speechTextElement) {
+        speechTextElement.innerHTML = `<i style="color:red;">重新生成失败，请检查网络或API设置。</i>`;
+      }
+    }
+  }
+  // ▲▲▲ 新增函数结束 ▲▲▲
+
+  // ▼▼▼ 【谁是卧底】用这块【已添加重roll按钮】的代码，完整替换旧的 renderUndercoverGameScreen 函数 ▼▼▼
+  /**
+   * 【卧底】渲染游戏主界面
+   */
+  function renderUndercoverGameScreen(options = {}) {
+    const playersGrid = document.getElementById('undercover-players-grid');
+    const logContainer = document.getElementById('undercover-game-log');
+
+    playersGrid.innerHTML = '';
+    undercoverGameState.players.forEach(player => {
+      const seat = document.createElement('div');
+      seat.className = 'player-seat';
+      const avatarClass = `player-avatar ${!player.isAlive ? 'dead' : ''} ${
+        options.speakingPlayerId === player.id ? 'speaking' : ''
+      }`;
+
+      seat.innerHTML = `
+            <img src="${player.avatar}" class="${avatarClass}">
+            <span class="player-name">${player.name} ${!player.isAlive ? '(淘汰)' : ''}</span>
+        `;
+      playersGrid.appendChild(seat);
+    });
+
+    logContainer.innerHTML = '';
+    undercoverGameState.gameLog.forEach((log, index) => {
+      // ★ 核心修改1：增加了index参数
+      const logEl = document.createElement('div');
+      // ★ 核心修改2：判断是否是AI的发言
+      if (log.type === 'speech' && typeof log.message === 'object' && !log.message.player.isUser) {
+        logEl.className = 'log-entry speech';
+        const { player, speech } = log.message;
+
+        // ★ 核心修改3：为AI发言添加重roll按钮
+        logEl.innerHTML = `
+            <img src="${player.avatar}" class="speech-avatar">
+            <div class="speech-content">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span class="speaker">${player.name}</span>
+                    <button class="uc-reroll-btn" data-log-index="${index}" title="重新生成发言" style="background:none; border:none; cursor:pointer; padding:0; color:var(--text-secondary);">
+                        <svg class="reroll-btn-icon" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                    </button>
+                </div>
+                <span class="speech-text">${speech.replace(/\n/g, '<br>')}</span>
+            </div>
+        `;
+      } else if (log.type === 'speech') {
+        // 用户发言保持原样
+        logEl.className = 'log-entry speech';
+        logEl.innerHTML = `
+                <img src="${log.message.player.avatar}" class="speech-avatar">
+                <div class="speech-content">
+                    <span class="speaker">${log.message.player.name}</span>
+                    <span class="speech-text">${log.message.speech.replace(/\n/g, '<br>')}</span>
+                </div>
+            `;
+      } else {
+        // 其他系统消息也保持原样
+        logEl.className = `log-entry ${log.type}`;
+        logEl.innerHTML = String(log.message).replace(/\n/g, '<br>');
+      }
+      logContainer.appendChild(logEl);
+    });
+    logContainer.scrollTop = logContainer.scrollHeight;
+  }
+  // ▲▲▲ 替换结束 ▲▲▲
+
+  /**
+   * 【卧底】添加一条游戏日志
+   */
+  function logToUndercoverGame(message, type = 'system') {
+    undercoverGameState.gameLog.push({ message, type });
+    renderUndercoverGameScreen();
+  }
+
+  // ▼▼▼ 【卧底输入框美化版】请用这个【全新】的函数，完整替换掉你旧的 waitForUserUndercoverAction 函数 ▼▼▼
+  /**
+   * 【卧底 V4】等待用户行动的通用函数（已修复placeholder错误）
+   */
+  function waitForUserUndercoverAction(promptText, actionType, context = {}) {
+    const me = undercoverGameState.players.find(p => p.isUser);
+    if (me && !me.isAlive) {
+      const actionArea = document.getElementById('undercover-action-area');
+      actionArea.innerHTML = `<h5>您已淘汰，正在观战...</h5>`;
+      return new Promise(async resolve => {
+        await sleep(3000);
+        actionArea.innerHTML = '';
+        resolve(null);
+      });
+    }
+
+    return new Promise(resolve => {
+      const actionArea = document.getElementById('undercover-action-area');
+      actionArea.innerHTML = '';
+      actionArea.className = 'undercover-action-area';
+
+      if (actionType === 'speak') {
+        actionArea.classList.add('speaking-mode');
+
+        // ★★★ 核心修复：从 context 对象中获取 placeholder ★★★
+        const placeholderText = context.placeholder || '请输入你的发言...';
+
+        actionArea.innerHTML = `<textarea id="undercover-user-speech-input" rows="1" placeholder="${placeholderText}"></textarea><button id="undercover-end-speech-btn" class="form-button">发言</button>`;
+
+        const textarea = document.getElementById('undercover-user-speech-input');
+        const endBtn = document.getElementById('undercover-end-speech-btn');
+        textarea.addEventListener('input', () => {
+          textarea.style.height = 'auto';
+          textarea.style.height = textarea.scrollHeight + 'px';
+        });
+        textarea.focus();
+        endBtn.onclick = () => {
+          const speech = textarea.value.trim() || '我过。';
+          actionArea.innerHTML = '';
+          actionArea.classList.remove('speaking-mode');
+          resolve(speech);
+        };
+      } else if (actionType === 'vote') {
+        actionArea.innerHTML = `<h5>${promptText}</h5>`;
+        const grid = document.createElement('div');
+        grid.className = 'vote-target-grid';
+
+        // ★★★ 核心修改：在这里判断是普通投票还是最终PK投票 ★★★
+        const targets = context.targets
+          ? context.targets.filter(p => !p.isUser)
+          : undercoverGameState.players.filter(p => p.isAlive && !p.isUser); // 否则是所有存活玩家
+
+        targets.forEach(player => {
+          const btn = document.createElement('button');
+          btn.className = 'form-button-secondary vote-target-btn';
+          btn.textContent = player.name;
+          btn.onclick = async () => {
+            const reason = await showCustomPrompt(`投票给 ${player.name}`, '请输入你的投票理由（可选）');
+            if (reason !== null) {
+              actionArea.innerHTML = '';
+              resolve({ voteForId: player.id, reason: reason.trim() || '没有理由，跟着感觉走。' });
+            }
+          };
+          grid.appendChild(btn);
+        });
+
+        // ★★★ 核心修改：只有在普通投票时才显示“弃票”按钮 ★★★
+        if (!context.targets) {
+          const passBtn = document.createElement('button');
+          passBtn.className = 'form-button-secondary vote-target-btn';
+          passBtn.textContent = '弃票';
+          passBtn.onclick = async () => {
+            const reason = await showCustomPrompt(`确认弃票`, '请输入你弃票的理由（可选）');
+            if (reason !== null) {
+              actionArea.innerHTML = '';
+              resolve({ voteForId: null, reason: reason.trim() || '信息不足，无法判断。' });
+            }
+          };
+          grid.appendChild(passBtn);
+        }
+
+        actionArea.appendChild(grid);
+      }
+    });
+  }
+  // ▲▲▲ 替换结束 ▲▲▲
+
+  // ▼▼▼ 用这块【已添加平票逻辑】的代码，完整替换你旧的 triggerUndercoverAiAction 函数 ▼▼▼
+  /**
+   * 【卧底-AI核心 V4 - 平票逻辑增强版】
+   * @param {string} playerId - 触发行动的AI玩家ID
+   * @param {string} actionType - AI需要执行的动作: 'describe', 'vote', 'tie_speak'
+   * @returns {Promise<object|string|null>} - AI的行动结果
+   */
+  async function triggerUndercoverAiAction(playerId, actionType, context = {}) {
+    const player = undercoverGameState.players.find(p => p.id === playerId);
+    if (!player || !player.isAlive) return null;
+
+    const { proxyUrl, apiKey, model } = state.apiConfig;
+    if (!proxyUrl || !apiKey || !model) {
+      if (actionType === 'describe' || actionType === 'tie_speak') return '我...词穷了，过。';
+      if (actionType === 'vote') {
+        const targets = context.targets || undercoverGameState.players.filter(p => p.isAlive && p.id !== playerId);
+        const randomTargetId = targets.length > 0 ? targets[Math.floor(Math.random() * targets.length)].id : null;
+        return { voteForId: randomTargetId, reason: '我凭直觉投的。' };
+      }
+      return null;
+    }
+
+    let actionPrompt = '';
+    let jsonFormat = '';
+    let roleDescription = '';
+    let votingRule = '';
+    // 【核心修改1】根据是否是平票后的再次投票，来决定可投票的目标
+    const voteTargets = context.targets || undercoverGameState.players.filter(p => p.isAlive && p.id !== player.id);
+    const alivePlayersListForVote = voteTargets.map(p => `- ${p.name} (id: ${p.id})`).join('\n');
+
+    const gameLog = undercoverGameState.gameLog
+      .filter(log => log.type === 'speech')
+      .map(log => `${log.message.player.name}: ${log.message.speech}`)
+      .join('\n');
+
+    switch (actionType) {
+      case 'describe':
+        // ★★★ 核心修改2：为“描述”指令添加轮次信息 ★★★
+        if (undercoverGameState.dayNumber > 1) {
+          actionPrompt = `游戏进入了第 ${undercoverGameState.dayNumber} 轮。现在轮到你发言。请根据你的身份和词语，用一句【全新的、和之前轮次不同】的话来描述。你的描述必须是真实的，但要足够模糊。禁止重复他人的描述。`;
+        } else {
+          actionPrompt = `现在是第一轮，轮到你发言。请根据你的身份和词语，用一句话描述。你的描述必须是真实的，但要足够模糊。禁止重复他人的描述。`;
+        }
+        jsonFormat = '{"description": "你的描述..."}';
+        break;
+      // =======================================================
+      // ★★★ 【全新】为AI增加补充发言的指令 ★★★
+      // =======================================================
+      case 'tie_speak':
+        actionPrompt =
+          '你因为平票正在进行补充发言。请为自己辩解，说服其他人不要投票给你。你的发言要简短有力，符合你的人设和身份。';
+        jsonFormat = '{"description": "你的补充发言..."}';
+        break;
+      case 'vote':
+        actionPrompt = `现在是投票环节。请仔细分析【所有玩家的发言】，找出描述最可疑、最偏离主题、或者听起来最心虚的那个人，然后投票给他/她，并给出【简洁且符合逻辑】的理由。或者，如果你觉得信息不足无法判断，也可以选择弃票，并说明你弃票的原因。`;
+        jsonFormat = '{"voteForId": "你投票的玩家ID或null", "reason": "你的投票或弃票理由..."}';
+        votingRule = `
+# 【【【投票铁律：这是最高指令，必须严格遵守】】】
+在你的 "reason" 投票理由中，【绝对禁止】直接或间接提及你自己的词语，或猜测别人的词语是什么。你的理由只能基于对他人【发言描述】的分析，例如“他的描述很模糊”、“她的描述和大家不一样”等等。
+`;
+        break;
+    }
+
+    if (player.role === 'civilian') {
+      roleDescription = `你是【平民】，你的词是【${player.word}】。你的目标是找出卧底和白板并投票淘汰他们。`;
+    } else if (player.role === 'undercover') {
+      roleDescription = `你是【卧底】，你的词是【${player.word}】。你的词和平民的词意思相近但不同。你的任务是【伪装】！仔细听别人的发言，找出他们的共同点，让自己听起来像个好人。`;
+    } else {
+      // whiteboard
+      roleDescription = `你是【白板】，你没有词语。你的任务是【伪装和猜测】！在轮到你发言之前，【仔细听】前面所有人的描述，【猜出】他们的词语大概是什么，然后给出一个【非常模糊】的描述，让自己听起来和他们是一伙的。`;
+    }
+
+    const systemPrompt = `
+# 游戏背景: 谁是卧底
+你正在扮演玩家“${player.name}”，你的人设是：“${player.persona}”。
+
+# 你的身份和任务
+${roleDescription}
+你的所有行为都必须符合你的人设和游戏目标。
+${votingRule}
+# 当前场上局势
+- 可投票的玩家列表:
+${alivePlayersListForVote} 
+- 本轮所有人的发言记录:
+${gameLog || '(暂无发言)'}
+
+# 你的行动指令
+${actionPrompt}
+
+# 输出格式
+你的回复【必须且只能】是一个严格的JSON对象，格式如下:
+${jsonFormat}
+`;
+
+    try {
+      const messagesForApi = [{ role: 'user', content: systemPrompt }];
+      let isGemini = proxyUrl === GEMINI_API_URL;
+      let geminiConfig = toGeminiRequestData(
+        model,
+        apiKey,
+        systemPrompt,
+        messagesForApi,
+        isGemini,
+        state.apiConfig.temperature,
+      );
+
+      const response = isGemini
+        ? await fetch(geminiConfig.url, geminiConfig.data)
+        : await fetch(`${proxyUrl}/v1/chat/completions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+            body: JSON.stringify({
+              model: model,
+              messages: messagesForApi,
+              temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+              response_format: { type: 'json_object' },
+            }),
+          });
+
+      if (!response.ok) throw new Error(await response.text());
+      const data = await response.json();
+      const content = (isGemini ? data.candidates[0].content.parts[0].text : data.choices[0].message.content).replace(
+        /^```json\s*|```$/g,
+        '',
+      );
+      const aiAction = JSON.parse(content);
+
+      // 【核心修改2】根据不同的行动类型，返回不同的结果
+      if (actionType === 'describe' || actionType === 'tie_speak') {
+        return aiAction.description || '我过。';
+      }
+
+      if (actionType === 'vote') {
+        if (aiAction.voteForId === player.id) {
+          const targets = voteTargets.filter(p => p.id !== player.id); // 确保不会投给自己
+          const randomTargetId = targets.length > 0 ? targets[Math.floor(Math.random() * targets.length)].id : null;
+          return { voteForId: randomTargetId, reason: '我感觉有点混乱，随便投一个吧。' };
+        }
+        return aiAction;
+      }
+      return null;
+    } catch (error) {
+      console.error(`卧底AI (${player.name}) 行动失败:`, error);
+      if (actionType === 'describe' || actionType === 'tie_speak') return '我想不出来，过。';
+      if (actionType === 'vote') {
+        const targets = voteTargets.filter(p => p.id !== player.id);
+        const randomTargetId = targets.length > 0 ? targets[Math.floor(Math.random() * targets.length)].id : null;
+        return { voteForId: randomTargetId, reason: '思考超时，凭直觉投的。' };
+      }
+      return null;
+    }
+  }
+  // ▲▲▲ 替换结束 ▲▲▲
+
+  /**
+   * 【卧底】检查游戏是否结束 (已集成复盘分享)
+   */
+  function checkUndercoverGameOver() {
+    const alivePlayers = undercoverGameState.players.filter(p => p.isAlive);
+    const aliveCount = alivePlayers.length;
+    const undercoverCount = alivePlayers.filter(p => p.role === 'undercover' || p.role === 'whiteboard').length;
+    const civilianCount = aliveCount - undercoverCount;
+
+    let winner = null;
+
+    if (undercoverCount === 0) {
+      winner = '平民阵营';
+    } else if (civilianCount <= undercoverCount) {
+      winner = '卧底阵营';
+    }
+
+    if (winner) {
+      undercoverGameState.isActive = false;
+      logToUndercoverGame(`游戏结束！${winner}胜利！`, 'system');
+
+      // ▼▼▼ 【核心修改】在这里调用我们新的复盘功能！ ▼▼▼
+      setTimeout(() => {
+        const summaryText = generateUndercoverSummary(winner);
+        showUndercoverSummaryModal(summaryText);
+      }, 2000);
+      // ▲▲▲ 修改结束 ▲▲▲
+
+      document.getElementById('undercover-action-area').innerHTML = '';
+      return true;
+    }
+    return false;
+  }
+
+  // ▼▼▼ 【全新】“谁是卧底”游戏复盘与分享功能核心代码 ▼▼▼
+
+  /**
+   * 生成“谁是卧底”的复盘文本，包含完整的游戏日志
+   * @param {string} winner - 胜利的阵营名称
+   * @returns {string} - 格式化后的复盘Markdown文本
+   */
+  function generateUndercoverSummary(winner) {
+    let summary = `**谁是卧底 - 游戏复盘**\n\n`;
+    summary += `🏆 **胜利方:** ${winner}\n\n`;
+    summary += `**词语揭晓:**\n- 平民词: **${undercoverGameState.civilianWord}**\n- 卧底词: **${undercoverGameState.undercoverWord}**\n\n`;
+
+    summary += `**玩家身份:**\n`;
+    undercoverGameState.players.forEach(p => {
+      const roleName = { undercover: '卧底', civilian: '平民', whiteboard: '白板' }[p.role];
+      summary += `- ${p.name}: ${roleName}\n`;
+    });
+
+    summary += `\n---\n\n**游戏过程回顾:**\n`;
+    const formattedLog = undercoverGameState.gameLog
+      .map(log => {
+        if (log.type === 'speech') {
+          return `${log.message.player.name}: ${log.message.speech}`;
+        }
+        return log.message.replace(/<strong>/g, '**').replace(/<\/strong>/g, '**'); // 将HTML粗体转为Markdown
+      })
+      .join('\n');
+    summary += formattedLog;
+
+    return summary;
+  }
+
+  /**
+   * 【卧底】打开复盘分享目标选择器
+   * @param {string} summaryText - 要分享的复盘文本
+   */
+  function openUndercoverSummaryTargetPicker(summaryText) {
+    const modal = document.getElementById('undercover-target-picker-modal');
+    const listEl = document.getElementById('undercover-target-list');
+    listEl.innerHTML = '';
+
+    const aiPlayers = undercoverGameState.players.filter(p => !p.isUser);
+
+    if (aiPlayers.length === 0) {
+      alert('没有可分享的AI玩家。');
+      return;
+    }
+
+    // 渲染可选的AI玩家列表
+    aiPlayers.forEach(player => {
+      const item = document.createElement('div');
+      item.className = 'player-selection-item'; // 复用之前的样式
+      item.innerHTML = `
+            <input type="checkbox" class="undercover-target-checkbox" value="${player.id}" checked>
+            <img src="${player.avatar || defaultAvatar}" alt="${player.name}">
+            <span class="name">${player.name}</span>
+        `;
+      listEl.appendChild(item);
+    });
+
+    // 绑定按钮事件
+    const confirmBtn = document.getElementById('uc-confirm-share-btn');
+    const newConfirmBtn = confirmBtn.cloneNode(true);
+    confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+    newConfirmBtn.onclick = () => {
+      const selectedIds = Array.from(document.querySelectorAll('.undercover-target-checkbox:checked')).map(
+        cb => cb.value,
+      );
+      if (selectedIds.length > 0) {
+        sendUndercoverSummaryToSelectedPlayers(summaryText, selectedIds);
+      } else {
+        alert('请至少选择一个分享对象！');
+      }
+    };
+
+    document.getElementById('uc-cancel-share-btn').onclick = () => modal.classList.remove('visible');
+    document.getElementById('uc-select-all-btn').onclick = () => {
+      document.querySelectorAll('.undercover-target-checkbox').forEach(cb => (cb.checked = true));
+    };
+    document.getElementById('uc-deselect-all-btn').onclick = () => {
+      document.querySelectorAll('.undercover-target-checkbox').forEach(cb => (cb.checked = false));
+    };
+
+    modal.classList.add('visible');
+  }
+
+  /**
+   * 【卧底】将游戏复盘发送到【选定】的AI角色的单聊中
+   * @param {string} summaryText - 复盘文本
+   * @param {string[]} targetIds - 目标AI角色的ID数组
+   */
+  async function sendUndercoverSummaryToSelectedPlayers(summaryText, targetIds) {
+    document.getElementById('undercover-summary-modal').classList.remove('visible');
+    document.getElementById('undercover-target-picker-modal').classList.remove('visible');
+    let sentCount = 0;
+
+    const aiContext = `[系统指令：刚刚结束了一局“谁是卧底”，这是游戏复盘。请根据这个复盘内容，以你的角色人设，和用户聊聊刚才的游戏。]\n\n${summaryText}`;
+
+    for (const chatId of targetIds) {
+      const chat = state.chats[chatId];
+      if (chat) {
+        const visibleMessage = {
+          role: 'user',
+          type: 'share_link',
+          timestamp: Date.now(),
+          title: '谁是卧底 - 游戏复盘',
+          description: '点击查看详细复盘记录',
+          source_name: '游戏中心',
+          content: summaryText,
+        };
+
+        const hiddenInstruction = {
+          role: 'system',
+          content: aiContext,
+          timestamp: Date.now() + 1,
+          isHidden: true,
+        };
+
+        chat.history.push(visibleMessage, hiddenInstruction);
+        await db.chats.put(chat);
+        sentCount++;
+      }
+    }
+
+    await showCustomAlert('分享成功', `游戏复盘已分享至 ${sentCount} 位AI玩家的单聊中！`);
+    showScreen('game-hall-screen');
+  }
+
+  /**
+   * 【卧底】显示游戏结算卡片 (V2 - 已集成分享功能)
+   */
+  function showUndercoverSummaryModal(summaryText) {
+    const modal = document.getElementById('undercover-summary-modal');
+    const contentEl = document.getElementById('undercover-summary-content');
+
+    // 使用Markdown渲染函数，让复盘更好看
+    contentEl.innerHTML = renderMarkdown(summaryText);
+
+    // --- ▼▼▼ 核心修改在这里 ▼▼▼ ---
+
+    // 为“分享复盘”按钮绑定新的点击事件
+    const repostBtn = document.getElementById('repost-undercover-summary-btn');
+    const newRepostBtn = repostBtn.cloneNode(true);
+    repostBtn.parentNode.replaceChild(newRepostBtn, repostBtn);
+    newRepostBtn.onclick = () => openUndercoverSummaryTargetPicker(summaryText); // 调用我们即将创建的目标选择器函数
+
+    // 为“返回大厅”按钮绑定事件
+    const backBtn = document.getElementById('back-to-hall-from-undercover-btn');
+    const newBackBtn = backBtn.cloneNode(true);
+    backBtn.parentNode.replaceChild(newBackBtn, backBtn);
+    newBackBtn.onclick = () => {
+      modal.classList.remove('visible');
+      showScreen('game-hall-screen');
+    };
+
+    // --- ▲▲▲ 修改结束 ▲▲▲ ---
+
+    modal.classList.add('visible');
+  }
+
+  // ▲▲▲ “谁是卧底”核心逻辑代码结束 ▲▲▲
+  /**
+   * 【全新】调用AI为“谁是卧底”游戏生成一组词语
+   * @returns {Promise<object>} - 返回一个包含 { civilian: '平民词', undercover: '卧底词' } 的对象
+   */
+  async function generateUndercoverWordsAI() {
+    await showCustomAlert('请稍候...', 'AI正在为你出题...');
+    const { proxyUrl, apiKey, model } = state.apiConfig;
+    if (!proxyUrl || !apiKey || !model) {
+      throw new Error('API未配置，无法生成词语。');
+    }
+
+    const prompt = `
+# 任务
+你是一个“谁是卧底”游戏出题人。请生成一组有趣且有迷惑性的词语。
+
+# 规则
+1.  你必须生成两个词语：一个“平民词(civilianWord)”和一个“卧底词(undercoverWord)”。
+2.  这两个词语必须属于同一大类，但具体指向不同。例如：牛奶 vs 豆浆，唇膏 vs 口红。
+3.  词语必须是常见的2-4个字的中文名词。
+4.  你的回复【必须且只能】是一个严格的JSON对象，格式如下:
+    {"civilianWord": "...", "undercoverWord": "..."}
+5.  【绝对禁止】返回任何JSON以外的文本、解释或分析。
+
+现在，请出题。`;
+
+    try {
+      const messagesForApi = [{ role: 'user', content: prompt }];
+      let isGemini = proxyUrl === GEMINI_API_URL;
+      let geminiConfig = toGeminiRequestData(model, apiKey, prompt, messagesForApi, isGemini);
+
+      const response = isGemini
+        ? await fetch(geminiConfig.url, geminiConfig.data)
+        : await fetch(`${proxyUrl}/v1/chat/completions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+            body: JSON.stringify({
+              model: model,
+              messages: messagesForApi,
+              temperature: parseFloat(state.apiConfig.temperature) || 0.8,

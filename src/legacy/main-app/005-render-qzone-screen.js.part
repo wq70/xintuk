@@ -1,0 +1,804 @@
+          // 统一管理所有UI元素的显隐
+          if (viewId === "messages-view") {
+            mainHeader.style.display = "flex";
+            mainBottomNav.style.display = "flex";
+          } else {
+            mainHeader.style.display = "none";
+            mainBottomNav.style.display = "none";
+          }
+
+          if (viewId !== "memories-view") {
+            activeCountdownTimers.forEach((timerId) => clearInterval(timerId));
+            activeCountdownTimers = [];
+          }
+
+          // 根据视图ID执行特定的渲染/更新逻辑
+          switch (viewId) {
+            case "qzone-screen":
+              views["qzone-screen"].style.backgroundColor = "#f0f2f5";
+              updateUnreadIndicator(0);
+              renderQzoneScreen();
+              renderQzonePosts();
+              break;
+            case "favorites-view":
+              views["favorites-view"].style.backgroundColor = "#f9f9f9";
+              renderFavoritesScreen();
+              break;
+            case "messages-view":
+              // 如果需要，可以在这里添加返回消息列表时要执行的逻辑
+              break;
+          }
+        }
+
+        function renderQzoneScreen() {
+          if (state && state.qzoneSettings) {
+            const settings = state.qzoneSettings;
+            document.getElementById("qzone-nickname").textContent =
+              settings.nickname;
+            document.getElementById("qzone-avatar-img").src = settings.avatar;
+            document.getElementById("qzone-banner-img").src = settings.banner;
+          }
+        }
+        window.renderQzoneScreenProxy = renderQzoneScreen;
+
+        async function saveQzoneSettings() {
+          if (db && state.qzoneSettings) {
+            await db.qzoneSettings.put(state.qzoneSettings);
+          }
+        }
+
+        function formatPostTimestamp(timestamp) {
+          if (!timestamp) return "";
+          const now = new Date();
+          const date = new Date(timestamp);
+          const diffSeconds = Math.floor((now - date) / 1000);
+          const diffMinutes = Math.floor(diffSeconds / 60);
+          const diffHours = Math.floor(diffMinutes / 60);
+          if (diffMinutes < 1) return "刚刚";
+          if (diffMinutes < 60) return `${diffMinutes}分钟前`;
+          if (diffHours < 24) return `${diffHours}小时前`;
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, "0");
+          const day = String(date.getDate()).padStart(2, "0");
+          const hours = String(date.getHours()).padStart(2, "0");
+          const minutes = String(date.getMinutes()).padStart(2, "0");
+          if (now.getFullYear() === year) {
+            return `${month}-${day} ${hours}:${minutes}`;
+          } else {
+            return `${year}-${month}-${day} ${hours}:${minutes}`;
+          }
+        }
+
+        async function renderQzonePosts() {
+          const postsListEl = document.getElementById("qzone-posts-list");
+          if (!postsListEl) return;
+
+          const [posts, favorites] = await Promise.all([
+            db.qzonePosts.orderBy("timestamp").reverse().toArray(),
+            db.favorites.where("type").equals("qzone_post").toArray(),
+          ]);
+
+          const favoritedPostIds = new Set(
+            favorites.map((fav) => fav.content.id),
+          );
+
+          postsListEl.innerHTML = "";
+
+          if (posts.length === 0) {
+            postsListEl.innerHTML =
+              '<p style="text-align:center; color: var(--text-secondary); padding: 30px 0;">这里空空如也，快来发布第一条说说吧！</p>';
+            return;
+          }
+
+          const userSettings = state.qzoneSettings;
+
+          // 1. 在渲染所有帖子之前，我们先创建一个包含所有AI角色名字的集合(Set)，方便快速查找。
+          const allAiCharacterNames = new Set(
+            Object.values(state.chats)
+              .filter((chat) => !chat.isGroup)
+              .map((chat) => chat.name),
+          );
+
+          posts.forEach((post) => {
+            const postContainer = document.createElement("div");
+            postContainer.className = "qzone-post-container";
+            postContainer.dataset.postId = post.id;
+
+            const postEl = document.createElement("div");
+            postEl.className = "qzone-post-item";
+
+            let authorAvatar = "",
+              authorNickname = "",
+              commentAvatar = userSettings.avatar;
+
+            if (post.authorId === "user") {
+              authorAvatar = userSettings.avatar;
+              authorNickname = userSettings.nickname;
+            } else if (state.chats[post.authorId]) {
+              const authorChat = state.chats[post.authorId];
+              authorAvatar = authorChat.settings.aiAvatar || defaultAvatar;
+              authorNickname = authorChat.name;
+            } else {
+              authorAvatar = defaultAvatar;
+              authorNickname = "{{char}}";
+            }
+
+            let contentHtml = "";
+            const publicTextHtml = post.publicText
+              ? `<div class="post-content">${post.publicText.replace(/\n/g, "<br>")}</div>`
+              : "";
+
+            if (post.type === "shuoshuo") {
+              contentHtml = `<div class="post-content" style="margin-bottom: 10px;">${post.content.replace(
+                /\n/g,
+                "<br>",
+              )}</div>`;
+            } else if (post.type === "image_post" && post.imageUrl) {
+              contentHtml = publicTextHtml
+                ? `${publicTextHtml}<div style="margin-top:10px;"><img src="${post.imageUrl}" class="chat-image"></div>`
+                : `<img src="${post.imageUrl}" class="chat-image">`;
+            } else if (post.type === "text_image") {
+              contentHtml = publicTextHtml
+                ? `${publicTextHtml}<div style="margin-top:10px;"><img src="https://i.postimg.cc/KYr2qRCK/1.jpg" class="chat-image" style="cursor: pointer;" data-hidden-text="${post.hiddenContent}"></div>`
+                : `<img src="https://i.postimg.cc/KYr2qRCK/1.jpg" class="chat-image" style="cursor: pointer;" data-hidden-text="${post.hiddenContent}">`;
+            } else if (post.type === "realimag") {
+              // RealImag真实图片动态渲染（支持多图布局）
+              const imageUrls =
+                post.imageUrls || (post.imageUrl ? [post.imageUrl] : []);
+
+              if (imageUrls.length > 0) {
+                const imageCount = imageUrls.length;
+                let imagesHtml = "";
+
+                // 使用统一的多图布局（包括单张图片）
+                imagesHtml = `<div class="post-images-grid grid-${imageCount}">`;
+                imageUrls.forEach((url, index) => {
+                  imagesHtml += `<img src="${url}" class="realimag-image" alt="图片${
+                    index + 1
+                  }" loading="lazy" onerror="this.src='https://i.postimg.cc/KYr2qRCK/1.jpg'; this.alt='图片加载失败';">`;
+                });
+                imagesHtml += "</div>";
+
+                contentHtml = publicTextHtml
+                  ? `${publicTextHtml}${imagesHtml}`
+                  : imagesHtml;
+              }
+            } else if (post.type === "naiimag") {
+              // NovelAI图片动态渲染（支持多图布局，最多2张）
+              const imageUrls =
+                post.imageUrls || (post.imageUrl ? [post.imageUrl] : []);
+
+              if (imageUrls.length > 0) {
+                const imageCount = imageUrls.length;
+                let imagesHtml = "";
+
+                // 使用统一的多图布局（包括单张图片）
+                imagesHtml = `<div class="post-images-grid grid-${imageCount}">`;
+                imageUrls.forEach((url, index) => {
+                  imagesHtml += `<img src="${url}" class="naiimag-image" alt="图片${
+                    index + 1
+                  }" loading="lazy" onerror="this.src='https://i.postimg.cc/KYr2qRCK/1.jpg'; this.alt='图片加载失败';">`;
+                });
+                imagesHtml += "</div>";
+
+                contentHtml = publicTextHtml
+                  ? `${publicTextHtml}${imagesHtml}`
+                  : imagesHtml;
+              }
+            }
+
+            let likesHtml = "";
+            if (post.likes && post.likes.length > 0) {
+              likesHtml = `<div class="post-likes-section"><svg class="like-icon" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg><span>${post.likes.join(
+                "、",
+              )} 觉得很赞</span></div>`;
+            }
+
+            let commentsHtml = "";
+            if (post.comments && post.comments.length > 0) {
+              // 2. 修改这里的过滤逻辑
+              const commentsToShow =
+                post.areCommentsVisible === false
+                  ? post.comments.filter(
+                      (comment) =>
+                        // 条件1: 评论者是你自己
+                        comment.commenterName === userSettings.nickname ||
+                        // 条件2: 评论者的名字在我们刚才创建的AI角色名字列表里
+                        allAiCharacterNames.has(comment.commenterName),
+                    )
+                  : post.comments; // 如果开关是开的，就显示所有评论
+
+              if (commentsToShow.length > 0) {
+                commentsHtml = '<div class="post-comments-container">';
+                commentsToShow.forEach((comment) => {
+                  const originalIndex = post.comments.indexOf(comment);
+                  let replyHtml = "";
+                  if (comment.replyTo) {
+                    replyHtml = `<span class="reply-text">回复</span> <span class="reply-target-name">${comment.replyTo}</span>`;
+                  }
+                  commentsHtml += `
+                                        <div class="comment-item" data-commenter-name="${comment.commenterName}">
+                                            <span class="commenter-name">${comment.commenterName}</span>${replyHtml}:
+                                            <span class="comment-text"> ${comment.text}</span>
+                                            <span class="comment-delete-btn" data-comment-index="${originalIndex}">×</span>
+                                        </div>`;
+                });
+                commentsHtml += "</div>";
+              }
+            }
+
+            const commentsAndFooterHtml = `
+                            ${commentsHtml}
+                            <div class="post-footer">
+                                <div class="comment-section">
+                                    <img src="${commentAvatar}" class="comment-avatar">
+                                    <input type="text" class="comment-input" placeholder="友善的评论是交流的起点">
+                                    <div class="at-mention-popup"></div>
+                                </div>
+                                <button class="comment-send-btn">发送</button>
+                            </div>
+                        `;
+
+            const userNickname = state.qzoneSettings.nickname;
+            const isLikedByUser =
+              post.likes && post.likes.includes(userNickname);
+            const isFavoritedByUser = favoritedPostIds.has(post.id);
+
+            postEl.innerHTML = `
+                            <div class="post-header"><img src="${authorAvatar}" class="post-avatar"><div class="post-info"><span class="post-nickname">${authorNickname}</span><span class="post-timestamp">${formatPostTimestamp(
+                              post.timestamp,
+                            )}</span></div>
+                                <div class="post-actions-btn">…</div>
+                            </div>
+                            <div class="post-main-content">${contentHtml}</div>
+                            <div class="post-feedback-icons">
+                                <span class="action-icon like ${
+                                  isLikedByUser ? "active" : ""
+                                }"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg></span>
+                                <span class="action-icon favorite ${
+                                  isFavoritedByUser ? "active" : ""
+                                }"><svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg></span>
+                                <span class="action-icon summon-npc" data-post-id="${post.id}" data-author-id="${
+                                  post.authorId
+                                }" title="召唤NPC评论"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></span>
+                                </div>
+                            ${likesHtml}
+                            ${commentsAndFooterHtml}
+                        `;
+
+            const deleteAction = document.createElement("div");
+            deleteAction.className = "qzone-post-delete-action";
+            deleteAction.innerHTML = "<span>删除</span>";
+            postContainer.appendChild(postEl);
+            postContainer.appendChild(deleteAction);
+            const commentSection =
+              postContainer.querySelector(".comment-section");
+            if (commentSection) {
+              commentSection.addEventListener("touchstart", (e) =>
+                e.stopPropagation(),
+              );
+              commentSection.addEventListener("mousedown", (e) =>
+                e.stopPropagation(),
+              );
+            }
+            postsListEl.appendChild(postContainer);
+            const commentInput = postContainer.querySelector(".comment-input");
+            if (commentInput) {
+              const popup = postContainer.querySelector(".at-mention-popup");
+              commentInput.addEventListener("input", () => {
+                const value = commentInput.value;
+                const atMatch = value.match(/@([\p{L}\w]*)$/u);
+                if (atMatch) {
+                  const namesToMention = new Set();
+                  const authorNickname =
+                    postContainer.querySelector(".post-nickname")?.textContent;
+                  if (authorNickname) namesToMention.add(authorNickname);
+                  postContainer
+                    .querySelectorAll(".commenter-name")
+                    .forEach((nameEl) => {
+                      namesToMention.add(nameEl.textContent.replace(":", ""));
+                    });
+                  namesToMention.delete(state.qzoneSettings.nickname);
+                  popup.innerHTML = "";
+                  if (namesToMention.size > 0) {
+                    const searchTerm = atMatch[1];
+                    namesToMention.forEach((name) => {
+                      if (
+                        name.toLowerCase().includes(searchTerm.toLowerCase())
+                      ) {
+                        const item = document.createElement("div");
+                        item.className = "at-mention-item";
+                        item.textContent = name;
+                        item.addEventListener("mousedown", (e) => {
+                          e.preventDefault();
+                          const newText =
+                            value.substring(0, atMatch.index) + `@${name} `;
+                          commentInput.value = newText;
+                          popup.style.display = "none";
+                          commentInput.focus();
+                        });
+                        popup.appendChild(item);
+                      }
+                    });
+                    popup.style.display =
+                      popup.children.length > 0 ? "block" : "none";
+                  } else {
+                    popup.style.display = "none";
+                  }
+                } else {
+                  popup.style.display = "none";
+                }
+              });
+              commentInput.addEventListener("blur", () => {
+                setTimeout(() => {
+                  popup.style.display = "none";
+                }, 200);
+              });
+            }
+          });
+        }
+
+        async function renderFollowingFeed() {
+          const feedListEl = document.getElementById(
+            "weibo-following-feed-list",
+          );
+          if (!feedListEl) return;
+
+          // 1. 从数据库获取所有动态
+          const allPosts = await db.qzonePosts
+            .orderBy("timestamp")
+            .reverse()
+            .toArray();
+
+          // 2. 筛选出作者不是 'user' 的动态
+          const followingPosts = allPosts.filter(
+            (post) => post.authorId !== "user",
+          );
+
+          feedListEl.innerHTML = ""; // 清空旧内容
+
+          if (followingPosts.length === 0) {
+            feedListEl.innerHTML =
+              '<p style="text-align:center; color: var(--text-secondary); padding: 30px 0;">你关注的人还没有发布任何动态哦。</p>';
+            return;
+          }
+
+          // 3. 遍历筛选后的动态，并渲染它们
+          //    【提示】这里创建单个动态HTML的逻辑，可以完全复制 `renderQzonePosts` 函数里的 forEach 循环内部的代码。
+          //    你只需要把目标容器从 `postsListEl` 改为 `feedListEl` 即可。
+          followingPosts.forEach((post) => {});
+        }
+
+        function displayFilteredFavorites(items) {
+          const listEl = document.getElementById("favorites-list");
+          listEl.innerHTML = "";
+
+          if (items.length === 0) {
+            const searchTerm = document.getElementById(
+              "favorites-search-input",
+            ).value;
+            const message = searchTerm
+              ? "未找到相关收藏"
+              : "你的收藏夹是空的，<br>快去动态或聊天中收藏喜欢的内容吧！";
+            listEl.innerHTML = `<p style="text-align:center; color: var(--text-secondary); padding: 50px 0;">${message}</p>`;
+            return;
+          }
+
+          for (const item of items) {
+            const card = document.createElement("div");
+            card.className = "favorite-item-card";
+            card.dataset.favid = item.id;
+
+            let headerHtml = "",
+              contentHtml = "",
+              sourceText = "",
+              footerHtml = "";
+
+            if (item.type === "qzone_post") {
+              const post = item.content;
+              sourceText = "来自动态";
+              let authorAvatar = defaultAvatar,
+                authorNickname = "未知用户";
+
+              if (post.authorId === "user") {
+                authorAvatar = state.qzoneSettings.avatar;
+                authorNickname = state.qzoneSettings.nickname;
+              } else if (state.chats[post.authorId]) {
+                authorAvatar = state.chats[post.authorId].settings.aiAvatar;
+                authorNickname = state.chats[post.authorId].name;
+              }
+
+              headerHtml = `<img src="${authorAvatar}" class="avatar"><div class="info"><div class="name">${authorNickname}</div></div>`;
+
+              const publicTextHtml = post.publicText
+                ? `<div class="post-content">${post.publicText.replace(/\n/g, "<br>")}</div>`
+                : "";
+              if (post.type === "shuoshuo") {
+                contentHtml = `<div class="post-content">${post.content.replace(/\n/g, "<br>")}</div>`;
+              } else if (post.type === "image_post" && post.imageUrl) {
+                contentHtml = publicTextHtml
+                  ? `${publicTextHtml}<div style="margin-top:10px;"><img src="${post.imageUrl}" class="chat-image"></div>`
+                  : `<img src="${post.imageUrl}" class="chat-image">`;
+              } else if (post.type === "text_image") {
+                contentHtml = publicTextHtml
+                  ? `${publicTextHtml}<div style="margin-top:10px;"><img src="https://i.postimg.cc/KYr2qRCK/1.jpg" class="chat-image" style="cursor: pointer;" data-hidden-text="${post.hiddenContent}"></div>`
+                  : `<img src="https://i.postimg.cc/KYr2qRCK/1.jpg" class="chat-image" style="cursor: pointer;" data-hidden-text="${post.hiddenContent}">`;
+              } else if (post.type === "realimag") {
+                // RealImag真实图片动态渲染（支持多图布局）
+                const imageUrls =
+                  post.imageUrls || (post.imageUrl ? [post.imageUrl] : []);
+
+                if (imageUrls.length > 0) {
+                  const imageCount = imageUrls.length;
+                  let imagesHtml = "";
+
+                  // 使用统一的多图布局（包括单张图片）
+                  imagesHtml = `<div class="post-images-grid grid-${imageCount}">`;
+                  imageUrls.forEach((url, index) => {
+                    imagesHtml += `<img src="${url}" class="realimag-image" alt="图片${
+                      index + 1
+                    }" loading="lazy" onerror="this.src='https://i.postimg.cc/KYr2qRCK/1.jpg'; this.alt='图片加载失败';">`;
+                  });
+                  imagesHtml += "</div>";
+
+                  contentHtml = publicTextHtml
+                    ? `${publicTextHtml}${imagesHtml}`
+                    : imagesHtml;
+                }
+              } else if (post.type === "naiimag") {
+                // NovelAI图片动态渲染（支持多图布局，最多2张）
+                const imageUrls =
+                  post.imageUrls || (post.imageUrl ? [post.imageUrl] : []);
+
+                if (imageUrls.length > 0) {
+                  const imageCount = imageUrls.length;
+                  let imagesHtml = "";
+
+                  // 使用统一的多图布局（包括单张图片）
+                  imagesHtml = `<div class="post-images-grid grid-${imageCount}">`;
+                  imageUrls.forEach((url, index) => {
+                    imagesHtml += `<img src="${url}" class="naiimag-image" alt="图片${
+                      index + 1
+                    }" loading="lazy" onerror="this.src='https://i.postimg.cc/KYr2qRCK/1.jpg'; this.alt='图片加载失败';">`;
+                  });
+                  imagesHtml += "</div>";
+
+                  contentHtml = publicTextHtml
+                    ? `${publicTextHtml}${imagesHtml}`
+                    : imagesHtml;
+                }
+              }
+
+              // 1. 构造点赞区域的HTML
+              let likesHtml = "";
+              // 检查 post 对象中是否存在 likes 数组并且不为空
+              if (post.likes && post.likes.length > 0) {
+                // 如果存在，就创建点赞区域的 div
+                likesHtml = `
+			                    <div class="post-likes-section">
+			                        <svg class="like-icon" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+			                        <span>${post.likes.join("、")} 觉得很赞</span>
+			                    </div>`;
+              }
+
+              // 2. 构造评论区域的HTML
+              let commentsHtml = "";
+              // 检查 post 对象中是否存在 comments 数组并且不为空
+              if (post.comments && post.comments.length > 0) {
+                // 如果存在，就创建评论容器，并遍历每一条评论
+                commentsHtml = '<div class="post-comments-container">';
+                post.comments.forEach((comment) => {
+                  commentsHtml += `
+			                        <div class="comment-item">
+			                            <span class="commenter-name">${comment.commenterName}:</span>
+			                            <span class="comment-text">${comment.text}</span>
+			                        </div>`;
+                });
+                commentsHtml += "</div>";
+              }
+
+              // 3. 将点赞和评论的HTML组合到 footerHtml 中
+              footerHtml = `${likesHtml}${commentsHtml}`;
+            } else if (item.type === "chat_message") {
+              const msg = item.content;
+              const chat = state.chats[item.chatId];
+              if (!chat) continue;
+
+              sourceText = `来自与 ${chat.name} 的聊天`;
+              const isUser = msg.role === "user";
+              let senderName, senderAvatar;
+
+              if (isUser) {
+                // 用户消息的逻辑保持不变
+                senderName = chat.isGroup
+                  ? chat.settings.myNickname || "我"
+                  : "我";
+                senderAvatar =
+                  chat.settings.myAvatar ||
+                  (chat.isGroup ? defaultMyGroupAvatar : defaultAvatar);
+                //...
+              } else {
+                // AI/成员消息
+                if (chat.isGroup) {
+                  const member = chat.members.find(
+                    (m) => m.originalName === msg.senderName,
+                  );
+
+                  // 如果找到了成员信息，就用他的“群昵称”；如果没找到（比如成员被踢了），就还是用消息里的名字作为备用。
+                  senderDisplayName = member
+                    ? member.groupNickname
+                    : msg.senderName || "未知成员";
+
+                  senderAvatar = member
+                    ? member.avatar
+                    : defaultGroupMemberAvatar;
+                } else {
+                  // 单聊的逻辑保持不变
+                  senderName = chat.name;
+                  senderAvatar = chat.settings.aiAvatar || defaultAvatar;
+                }
+              }
+
+              // 后续拼接 headerHtml 和 contentHtml 的逻辑都保持不变
+              headerHtml = `<img src="${senderAvatar}" class="avatar"><div class="info"><div class="name">${senderName}</div></div>`;
+
+              if (
+                typeof msg.content === "string" &&
+                STICKER_REGEX.test(msg.content)
+              ) {
+                contentHtml = `<img src="${msg.content}" class="sticker-image" style="max-width: 80px; max-height: 80px;">`;
+              } else if (
+                Array.isArray(msg.content) &&
+                msg.content[0]?.type === "image_url"
+              ) {
+                contentHtml = `<img src="${msg.content[0].image_url.url}" class="chat-image">`;
+              } else {
+                const messageText = String(msg.content || "");
+                // 侦测格式：[sticker:名字]
+                const stickerMatch = messageText.match(
+                  /\[sticker:\s*(.+?)\s*\]/i,
+                );
+
+                if (stickerMatch) {
+                  // 如果匹配成功，提取出名字
+                  const stickerName = stickerMatch[1].trim();
+                  // 在所有可能的表情库里查找（用户的、角色的专属、角色的通用）
+                  const allStickers = [
+                    ...state.userStickers,
+                    ...state.charStickers,
+                    ...(chat.settings.stickerLibrary || []),
+                  ];
+                  const foundSticker = allStickers.find(
+                    (s) => s.name === stickerName,
+                  );
+
+                  if (foundSticker) {
+                    // 如果找到了，就显示图片！
+                    bubble.classList.add("is-sticker");
+                    contentHtml = `<img src="${foundSticker.url}" alt="${foundSticker.name}" class="sticker-image">`;
+                  } else {
+                    // 如果没找到（比如AI自己编了个名字），就还是按普通文字显示
+                    contentHtml = messageText.replace(/\n/g, "<br>");
+                  }
+                } else {
+                  // 如果不匹配，就是普通的文本消息
+                  contentHtml = messageText.replace(/\n/g, "<br>");
+                }
+              }
+            }
+
+            card.innerHTML = `
+			            <div class="fav-card-header">${headerHtml}<div class="source">${sourceText}</div></div>
+			            <div class="fav-card-content">${contentHtml}</div>
+			            ${footerHtml}`;
+
+            listEl.appendChild(card);
+          }
+        }
+
+        /**
+         * 负责准备数据并触发渲染
+         */
+        async function renderFavoritesScreen() {
+          // 1. 从数据库获取最新数据并缓存
+          allFavoriteItems = await db.favorites
+            .orderBy("timestamp")
+            .reverse()
+            .toArray();
+
+          // 2. 清空搜索框并隐藏清除按钮
+          const searchInput = document.getElementById("favorites-search-input");
+          const clearBtn = document.getElementById(
+            "favorites-search-clear-btn",
+          );
+          searchInput.value = "";
+          clearBtn.style.display = "none";
+
+          // 3. 显示所有收藏项
+          displayFilteredFavorites(allFavoriteItems);
+        }
+
+        function resetCreatePostModal() {
+          document.getElementById("post-public-text").value = "";
+          document.getElementById("post-image-preview").src = "";
+          document.getElementById("post-image-description").value = "";
+          document
+            .getElementById("post-image-preview-container")
+            .classList.remove("visible");
+          document.getElementById("post-image-desc-group").style.display =
+            "none";
+          document.getElementById("post-local-image-input").value = "";
+          document.getElementById("post-hidden-text").value = "";
+
+          const imageModeBtn = document.getElementById("switch-to-image-mode");
+          const textImageModeBtn = document.getElementById(
+            "switch-to-text-image-mode",
+          );
+          const imageModeContent =
+            document.getElementById("image-mode-content");
+          const textImageModeContent = document.getElementById(
+            "text-image-mode-content",
+          );
+
+          imageModeBtn.classList.add("active");
+          textImageModeBtn.classList.remove("active");
+          imageModeContent.classList.add("active");
+          textImageModeContent.classList.remove("active");
+        }
+
+        async function exportBackup() {
+          try {
+            const backupData = {
+              version: 1,
+              timestamp: Date.now(),
+            };
+
+            const [
+              chats,
+              worldBooks,
+              userStickers,
+              charStickers,
+              apiConfig,
+              globalSettings,
+              personaPresets,
+              musicLibrary,
+              qzoneSettings,
+              qzonePosts,
+              qzoneAlbums,
+              qzonePhotos,
+              favorites,
+              qzoneGroups,
+              memories,
+              worldBookCategories,
+              callRecords,
+              customAvatarFrames,
+              themes,
+              apiPresets,
+              bubbleStylePresets,
+              fontPresets,
+              homeScreenPresets,
+              datingScenes,
+              datingPresets,
+              datingSpriteGroups,
+              datingSprites,
+              datingHistory,
+              pomodoroSessions,
+              ludoQuestionBanks,
+              ludoQuestions,
+              scriptKillScripts,
+              taobaoProducts,
+              taobaoOrders,
+              taobaoCart,
+              userWalletTransactions,
+              userStickerCategories,
+            ] = await Promise.all([
+              db.chats.toArray(),
+              db.worldBooks.toArray(),
+              db.userStickers.toArray(),
+              db.charStickers.toArray(), // <--- 新增的这一行！
+              db.apiConfig.get("main"),
+              db.globalSettings.get("main"),
+              db.personaPresets.toArray(),
+              db.musicLibrary.get("main"),
+              db.qzoneSettings.get("main"),
+              db.qzonePosts.toArray(),
+              db.qzoneAlbums.toArray(),
+              db.qzonePhotos.toArray(),
+              db.favorites.toArray(),
+              db.qzoneGroups.toArray(),
+              db.memories.toArray(),
+              db.worldBookCategories.toArray(),
+              db.callRecords.toArray(),
+              db.customAvatarFrames.toArray(),
+              db.themes.toArray(),
+              db.apiPresets.toArray(),
+              db.bubbleStylePresets.toArray(),
+              db.fontPresets.toArray(),
+              db.homeScreenPresets.toArray(),
+              db.datingScenes.toArray(),
+              db.datingPresets.toArray(),
+              db.datingSpriteGroups.toArray(),
+              db.datingSprites.toArray(),
+              db.datingHistory.toArray(),
+              db.pomodoroSessions.toArray(),
+              db.ludoQuestionBanks.toArray(),
+              db.ludoQuestions.toArray(),
+              db.scriptKillScripts.toArray(),
+              db.taobaoProducts.toArray(),
+              db.taobaoOrders.toArray(),
+              db.taobaoCart.toArray(),
+              db.userWalletTransactions.toArray(),
+              db.userStickerCategories.toArray(),
+            ]);
+
+            Object.assign(backupData, {
+              chats,
+              worldBooks,
+              userStickers,
+              charStickers,
+              apiConfig,
+              globalSettings,
+              personaPresets,
+              musicLibrary,
+              qzoneSettings,
+              qzonePosts,
+              qzoneAlbums,
+              qzonePhotos,
+              favorites,
+              qzoneGroups,
+              memories,
+              worldBookCategories,
+              callRecords,
+              customAvatarFrames,
+              themes,
+              apiPresets,
+              bubbleStylePresets,
+              fontPresets,
+              homeScreenPresets,
+              datingScenes,
+              datingPresets,
+              datingSpriteGroups,
+              datingSprites,
+              datingHistory,
+              pomodoroSessions,
+              ludoQuestionBanks,
+              ludoQuestions,
+              scriptKillScripts,
+              taobaoProducts,
+              taobaoOrders,
+              taobaoCart,
+              userWalletTransactions,
+              userStickerCategories,
+            });
+
+            backupData.homeScreenState = {
+              // --- 1. 个人资料卡 ---
+              "profile-banner-img":
+                document.getElementById("profile-banner-img")?.src || "",
+              "profile-avatar-img":
+                document.getElementById("profile-avatar-img")?.src || "",
+              homeAvatarFrame:
+                document.getElementById("profile-avatar-frame")?.src || "",
+              "profile-username":
+                document.getElementById("profile-username")?.textContent ||
+                "你的昵称",
+              "profile-sub-username":
+                document.getElementById("profile-sub-username")?.textContent ||
+                "@your_id",
+              "profile-bio":
+                document.getElementById("profile-bio")?.textContent ||
+                "点击这里编辑你的个性签名",
+              "profile-location":
+                document.getElementById("profile-location")?.innerHTML || "",
+
+              // --- 2. 第一页小组件 (保持不变) ---
+              "widget-bubble-1":
+                document.getElementById("widget-bubble-1")?.textContent ||
+                "点击编辑文字",
+              "widget-image-1":
+                document.getElementById("widget-image-1")?.src || "",
+              "widget-subtext-1":
+                document.getElementById("widget-subtext-1")?.textContent ||
+                "点击编辑文字",
+              "widget-bubble-2":
+                document.getElementById("widget-bubble-2")?.textContent ||

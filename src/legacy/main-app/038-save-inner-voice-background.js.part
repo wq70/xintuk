@@ -1,0 +1,943 @@
+            document.getElementById("inner-voice-bg-input").click();
+          } else if (choice === "reset") {
+            // 调用保存函数并传入空字符串，表示恢复默认
+            await saveInnerVoiceBackground("");
+          }
+        }
+
+        /**
+         * 保存新的背景图片URL到【当前角色】
+         * @param {string} url - 图片的URL (可以是网络链接或Base64)
+         */
+        async function saveInnerVoiceBackground(url) {
+          if (!state.activeChatId) return;
+          const chat = state.chats[state.activeChatId];
+          if (!chat) return;
+
+          // 1. 将背景URL保存在当前角色的数据中
+          chat.innerVoiceBackground = url;
+
+          // 2. 将更新后的整个 chat 对象保存回数据库
+          await db.chats.put(chat);
+
+          // 3. 立即应用新的背景
+          applyInnerVoiceBackground(url);
+
+          // 4. 给用户一个反馈
+          alert(url ? "当前角色背景已更新！" : "当前角色背景已恢复默认。");
+        }
+
+        /**
+         * 将指定的背景图应用到心声面板上
+         * @param {string} url - 图片的URL
+         */
+        function applyInnerVoiceBackground(url) {
+          const panel = document.getElementById("inner-voice-main-panel");
+          if (!panel) return;
+
+          if (url) {
+            panel.style.backgroundImage = `url(${url})`;
+          } else {
+            // 如果URL为空，就移除背景图，恢复CSS中定义的默认样式
+            panel.style.backgroundImage = "none";
+          }
+        }
+
+        function calculateTokenCount(text) {
+          if (!text) return 0;
+          // 简单估算：如果是中文环境，通常可以直接用字符数作为参考
+          // 或者粗略估算：Token ≈ 字符数
+          // 如果你想显示的数值小一点（更接近GPT的Token），可以乘以 0.7
+          return text.length;
+        }
+
+        /**
+         * 【升级版】获取Token详情 + 异常消息检测
+         * @param {string} chatId - 目标聊天的ID
+         */
+        async function getTokenDetailedBreakdown(chatId) {
+          const chat = state.chats[chatId];
+          if (!chat) return null;
+
+          const settings = chat.settings;
+          const breakdown = [];
+          const outlierThreshold = 300; // 设定阈值：超过300字符被视为"大消息"
+          let outliers = []; // 用于存储异常大的消息
+
+          // ... (前1-4部分保持不变: 人设、世界书、表情包、总结) ...
+          // 1. 核心人设
+          let personaText = chat.isGroup
+            ? `群聊...${chat.members.map((m) => m.persona).join("")}`
+            : (chat.settings.aiPersona || "") + (chat.settings.myPersona || "");
+          breakdown.push({
+            name: "核心人设",
+            count: calculateTokenCount(personaText),
+          });
+
+          // 2. 世界书
+          let wbText = "";
+          if (settings.linkedWorldBookIds) {
+            wbText = settings.linkedWorldBookIds
+              .map((id) => {
+                const b = state.worldBooks.find((wb) => wb.id === id);
+                return b ? b.content : "";
+              })
+              .join("");
+          }
+          breakdown.push({
+            name: "世界书",
+            count: calculateTokenCount(wbText),
+          });
+
+          // 3. 表情包定义
+          let stickerText = "";
+          const allStickers = [
+            ...(settings.stickerLibrary || []),
+            ...(state.charStickers || []),
+          ];
+          if (allStickers.length > 0)
+            stickerText = allStickers.map((s) => s.name).join("");
+          breakdown.push({
+            name: "表情包定义",
+            count: calculateTokenCount(stickerText),
+          });
+
+          // 4. 长期记忆
+          const summaryText = chat.history
+            .filter((m) => m.type === "summary")
+            .map((s) => s.content)
+            .join("");
+          breakdown.push({
+            name: "长期记忆(总结)",
+            count: calculateTokenCount(summaryText),
+          });
+
+          // 5. 短期记忆 (对话) - 【核心修改部分】
+          const history = chat.history.filter((msg) => !msg.isHidden);
+          const memoryDepth = settings.maxMemory || 10;
+          const contextMessages = history.slice(-memoryDepth);
+
+          let userMsgLen = 0;
+          let aiMsgLen = 0;
+
+          contextMessages.forEach((msg) => {
+            let content =
+              typeof msg.content === "string"
+                ? msg.content
+                : JSON.stringify(msg.content);
+            let len = calculateTokenCount(content);
+
+            // --- 异常检测逻辑 ---
+            if (len > outlierThreshold) {
+              outliers.push({
+                role: msg.role,
+                preview: content.substring(0, 15) + "...", // 预览前15个字
+                count: len,
+                timestamp: msg.timestamp, // 用于跳转
+              });
+            }
+            // ------------------
+
+            if (msg.role === "user") userMsgLen += len;
+            else aiMsgLen += len;
+          });
+
+          // 对异常消息按大小排序 (最大的在前面)
+          outliers.sort((a, b) => b.count - a.count);
+
+          breakdown.push({ name: "短期记忆(用户)", count: userMsgLen });
+          breakdown.push({ name: "短期记忆(AI)", count: aiMsgLen });
+          breakdown.push({ name: "系统格式指令", count: 800 });
+
+          // 返回数据增加了 outliers 字段
+          return { items: breakdown, outliers: outliers };
+        }
+
+        /**
+         * 为Token计算准备完整的上下文和提示词
+         * @param {string} chatId - 目标聊天的ID
+         * @returns {Promise<string>} - 拼接好的、将要发送给AI的完整文本
+         */
+        async function getContextForTokenCalculation(chatId) {
+          const chat = state.chats[chatId];
+          if (!chat) return "";
+
+          let combinedText = "";
+          const settings = chat.settings;
+
+          // 1. 添加核心提示词 (人设)
+          if (chat.isGroup) {
+            const membersList = chat.members
+              .map((m) => `- **${m.originalName}**: ${m.persona}`)
+              .join("\n");
+            const myNickname = chat.settings.myNickname || "我";
+            combinedText += `你是一个群聊AI... # 群成员列表及人设\n${membersList}\n# 用户的角色\n- **${myNickname}**: ${chat.settings.myPersona}`;
+          } else {
+            combinedText += chat.settings.aiPersona || "";
+            combinedText += chat.settings.myPersona || "";
+          }
+
+          // 2. 添加世界书内容
+          if (
+            settings.linkedWorldBookIds &&
+            settings.linkedWorldBookIds.length > 0
+          ) {
+            const linkedContents = settings.linkedWorldBookIds
+              .map((bookId) => {
+                const worldBook = state.worldBooks.find(
+                  (wb) => wb.id === bookId,
+                );
+                return worldBook ? worldBook.content : "";
+              })
+              .join("\n");
+            combinedText += linkedContents;
+          }
+
+          // 3. 添加所有总结作为长期记忆
+          const summaryContext = chat.history
+            .filter((msg) => msg.type === "summary")
+            .map((s) => s.content)
+            .join("\n");
+          combinedText += summaryContext;
+
+          // 4. 添加最近的对话记录 (上下文记忆)
+          const history = chat.history.filter((msg) => !msg.isHidden);
+          const memoryDepth = settings.maxMemory || 10;
+          const contextMessages = history.slice(-memoryDepth);
+
+          const messageText = contextMessages
+            .map((msg) => {
+              let content = "";
+              if (typeof msg.content === "string") {
+                content = msg.content;
+              } else if (Array.isArray(msg.content)) {
+                content = "[图片]"; // 将图片简化为占位符
+              } else if (msg.type) {
+                content = `[${msg.type}]`;
+              }
+              const sender =
+                msg.role === "user" ? "用户" : msg.senderName || chat.name;
+              return `${sender}: ${content}`;
+            })
+            .join("\n");
+
+          combinedText += "\n" + messageText;
+
+          return combinedText;
+        }
+        /**
+         * 清理所有与已删除角色关联的失效数据
+         */
+        async function clearOrphanedData() {
+          // 1. 在执行敏感操作前，先弹窗向用户确认
+          const confirmed = await showCustomConfirm(
+            "确认清理",
+            "此操作将扫描并删除所有与【已不存在的角色】关联的数据（如动态、微博、回忆、通话记录等），释放存储空间。\n\n此操作不可撤销，确定要继续吗？",
+            { confirmButtonClass: "btn-danger" }, // 使用醒目的红色按钮
+          );
+
+          // 如果用户点了“取消”，则直接退出
+          if (!confirmed) return;
+
+          // 显示一个“处理中”的提示，避免用户以为程序卡死
+          await showCustomAlert("请稍候...", "正在扫描并清理失效数据...");
+
+          try {
+            let totalDeletedCount = 0;
+
+            // 2. 获取所有仍然存在的、有效的角色ID列表
+            const validChatIds = new Set(
+              (await db.chats.toArray()).map((c) => c.id),
+            );
+            validChatIds.add("user"); // 'user' (即“我”) 永远是有效的作者
+
+            // 3. 定义我们需要检查的数据库表和它们用来关联角色ID的字段名
+            const tablesToCheck = [
+              { name: "qzonePosts", idField: "authorId", typeName: "动态" },
+              { name: "weiboPosts", idField: "authorId", typeName: "微博" },
+              { name: "memories", idField: "chatId", typeName: "回忆/约定" },
+              { name: "callRecords", idField: "chatId", typeName: "通话记录" },
+            ];
+
+            // 4. 遍历每一个需要检查的表
+            for (const tableInfo of tablesToCheck) {
+              const table = db[tableInfo.name];
+              const allItems = await table.toArray();
+
+              // 找出所有作者ID已经不存在的“孤儿”数据
+              const idsToDelete = allItems
+                .filter((item) => !validChatIds.has(item[tableInfo.idField]))
+                .map((item) => item.id);
+
+              // 如果找到了需要删除的数据
+              if (idsToDelete.length > 0) {
+                await table.bulkDelete(idsToDelete); // 批量删除，效率更高
+                console.log(
+                  `从 ${tableInfo.name} 表中清除了 ${idsToDelete.length} 条失效数据。`,
+                );
+                totalDeletedCount += idsToDelete.length;
+              }
+            }
+
+            // 5. 根据清理结果，给用户最终的反馈
+            if (totalDeletedCount > 0) {
+              await showCustomAlert(
+                "清理完成",
+                `已成功清理 ${totalDeletedCount} 条失效数据！`,
+              );
+            } else {
+              await showCustomAlert("扫描完成", "未发现任何可清理的失效数据。");
+            }
+          } catch (error) {
+            console.error("清理失效数据时出错:", error);
+            await showCustomAlert(
+              "操作失败",
+              `清理过程中发生错误: ${error.message}`,
+            );
+          }
+        }
+
+        /**
+         * 处理取消情侣空间
+         */
+        async function handleCancelLoversSpace() {
+          if (!activeLoversSpaceCharId) return;
+          const confirmed = await showCustomConfirm(
+            "取消情侣空间",
+            "确定要取消情侣空间吗？这会使空间变为未启用状态，但所有数据（说说、照片等）都会被保留。此操作不会通知对方。",
+            { confirmButtonClass: "btn-danger" },
+          );
+
+          if (confirmed) {
+            const chat = state.chats[activeLoversSpaceCharId];
+            if (chat && chat.loversSpaceData) {
+              // 将情侣空间数据设置为null，即可禁用它
+              chat.loversSpaceData = null;
+              await db.chats.put(chat);
+              document
+                .getElementById("ls-settings-modal")
+                .classList.remove("visible");
+              alert("情侣空间已取消。");
+              // 返回到聊天列表主屏幕
+              showScreen("chat-list-screen");
+            }
+          }
+        }
+
+        /**
+         * 处理解除情侣关系
+         */
+        async function handleDisconnectLoversSpace() {
+          if (!activeLoversSpaceCharId) return;
+          const chat = state.chats[activeLoversSpaceCharId];
+          if (!chat) return;
+
+          const confirmed = await showCustomConfirm(
+            "解除关系",
+            `确定要与“${chat.name}”解除关系吗？情侣空间将被取消，并且对方会收到通知并对此发表意见。`,
+            { confirmButtonClass: "btn-danger" },
+          );
+
+          if (confirmed) {
+            // 1. 禁用空间
+            chat.loversSpaceData = null;
+
+            // 2. 创建您发出的、在右侧的“解除卡片”
+            const userDisconnectCardMessage = {
+              role: "user",
+              type: "lovers_space_disconnect", // 一个新类型，用于渲染卡片
+              content: `情侣空间已解除`, // 卡片底层可编辑的文字
+              timestamp: Date.now(),
+            };
+            chat.history.push(userDisconnectCardMessage);
+
+            // 3. 创建居中的、灰色的“系统通知”
+            const systemNotification = {
+              role: "system",
+              type: "pat_message", // 复用“拍一拍”的居中灰色气泡样式
+              content: `你和 ${chat.name} 的情侣空间已解除`,
+              timestamp: Date.now() + 1, // 时间戳+1确保在卡片之后
+            };
+            chat.history.push(systemNotification);
+
+            // 4. 给AI看的隐藏指令
+            const hiddenMessageForAI = {
+              role: "system",
+              content: `[系统指令：用户刚刚解除了与你的情侣关系。]`,
+              timestamp: Date.now() + 2, // 时间戳再+1
+              isHidden: true,
+            };
+            chat.history.push(hiddenMessageForAI);
+
+            // 5. 保存、关闭弹窗、跳转、触发回应
+            await db.chats.put(chat);
+            document
+              .getElementById("ls-settings-modal")
+              .classList.remove("visible");
+            document
+              .getElementById("lovers-space-screen")
+              .classList.remove("visible");
+
+            openChat(activeLoversSpaceCharId);
+
+            alert("关系已解除，对方已知晓。");
+            triggerAiResponse();
+          }
+        }
+
+        /**
+         * 打开手动总结的模式选择弹窗
+         */
+        async function openManualSummaryOptions() {
+          const choice = await showChoiceModal("手动总结", [
+            { text: "总结最新内容", value: "latest" },
+            { text: "总结指定范围", value: "range" },
+          ]);
+
+          if (choice === "latest") {
+            // 用户选择总结最新，调用主函数并传入'latest'模式
+            await triggerManualSummaryNow("latest");
+          } else if (choice === "range") {
+            // 用户选择总结范围，调用范围输入函数
+            await promptForSummaryRange();
+          }
+        }
+
+        /**
+         * 提示用户输入要总结的消息范围
+         */
+        async function promptForSummaryRange() {
+          const chat = state.chats[state.activeChatId];
+          if (!chat) return;
+
+          const totalMessages = chat.history.length;
+          if (totalMessages === 0) {
+            alert("聊天记录为空，无法进行总结。");
+            return;
+          }
+
+          // 弹出输入框，让用户输入开始序号
+          const startStr = await showCustomPrompt(
+            "指定范围",
+            `请输入开始的消息序号 (1 - ${totalMessages})`,
+            "1",
+            "number",
+          );
+          if (startStr === null) return; // 用户点击了取消
+
+          const startNum = parseInt(startStr);
+          if (isNaN(startNum) || startNum < 1 || startNum > totalMessages) {
+            alert("请输入有效的开始序号。");
+            return;
+          }
+
+          // 弹出输入框，让用户输入结束序号
+          const endStr = await showCustomPrompt(
+            "指定范围",
+            `请输入结束的消息序号 (${startNum} - ${totalMessages})`,
+            totalMessages,
+            "number",
+          );
+          if (endStr === null) return; // 用户点击了取消
+
+          const endNum = parseInt(endStr);
+          if (isNaN(endNum) || endNum < startNum || endNum > totalMessages) {
+            alert("请输入有效的结束序号。");
+            return;
+          }
+
+          // 调用主函数并传入'range'模式和具体的范围
+          await triggerManualSummaryNow("range", {
+            start: startNum,
+            end: endNum,
+          });
+        }
+
+        /**
+         * 将时间字符串（如 "20:00", "早上9点"）解析为分钟数
+         * @param {string} timeStr - 时间字符串
+         * @returns {number} - 从午夜0点开始的分钟数
+         */
+        function parseTime(timeStr) {
+          if (!timeStr || typeof timeStr !== "string") return -1; // 错误或无效输入返回-1
+
+          let hours = 0;
+          let minutes = 0;
+
+          // 匹配 "HH:mm" 或 "H:mm" 格式
+          const match = timeStr.match(/(\d{1,2}):(\d{2})/);
+          if (match) {
+            hours = parseInt(match[1], 10);
+            minutes = parseInt(match[2], 10);
+          } else {
+            // 如果不是标准格式，尝试匹配中文描述
+            const numMatch = timeStr.match(/(\d+)/);
+            const num = numMatch ? parseInt(numMatch[0], 10) : -1;
+
+            if (num !== -1) {
+              if (timeStr.includes("下午") || timeStr.includes("晚上")) {
+                // 下午1点(13点)到晚上11点(23点)
+                if (num < 12) {
+                  hours = num + 12;
+                } else {
+                  hours = num; // 如果已经是24小时制如“晚上20点”，直接使用
+                }
+              } else {
+                // 早上或上午
+                hours = num;
+              }
+            } else {
+              return -1; // 无法解析
+            }
+          }
+
+          // 处理特殊情况，如晚上12点应为0点
+          if (
+            (timeStr.includes("晚上") || timeStr.includes("凌晨")) &&
+            hours === 12
+          ) {
+            hours = 0;
+          }
+          // 处理下午12点应为12点
+          if (
+            (timeStr.includes("下午") || timeStr.includes("中午")) &&
+            hours === 24
+          ) {
+            hours = 12;
+          }
+
+          return hours * 60 + minutes;
+        }
+        /**
+         * 检查并更新火花天数 (已修复熄灭后从1开始的问题)
+         * @param {string} chatId - 要更新火花的聊天ID
+         * @returns {Promise<boolean>} - 如果火花天数有变化，则返回true
+         */
+        async function updateStreak(chatId) {
+          const chat = state.chats[chatId];
+          // 如果不是单聊，或者功能未开启，直接返回
+          if (!chat || chat.isGroup || !chat.settings.streak?.enabled) {
+            return false;
+          }
+
+          const streak = chat.settings.streak;
+          const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD格式
+
+          // 如果今天已经互动过了，就什么都不做
+          if (streak.lastInteractionDate === today) {
+            return false;
+          }
+
+          let changed = false;
+
+          // 检查火花是否已熄灭
+          if (streak.lastInteractionDate && streak.extinguishThreshold !== -1) {
+            const lastDate = new Date(streak.lastInteractionDate);
+            const todayDate = new Date(today);
+            // 为了精确计算天数差异，我们将两个日期都设置为UTC时间的午夜
+            const lastDateUTC = Date.UTC(
+              lastDate.getFullYear(),
+              lastDate.getMonth(),
+              lastDate.getDate(),
+            );
+            const todayDateUTC = Date.UTC(
+              todayDate.getFullYear(),
+              todayDate.getMonth(),
+              todayDate.getDate(),
+            );
+
+            const daysDiff =
+              (todayDateUTC - lastDateUTC) / (1000 * 60 * 60 * 24);
+
+            if (daysDiff >= streak.extinguishThreshold) {
+              // 如果断联天数达到了你设置的阈值，就将当前火花天数归零。
+              streak.currentDays = 0;
+              console.log(
+                `🔥 与 ${chat.name} 的火花因超过 ${streak.extinguishThreshold} 天未联系而熄灭，将重新从 1 开始计算。`,
+              );
+              changed = true;
+            }
+          }
+
+          // 今天是新的互动日，天数+1
+          // 如果是永不熄灭模式，currentDays 为 -1, 不应该增加
+          if (streak.currentDays >= 0) {
+            streak.currentDays++;
+            changed = true;
+          }
+
+          // 无论火花是否熄灭，只要今天互动了，就把“最后互动日期”更新为今天。
+          streak.lastInteractionDate = today;
+
+          await db.chats.put(chat);
+
+          if (changed) {
+            console.log(
+              `🔥 与 ${chat.name} 的火花天数更新为: ${streak.currentDays}`,
+            );
+          }
+
+          return changed; // 返回是否发生了变化
+        }
+
+        /**
+         * 处理设置/取消管理员
+         */
+        async function handleToggleAdmin(memberId) {
+          const chat = state.chats[state.activeChatId];
+          // 权限检查：确保操作者是群主
+          if (!chat || chat.ownerId !== "user") {
+            alert("你不是群主，没有权限执行此操作！");
+            return;
+          }
+
+          let targetNickname;
+          let isAdminNow;
+
+          // 1. 判断操作目标是不是用户自己
+          if (memberId === "user") {
+            // 如果是用户，就修改 chat.settings 里的专属标志
+            // 我们使用 isUserAdmin 属性来记录用户是否是管理员
+            chat.settings.isUserAdmin = !chat.settings.isUserAdmin;
+            targetNickname = chat.settings.myNickname || "我";
+            isAdminNow = chat.settings.isUserAdmin;
+          } else {
+            // 如果是其他成员，保持原有逻辑不变
+            const member = chat.members.find((m) => m.id === memberId);
+            if (!member) return;
+
+            // 不能将群主设为管理员或取消其管理员身份
+            if (member.id === chat.ownerId) {
+              alert("不能对群主进行此操作。");
+              return;
+            }
+
+            member.isAdmin = !member.isAdmin;
+            targetNickname = member.groupNickname;
+            isAdminNow = member.isAdmin;
+          }
+
+          await db.chats.put(chat);
+
+          // 准备并发送系统通知消息
+          const actionText = isAdminNow ? "设为管理员" : "取消了管理员身份";
+          const myNickname = chat.settings.myNickname || "我";
+          // 这里我们用 logSystemMessage 函数来发送通知，它会自动刷新UI
+          await logSystemMessage(
+            chat.id,
+            `“${myNickname}”将“${targetNickname}”${actionText}。`,
+          );
+
+          // 刷新成员管理列表的显示
+          renderMemberManagementList();
+        }
+
+        /**
+         * 处理设置群成员头衔
+         */
+        async function handleSetMemberTitle(memberId) {
+          const chat = state.chats[state.activeChatId];
+          // 权限检查：群主或管理员才能设置
+          const isOwner = chat.ownerId === "user";
+          const isAdmin = chat.settings.isUserAdmin;
+
+          if (!chat || (!isOwner && !isAdmin)) {
+            alert("你不是群主或管理员，没有权限执行此操作！");
+            return;
+          }
+
+          let targetNickname;
+          let oldTitle;
+
+          if (memberId === "user") {
+            targetNickname = chat.settings.myNickname || "我";
+            oldTitle = chat.settings.myGroupTitle || "";
+          } else {
+            const member = chat.members.find((m) => m.id === memberId);
+            if (!member) return;
+            targetNickname = member.groupNickname;
+            oldTitle = member.groupTitle || "";
+          }
+
+          const newTitle = await showCustomPrompt(
+            `为“${targetNickname}”设置头衔`,
+            "留空则为取消头衔",
+            oldTitle,
+          );
+
+          if (newTitle !== null) {
+            const trimmedTitle = newTitle.trim();
+
+            if (memberId === "user") {
+              chat.settings.myGroupTitle = trimmedTitle;
+            } else {
+              const member = chat.members.find((m) => m.id === memberId);
+              if (member) member.groupTitle = trimmedTitle;
+            }
+
+            await db.chats.put(chat);
+
+            const myNickname = chat.settings.myNickname || "我";
+            await logTitleChange(
+              chat.id,
+              myNickname,
+              targetNickname,
+              trimmedTitle,
+            );
+
+            renderMemberManagementList();
+          }
+        }
+
+        /**
+         * 处理转让群主 (已添加系统消息通知)
+         */
+        async function handleTransferOwnership(memberId) {
+          const chat = state.chats[state.activeChatId];
+          const newOwner = chat.members.find((m) => m.id === memberId);
+          if (!newOwner) return;
+
+          // 获取旧群主的昵称，也就是你自己的昵称
+          const oldOwnerNickname = chat.settings.myNickname || "我";
+
+          const confirmed = await showCustomConfirm(
+            "转让群主",
+            `你确定要将群主身份转让给“${newOwner.groupNickname}”吗？\n此操作不可撤销，你将失去群主权限。`,
+            { confirmButtonClass: "btn-danger" },
+          );
+
+          if (confirmed) {
+            // 更新群主ID
+            chat.ownerId = newOwner.id;
+
+            // 将新群主设为管理员（如果他之前不是）
+            newOwner.isAdmin = true;
+
+            // 1. 构建系统消息的内容
+            const message = `“${oldOwnerNickname}”已将群主转让给“${newOwner.groupNickname}”`;
+
+            // 2. 调用你已有的函数来发送这条系统消息
+            //    这个函数会自动保存数据并刷新聊天列表，非常方便！
+            await logSystemMessage(chat.id, message);
+
+            // 刷新成员管理列表的显示
+            renderMemberManagementList();
+
+            // 给出成功提示
+            await showCustomAlert(
+              "操作成功",
+              `群主已成功转让给“${newOwner.groupNickname}”。`,
+            );
+          }
+        }
+
+        /**
+         * 发送一条居中显示的系统消息到当前聊天
+         * @param {string} chatId - 目标聊天的ID
+         * @param {string} messageContent - 要显示的消息内容
+         */
+        async function logSystemMessage(chatId, messageContent) {
+          const chat = state.chats[chatId];
+          if (!chat) return;
+
+          // 1. 创建系统消息对象
+          const systemMessage = {
+            role: "system", // 这是一个系统角色的消息
+            type: "pat_message", // 复用“拍一拍”的居中灰色气泡样式
+            content: messageContent,
+            timestamp: Date.now(),
+          };
+
+          // 2. 将消息添加到聊天记录并保存
+          chat.history.push(systemMessage);
+          await db.chats.put(chat);
+
+          // 3. 如果用户正在查看此聊天，则立即显示新消息
+          if (
+            state.activeChatId === chatId &&
+            document
+              .getElementById("chat-interface-screen")
+              .classList.contains("active")
+          ) {
+            appendMessage(systemMessage, chat);
+          }
+
+          // 4. 刷新聊天列表以更新预览
+          await renderChatList();
+
+          console.log(`系统消息已记录: ${messageContent}`);
+        }
+
+        /**
+         * 记录并发送群头衔变更的系统消息
+         * @param {string} chatId - 发生变更的群聊ID
+         * @param {string} actorName - 执行操作的人的昵称
+         * @param {string} targetName - 被修改头衔的人的昵称
+         * @param {string} newTitle - 新的头衔
+         */
+        async function logTitleChange(chatId, actorName, targetName, newTitle) {
+          // 1. 构造消息内容
+          const messageContent = newTitle
+            ? `${actorName} 将“${targetName}”的群头衔修改为“${newTitle}”`
+            : `${actorName} 取消了“${targetName}”的群头衔`;
+
+          // 2. 调用通用的系统消息函数
+          await logSystemMessage(chatId, messageContent);
+        }
+
+        /* 群公告功能核心函数 */
+
+        /**
+         * 打开群公告弹窗并渲染内容
+         */
+        function openGroupAnnouncementModal() {
+          const chat = state.chats[state.activeChatId];
+          if (!chat || !chat.isGroup) return;
+
+          const modal = document.getElementById("group-announcement-modal");
+          const contentArea = document.getElementById(
+            "announcement-content-area",
+          );
+          const footer = document.getElementById("announcement-footer");
+
+          const announcement = chat.settings.groupAnnouncement || "暂无公告";
+          contentArea.innerHTML = announcement.replace(/\n/g, "<br>");
+
+          const canEdit = chat.ownerId === "user" || chat.settings.isUserAdmin;
+
+          footer.innerHTML = "";
+          if (canEdit) {
+            const editBtn = document.createElement("button");
+            editBtn.className = "cancel";
+            editBtn.textContent = "编辑";
+            // 改用 addEventListener 来绑定事件，更安全可靠
+            editBtn.addEventListener("click", editGroupAnnouncement);
+            footer.appendChild(editBtn);
+          }
+
+          const closeBtn = document.createElement("button");
+          closeBtn.className = "save";
+          closeBtn.textContent = "关闭";
+          // 同样改用 addEventListener
+          closeBtn.addEventListener("click", closeGroupAnnouncementModal);
+          footer.appendChild(closeBtn);
+
+          modal.classList.add("visible");
+        }
+
+        /**
+         * 进入公告编辑模式
+         */
+        function editGroupAnnouncement() {
+          const chat = state.chats[state.activeChatId];
+          const contentArea = document.getElementById(
+            "announcement-content-area",
+          );
+          const footer = document.getElementById("announcement-footer");
+
+          const currentContent = chat.settings.groupAnnouncement || "";
+          contentArea.innerHTML = `<textarea id="announcement-editor">${currentContent}</textarea>`;
+
+          // 这里也全部改用 addEventListener 的方式绑定
+          footer.innerHTML = ""; // 先清空
+
+          const cancelBtn = document.createElement("button");
+          cancelBtn.className = "cancel";
+          cancelBtn.textContent = "取消";
+          cancelBtn.addEventListener("click", closeGroupAnnouncementModal); // 直接调用函数
+
+          const saveBtn = document.createElement("button");
+          saveBtn.className = "save";
+          saveBtn.textContent = "保存";
+          saveBtn.addEventListener("click", saveGroupAnnouncement); // 直接调用函数
+
+          footer.appendChild(cancelBtn);
+          footer.appendChild(saveBtn);
+
+          document.getElementById("announcement-editor").focus();
+        }
+
+        /**
+         * 保存新的群公告
+         */
+        async function saveGroupAnnouncement() {
+          const chat = state.chats[state.activeChatId];
+          const newContent = document
+            .getElementById("announcement-editor")
+            .value.trim();
+
+          chat.settings.groupAnnouncement = newContent;
+          await db.chats.put(chat);
+
+          const myNickname = chat.settings.myNickname || "我";
+          await logSystemMessage(chat.id, `“${myNickname}”修改了群公告。`);
+
+          closeGroupAnnouncementModal();
+          alert("群公告已更新！");
+        }
+
+        /**
+         * 关闭群公告弹窗
+         */
+        function closeGroupAnnouncementModal() {
+          // 关闭后，重新渲染一次查看状态，以防用户取消了编辑
+          const modal = document.getElementById("group-announcement-modal");
+          modal.classList.remove("visible");
+          // 延迟一点点再打开，可以避免视觉上的冲突
+          setTimeout(() => {
+            if (modal.classList.contains("visible")) {
+              // 做个检查，万一用户快速操作
+              openGroupAnnouncementModal();
+            }
+          }, 10);
+          // 直接关闭，不再重新打开
+          document
+            .getElementById("group-announcement-modal")
+            .classList.remove("visible");
+        }
+
+        /**
+         * 获取并格式化当前聊天的续火花状态，生成给AI看的上下文
+         * @param {object} chat - 当前的聊天对象
+         * @returns {string} - 格式化后的火花状态文本，或空字符串
+         */
+        async function getStreakContext(chat) {
+          // 1. 安全检查：如果不是单聊，或者功能未开启，则直接返回空内容
+          if (!chat || chat.isGroup || !chat.settings.streak?.enabled) {
+            return "";
+          }
+
+          const streak = chat.settings.streak;
+          const currentDays = streak.currentDays || 0;
+          const extinguishThreshold = streak.extinguishThreshold || 1;
+          const lastInteractionDate = streak.lastInteractionDate;
+          let isExtinguished = false;
+
+          // 2. 判断火花是否已熄灭
+          if (lastInteractionDate && extinguishThreshold !== -1) {
+            const lastDate = new Date(lastInteractionDate);
+            const todayDate = new Date();
+            todayDate.setHours(0, 0, 0, 0); // 将时间设为当日零点，以精确计算天数
+
+            // 计算最后一次互动到今天过了多少天
+            const daysDiff =
+              (todayDate.getTime() - lastDate.getTime()) /
+              (1000 * 60 * 60 * 24);
+
+            if (daysDiff >= extinguishThreshold) {
+              isExtinguished = true;
+            }
+          }
+
+          let statusText = "";
+
+          // 3. 根据不同状态，生成给AI看的不同文本
+          if (isExtinguished && currentDays > 0) {
+            // 这种状态表示“曾经有过火花，但现在断了”
+            statusText = `你们的聊天火花【已熄灭】。之前曾连续聊了 ${currentDays} 天，但现在中断了。`;
+          } else if (currentDays > 10) {
+            statusText = `你们的聊天火花正在热烈燃烧，已经持续了【${currentDays}】天了！这是一个值得纪念的数字。`;
+          } else if (currentDays > 0) {
+            statusText = `你们的聊天火花正在延续，已经持续了【${currentDays}】天。`;
+          } else {
+            // 天数为0，说明是刚开启或刚重置

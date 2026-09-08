@@ -1,0 +1,918 @@
+          const lyricsList = document.getElementById("music-lyrics-list");
+          const container = document.getElementById("music-lyrics-container");
+          const lines = lyricsList.querySelectorAll(".lyric-line");
+          lines.forEach((line) => line.classList.remove("active"));
+          if (state.musicState.currentLyricIndex === -1) {
+            lyricsList.style.transform = `translateY(0px)`;
+            return;
+          }
+          const activeLine = lyricsList.querySelector(
+            `.lyric-line[data-index="${state.musicState.currentLyricIndex}"]`,
+          );
+          if (activeLine) {
+            activeLine.classList.add("active");
+            const containerHeight = container.offsetHeight;
+            const offset =
+              containerHeight / 3 -
+              activeLine.offsetTop -
+              activeLine.offsetHeight / 2;
+            lyricsList.style.transform = `translateY(${offset}px)`;
+          }
+
+          // 同步歌词到悬浮栏
+          const floatingLyricText = document.getElementById(
+            "floating-lyric-text",
+          );
+          if (activeLine) {
+            floatingLyricText.textContent = activeLine.textContent;
+          } else if (state.musicState.parsedLyrics.length > 0) {
+            floatingLyricText.textContent = "♪ ♪ ♪"; // 歌曲前奏
+          } else {
+            floatingLyricText.textContent = "♪ 暂无歌词 ♪";
+          }
+        }
+
+        function formatMusicTime(seconds) {
+          if (isNaN(seconds) || seconds < 0) return "0:00";
+          const minutes = Math.floor(seconds / 60);
+          const remainingSeconds = Math.floor(seconds % 60);
+          return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
+        }
+
+        function updateMusicProgressBar() {
+          const currentTimeEl = document.getElementById("music-current-time");
+          const totalTimeEl = document.getElementById("music-total-time");
+          const progressFillEl = document.getElementById("music-progress-fill");
+          if (!audioPlayer.duration) {
+            currentTimeEl.textContent = "0:00";
+            totalTimeEl.textContent = "0:00";
+            progressFillEl.style.width = "0%";
+            return;
+          }
+          const progressPercent =
+            (audioPlayer.currentTime / audioPlayer.duration) * 100;
+          progressFillEl.style.width = `${progressPercent}%`;
+          currentTimeEl.textContent = formatMusicTime(audioPlayer.currentTime);
+          totalTimeEl.textContent = formatMusicTime(audioPlayer.duration);
+          updateActiveLyric(audioPlayer.currentTime);
+        }
+
+        /**
+         * 处理用户点击“撤回”按钮的入口函数
+         */
+        async function handleRecallClick() {
+          if (!activeMessageTimestamp) return;
+
+          const RECALL_TIME_LIMIT_MS = 2 * 60 * 1000; // 设置2分钟的撤回时限
+          const messageTime = activeMessageTimestamp;
+          const now = Date.now();
+
+          // 检查是否超过了撤回时限
+          if (now - messageTime > RECALL_TIME_LIMIT_MS) {
+            hideMessageActions();
+            await showCustomAlert(
+              "操作失败",
+              "该消息发送已超过2分钟，无法撤回。",
+            );
+            return;
+          }
+
+          // 如果在时限内，执行真正的撤回逻辑
+          await recallMessage(messageTime, true);
+          hideMessageActions();
+        }
+
+        /**
+         * 消息撤回的核心逻辑
+         * @param {number} timestamp - 要撤回的消息的时间戳
+         * @param {boolean} isUserRecall - 是否是用户主动撤回
+         */
+        async function recallMessage(timestamp, isUserRecall) {
+          const chat = state.chats[state.activeChatId];
+          if (!chat) return;
+
+          const messageIndex = chat.history.findIndex(
+            (m) => m.timestamp === timestamp,
+          );
+          if (messageIndex === -1) return;
+
+          const messageToRecall = chat.history[messageIndex];
+
+          // 1. 修改消息对象，将其变为“已撤回”状态
+          const recalledData = {
+            originalType: messageToRecall.type || "text",
+            originalContent: messageToRecall.content,
+            // 保存其他可能存在的原始数据
+            originalMeaning: messageToRecall.meaning,
+            originalQuote: messageToRecall.quote,
+          };
+
+          messageToRecall.type = "recalled_message";
+          messageToRecall.content = isUserRecall
+            ? "你撤回了一条消息"
+            : "对方撤回了一条消息";
+          messageToRecall.recalledData = recalledData;
+          // 清理掉不再需要的旧属性
+          delete messageToRecall.meaning;
+          delete messageToRecall.quote;
+
+          // 2. 如果是用户撤回，需要给AI发送一条它看不懂内容的隐藏提示
+          if (isUserRecall) {
+            const hiddenMessageForAI = {
+              role: "system",
+              content: `[系统提示：用户撤回了一条消息。你不知道内容是什么，只需知道这个事件即可。]`,
+              timestamp: Date.now(),
+              isHidden: true,
+            };
+            chat.history.push(hiddenMessageForAI);
+          }
+
+          // 3. 保存到数据库并刷新UI
+          await db.chats.put(chat);
+          renderChatInterface(state.activeChatId);
+          if (isUserRecall) renderChatList(); // 用户撤回时，最后一条消息变了，需要刷新列表
+        }
+
+        /**
+         * 打开分类管理模态框
+         */
+        async function openCategoryManager() {
+          await renderCategoryListInManager();
+          document
+            .getElementById("world-book-category-manager-modal")
+            .classList.add("visible");
+        }
+
+        /**
+         * 在模态框中渲染已存在的分类列表
+         */
+        async function renderCategoryListInManager() {
+          const listEl = document.getElementById("existing-categories-list");
+          const categories = await db.worldBookCategories.toArray();
+          listEl.innerHTML = "";
+          if (categories.length === 0) {
+            listEl.innerHTML =
+              '<p style="text-align: center; color: var(--text-secondary);">还没有任何分类</p>';
+          }
+          categories.forEach((cat) => {
+            // 复用好友分组的样式
+            const item = document.createElement("div");
+            item.className = "existing-group-item";
+            item.innerHTML = `
+			            <span class="group-name">${cat.name}</span>
+			            <span class="delete-group-btn" data-id="${cat.id}">×</span>
+			        `;
+            listEl.appendChild(item);
+          });
+        }
+
+        /**
+         * 添加一个新的世界书分类
+         */
+        async function addNewCategory() {
+          const input = document.getElementById("new-category-name-input");
+          const name = input.value.trim();
+          if (!name) {
+            alert("分类名不能为空！");
+            return;
+          }
+          const existing = await db.worldBookCategories
+            .where("name")
+            .equals(name)
+            .first();
+          if (existing) {
+            alert(`分类 "${name}" 已经存在了！`);
+            return;
+          }
+          await db.worldBookCategories.add({ name });
+          input.value = "";
+          await renderCategoryListInManager();
+        }
+
+        /**
+         * 删除一个世界书分类
+         * @param {number} categoryId - 要删除的分类的ID
+         */
+        async function deleteCategory(categoryId) {
+          const confirmed = await showCustomConfirm(
+            "确认删除",
+            "删除分类后，该分类下的所有世界书将变为“未分类”。确定要删除吗？",
+            { confirmButtonClass: "btn-danger" },
+          );
+          if (confirmed) {
+            await db.worldBookCategories.delete(categoryId);
+            // 将属于该分类的世界书的 categoryId 设为 null
+            const booksToUpdate = await db.worldBooks
+              .where("categoryId")
+              .equals(categoryId)
+              .toArray();
+            for (const book of booksToUpdate) {
+              book.categoryId = null;
+              await db.worldBooks.put(book);
+              const bookInState = state.worldBooks.find(
+                (wb) => wb.id === book.id,
+              );
+              if (bookInState) bookInState.categoryId = null;
+            }
+            await renderCategoryListInManager();
+          }
+        }
+
+        // 角色专属NPC库管理功能函数
+        let editingNpcId = null; // 用于追踪正在编辑的NPC
+
+        /**
+         * 打开NPC库管理界面
+         */
+        function openNpcManager() {
+          if (!state.activeChatId || state.chats[state.activeChatId].isGroup)
+            return;
+          const chat = state.chats[state.activeChatId];
+          document.getElementById("npc-management-title").textContent =
+            `“${chat.name}”的NPC库`;
+          renderNpcList();
+          showScreen("npc-management-screen");
+        }
+
+        /**
+         * 渲染NPC列表
+         */
+        function renderNpcList() {
+          const listEl = document.getElementById("npc-management-list");
+          const chat = state.chats[state.activeChatId];
+          const npcLibrary = chat.npcLibrary || [];
+          listEl.innerHTML = "";
+
+          if (npcLibrary.length === 0) {
+            listEl.innerHTML =
+              '<p style="text-align:center; color: #8a8a8a; margin-top: 50px;">这里空空如也，点击右上角“+”添加第一个NPC吧！</p>';
+            return;
+          }
+
+          npcLibrary.forEach((npc) => {
+            // 复用聊天列表的样式，非常方便
+            const item = document.createElement("div");
+            item.className = "chat-list-item";
+            item.style.cursor = "pointer";
+            item.innerHTML = `
+			            <img src="${npc.avatar || defaultGroupMemberAvatar}" class="avatar">
+			            <div class="info">
+			                <span class="name">${npc.name}</span>
+			                <div class="last-msg">${npc.persona.substring(0, 30)}...</div>
+			            </div>
+			        `;
+            // 点击编辑
+            item.addEventListener("click", () => openNpcEditor(npc.id));
+            // 长按删除
+            addLongPressListener(item, () => deleteNpc(npc.id, npc.name));
+            listEl.appendChild(item);
+          });
+        }
+
+        async function openNpcEditor(npcId = null) {
+          editingNpcId = npcId;
+          // 使用正确的 state.activeChatId 来获取当前聊天对象
+          const chat = state.chats[state.activeChatId];
+          if (!chat) return; // 安全检查
+
+          let npc = { name: "", persona: "", avatar: defaultGroupMemberAvatar };
+
+          if (npcId) {
+            // 从正确的 chat.npcLibrary 中查找数据
+            npc = (chat.npcLibrary || []).find((n) => n.id === npcId) || npc;
+            document.getElementById("persona-editor-title").textContent =
+              `编辑NPC: ${npc.name}`;
+          } else {
+            document.getElementById("persona-editor-title").textContent =
+              "添加新NPC";
+          }
+
+          // 填充编辑器内容
+          document.getElementById("npc-editor-name-input").value = npc.name;
+          document.getElementById("preset-avatar-preview").src = npc.avatar;
+          document.getElementById("preset-persona-input").value = npc.persona;
+
+          // 根据NPC模式，显隐特定UI元素
+          document.getElementById("npc-editor-name-group").style.display =
+            "block";
+          document.getElementById(
+            "persona-editor-change-frame-btn",
+          ).style.display = "none";
+
+          // 绑定正确的保存函数
+          document.getElementById("save-persona-preset-btn").onclick = saveNpc;
+
+          // 最后才显示弹窗
+          document
+            .getElementById("persona-editor-modal")
+            .classList.add("visible");
+        }
+
+        /**
+         * 保存NPC（新建或更新）
+         */
+        async function saveNpc() {
+          const chat = state.chats[state.activeChatId];
+
+          // 从编辑器中获取所有数据
+          const name = document
+            .getElementById("npc-editor-name-input")
+            .value.trim();
+          const persona = document
+            .getElementById("preset-persona-input")
+            .value.trim();
+          const avatar = document.getElementById("preset-avatar-preview").src;
+
+          if (!name) {
+            alert("NPC名字不能为空！");
+            return;
+          }
+
+          if (editingNpcId) {
+            // 更新现有的NPC
+            const npc = chat.npcLibrary.find((n) => n.id === editingNpcId);
+            if (npc) {
+              npc.name = name;
+              npc.persona = persona;
+              npc.avatar = avatar;
+            }
+          } else {
+            // 添加一个全新的NPC
+            const newNpc = {
+              id: "npc_" + Date.now(),
+              name: name,
+              persona: persona,
+              avatar: avatar,
+            };
+            chat.npcLibrary.push(newNpc);
+          }
+
+          await db.chats.put(chat);
+          renderNpcList();
+          closePersonaEditor(); // 复用关闭编辑器的函数
+        }
+
+        /**
+         * 删除一个NPC
+         * @param {string} npcId - 要删除的NPC的ID
+         * @param {string} npcName - 要删除的NPC的名字，用于确认提示
+         */
+        async function deleteNpc(npcId, npcName) {
+          const confirmed = await showCustomConfirm(
+            "删除NPC",
+            `确定要从“${state.chats[state.activeChatId].name}”的NPC库中删除 “${npcName}” 吗？`,
+            { confirmButtonClass: "btn-danger" },
+          );
+
+          if (confirmed) {
+            const chat = state.chats[state.activeChatId];
+            chat.npcLibrary = chat.npcLibrary.filter((n) => n.id !== npcId);
+            await db.chats.put(chat);
+            renderNpcList();
+          }
+        }
+
+        // --- 自定义头像框管理功能 ---
+
+        function openFrameManager() {
+          renderFrameManager();
+          document
+            .getElementById("custom-frame-manager-modal")
+            .classList.add("visible");
+        }
+
+        async function renderFrameManager() {
+          const grid = document.getElementById("custom-frame-grid");
+          grid.innerHTML = "";
+          const customFrames = await db.customAvatarFrames.toArray();
+          if (customFrames.length === 0) {
+            grid.innerHTML =
+              '<p style="color: var(--text-secondary); grid-column: 1 / -1; text-align: center;">你还没有上传过头像框哦~</p>';
+            return;
+          }
+          customFrames.forEach((frame) => {
+            const item = document.createElement("div");
+            // 复用表情面板的样式，很方便
+            item.className = "sticker-item";
+            item.style.backgroundImage = `url(${frame.url})`;
+            item.title = frame.name;
+
+            const deleteBtn = document.createElement("div");
+            deleteBtn.className = "delete-btn";
+            deleteBtn.innerHTML = "×";
+            deleteBtn.style.display = "block";
+            deleteBtn.onclick = async (e) => {
+              e.stopPropagation();
+              const confirmed = await showCustomConfirm(
+                "删除头像框",
+                `确定要删除“${frame.name}”吗？`,
+                {
+                  confirmButtonClass: "btn-danger",
+                },
+              );
+              if (confirmed) {
+                await db.customAvatarFrames.delete(frame.id);
+                renderFrameManager(); // 刷新管理列表
+              }
+            };
+            item.appendChild(deleteBtn);
+            grid.appendChild(item);
+          });
+        }
+
+        /**
+         * 处理用户上传自定义头像框的逻辑
+         */
+        function handleUploadCustomFrame() {
+          document.getElementById("custom-frame-upload-input").addEventListener(
+            "change",
+            async (event) => {
+              const files = event.target.files;
+              if (!files.length) return;
+
+              const newFrames = [];
+
+              // 使用 for...of 循环来逐个处理选中的文件
+              for (const file of files) {
+                // 自动生成名字，而不是让用户输入
+                // 用 "文件名 (前8位) + 时间戳" 来确保名字几乎不会重复
+                const fileName = file.name
+                  .replace(/\.[^/.]+$/, "")
+                  .substring(0, 8);
+                const autoName = `${fileName}_${Date.now()}`;
+
+                const base64Url = await new Promise((resolve) => {
+                  const reader = new FileReader();
+                  reader.onload = (e) => resolve(e.target.result);
+                  reader.readAsDataURL(file);
+                });
+
+                newFrames.push({
+                  id: "frame_" + (Date.now() + newFrames.length), // 确保ID唯一
+                  name: autoName,
+                  url: base64Url,
+                });
+              }
+
+              // 循环结束后，批量添加到数据库
+              if (newFrames.length > 0) {
+                await db.customAvatarFrames.bulkAdd(newFrames);
+                renderFrameManager(); // 刷新管理列表
+                await showCustomAlert(
+                  "上传成功",
+                  `已成功添加 ${newFrames.length} 个新头像框！`,
+                );
+              }
+
+              // 清空文件选择器的值
+              event.target.value = null;
+            },
+            { once: true },
+          );
+
+          document.getElementById("custom-frame-upload-input").click();
+        }
+
+        async function openFrameSelectorModal(type, targetId = null) {
+          const grid = document.getElementById("avatar-frame-grid");
+          grid.innerHTML = "";
+
+          currentFrameSelection.type = type;
+          currentFrameSelection.target = targetId;
+
+          const chat = state.chats[state.activeChatId];
+          let currentFrameUrl = "";
+          let previewAvatarUrl = "";
+
+          if (type === "char-weibo") {
+            // 如果是为“角色微博”换框
+            const charChat = state.chats[currentViewingWeiboProfileId];
+            currentFrameUrl = charChat.settings.weiboAvatarFrame || "";
+            previewAvatarUrl = charChat.settings.weiboAvatar || defaultAvatar;
+          } else if (type === "home_profile") {
+            currentFrameUrl = state.globalSettings.homeAvatarFrame || "";
+            previewAvatarUrl =
+              document.getElementById("profile-avatar-img").src;
+          } else if (type === "weibo_profile") {
+            currentFrameUrl = state.qzoneSettings.weiboAvatarFrame || "";
+            previewAvatarUrl = state.qzoneSettings.weiboAvatar || defaultAvatar;
+          } else if (type === "ai") {
+            currentFrameUrl = chat.settings.aiAvatarFrame || "";
+            previewAvatarUrl = chat.settings.aiAvatar || defaultAvatar;
+          } else if (type === "my") {
+            currentFrameUrl = chat.settings.myAvatarFrame || "";
+            previewAvatarUrl = chat.settings.myAvatar || defaultAvatar;
+          } else if (type === "member" && targetId) {
+            const member = chat.members.find((m) => m.id === targetId);
+            if (member) {
+              currentFrameUrl = member.avatarFrame || "";
+              previewAvatarUrl = member.avatar || defaultGroupMemberAvatar;
+            }
+          }
+
+          // 后续渲染逻辑保持不变
+          const customFrames = await db.customAvatarFrames.toArray();
+          const frameUrlSet = new Set();
+          const allFrames = [...avatarFrames, ...customFrames].filter(
+            (frame) => {
+              if (!frame.url || !frameUrlSet.has(frame.url)) {
+                frameUrlSet.add(frame.url);
+                return true;
+              }
+              return false;
+            },
+          );
+
+          allFrames.forEach((frame) => {
+            const item = createFrameItem(frame, previewAvatarUrl);
+            if (currentFrameUrl === frame.url) {
+              item.classList.add("selected");
+              currentFrameSelection.url = frame.url;
+            }
+            grid.appendChild(item);
+          });
+
+          document
+            .getElementById("avatar-frame-modal")
+            .classList.add("visible");
+        }
+
+        // 辅助函数：创建一个头像框选项
+        function createFrameItem(frame, previewAvatarSrc) {
+          const item = document.createElement("div");
+          item.className = "frame-item";
+          item.title = frame.name;
+          item.innerHTML = `
+			        <img src="${previewAvatarSrc}" class="preview-avatar">
+			        ${frame.url ? `<img src="${frame.url}" class="preview-frame" style="pointer-events: none;">` : ""}
+			    `;
+          item.addEventListener("click", () => {
+            document
+              .querySelectorAll("#avatar-frame-grid .frame-item")
+              .forEach((el) => el.classList.remove("selected"));
+            item.classList.add("selected");
+            currentFrameSelection.url = frame.url;
+          });
+          return item;
+        }
+
+        // 保存选择
+
+        async function saveSelectedFrames() {
+          const { type, url, target } = currentFrameSelection;
+
+          // 对于不属于“角色设置”的功能 (比如主屏幕、微博)，保持原有的立即保存逻辑
+          if (type === "char-weibo") {
+            const charChat = state.chats[currentViewingWeiboProfileId];
+            if (charChat) {
+              charChat.settings.weiboAvatarFrame = url;
+              await db.chats.put(charChat);
+              await renderWeiboCharProfile(currentViewingWeiboProfileId);
+            }
+          } else if (type === "home_profile") {
+            if (!state.globalSettings) state.globalSettings = {};
+            state.globalSettings.homeAvatarFrame = url;
+            await db.globalSettings.put(state.globalSettings);
+            renderHomeScreenProfileFrame();
+          } else if (type === "weibo_profile") {
+            if (!state.qzoneSettings) state.qzoneSettings = {};
+            state.qzoneSettings.weiboAvatarFrame = url;
+            await saveQzoneSettings();
+            await renderWeiboProfile();
+          }
+          // 对于“角色设置”里的头像框不再立即保存，只在内存中更新
+          else {
+            const chat = state.chats[state.activeChatId];
+            if (!chat) return; // 安全检查
+
+            if (type === "ai") {
+              chat.settings.aiAvatarFrame = url;
+            } else if (type === "my") {
+              chat.settings.myAvatarFrame = url;
+            } else if (type === "member" && target) {
+              const member = chat.members.find((m) => m.id === target);
+              if (member) member.avatarFrame = url;
+            }
+
+            // 数据将在用户点击角色设置主面板的“保存”按钮时，与其他所有设置一起被保存。
+            console.log(`头像框选择已暂存: type=${type}, url=${url}`);
+          }
+
+          // 只需关闭头像框选择弹窗即可，不做其他多余操作
+          document
+            .getElementById("avatar-frame-modal")
+            .classList.remove("visible");
+        }
+
+        /**
+         * 检查两个时间戳是否在不同的自然日
+         * @param {number} timestamp1 - 新消息的时间戳
+         * @param {number | null} timestamp2 - 上一条消息的时间戳
+         * @returns {boolean} - 如果是新的一天，返回 true
+         */
+        function isNewDay(timestamp1, timestamp2) {
+          // 如果没有上一条消息的时间戳，说明这是第一条消息，肯定要显示日期
+          if (!timestamp2) return true;
+
+          const date1 = new Date(timestamp1);
+          const date2 = new Date(timestamp2);
+
+          // 比较年、月、日是否完全相同
+          return (
+            date1.getFullYear() !== date2.getFullYear() ||
+            date1.getMonth() !== date2.getMonth() ||
+            date1.getDate() !== date2.getDate()
+          );
+        }
+
+        /**
+         * 将时间戳格式化为 "X月X日 HH:mm" 的形式
+         * @param {number} timestamp - 时间戳
+         * @returns {string} - 格式化后的日期字符串
+         */
+        function formatDateStamp(timestamp) {
+          const date = new Date(timestamp);
+          const month = date.getMonth() + 1;
+          const day = date.getDate();
+          const hours = String(date.getHours()).padStart(2, "0");
+          const minutes = String(date.getMinutes()).padStart(2, "0");
+          return `${month}月${day}日 ${hours}:${minutes}`;
+        }
+
+        /**
+         * 根据时间戳，格式化聊天列表右侧的日期/时间显示
+         * @param {number} timestamp - 消息的时间戳
+         * @returns {string} - 格式化后的字符串 (例如 "14:30", "昨天", "08/03")
+         */
+        function formatChatListTimestamp(timestamp) {
+          if (!timestamp) return ""; // 如果没有时间戳，返回空字符串
+
+          const now = new Date();
+          const msgDate = new Date(timestamp);
+
+          // 判断是否为今天
+          const isToday =
+            now.getFullYear() === msgDate.getFullYear() &&
+            now.getMonth() === msgDate.getMonth() &&
+            now.getDate() === msgDate.getDate();
+
+          if (isToday) {
+            // 如果是今天，只显示时间
+            return msgDate.toLocaleTimeString("zh-CN", {
+              hour: "2-digit",
+              minute: "2-digit",
+            });
+          }
+
+          // 判断是否为昨天
+          const yesterday = new Date();
+          yesterday.setDate(now.getDate() - 1);
+          const isYesterday =
+            yesterday.getFullYear() === msgDate.getFullYear() &&
+            yesterday.getMonth() === msgDate.getMonth() &&
+            yesterday.getDate() === msgDate.getDate();
+
+          if (isYesterday) {
+            return "昨天";
+          }
+
+          // 判断是否为今年
+          if (now.getFullYear() === msgDate.getFullYear()) {
+            // 如果是今年，显示 "月/日"
+            const month = String(msgDate.getMonth() + 1).padStart(2, "0");
+            const day = String(msgDate.getDate()).padStart(2, "0");
+            return `${month}/${day}`;
+          }
+
+          // 如果是更早的年份，显示 "年/月/日"
+          const year = msgDate.getFullYear();
+          const month = String(msgDate.getMonth() + 1).padStart(2, "0");
+          const day = String(msgDate.getDate()).padStart(2, "0");
+          return `${year}/${month}/${day}`;
+        }
+
+        /**
+         * 创建一个功能完整的日期戳“伪消息”元素
+         * @param {number} timestamp - 该日期戳代表的时间
+         * @returns {HTMLElement} - 创建好的 DOM 元素
+         */
+        function createDateStampElement(timestamp) {
+          // 1. 创建最外层的包裹 div，和真实消息一样
+          const wrapper = document.createElement("div");
+          wrapper.className = "message-wrapper date-stamp-wrapper";
+          // 把时间戳存起来，这是多选和删除的关键
+          wrapper.dataset.timestamp = timestamp;
+
+          // 2. 创建气泡 div
+          const bubble = document.createElement("div");
+          // 同时加上 .message-bubble 类，让多选逻辑能找到它
+          bubble.className = "message-bubble date-stamp-bubble";
+          bubble.dataset.timestamp = timestamp;
+          bubble.textContent = formatDateStamp(timestamp);
+
+          wrapper.appendChild(bubble);
+
+          // 3. 为它绑定和真实消息完全一样的事件监听器
+          addLongPressListener(wrapper, () => {
+            // 日期戳不支持复杂操作，长按直接进入多选
+            enterSelectionMode(timestamp);
+          });
+          wrapper.addEventListener("click", () => {
+            if (isSelectionMode) {
+              toggleMessageSelection(timestamp);
+            }
+          });
+
+          return wrapper;
+        }
+
+        // --- 美化功能的核心变量 ---
+        let activeThemeId = null; // 用于追踪当前正在编辑的主题ID
+
+        /**
+         * 将CSS代码应用到页面上
+         * @param {string} cssCode - 要应用的CSS代码字符串
+         */
+        function applyThemeCss(cssCode) {
+          const styleTag = document.getElementById("custom-theme-style");
+          if (styleTag) {
+            styleTag.innerHTML = cssCode || "";
+          }
+        }
+
+        /**
+         * 从数据库加载所有主题到下拉选择框
+         */
+        async function loadThemesToDropdown() {
+          const selector = document.getElementById("theme-selector");
+          selector.innerHTML = '<option value="">-- 选择方案或新建 --</option>'; // 默认选项
+
+          const themes = await db.themes.toArray();
+          themes.forEach((theme) => {
+            const option = document.createElement("option");
+            option.value = theme.id;
+            option.textContent = theme.name;
+            selector.appendChild(option);
+          });
+        }
+
+        /**
+         * 处理用户从下拉框选择一个主题的逻辑
+         */
+        async function handleThemeSelection() {
+          const selector = document.getElementById("theme-selector");
+          const editor = document.getElementById("theme-css-editor");
+          activeThemeId = selector.value ? parseInt(selector.value) : null;
+
+          if (activeThemeId) {
+            const theme = await db.themes.get(activeThemeId);
+            editor.value = theme.css;
+          } else {
+            // 如果选择“--”，就加载模板
+            editor.value = THEME_CSS_TEMPLATE;
+          }
+          // 立即应用选中的或模板代码，让用户看到效果
+          applyThemeCss(editor.value);
+        }
+
+        /**
+         * 保存当前编辑区的内容到当前选中的主题
+         */
+        async function saveCurrentTheme() {
+          if (!activeThemeId) {
+            alert("请先选择一个方案，或使用“另存为”来创建新方案。");
+            return;
+          }
+          const cssCode = document.getElementById("theme-css-editor").value;
+          await db.themes.update(activeThemeId, { css: cssCode });
+          alert("当前方案已保存！");
+        }
+
+        /**
+         * 将当前编辑区的内容另存为一个新主题
+         */
+        async function saveAsNewTheme() {
+          const themeName = await showCustomPrompt(
+            "保存新方案",
+            "请输入新方案的名称",
+          );
+          if (!themeName || !themeName.trim()) {
+            if (themeName !== null) alert("方案名称不能为空！");
+            return;
+          }
+          const cssCode = document.getElementById("theme-css-editor").value;
+          const newTheme = { name: themeName.trim(), css: cssCode };
+          const newId = await db.themes.add(newTheme);
+
+          // 刷新下拉框并自动选中新保存的方案
+          await loadThemesToDropdown();
+          document.getElementById("theme-selector").value = newId;
+          activeThemeId = newId;
+
+          alert(`方案 "${themeName}" 已成功保存！`);
+        }
+        /**
+         * 打开清除角色CSS的管理菜单
+         */
+        async function openCharCssManager() {
+          const choice = await showChoiceModal("清理角色气泡样式", [
+            { text: "🧹 一键清除所有角色的CSS", value: "clear_all" },
+            { text: "🔍 选择特定角色清除", value: "select_char" },
+          ]);
+
+          if (!choice) return;
+
+          if (choice === "clear_all") {
+            await clearAllCharsCustomCss();
+          } else if (choice === "select_char") {
+            await openCharCssSelector();
+          }
+        }
+
+        /**
+         * 清除所有单聊角色的自定义CSS
+         */
+        async function clearAllCharsCustomCss() {
+          // 检查是否有任何角色设置了CSS
+          let hasAny = false;
+          for (const chatId in state.chats) {
+            const chat = state.chats[chatId];
+            if (!chat.isGroup && chat.settings && chat.settings.customCss) {
+              hasAny = true;
+              break;
+            }
+          }
+
+          if (!hasAny) {
+            alert("当前没有任何角色设置了自定义CSS，无需清理。");
+            return;
+          }
+
+          const confirmed = await showCustomConfirm(
+            "确认全清",
+            "确定要清除【所有】角色的自定义气泡样式(CSS)吗？\n此操作将使所有角色恢复默认或全局样式，且不可恢复。",
+            { confirmButtonClass: "btn-danger" },
+          );
+
+          if (!confirmed) return;
+
+          let count = 0;
+          for (const chatId in state.chats) {
+            const chat = state.chats[chatId];
+            if (!chat.isGroup && chat.settings && chat.settings.customCss) {
+              chat.settings.customCss = ""; // 清空
+              count++;
+              await db.chats.put(chat);
+            }
+          }
+
+          // 如果当前正在聊天的角色被清除了，刷新一下界面
+          if (state.activeChatId && !state.chats[state.activeChatId].isGroup) {
+            renderChatInterface(state.activeChatId);
+          }
+
+          alert(`已清除 ${count} 个角色的自定义样式。`);
+        }
+
+        /**
+         * 打开选择器，勾选要清除的角色
+         */
+        async function openCharCssSelector() {
+          // 1. 筛选出所有设置了customCss的角色
+          const chatsWithCss = Object.values(state.chats).filter(
+            (c) => !c.isGroup && c.settings && c.settings.customCss,
+          );
+
+          if (chatsWithCss.length === 0) {
+            alert("当前没有任何角色设置了自定义CSS。");
+            return;
+          }
+
+          // 2. 复用现有的自定义模态框来显示列表
+          const modal = document.getElementById("custom-modal-overlay");
+          const modalTitle = document.getElementById("custom-modal-title");
+          const modalBody = document.getElementById("custom-modal-body");
+          const confirmBtn = document.getElementById("custom-modal-confirm");
+          const cancelBtn = document.getElementById("custom-modal-cancel");
+
+          modalTitle.textContent = "选择要清除样式的角色";
+          modalBody.innerHTML =
+            '<div id="css-char-list" style="max-height: 300px; overflow-y: auto; text-align: left;"></div>';
+
+          const listEl = document.getElementById("css-char-list");
+
+          // 3. 生成列表
+          chatsWithCss.forEach((chat) => {
+            const item = document.createElement("div");
+            item.style.cssText =
+              "display:flex; align-items:center; padding:10px; border-bottom:1px solid #eee; cursor:pointer;";
+            item.innerHTML = `
+            <input type="checkbox" class="css-clear-checkbox" value="${
+              chat.id
+            }" style="margin-right:10px; transform: scale(1.2);">
+            <img src="${
+              chat.settings.aiAvatar || defaultAvatar
+            }" style="width:30px; height:30px; border-radius:50%; margin-right:10px; object-fit: cover;">
+            <div style="flex:1;">
+                <div style="font-weight:bold;">${chat.name}</div>
+                <div style="font-size:10px; color:#888; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width: 150px;">

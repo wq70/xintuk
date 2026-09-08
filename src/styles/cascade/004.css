@@ -1,0 +1,1524 @@
+
+
+@keyframes typing-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+#chat-header-title {
+  transition: opacity 0.2s ease-in-out;
+}
+
+@keyframes message-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.message-wrapper.animate-in {
+  animation: message-pop-in 0.3s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+}
+
+/* ▼▼▼ 【全新】App图标设置样式 ▼▼▼ */
+#icon-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+  gap: 20px;
+  width: 100%;
+  padding: 0 10px;
+  box-sizing: border-box;
+}
+
+.icon-setting-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.icon-preview {
+  width: 60px;
+  height: 60px;
+  border-radius: 15px;
+  background-size: cover;
+  background-position: center;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.change-icon-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  border: 1px solid #ccc;
+  background-color: #f0f0f0;
+  border-radius: 5px;
+  cursor: pointer;
+}
+/* ▲▲▲ 新CSS粘贴结束 ▲▲▲ */
+
+/* ▼▼▼ 【全新】外观设置页面布局修正 ▼▼▼ */
+
+/* 1. 修正滚动问题 */
+#wallpaper-screen .form-container {
+  /* 核心修正1: 解决flex布局下的滚动冲突，让滚动条能正常出现 */
+  min-height: 0;
+}
+
+/* 2. 修正壁纸预览被压扁的问题 */
+#wallpaper-preview {
+  /* 核心修正2: 防止预览框被过多的内容挤压变形，让它保持自己的高度 */
+  flex-shrink: 0;
+}
+/* ▲▲▲ 修正结束 ▲▲▲ */
+
+/* ▼▼▼ 【全新】分享链接功能样式 (无图版) ▼▼▼ */
+
+/* 1. 浏览器界面背景色和内容区样式 (保持不变) */
+#browser-screen {
+  background-color: #f8f9fa;
+}
+#browser-content {
+  padding: 20px;
+  font-size: 16px;
+  line-height: 1.8;
+  color: #333;
+  overflow-y: auto;
+  background-color: #f8f9fa;
+}
+#browser-content .article-title {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+#browser-content .article-meta {
+  font-size: 13px;
+  color: #8a8a8a;
+  margin-bottom: 25px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #e0e0e0;
+}
+#browser-content .article-body {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+#browser-content .article-body p {
+  margin-bottom: 1em;
+}
+
+/* 2. 聊天气泡中的链接卡片样式 (无图版) */
+.message-bubble.is-link-share .content {
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  border: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.message-bubble.is-book-share .content {
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  border: none;
+}
+
+.link-share-card {
+  width: 210px;
+  background-color: #fff;
+  border-radius: 10px;
+  border: 1px solid #e0e0e0;
+  padding: 12px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.link-share-card:hover {
+  background-color: #f9f9f9;
+}
+
+.link-share-card .title {
+  font-weight: 600;
+  font-size: 15px;
+  line-height: 1.4;
+  color: #1f1f1f;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.link-share-card .description {
+  font-size: 13px;
+  color: #8a8a8a;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.link-share-card .footer {
+  display: flex; /* 让图标和文字水平对齐 */
+  align-items: center;
+  gap: 6px; /* 图标和文字的间距 */
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 4px; /* 和上面的描述拉开一点距离 */
+}
+.link-share-card .footer-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0; /* 防止图标被压缩 */
+}
+
+/* 连载分享专用卡片 */
+.book-share-card {
+  display: grid;
+  grid-template-columns: 8px 1fr;
+  background: #fff;
+  border: 1px solid #e6d8c6;
+  border-radius: 12px;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+  width: 240px;
+}
+.book-share-card .book-spine {
+  background: linear-gradient(180deg, #c69c6d 0%, #b38658 100%);
+  box-shadow: 2px 0 6px rgba(0, 0, 0, 0.1) inset;
+}
+.book-share-card .book-body {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.book-share-card .book-tag {
+  display: inline-block;
+  font-size: 11px;
+  color: #8c6239;
+  background: #f6e9d8;
+  padding: 2px 6px;
+  border-radius: 6px;
+  width: fit-content;
+}
+.book-share-card .book-title {
+  font-weight: 700;
+  font-size: 15px;
+  color: #2b1a10;
+  line-height: 1.3;
+}
+.book-share-card .book-meta {
+  font-size: 12px;
+  color: #8a8a8a;
+}
+.book-share-card .book-desc {
+  font-size: 13px;
+  color: #5a4a3c;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.book-share-card .book-latest {
+  font-size: 12px;
+  color: #8c6239;
+  font-weight: 600;
+}
+
+/* ▲▲▲ 新CSS粘贴结束 ▲▲▲ */
+
+/* ▼▼▼ 请将这段新样式粘贴到 <style> 的末尾 ▼▼▼ */
+
+/* 单条评论的容器，现在需要相对定位 */
+.comment-item {
+  position: relative;
+  padding-right: 25px; /* 在右侧留出删除按钮的空间 */
+}
+
+/* 评论删除按钮的样式 */
+.comment-delete-btn {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  line-height: 22px;
+  text-align: center;
+  border-radius: 50%;
+  color: var(--text-secondary);
+  font-size: 18px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  opacity: 0; /* 默认隐藏 */
+}
+
+/* 鼠标悬停在评论上时，显示删除按钮 */
+.comment-item:hover .comment-delete-btn {
+  opacity: 1;
+}
+
+.comment-delete-btn:hover {
+  background-color: #f0f0f0;
+  color: #ff3b30;
+}
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+
+/* ▼▼▼ 【请求7】主屏幕预设保存按钮主题色适配 (请将这块代码也粘贴到 <style> 的末尾) ▼▼▼ */
+#save-home-preset-btn {
+  background-color: var(--accent-color);
+  color: white;
+}
+/* ▲▲▲ 粘贴结束 ▲▲▲ */
+
+/* ▼▼▼ 【全新】引用回复功能样式 ▼▼▼ */
+
+/* 1. 输入框上方的“回复预览栏” */
+#reply-preview-bar {
+  display: none; /* 默认隐藏 */
+  padding: 8px 12px;
+  margin: 0 8px 8px 8px; /* 和输入框周围的边距保持一致 */
+  background-color: rgba(0, 0, 0, 0.05);
+  border-left: 3px solid var(--accent-color);
+  border-radius: 6px;
+  position: relative;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+#phone-screen.dark-mode #reply-preview-bar {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.reply-preview-content .sender {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.reply-preview-content .text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block; /* 确保省略号生效 */
+  max-width: 95%;
+}
+
+#cancel-reply-btn {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  line-height: 20px;
+  text-align: center;
+  border-radius: 50%;
+  background-color: rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  font-size: 14px;
+}
+
+/* 2. 消息气泡内部的“引用消息块” */
+.quoted-message {
+  padding: 6px 10px;
+  margin-bottom: 6px;
+  background-color: rgba(0, 0, 0, 0.04);
+  border-left: 2px solid var(--accent-color);
+  border-radius: 4px;
+  font-size: 0.9em; /* 字体比正文小一点 */
+  opacity: 0.8;
+  /* (已移除 overflow: hidden;) */
+}
+
+#phone-screen.dark-mode .quoted-message {
+  background-color: rgba(255, 255, 255, 0.08);
+  border-left-color: #a0cff1;
+}
+
+.quoted-message .quoted-sender {
+  font-weight: 600;
+  color: var(--accent-color);
+}
+#phone-screen.dark-mode .quoted-message .quoted-sender {
+  color: #a0cff1;
+}
+
+.quoted-message .quoted-content {
+  color: var(--text-secondary);
+  white-space: normal; /* 核心修正1: 允许文本正常换行 */
+  word-break: break-word; /* 核心修正2: 强制长单词或连续字符断开，防止溢出 */
+  display: block;
+  /* (已移除 overflow 和 text-overflow，因为我们需要多行显示而不是单行省略号) */
+}
+
+/* === 字体预览框样式 (修正后) === */
+
+/* 将它修改为 ▼▼▼ */
+#font-preview {
+  padding: 20px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background-color: #f0f2f5; /* 统一为更浅的灰色，然后让夜间模式CSS去覆盖 */
+  transition:
+    background-color 0.3s,
+    border-color 0.3s;
+}
+
+/* 预览框里的文字颜色，默认是黑色 */
+#font-preview p {
+  color: var(--text-primary);
+}
+
+/* 夜间模式下的修正样式 */
+#phone-screen.dark-mode #font-preview {
+  background-color: #1c1c1e; /* 深灰色背景 */
+  border-color: #38383a; /* 暗色边框 */
+}
+
+/* 夜间模式下，预览框里的文字变为白色 */
+#phone-screen.dark-mode #font-preview p {
+  color: #ffffff;
+}
+
+/* ▼▼▼ 【全新】精致版转账操作弹窗样式 ▼▼▼ */
+.transfer-actions-content {
+  background-color: #fff0f5; /* 粉嫩的背景色 */
+  border-radius: 20px;
+  width: 290px;
+  padding: 20px;
+  box-shadow: 0 5px 25px rgba(255, 105, 180, 0.3); /* 粉色阴影 */
+  text-align: center;
+  position: relative;
+  border: 1px solid #ffcce0;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.transfer-actions-header {
+  font-size: 20px;
+  font-weight: bold;
+  color: #a35c7b; /* 深粉色标题 */
+  margin-bottom: 15px;
+}
+
+.transfer-actions-body p {
+  font-size: 15px;
+  color: #555;
+  margin: 0 0 25px 0;
+  line-height: 1.5;
+}
+
+.transfer-actions-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+}
+
+.transfer-actions-footer .action-btn {
+  flex: 1;
+  padding: 12px;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
+  color: white;
+}
+
+.transfer-actions-footer .action-btn:active {
+  transform: scale(0.95);
+}
+
+.transfer-actions-footer .action-btn.accept {
+  background: linear-gradient(135deg, #ff85b3, #ff69b4);
+  box-shadow: 0 4px 10px rgba(255, 105, 180, 0.4);
+}
+
+.transfer-actions-footer .action-btn.decline {
+  background: linear-gradient(135deg, #c2c2c2, #a0a0a0);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+.transfer-actions-content .cancel-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background-color: rgba(0, 0, 0, 0.1);
+  color: #a35c7b;
+  font-size: 20px;
+  line-height: 28px;
+  cursor: pointer;
+}
+/* ▲▲▲ 新CSS粘贴结束 ▲▲▲ */
+
+/* ▼▼▼ 请将这段新样式粘贴到 <style> 的末尾 ▼▼▼ */
+
+/* === 未读消息红点样式 === */
+.unread-count-wrapper {
+  flex-shrink: 0;
+  width: 40px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 20px; /* 让红点和名字差不多高 */
+}
+
+.unread-count {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  background-color: #ff3b30; /* iOS 风格的红色 */
+  color: white;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+  text-align: center;
+  border-radius: 10px; /* 圆角矩形 */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  display: none; /* 默认隐藏 */
+  justify-content: center;
+  align-items: center;
+}
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+
+/* ▼▼▼ 【全新】通话记录页面与卡片样式 ▼▼▼ */
+
+/* 确保页面背景色统一 */
+#call-history-screen {
+  background-color: #f0f2f5;
+}
+
+/* 通话记录卡片样式 */
+.call-record-card {
+  background-color: var(--secondary-bg);
+  border-radius: 12px;
+  padding: 15px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+  border-left: 5px solid var(--accent-color);
+}
+.call-record-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* 卡片头部：包含日期和时长 */
+.call-record-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-color);
+}
+.call-record-card .card-header .duration {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+/* 卡片主体：参与者头像 */
+.call-record-card .card-body {
+  display: flex;
+  align-items: center;
+}
+.call-record-card .participants-avatars {
+  display: flex;
+  align-items: center;
+}
+.call-record-card .participant-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+/* 让头像有一个漂亮的堆叠效果 */
+.call-record-card .participant-avatar:not(:first-child) {
+  margin-left: -12px;
+}
+.call-record-card .participants-names {
+  margin-left: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 15px;
+}
+
+/* --- 通话详情弹窗样式 --- */
+#transcript-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 15px;
+}
+.transcript-entry {
+  padding: 8px 12px;
+  border-radius: 10px;
+  max-width: 85%;
+  line-height: 1.5;
+  word-break: break-word;
+}
+.transcript-entry.user {
+  background-color: #dcf8c6; /* 类似微信的绿色 */
+  align-self: flex-end;
+}
+.transcript-entry.assistant {
+  background-color: #ffffff;
+  align-self: flex-start;
+}
+/* ▲▲▲ 新CSS粘贴结束 ▲▲▲ */
+
+#chat-list-title {
+  cursor: pointer;
+}
+
+/* ▼▼▼ 【全新】通话记录卡片美化样式 ▼▼▼ */
+
+.call-record-card .card-body {
+  /* 将 body 改为 flex 布局，让标题和参与者信息垂直排列 */
+  display: flex;
+  flex-direction: column;
+  gap: 8px; /* 标题和参与者信息之间的间距 */
+}
+
+.call-record-card .custom-title {
+  font-size: 16px;
+  font-weight: 600; /* 加粗，让它像个标题 */
+  color: var(--text-primary);
+  padding-bottom: 8px; /* 标题下的留白 */
+  border-bottom: 1px solid var(--border-color); /* 在标题下加一条分割线 */
+  margin-bottom: 4px; /* 和下面的参与者信息拉开一点距离 */
+}
+
+.call-record-card .participants-info {
+  /* 这个新容器让头像和“与xx”能水平对齐 */
+  display: flex;
+  align-items: center;
+}
+
+/* 参与者名字的样式微调，让它不那么突出 */
+.call-record-card .participants-names {
+  margin-left: 12px;
+  font-weight: 500; /* 不再加粗 */
+  font-size: 14px; /* 稍微小一点 */
+  color: var(--text-secondary); /* 使用次要文字颜色 */
+}
+
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+
+/* ▼▼▼ 【全新】语音转文字功能样式 ▼▼▼ */
+
+/* 1. 语音文字内容的样式 */
+.voice-transcript {
+  font-size: 14px; /* 文字大小 */
+  line-height: 1.6; /* 行高，让多行文本更易读 */
+  color: var(--text-secondary); /* 使用次要文字颜色，与语音条区分 */
+  padding: 8px 12px; /* 内边距 */
+  margin-top: 6px; /* 和上方的语音条拉开一点距离 */
+  background-color: rgba(0, 0, 0, 0.04); /* 给一个淡淡的背景，更有层次感 */
+  border-radius: 6px; /* 圆角 */
+  word-break: break-word; /* 确保长文本能正常换行 */
+  display: none; /* 默认隐藏 */
+}
+
+#phone-screen.dark-mode .voice-transcript {
+  background-color: rgba(255, 255, 255, 0.1); /* 夜间模式下的背景色 */
+}
+
+/* 2. 旋转加载动画的样式 */
+.loading-spinner {
+  display: none; /* 默认隐藏 */
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(0, 0, 0, 0.2);
+  border-top-color: var(--accent-color); /* 旋转部分的颜色 */
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 8px; /* 和波形图、时长保持一点间距 */
+}
+
+/* 3. 定义旋转动画 */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+
+/* ▼▼▼ 【全新】分享记录查看器样式修正 ▼▼▼ */
+#shared-history-viewer-content {
+  display: flex;
+  flex-direction: column; /* 让气泡垂直排列 */
+  gap: 20px; /* 在每个气泡之间增加20像素的间距 */
+  padding: 15px; /* 在容器四周也增加一些内边距，避免气泡贴边 */
+}
+/* ▲▲▲ 新CSS粘贴结束 ▲▲▲ */
+
+/* ▼▼▼ 【全新】播放器和歌词样式 ▼▼▼ */
+#music-player-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 50;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 60px;
+  background-color: rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-50px);
+  transition:
+    opacity 0.4s ease-out,
+    transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+#music-player-overlay.visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.music-player-window {
+  width: 70%;
+  min-height: 420px;
+  background-color: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 25px;
+  box-shadow: 0 8px 32px 0 rgba(25, 25, 25, 0.37);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  padding: 25px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: #1f1f1f;
+  position: relative;
+  justify-content: space-between;
+  padding-bottom: 15px;
+}
+
+.music-player-top-actions {
+  position: absolute;
+  top: 15px;
+  left: 15px;
+  right: 15px;
+  width: calc(100% - 30px);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.top-left-cluster {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+#music-return-btn,
+#music-exit-btn {
+  background: none;
+  border: none;
+  font-size: 28px;
+  font-weight: 300;
+  cursor: pointer;
+  color: #555;
+  padding: 5px;
+  line-height: 1;
+}
+#music-exit-btn {
+  font-size: 24px;
+  font-weight: 400;
+}
+
+.music-progress-bar-container {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 25px;
+  margin-bottom: 10px;
+}
+.time-display {
+  font-size: 11px;
+  color: #888;
+  width: 35px;
+  text-align: center;
+  flex-shrink: 0;
+  font-family: "SF Mono", "Menlo", monospace;
+}
+.progress-bar {
+  flex-grow: 1;
+  height: 5px;
+  background-color: #e5e5e5;
+  border-radius: 2.5px;
+  cursor: pointer;
+}
+.progress-bar-fill {
+  width: 0%;
+  height: 100%;
+  background-color: #333;
+  border-radius: 2.5px;
+}
+
+#music-lyrics-container {
+  width: 100%;
+  height: 192px;
+  overflow: hidden;
+  position: relative;
+  -webkit-mask-image: linear-gradient(
+    transparent,
+    black 20%,
+    black 80%,
+    transparent
+  );
+  mask-image: linear-gradient(transparent, black 20%, black 80%, transparent);
+}
+
+#music-lyrics-list {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: transform 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+.lyric-line {
+  padding: 4px 0;
+  font-size: 14px;
+  color: #666;
+  text-align: center;
+  line-height: 1.5;
+  transition: all 0.5s ease;
+  opacity: 0.7;
+  transform: scale(0.95);
+}
+
+.lyric-line.active {
+  font-size: 16px;
+  color: #000;
+  opacity: 1;
+  transform: scale(1);
+}
+
+.music-player-controls-wrapper {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.music-controls {
+  margin-top: 0;
+}
+
+#music-return-btn,
+#music-exit-btn,
+#music-playlist-btn {
+  position: relative;
+}
+
+#music-return-btn {
+  top: -2px;
+}
+#music-playlist-btn {
+  top: -3px;
+}
+
+.playlist-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+.playlist-action-btn {
+  font-size: 18px;
+  color: #888;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+.playlist-action-btn:hover {
+  color: #000;
+}
+.delete-track-btn {
+  font-size: 24px;
+  color: #ff3b30;
+}
+.delete-track-btn:hover {
+  color: #c00;
+}
+.lyrics-btn {
+  font-weight: 500;
+}
+
+/* ▼▼▼ 【最终头像放大版】请用这块代码替换所有相关的头像尺寸规则 ▼▼▼ */
+
+/* 1. 普通头像样式（无框） */
+.message-bubble .avatar {
+  width: 38px; /* ★ 修改点：将尺寸从 34px 放大到 42px */
+  height: 38px; /* ★ 修改点：高度也同步放大 */
+  border-radius: 20%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+/* 2. 带框头像的容器样式 */
+.avatar-with-frame {
+  position: relative;
+  width: 41px; /* ★ 修改点：尺寸与普通头像保持一致 */
+  height: 41px; /* ★ 修改点：高度也同步放大 */
+  flex-shrink: 0;
+}
+
+/* ▲▲▲ 替换结束 ▲▲▲ */
+
+/* ▼▼▼ 【全新】撤回消息样式 ▼▼▼ */
+
+/* 1. 撤回消息的占位符样式 */
+.recalled-message-placeholder {
+  align-self: center; /* 居中显示 */
+  padding: 4px 12px;
+  margin: 5px 0;
+  background-color: rgba(0, 0, 0, 0.1);
+  color: var(--text-secondary);
+  font-size: 12px;
+  border-radius: 10px;
+  text-align: center;
+  max-width: 80%;
+  cursor: pointer; /* 让它看起来可以点击 */
+}
+
+/* 2. 夜间模式下的适配 */
+#phone-screen.dark-mode .recalled-message-placeholder {
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+/* 3. AI撤回消息时的动画效果 */
+@keyframes recall-animation {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+}
+
+.message-wrapper.recalled-animation {
+  animation: recall-animation 0.3s ease-out forwards;
+}
+
+/* ▲▲▲ 新CSS粘贴结束 ▲▲▲ */
+
+/* ▼▼▼ 【全新】撤回消息样式修正 ▼▼▼ */
+
+/* 强制撤回消息的占位符不换行，并保持内容居中 */
+.recalled-message-placeholder {
+  white-space: nowrap; /* 核心：禁止文本换行 */
+  display: inline-block; /* 让背景根据内容自适应宽度 */
+  padding: 4px 12px;
+}
+
+/* ▲▲▲ 新CSS粘贴结束 ▲▲▲ */
+
+/* ▼▼▼ 【全新】世界书分类列表样式 ▼▼▼ */
+.world-book-group-container {
+  border-bottom: 1px solid var(--border-color);
+}
+.world-book-group-container:first-child {
+  border-top: 1px solid var(--border-color);
+}
+.world-book-group-header {
+  display: flex;
+  align-items: center;
+  padding: 12px 15px;
+  cursor: pointer;
+  background-color: #f7f7f7;
+}
+.world-book-group-header .arrow {
+  font-size: 14px;
+  margin-right: 8px;
+  transition: transform 0.2s ease;
+}
+.world-book-group-header.collapsed .arrow {
+  transform: rotate(-90deg);
+}
+.world-book-group-header .group-name {
+  font-weight: 600;
+  font-size: 15px;
+}
+.world-book-group-content {
+  max-height: 100000px; /* <--- 就是修改这里，把值改大即可 */
+  overflow: hidden;
+  transition: max-height 0.3s ease-in-out;
+}
+.world-book-group-content.collapsed {
+  max-height: 0;
+}
+#phone-screen.dark-mode .world-book-group-header {
+  background-color: #1c1c1e;
+}
+/* ▲▲▲ 新CSS粘贴结束 ▲▲▲ */
+
+/* ▼▼▼ 【全新】红包/转账模态框页签样式 ▼▼▼ */
+.frame-tabs {
+  display: flex;
+  background-color: #f0f0f0;
+  padding: 4px;
+  margin: 15px;
+  border-radius: 8px;
+}
+.frame-tab {
+  flex: 1;
+  text-align: center;
+  padding: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #555;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.2s ease-in-out;
+}
+.frame-tab.active {
+  background-color: #ffffff;
+  color: #000000;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+/* ▲▲▲ 新CSS粘贴结束 ▲▲▲ */
+
+/* ▼▼▼ 请将这段全新的CSS粘贴到 <style> 的末尾 ▼▼▼ */
+
+/* 1. 分类文件夹的样式 */
+.wb-category-header {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  cursor: pointer;
+  background-color: #f0f2f5; /* 给文件夹一个淡淡的背景色以区分 */
+  font-weight: 600; /* 加粗字体 */
+}
+#phone-screen.dark-mode .wb-category-header {
+  background-color: #2c2c2e; /* 夜间模式下的背景色 */
+}
+
+/* 2. 展开/收起的小箭头 */
+.wb-category-header .arrow {
+  font-size: 12px;
+  margin-right: 8px;
+  transition: transform 0.2s ease;
+}
+
+/* 3. 当文件夹收起时，箭头旋转 */
+.wb-category-header.collapsed .arrow {
+  transform: rotate(-90deg);
+}
+
+/* 4. 存放书籍条目的容器 */
+.wb-book-container {
+  padding-left: 20px; /* 核心：让书籍条目向内缩进，看起来像在文件夹里 */
+  max-height: 100000px; /* 一个足够大的值，用于动画 */
+  overflow: hidden;
+  transition: max-height 0.3s ease-in-out;
+}
+
+/* 5. 当文件夹收起时，书籍容器的高度变为0，实现动画效果 */
+.wb-book-container.collapsed {
+  max-height: 0;
+}
+
+/* 6. 单个书籍条目（覆盖默认的label样式，微调间距） */
+.wb-book-container label {
+  padding: 8px 12px;
+}
+
+/* ▲▲▲ 新CSS粘贴结束 ▲▲▲ */
+
+/* ▼▼▼ 【全新】世界书关联选择器 - 视觉优化 ▼▼▼ */
+
+/* 1. 让分类标题更突出 */
+.wb-category-header > span:last-of-type {
+  font-size: 14px;
+  font-weight: 700; /* 加粗 */
+  color: var(--text-primary);
+}
+
+/* 2. 为箭头设置一个漂亮的颜色循环 */
+#world-book-checkboxes-container
+  .wb-category-header:nth-of-type(6n + 1)
+  .arrow {
+  color: #007bff;
+} /* 蓝色 */
+#world-book-checkboxes-container
+  .wb-category-header:nth-of-type(6n + 2)
+  .arrow {
+  color: #28a745;
+} /* 绿色 */
+#world-book-checkboxes-container
+  .wb-category-header:nth-of-type(6n + 3)
+  .arrow {
+  color: #fd7e14;
+} /* 橙色 */
+#world-book-checkboxes-container
+  .wb-category-header:nth-of-type(6n + 4)
+  .arrow {
+  color: #6f42c1;
+} /* 紫色 */
+#world-book-checkboxes-container
+  .wb-category-header:nth-of-type(6n + 5)
+  .arrow {
+  color: #dc3545;
+} /* 红色 */
+#world-book-checkboxes-container
+  .wb-category-header:nth-of-type(6n + 6)
+  .arrow {
+  color: #ffc107;
+} /* 黄色 */
+
+/* ▲▲▲ 新CSS粘贴结束 ▲▲▲ */
+
+/* === 头像框选择模态框样式 (这是新添加的) === */
+.change-frame-btn {
+  padding: 6px 10px;
+  border: 1px solid #ccc;
+  background-color: #f0f0f0;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 13px;
+  margin-left: 10px;
+}
+
+#avatar-frame-modal .modal-content {
+  height: 70%; /* 让窗口高一点 */
+}
+
+#avatar-frame-modal .modal-body {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.frame-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.frame-tab {
+  flex: 1;
+  padding: 12px;
+  text-align: center;
+  font-weight: 500;
+  cursor: pointer;
+  color: var(--text-secondary);
+  border-bottom: 2px solid transparent;
+}
+
+.frame-tab.active {
+  color: var(--accent-color);
+  border-bottom-color: var(--accent-color);
+}
+
+.frame-content {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 15px;
+}
+
+.frame-grid {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(70px, 1fr)
+  ); /* 每行自动填充，最小70px宽 */
+  gap: 15px;
+}
+
+.frame-item {
+  aspect-ratio: 1 / 1; /* 保持正方形 */
+  border: 2px solid transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  background-color: #f0f0f0;
+  background-size: cover;
+  background-position: center;
+  padding: 5px;
+  transition: all 0.2s ease;
+  position: relative; /* 为预览图做准备 */
+}
+
+.frame-item.selected {
+  border-color: var(--accent-color);
+  transform: scale(1.05);
+}
+
+.frame-item .preview-avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.frame-item .preview-frame {
+  position: absolute;
+  top: -7px;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* ▼▼▼ 把这些CSS加回去 ▼▼▼ */
+
+.avatar-with-frame .avatar-img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%; /* 带框的头像通常是圆的 */
+  object-fit: cover;
+  z-index: 1;
+}
+/* ▼▼▼ 【最终修复版】请用这整块代码，替换掉旧的聊天和心声头像框规则 ▼▼▼ */
+
+.avatar-with-frame .avatar-frame,
+#inner-voice-avatar-frame {
+  position: absolute;
+  /* 核心修改1：将宽高统一设置为125%，确保能完全包裹34px的头像，并留出漂亮的边距 */
+  width: 125%;
+  height: 125%;
+
+  /* 核心修改2：使用标准的-50%来精确定位，确保头像框完美居中 */
+  transform: translate(-50%, -50%);
+
+  /* 核心修改3：将定位基点也改为标准的50%，与transform配合使用 */
+  top: 50%;
+  left: 50%;
+
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* ▲▲▲ 替换结束 ▲▲▲ */
+
+/* ▲▲▲ 添加结束 ▲▲▲ */
+
+/* ▼▼▼ 【最终美化版】聊天列表左滑置顶功能样式 (已修复Bug) ▼▼▼ */
+
+/* 1. 外层包裹容器 (已移除 display:flex) */
+.chat-list-item-swipe-container {
+  position: relative;
+  overflow: hidden;
+}
+
+/* 2. 可滑动的内容区 (保持不变) */
+.chat-list-item-content {
+  position: relative;
+  z-index: 2;
+  background-color: var(--secondary-bg);
+  transition:
+    transform 0.3s ease,
+    background-color 0.3s ease;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+/* 3. 【核心修改1】置顶聊天时，使用对比度更强的背景色 */
+.chat-list-item-content.pinned {
+  background-color: #f0f2f5; /* 日间模式下的置顶颜色 (已加深) */
+}
+#phone-screen.dark-mode .chat-list-item-content.pinned {
+  background-color: #3a3a3c; /* 夜间模式下的置顶颜色 (已加深) */
+}
+
+/* 4. 隐藏的操作按钮区域 (保持不变) */
+.swipe-actions {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+}
+
+/* 5. 单个操作按钮的样式 (保持不变) */
+.swipe-action-btn {
+  height: 100%;
+  padding: 0 20px;
+  border: none;
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+}
+
+.swipe-action-btn.pin {
+  background-color: #f0ad4e;
+}
+.swipe-action-btn.unpin {
+  background-color: #777;
+}
+.swipe-action-btn.delete {
+  background-color: #ff3b30;
+}
+
+/* 6. 当内容区被滑开时 (保持不变) */
+.chat-list-item-content.swiped {
+  transform: translateX(-160px);
+}
+
+/* 7. 分割线的正确逻辑 (保持不变) */
+.chat-list-item {
+  border-bottom: none;
+}
+.chat-list-item-swipe-container:not(:last-child) {
+  border-bottom: 1px solid var(--border-color);
+}
+.chat-group-container {
+  border-bottom: 1px solid var(--border-color);
+}
+.chat-group-container:first-of-type {
+  border-top: 1px solid var(--border-color);
+}
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+
+/* ▼▼▼ 用下面这段【新样式】，替换掉你旧的 .date-stamp 样式 ▼▼▼ */
+
+/* 日期戳的外层包裹，让它像系统消息一样居中 */
+.date-stamp-wrapper {
+  justify-content: center;
+  align-self: center;
+  margin: 10px 0;
+  max-width: 80%;
+}
+
+/* 日期戳的气泡本身 */
+.date-stamp-bubble {
+  background-color: rgba(0, 0, 0, 0.1);
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: 10px;
+}
+
+/* 适配夜间模式 */
+#phone-screen.dark-mode .date-stamp-bubble {
+  background-color: rgba(255, 255, 255, 0.15);
+}
+/* ▲▲▲ 替换结束 ▲▲▲ */
+
+/* ▼▼▼ 请将这段新CSS粘贴到 <style> 的末尾 ▼▼▼ */
+.chat-list-time {
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-align: right;
+  margin-left: 8px; /* 和中间的信息区拉开一点距离 */
+  flex-shrink: 0; /* 防止在空间不足时被压缩 */
+  align-self: flex-start; /* 让它和顶部的名字对齐 */
+  padding-top: 2px; /* 微调垂直位置 */
+}
+/* ▲▲▲ 新CSS粘贴结束 ▲▲▲ */
+
+/* ▼▼▼ 请将这段新CSS粘贴到 <style> 的末尾 ▼▼▼ */
+.chat-list-right-column {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end; /* 让内容靠右对齐 */
+  gap: 4px; /* 在时间和红点之间加一点点间距 */
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+/* ▲▲▲ 新CSS粘贴结束 ▲▲▲ */
+
+/* ▼▼▼ 【全新】锁屏与密码界面样式 ▼▼▼ */
+
+/* 1. 锁屏界面的总容器 */
+#lock-screen {
+  /* 核心：用一个非常高的 z-index 确保它能覆盖所有其他屏幕 */
+  z-index: 999;
+  background-size: cover;
+  background-position: center;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between; /* 让时钟和提示语上下分布 */
+  align-items: center;
+  padding: 80px 20px 50px 20px;
+  box-sizing: border-box;
+  transition: transform 0.3s ease-out;
+}
+
+/* 2. 锁屏时钟 (复用主屏幕时钟的样式) */
+#lock-clock-container {
+  text-align: center;
+  text-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
+  flex-shrink: 0;
+}
+#lock-main-time {
+  font-size: 80px;
+  font-weight: 200;
+}
+#lock-main-date {
+  font-size: 18px;
+  font-weight: 500;
+}
+
+/* 3. “向上轻扫”的提示文字和动画 */
+#unlock-hint {
+  font-size: 16px;
+  font-weight: 500;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  /* 添加一个呼吸动画，吸引用户注意 */
+  animation: hint-pulse 2s infinite ease-in-out;
+}
+@keyframes hint-pulse {
+  0%,
+  100% {
+    opacity: 0.7;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-5px);
+  }
+}
+
+/* 4. 密码输入弹窗的遮罩层 */
+#password-modal-overlay {
+  /* 使用一个半透明的毛玻璃效果背景 */
+  background-color: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  z-index: 1000; /* 比锁屏更高，确保在最上层 */
+}
+
+/* 5. 密码输入弹窗的内容区 */
+.password-modal-content {
+  background-color: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  width: 280px;
+  border-radius: 15px;
+  padding: 20px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  color: #333;
+}
+.password-modal-content p {
+  font-size: 17px;
+  font-weight: 600;
+  margin: 0;
+}
+
+/* 6. 密码输入框 */
+#password-input-field {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  font-size: 16px;
+  text-align: center;
+  box-sizing: border-box;
+  background-color: rgba(255, 255, 255, 0.7);
+}
+#password-input-field:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+/* 7. 密码弹窗的按钮区域 */
+.password-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 5px;
+}
+.password-actions button {
+  flex: 1;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+}
+#password-cancel-btn {
+  background-color: #e9ecef;
+  color: #495057;
+}
+#password-confirm-btn {
+  background-color: var(--accent-color);
+  color: white;
+}
+
+/* 8. 密码错误时的晃动动画 */
+@keyframes shake-error {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  10%,
+  30%,
+  50%,
+  70%,
+  90% {
+    transform: translateX(-5px);
+  }
+  20%,
+  40%,
+  60%,
+  80% {
+    transform: translateX(5px);
+  }
+}
+.password-modal-content.error {
+  animation: shake-error 0.4s ease-in-out;
+}
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+
+/* ▼▼▼ 用这块【最终修复版】代码，完整替换掉你旧的 .bubble-preset-manager 样式 ▼▼▼ */
+
+/* 这是你要修改前的代码 */
+/* ▼▼▼ 【全新】气泡/API样式预设功能CSS ▼▼▼ */
+.bubble-preset-manager {
+  display: flex;
+  align-items: baseline; /* 核心修改：从 center 改为 baseline */
+  gap: 10px; /* 元素之间的间距 */
+}
+
+/* ▲▲▲ 替换结束 ▲▲▲ */
+
+/* 下拉框的样式，让它占据大部分空间 */
+.bubble-preset-manager select {
+  flex-grow: 1; /* 占据所有剩余空间 */
+}
+
+/* 管理按钮的样式，让它小巧精致 */

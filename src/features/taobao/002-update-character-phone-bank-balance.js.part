@@ -1,0 +1,1424 @@
+async function updateCharacterPhoneBankBalance(charId, amount, description) {
+  const chat = state.chats[charId];
+  if (!chat || chat.isGroup) return;
+
+  if (!chat.characterPhoneData) chat.characterPhoneData = {};
+  if (!chat.characterPhoneData.bank)
+    chat.characterPhoneData.bank = { balance: 0, transactions: [] };
+  if (typeof chat.characterPhoneData.bank.balance !== "number")
+    chat.characterPhoneData.bank.balance = 0;
+
+  chat.characterPhoneData.bank.balance += amount;
+
+  const newTransaction = {
+    type: amount > 0 ? "收入" : "支出",
+    amount: Math.abs(amount),
+    description: description,
+    timestamp: Date.now(),
+  };
+
+  // 让最新的交易记录显示在最前面
+  if (!Array.isArray(chat.characterPhoneData.bank.transactions)) {
+    chat.characterPhoneData.bank.transactions = [];
+  }
+  chat.characterPhoneData.bank.transactions.unshift(newTransaction);
+
+  await db.chats.put(chat);
+  console.log(
+    `✅ 角色[${chat.name}]钱包已更新: 金额=${amount.toFixed(2)}, 新余额=${chat.characterPhoneData.bank.balance.toFixed(
+      2,
+    )}`,
+  );
+}
+
+/**
+ * 清空桃宝首页的所有商品及购物车
+ */
+async function clearTaobaoProducts() {
+  // 1. 修改提示语，告知用户购物车也会被清空
+  const confirmed = await showCustomConfirm(
+    "确认清空",
+    "确定要清空桃宝首页的所有商品吗？此操作将【一并清空购物车】，且无法恢复。",
+    { confirmButtonClass: "btn-danger" },
+  );
+
+  if (confirmed) {
+    try {
+      // 使用数据库事务，确保两步操作要么都成功，要么都失败，更安全
+      await db.transaction("rw", db.taobaoProducts, db.taobaoCart, async () => {
+        // 清空商品库
+        await db.taobaoProducts.clear();
+        // 清空购物车数据库
+        await db.taobaoCart.clear();
+      });
+
+      // 重新渲染UI
+      await renderTaobaoProducts();
+      // 刷新购物车UI（让页面变空）
+      await renderTaobaoCart();
+      // 更新购物车角标（让红点消失）
+      updateCartBadge();
+
+      // 2. 修改成功提示
+      await showCustomAlert("操作成功", "所有商品及购物车已被清空！");
+    } catch (error) {
+      console.error("清空桃宝商品时出错:", error);
+      await showCustomAlert("操作失败", `发生错误: ${error.message}`);
+    }
+  }
+}
+
+/**
+ * 打开“桃宝”App，并渲染默认视图
+ */
+async function openTaobaoApp() {
+  showScreen("taobao-screen");
+  await renderTaobaoProducts(); // 默认显示所有商品
+  renderBalanceDetails(); // 刷新余额显示
+}
+
+/**
+ * 渲染“饿了么”页面的美食列表
+ */
+async function renderElemeFoods() {
+  const gridEl = document.getElementById("eleme-grid");
+  gridEl.innerHTML = "";
+  const foods = await db.elemeFoods.toArray();
+
+  if (foods.length === 0) {
+    gridEl.innerHTML =
+      '<p style="grid-column: 1 / -1; text-align: center; color: var(--text-secondary);">还没有美食哦，点击右上角“✨”或“+”来发现美味吧！</p>';
+    return;
+  }
+
+  foods.forEach((food) => {
+    const card = document.createElement("div");
+    card.className = "product-card";
+    card.style.cursor = "pointer";
+    card.dataset.foodId = food.id;
+
+    card.innerHTML = `
+        <div class="product-image-container">
+            <!-- 图片或加载动画将在这里 -->
+        </div>
+        <div class="product-info">
+            <div class="product-name" title="${food.name} · ${food.restaurant}">${food.name}</div>
+            <div class="product-price">¥${food.price.toFixed(2)}</div>
+        </div>
+    `;
+
+    const imageContainer = card.querySelector(".product-image-container");
+
+    if (food.imageUrl) {
+      imageContainer.innerHTML = `<img src="${food.imageUrl}" class="product-image" alt="${food.name}">`;
+    } else {
+      imageContainer.innerHTML = `<div class="loading-spinner"></div>`;
+      imageGenerationQueue.push({ type: "eleme", item: food });
+    }
+
+    addLongPressListener(card, () => showFoodActions(food.id));
+    gridEl.appendChild(card);
+  });
+
+  // 渲染完所有卡片后，触发一次队列处理器
+  processImageQueue();
+}
+
+/**
+ * 打开美食详情弹窗
+ * @param {number} foodId - 美食的ID
+ */
+async function openFoodDetail(foodId) {
+  const food = await db.elemeFoods.get(foodId);
+  if (!food) return;
+
+  const modal = document.getElementById("product-detail-modal");
+  const bodyEl = document.getElementById("product-detail-body");
+  const reviewsSection = document.getElementById("product-reviews-section");
+  const closeBtn = document.getElementById("close-product-detail-btn");
+  const actionBtn = document.getElementById("detail-add-to-cart-btn");
+
+  // 1. 渲染美食基本信息
+  bodyEl.innerHTML = `
+        <img src="${food.imageUrl}" class="product-image" alt="${food.name}">
+        <h2 class="product-name">${food.name}</h2>
+        <p class="product-price">¥${food.price.toFixed(2)}</p>
+        <p style="color: #888; font-size: 13px;">店铺: ${food.restaurant || "精选商家"}</p>
+    `;
+
+  // 2. 隐藏不相关的“宝贝评价”区域
+  reviewsSection.style.display = "none";
+
+  // 3. 改造底部按钮
+  const newActionBtn = actionBtn.cloneNode(true);
+  newActionBtn.textContent = "给Ta点单"; // 修改按钮文字
+  actionBtn.parentNode.replaceChild(newActionBtn, actionBtn);
+
+  // 为新按钮绑定“点单”逻辑
+  newActionBtn.onclick = async () => {
+    modal.classList.remove("visible"); // 先关闭弹窗
+    await handleOrderForChar(foodId); // 再执行点单流程
+  };
+
+  // 绑定关闭按钮
+  closeBtn.onclick = () => modal.classList.remove("visible");
+
+  // 显示弹窗
+  modal.classList.add("visible");
+}
+/**
+ * 【全新】清空饿了么的所有美食
+ */
+async function clearElemeFoods() {
+  const confirmed = await showCustomConfirm(
+    "确认清空",
+    "确定要清空饿了么的所有美食吗？此操作无法恢复。",
+    {
+      confirmButtonClass: "btn-danger",
+    },
+  );
+
+  if (confirmed) {
+    try {
+      await db.elemeFoods.clear(); // 清空美食数据库
+      await renderElemeFoods(); // 重新渲染UI，显示空状态
+      await showCustomAlert("操作成功", "所有美食已被清空！");
+    } catch (error) {
+      console.error("清空饿了么美食时出错:", error);
+      await showCustomAlert("操作失败", `发生错误: ${error.message}`);
+    }
+  }
+}
+
+/**
+ * 为“饿了么”随机生成商品
+ */
+async function handleGenerateFoodsAI() {
+  await showCustomAlert("请稍候...", "AI正在搜罗全城好物...");
+  const { proxyUrl, apiKey, model } = state.apiConfig;
+  if (!proxyUrl || !apiKey || !model) {
+    alert("请先在API设置中配置好才能使用AI功能哦！");
+    return;
+  }
+
+  const prompt = `
+# 任务
+你是一个外卖App“饿了么”的编辑。请为我随机推荐5-8款外卖商品。
+
+# 核心规则
+1.  **商品多样性**: 商品类型必须多样化，可以包含【美食、零食、饮料、药品、日用品】等。
+2.  **名称诱人**: 商品名称要听起来就很好。
+3.  **格式铁律**: 你的回复【必须且只能】是一个严格的JSON数组，每个对象代表一款商品，并包含以下字段:
+    -   \`"name"\`: 商品名称 (字符串)
+    -   \`"price"\`: 价格 (数字)
+    -   \`"restaurant"\`: 虚拟的店铺名称 (字符串)
+    -   \`"category"\`: 商品分类 (字符串, 例如: "美食", "饮品", "零食", "药品", "日用")
+    -   \`"imagePrompt"\`: 一个详细的、用于文生图AI的【英文提示词】，用于生成一张关于该商品的【诱人的产品图 (appetizing product shot)】。
+
+# JSON输出格式示例:
+[
+  {
+    "name": "多肉葡萄奶盖茶",
+    "price": 22.0,
+    "restaurant": "奈雪的茶",
+    "category": "饮品",
+    "imagePrompt": "A cup of grape cheese foam tea, with fresh grape pulp, product shot, minimalist, vibrant, delicious and appetizing, commercial photography"
+  },
+  {
+    "name": "布洛芬缓释胶囊",
+    "price": 15.5,
+    "restaurant": "家门口药房",
+    "category": "药品",
+    "imagePrompt": "A box of Ibuprofen sustained-release capsules, clean medical product shot, minimalist, on a white background, professional photography"
+  }
+]`;
+
+  try {
+    const messagesForApi = [{ role: "user", content: prompt }];
+    const isGemini = proxyUrl === GEMINI_API_URL;
+    const requestData = isGemini
+      ? toGeminiRequestData(model, apiKey, prompt, messagesForApi, isGemini)
+      : {
+          url: `${proxyUrl}/v1/chat/completions`,
+          options: {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+              model: model,
+              messages: messagesForApi,
+              temperature: 1.1,
+              response_format: { type: "json_object" },
+            }),
+          },
+        };
+    const response = await fetch(requestData.url, requestData.options);
+    if (!response.ok) throw new Error(`API请求失败: ${await response.text()}`);
+    const data = await response.json();
+    const rawContent = isGemini
+      ? data.candidates[0].content.parts[0].text
+      : data.choices[0].message.content;
+    let newFoods;
+    try {
+      newFoods = JSON.parse(rawContent.replace(/^```json\s*|```$/g, "").trim());
+    } catch (e) {
+      throw new Error("AI返回的JSON格式不正确。");
+    }
+
+    if (Array.isArray(newFoods) && newFoods.length > 0) {
+      const foodsToSave = newFoods.map((food) => ({ ...food, imageUrl: "" }));
+      await db.elemeFoods.bulkAdd(foodsToSave);
+      await renderElemeFoods(); // 重新渲染饿了么页面
+      await showCustomAlert(
+        "生成成功！",
+        `已成功为您推荐 ${newFoods.length} 款商品！`,
+      );
+    } else {
+      throw new Error("AI返回的数据格式不正确或为空。");
+    }
+  } catch (error) {
+    console.error("AI生成饿了么商品失败:", error);
+    await showCustomAlert("生成失败", `发生错误: ${error.message}`);
+  }
+}
+
+/**
+ * 根据关键词搜索商品
+ */
+async function handleSearchFoodsAI() {
+  const searchTerm = document.getElementById("eleme-search-input").value.trim();
+  if (!searchTerm) {
+    alert("请输入你想搜索的商品关键词！");
+    return;
+  }
+
+  await showCustomAlert(
+    "请稍候...",
+    `AI正在为你寻找关于“${searchTerm}”的商品...`,
+  );
+  const { proxyUrl, apiKey, model } = state.apiConfig;
+  if (!proxyUrl || !apiKey || !model) {
+    alert("请先配置API！");
+    return;
+  }
+
+  const prompt = `
+# 任务
+你是一个外卖App“饿了么”的搜索引擎。请根据用户提供的【搜索关键词】，为Ta创作一个包含5-8件相关外卖商品的列表。
+
+# 用户搜索的关键词:
+"${searchTerm}"
+
+# 核心规则
+1.  **高度相关**: 所有商品都必须与用户的搜索关键词 "${searchTerm}" 紧密相关。
+2.  **格式铁律**: 你的回复【必须且只能】是一个严格的JSON数组，每个对象代表一款商品，并包含以下字段:
+    -   \`"name"\`: 商品名称
+    -   \`"price"\`: 价格 (数字)
+    -   \`"restaurant"\`: 虚拟的店铺名称
+    -   \`"category"\`: 商品分类 (例如: "美食", "饮品", "零食", "药品", "日用")
+    -   \`"imagePrompt"\`: 一个详细的、用于文生图AI的【英文提示词】，用于生成一张关于“${searchTerm}”的【诱人的产品图 (appetizing product shot)】。
+
+# JSON输出格式示例:
+[
+  {
+    "name": "经典意式肉酱面",
+    "price": 42.0,
+    "restaurant": "街角意面馆",
+    "category": "美食",
+    "imagePrompt": "A bowl of classic Italian bolognese pasta, food photography, close-up, delicious and appetizing, garnished with basil leaves, high detail"
+  }
+]`;
+
+  try {
+    const messagesForApi = [{ role: "user", content: prompt }];
+    const isGemini = proxyUrl === GEMINI_API_URL;
+    const requestData = isGemini
+      ? toGeminiRequestData(model, apiKey, prompt, messagesForApi, isGemini)
+      : {
+          url: `${proxyUrl}/v1/chat/completions`,
+          options: {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+              model: model,
+              messages: messagesForApi,
+              temperature: 0.8,
+              response_format: { type: "json_object" },
+            }),
+          },
+        };
+
+    const response = await fetch(requestData.url, requestData.options);
+    if (!response.ok) throw new Error(`API请求失败: ${await response.text()}`);
+
+    const data = await response.json();
+    const rawContent = isGemini
+      ? data.candidates[0].content.parts[0].text
+      : data.choices[0].message.content;
+    let foundFoods;
+    try {
+      foundFoods = JSON.parse(
+        rawContent.replace(/^```json\s*|```$/g, "").trim(),
+      );
+    } catch (e) {
+      throw new Error("AI返回的JSON格式不正确。");
+    }
+
+    if (Array.isArray(foundFoods) && foundFoods.length > 0) {
+      const foodsToSave = foundFoods.map((food) => ({ ...food, imageUrl: "" }));
+      await db.elemeFoods.bulkAdd(foodsToSave);
+      await renderElemeFoods(); // 刷新列表
+      await showCustomAlert(
+        "搜索成功！",
+        `AI找到的 ${foundFoods.length} 款商品已添加到列表！`,
+      );
+    } else {
+      throw new Error("AI没有找到相关的商品。");
+    }
+  } catch (error) {
+    console.error("AI搜索饿了么商品失败:", error);
+    await showCustomAlert("搜索失败", `发生错误: ${error.message}`);
+  }
+}
+
+/**
+ * 打开美食编辑器（支持添加和编辑）
+ * @param {number|null} foodId - 如果是编辑模式，传入美食ID；否则为null
+ */
+async function openFoodEditor(foodId = null) {
+  currentEditingFoodId = foodId; // 保存正在编辑的美食ID
+  const modal = document.getElementById("product-editor-modal");
+  const titleEl = document.getElementById("product-editor-title");
+
+  // 调整UI和填充数据
+  document.getElementById("product-category-input").placeholder =
+    "店铺名 (选填)";
+  // 确保保存按钮的事件指向美食保存函数
+  const saveBtn = document.getElementById("save-product-btn");
+  const newSaveBtn = saveBtn.cloneNode(true); // 克隆以清除旧事件
+  saveBtn.parentNode.replaceChild(newSaveBtn, saveBtn);
+  newSaveBtn.addEventListener("click", saveFoodItem);
+
+  if (foodId) {
+    // 编辑模式
+    titleEl.textContent = "编辑美食";
+    const food = await db.elemeFoods.get(foodId);
+    if (food) {
+      document.getElementById("product-name-input").value = food.name;
+      document.getElementById("product-price-input").value = food.price;
+      document.getElementById("product-image-input").value = food.imageUrl;
+      document.getElementById("product-category-input").value =
+        food.restaurant || "";
+    }
+  } else {
+    // 添加模式
+    titleEl.textContent = "手动添加美食";
+    // 清空输入框
+    document.getElementById("product-name-input").value = "";
+    document.getElementById("product-price-input").value = "";
+    document.getElementById("product-image-input").value = "";
+    document.getElementById("product-category-input").value = "";
+  }
+
+  modal.classList.add("visible");
+}
+
+/**
+ * 保存手动添加或编辑的美食
+ */
+async function saveFoodItem() {
+  const name = document.getElementById("product-name-input").value.trim();
+  const price = parseFloat(
+    document.getElementById("product-price-input").value,
+  );
+  let imageUrl = document.getElementById("product-image-input").value.trim();
+  const restaurant = document
+    .getElementById("product-category-input")
+    .value.trim();
+
+  if (!name || isNaN(price) || price <= 0) {
+    alert("请填写美食名称和有效价格！");
+    return;
+  }
+
+  // 如果用户没有提供图片链接，则留空，让渲染器去触发AI生图
+  if (!imageUrl) {
+    imageUrl = "";
+  }
+
+  const foodData = {
+    name,
+    price,
+    imageUrl,
+    restaurant: restaurant || "私房小厨",
+  };
+
+  try {
+    if (currentEditingFoodId) {
+      // 更新模式
+      await db.elemeFoods.update(currentEditingFoodId, foodData);
+      await showCustomAlert("保存成功", "美食信息已更新！");
+    } else {
+      // 添加模式
+      await db.elemeFoods.add(foodData);
+      await showCustomAlert("添加成功", "新美食已添加！");
+    }
+
+    // 操作完成后关闭弹窗并刷新列表
+    document.getElementById("product-editor-modal").classList.remove("visible");
+    await renderElemeFoods();
+  } catch (error) {
+    console.error("保存美食失败:", error);
+    await showCustomAlert("保存失败", `发生错误: ${error.message}`);
+  } finally {
+    currentEditingFoodId = null; // 无论成功失败，都重置编辑ID
+  }
+}
+
+/**
+ * 核心函数：处理用户点击“给Ta点单”的完整流程
+ * @param {number} foodId - 被点击的美食的ID
+ */
+async function handleOrderForChar(foodId) {
+  const food = await db.elemeFoods.get(foodId);
+  if (!food) return;
+
+  // 1. 检查用户余额
+  if ((state.globalSettings.userBalance || 0) < food.price) {
+    alert("你的余额不足，无法为Ta点单！");
+    return;
+  }
+
+  // 2. 打开角色选择器，让用户选择为谁点单
+  const targetCharId = await openCharSelectorForEleme();
+  if (!targetCharId) return; // 如果用户取消了选择，则结束流程
+
+  const char = state.chats[targetCharId];
+  if (!char) return;
+
+  // 3. 弹出最终确认框
+  const confirmed = await showCustomConfirm(
+    "确认点单",
+    `确定要花费 ¥${food.price.toFixed(2)} 为“${char.name}”点一份“${food.name}”吗？`,
+    { confirmText: "立即下单" },
+  );
+
+  if (confirmed) {
+    const remark = await showCustomPrompt(
+      "外卖备注 (可选)",
+      "有什么想对骑手或商家说的吗？",
+      "无接触配送，谢谢！", // 这是一个友好的默认值
+    );
+    // 如果用户点了取消，remark会是null，但不影响流程
+
+    await showCustomAlert("请稍候...", `正在为“${char.name}”下单...`);
+
+    // 4. 扣除用户余额
+    await updateUserBalanceAndLogTransaction(
+      -food.price,
+      `为 ${char.name} 点外卖: ${food.name}`,
+    );
+
+    // 5. 创建外卖订单记录
+    await db.elemeOrders.add({
+      foodId: foodId,
+      quantity: 1,
+      timestamp: Date.now(),
+      status: "已下单",
+      recipientId: targetCharId,
+    });
+
+    await sendElemeOrderNotificationToChar(targetCharId, food, remark);
+
+    await showCustomAlert(
+      "下单成功！",
+      `已为“${char.name}”点好外卖，并已通过私信通知对方啦！`,
+    );
+    renderChatList();
+  }
+}
+
+/**
+ * 辅助函数：打开一个单选的角色选择器
+ * @returns {Promise<string|null>} - 返回选中的角色ID，如果取消则返回null
+ */
+async function openCharSelectorForEleme() {
+  return new Promise((resolve) => {
+    const modal = document.getElementById("share-target-modal");
+    const listEl = document.getElementById("share-target-list");
+    const titleEl = document.getElementById("share-target-modal-title");
+    const confirmBtn = document.getElementById("confirm-share-target-btn");
+    const cancelBtn = document.getElementById("cancel-share-target-btn");
+
+    titleEl.textContent = "要为谁点单？";
+    listEl.innerHTML = "";
+
+    const singleChats = Object.values(state.chats).filter((c) => !c.isGroup);
+
+    if (singleChats.length === 0) {
+      alert("你还没有任何可以点单的好友哦。");
+      modal.classList.remove("visible");
+      resolve(null);
+      return;
+    }
+
+    singleChats.forEach((chat) => {
+      const item = document.createElement("div");
+      item.className = "contact-picker-item";
+      item.innerHTML = `
+                <input type="radio" name="eleme-target" value="${chat.id}" id="target-${
+                  chat.id
+                }" style="margin-right: 15px;">
+                <label for="target-${chat.id}" style="display:flex; align-items:center; width:100%; cursor:pointer;">
+                    <img src="${chat.settings.aiAvatar || defaultAvatar}" class="avatar">
+                    <span class="name">${chat.name}</span>
+                </label>
+            `;
+      listEl.appendChild(item);
+    });
+
+    modal.classList.add("visible");
+
+    const newConfirmBtn = confirmBtn.cloneNode(true);
+    confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+    const newCancelBtn = cancelBtn.cloneNode(true);
+    cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+
+    const cleanup = () => modal.classList.remove("visible");
+
+    newConfirmBtn.onclick = () => {
+      const selectedRadio = document.querySelector(
+        'input[name="eleme-target"]:checked',
+      );
+      if (selectedRadio) {
+        cleanup();
+        resolve(selectedRadio.value);
+      } else {
+        alert("请选择一个点单对象！");
+      }
+    };
+
+    newCancelBtn.onclick = () => {
+      cleanup();
+      resolve(null);
+    };
+  });
+}
+
+/**
+ * 发送外卖订单通知到指定角色的聊天
+ */
+async function sendElemeOrderNotificationToChar(targetChatId, food, remark) {
+  const chat = state.chats[targetChatId];
+  if (!chat) return;
+
+  // 准备给AI看的文本，现在包含了备注信息
+  const textContentForAI = `[系统提示：用户给你点了一份来自“${food.restaurant}”的外卖“${food.name}”，并备注说：“${
+    remark || "无"
+  }”。请根据你的人设对此作出回应。]`;
+
+  // 准备要渲染成卡片的数据 (payload)
+  const notificationPayload = {
+    foodName: food.name,
+    foodImageUrl: food.imageUrl,
+    senderName: state.qzoneSettings.nickname || "我",
+    remark: remark || "", // 将备注保存到payload中
+  };
+
+  // 创建消息对象
+  const notificationMessage = {
+    role: "user", // 由用户发出
+    type: "eleme_order_notification",
+    timestamp: Date.now(),
+    // content 字段现在用于AI理解上下文，而不是UI渲染
+    content: `我给你点了份外卖：${food.name} `,
+    payload: notificationPayload,
+  };
+  chat.history.push(notificationMessage);
+
+  // 创建给AI看的隐藏指令
+  const hiddenMessage = {
+    role: "system",
+    content: textContentForAI,
+    timestamp: Date.now() + 1,
+    isHidden: true,
+  };
+  chat.history.push(hiddenMessage);
+
+  chat.unreadCount = (chat.unreadCount || 0) + 1;
+  await db.chats.put(chat);
+
+  if (state.activeChatId !== targetChatId) {
+    showNotification(targetChatId, "你收到了一份外卖！");
+  }
+
+  // 主动触发AI回应
+  openChat(targetChatId);
+}
+
+function switchTaobaoView(viewId) {
+  document
+    .querySelectorAll(".taobao-view")
+    .forEach((v) => v.classList.remove("active"));
+  document.getElementById(viewId).classList.add("active");
+
+  document.querySelectorAll(".taobao-tab").forEach((t) => {
+    t.classList.toggle("active", t.dataset.view === viewId);
+  });
+
+  if (viewId === "orders-view") {
+    renderTaobaoOrders();
+  } else if (viewId === "my-view") {
+    renderBalanceDetails();
+  } else if (viewId === "cart-view") {
+    renderTaobaoCart();
+  } else if (viewId === "eleme-view") {
+    // <-- 新增的判断
+    renderElemeFoods();
+  }
+}
+
+/**
+ * 渲染购物车页面
+ */
+async function renderTaobaoCart() {
+  const listEl = document.getElementById("cart-item-list");
+  const checkoutBar = document.getElementById("cart-checkout-bar");
+  listEl.innerHTML = "";
+
+  const cartItems = await db.taobaoCart.toArray();
+
+  if (cartItems.length === 0) {
+    listEl.innerHTML =
+      '<p style="text-align:center; color: var(--text-secondary); padding: 50px 0;">购物车空空如也~</p>';
+    checkoutBar.style.display = "none";
+    updateCartBadge(0);
+    return;
+  }
+
+  checkoutBar.style.display = "flex";
+  let totalPrice = 0;
+  let totalItems = 0;
+
+  for (const item of cartItems) {
+    const product = await db.taobaoProducts.get(item.productId);
+    if (!product) continue;
+
+    totalItems += item.quantity;
+    totalPrice += product.price * item.quantity;
+
+    const itemEl = document.createElement("div");
+    itemEl.className = "cart-item";
+    itemEl.innerHTML = `
+            <img src="${product.imageUrl}" class="product-image" data-product-id="${product.id}">
+            <div class="cart-item-info" data-product-id="${product.id}">
+                <div class="product-name">${product.name}</div>
+                <div class="product-price">¥${product.price.toFixed(2)}</div>
+            </div>
+            <div class="quantity-controls">
+                <button class="quantity-decrease" data-cart-id="${item.id}" ${
+                  item.quantity <= 1 ? "disabled" : ""
+                }>-</button>
+                <span class="quantity-display">${item.quantity}</span>
+                <button class="quantity-increase" data-cart-id="${item.id}">+</button>
+            </div>
+            <button class="delete-cart-item-btn" data-cart-id="${item.id}">×</button>
+        `;
+    listEl.appendChild(itemEl);
+  }
+
+  document.getElementById("cart-total-price").textContent =
+    `¥ ${totalPrice.toFixed(2)}`;
+  const checkoutBtn = document.getElementById("checkout-btn");
+  checkoutBtn.textContent = `结算(${totalItems})`;
+  checkoutBtn.dataset.totalPrice = totalPrice; // 把总价存起来，方便结算时用
+
+  updateCartBadge(totalItems);
+}
+
+/**
+ * 更新购物车图标上的角标数量
+ */
+function updateCartBadge() {
+  const badge = document.getElementById("cart-item-count-badge");
+  db.taobaoCart.toArray().then((items) => {
+    const totalCount = items.reduce((sum, item) => sum + item.quantity, 0);
+    if (totalCount > 0) {
+      badge.textContent = totalCount > 99 ? "99+" : totalCount;
+      badge.style.display = "inline-block";
+    } else {
+      badge.style.display = "none";
+    }
+  });
+}
+
+/**
+ * 处理加入购物车的逻辑
+ */
+async function handleAddToCart(productId) {
+  const existingItem = await db.taobaoCart
+    .where("productId")
+    .equals(productId)
+    .first();
+  if (existingItem) {
+    // 如果已存在，则数量+1
+    await db.taobaoCart.update(existingItem.id, {
+      quantity: existingItem.quantity + 1,
+    });
+  } else {
+    // 如果不存在，则新增
+    await db.taobaoCart.add({ productId: productId, quantity: 1 });
+  }
+  await showCustomAlert("成功", "宝贝已加入购物车！");
+  updateCartBadge(); // 更新角标
+}
+
+/**
+ * 处理购物车内商品数量的变化
+ */
+async function handleChangeCartItemQuantity(cartId, change) {
+  const item = await db.taobaoCart.get(cartId);
+  if (!item) return;
+
+  const newQuantity = item.quantity + change;
+  if (newQuantity <= 0) {
+    // 如果数量减到0，就删除该项
+    await handleRemoveFromCart(cartId);
+  } else {
+    await db.taobaoCart.update(cartId, { quantity: newQuantity });
+    await renderTaobaoCart();
+  }
+}
+
+/**
+ * 从购物车中移除商品
+ */
+async function handleRemoveFromCart(cartId) {
+  await db.taobaoCart.delete(cartId);
+  await renderTaobaoCart();
+}
+
+/**
+ * 打开商品详情弹窗
+ */
+async function openProductDetail(productId) {
+  const product = await db.taobaoProducts.get(productId);
+  if (!product) return;
+
+  const modal = document.getElementById("product-detail-modal");
+  const bodyEl = document.getElementById("product-detail-body");
+  const reviewsSection = document.getElementById("product-reviews-section");
+  const reviewsListEl = document.getElementById("product-reviews-list");
+  const generateBtn = document.getElementById("generate-reviews-btn");
+  const actionBtn = document.getElementById("detail-add-to-cart-btn");
+
+  // 强制重置UI状态
+  // 无论上次是什么状态，都确保评价区是可见的
+  reviewsSection.style.display = "block";
+
+  // 渲染商品基本信息
+  bodyEl.innerHTML = `
+        <img src="${product.imageUrl}" class="product-image" alt="${product.name}">
+        <h2 class="product-name">${product.name}</h2>
+        <p class="product-price">${product.price.toFixed(2)}</p>
+        <p style="color: #888; font-size: 13px;">店铺: ${product.store || "桃宝自营"}</p>
+    `;
+
+  // 渲染评价区域
+  reviewsListEl.innerHTML = "";
+  if (product.reviews && product.reviews.length > 0) {
+    product.reviews.forEach((review) => {
+      const reviewEl = document.createElement("div");
+      reviewEl.className = "product-review-item";
+      reviewEl.innerHTML = `
+                <div class="review-author">${review.author}</div>
+                <p>${review.text}</p>
+            `;
+      reviewsListEl.appendChild(reviewEl);
+    });
+    generateBtn.style.display = "none";
+  } else {
+    reviewsListEl.innerHTML =
+      '<p style="text-align: center; color: var(--text-secondary); font-size: 13px;">还没有人评价哦~</p>';
+    generateBtn.style.display = "block";
+  }
+
+  // 重新绑定“生成评价”按钮的事件 (防止重复绑定)
+  const newGenerateBtn = generateBtn.cloneNode(true);
+  generateBtn.parentNode.replaceChild(newGenerateBtn, generateBtn);
+  newGenerateBtn.addEventListener("click", () =>
+    generateProductReviews(productId),
+  );
+
+  // 强制重置按钮并重新绑定事件
+  // 先克隆按钮以清除旧事件监听器
+  const newAddToCartBtn = actionBtn.cloneNode(true);
+
+  newAddToCartBtn.textContent = "加入购物车";
+  // 为新按钮绑定正确的“加入购物车”逻辑
+  newAddToCartBtn.onclick = async () => {
+    await handleAddToCart(productId);
+    modal.classList.remove("visible"); // 添加后自动关闭弹窗
+  };
+  actionBtn.parentNode.replaceChild(newAddToCartBtn, actionBtn);
+
+  // 绑定关闭按钮
+  document.getElementById("close-product-detail-btn").onclick = () =>
+    modal.classList.remove("visible");
+
+  // 最后，显示弹窗
+  modal.classList.add("visible");
+}
+
+/**
+ * 为指定商品生成评价
+ * @param {number} productId - 商品的ID
+ */
+async function generateProductReviews(productId) {
+  await showCustomAlert("请稍候...", "正在召唤买家秀大军...");
+  const { proxyUrl, apiKey, model } = state.apiConfig;
+  if (!proxyUrl || !apiKey || !model) {
+    alert("请先配置API！");
+    return;
+  }
+
+  const product = await db.taobaoProducts.get(productId);
+  if (!product) return;
+
+  const prompt = `
+# 任务
+你是一位专业的电商评论生成器。请你为以下商品生成3-5条风格各异的模拟买家评价。
+
+# 商品信息
+- 名称: ${product.name}
+- 价格: ${product.price}元
+- 分类: ${product.category || "未分类"}
+
+# 核心规则
+1.  **风格多样**: 生成的评论应包含不同风格，例如：
+    -   **好评**: 详细夸赞商品的某个优点。
+    -   **中评/追评**: 描述使用一段时间后的感受，可能提到一些小瑕疵。
+    -   **差评**: 吐槽商品的某个缺点，但语气要像真实买家。
+    -   **搞笑评论**: 写一些幽默风趣的评论。
+    -   **简洁评论**: 例如“好评”、“还行”、“物流很快”。
+2.  **昵称真实**: 评论的作者昵称 ("author") 必须是随机的、生活化的、符合购物App用户习惯的。例如：“匿名用户”、“小王不吃香菜”、“可乐爱好者”。
+3.  **格式铁律**: 你的回复【必须且只能】是一个严格的JSON数组，每个对象代表一条评论，并包含 "author" 和 "text" 两个字段。
+
+# JSON输出格式示例:
+[
+  { "author": "匿名用户", "text": "物流很快，包装也很好，宝贝跟描述的一样，好评！" },
+  { "author": "是小张呀", "text": "有点色差，不过还能接受。先用用看，过段时间再来追评。" }
+]
+`;
+  try {
+    const messagesForApi = [{ role: "user", content: prompt }];
+    let isGemini = proxyUrl === GEMINI_API_URL;
+    let geminiConfig = toGeminiRequestData(
+      model,
+      apiKey,
+      prompt,
+      messagesForApi,
+      isGemini,
+    );
+
+    const response = isGemini
+      ? await fetch(geminiConfig.url, geminiConfig.data)
+      : await fetch(`${proxyUrl}/v1/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: messagesForApi,
+            temperature: parseFloat(state.apiConfig.temperature) || 1.0,
+            response_format: { type: "json_object" },
+          }),
+        });
+
+    if (!response.ok) throw new Error(`API请求失败: ${await response.text()}`);
+
+    const data = await response.json();
+    const rawContent = isGemini
+      ? data.candidates[0].content.parts[0].text
+      : data.choices[0].message.content;
+    const cleanedContent = rawContent.replace(/^```json\s*|```$/g, "").trim();
+    const newReviews = JSON.parse(cleanedContent);
+
+    if (Array.isArray(newReviews) && newReviews.length > 0) {
+      // 将AI生成的评价保存到商品数据中
+      await db.taobaoProducts.update(productId, { reviews: newReviews });
+      await showCustomAlert(
+        "生成成功！",
+        `已成功生成 ${newReviews.length} 条评价。`,
+      );
+      // 重新打开详情页，刷新显示
+      await openProductDetail(productId);
+    } else {
+      throw new Error("AI返回的数据格式不正确。");
+    }
+  } catch (error) {
+    console.error("生成商品评价失败:", error);
+    await showCustomAlert("生成失败", `发生错误: ${error.message}`);
+  }
+}
+
+/**
+ * 结算购物车
+ */
+async function handleCheckout() {
+  const checkoutBtn = document.getElementById("checkout-btn");
+  const totalPrice = parseFloat(checkoutBtn.dataset.totalPrice);
+
+  if (totalPrice <= 0) return;
+
+  const currentBalance = state.globalSettings.userBalance || 0;
+  if (currentBalance < totalPrice) {
+    alert("余额不足！请先去“我的”页面充值。");
+    return;
+  }
+
+  const confirmed = await showCustomConfirm(
+    "确认支付",
+    `本次将花费 ¥${totalPrice.toFixed(2)}，确定要结算吗？`,
+    {
+      confirmText: "立即支付",
+    },
+  );
+
+  if (confirmed) {
+    const cartItems = await db.taobaoCart.toArray();
+    const productPromises = cartItems.map((item) =>
+      db.taobaoProducts.get(item.productId),
+    );
+    const productsInCart = await Promise.all(productPromises);
+    const validProducts = productsInCart.filter(Boolean);
+
+    let description = "购买商品: ";
+    const itemNames = validProducts.map((p) => `“${p.name}”`);
+    if (itemNames.length > 2) {
+      description +=
+        itemNames.slice(0, 2).join("、") + ` 等${itemNames.length}件商品`;
+    } else {
+      description += itemNames.join("、");
+    }
+
+    await updateUserBalanceAndLogTransaction(-totalPrice, description);
+
+    // 为每个订单创建物流历史起点
+    const newOrders = cartItems.map((item, index) => ({
+      productId: item.productId,
+      quantity: item.quantity,
+      timestamp: Date.now() + index, // 订单创建时间
+      status: "已付款，等待发货",
+      // 我们不再需要在数据库里存 logisticsHistory，因为它是动态模拟的
+    }));
+
+    await db.taobaoOrders.bulkAdd(newOrders);
+    await db.taobaoCart.clear();
+    await renderTaobaoCart();
+
+    alert("支付成功！宝贝正在火速打包中~");
+    switchTaobaoView("orders-view");
+  }
+}
+
+/**
+ * 渲染商品列表，按需生成并永久保存图片
+ */
+async function renderTaobaoProducts(category = null) {
+  const gridEl = document.getElementById("product-grid");
+  gridEl.innerHTML = "";
+
+  const allProducts = await db.taobaoProducts.orderBy("name").toArray();
+  const categories = [
+    ...new Set(allProducts.map((p) => p.category).filter(Boolean)),
+  ];
+
+  const productsToRender = category
+    ? allProducts.filter((p) => p.category === category)
+    : allProducts;
+
+  if (productsToRender.length === 0) {
+    gridEl.innerHTML =
+      '<p style="grid-column: 1 / -1; text-align: center; color: var(--text-secondary);">还没有商品哦，点击右上角“+”添加吧！</p>';
+    return;
+  }
+
+  productsToRender.forEach((product) => {
+    const card = document.createElement("div");
+    card.className = "product-card";
+    card.dataset.productId = product.id;
+
+    card.innerHTML = `
+        <div class="product-image-container">
+            <!-- 图片或加载动画将在这里 -->
+        </div>
+        <div class="product-info">
+            <div class="product-name">${product.name}</div>
+            <div class="product-price">${product.price.toFixed(2)}</div>
+        </div>
+    `;
+
+    const imageContainer = card.querySelector(".product-image-container");
+
+    if (product.imageUrl) {
+      imageContainer.innerHTML = `<img src="${product.imageUrl}" class="product-image" alt="${product.name}">`;
+    } else {
+      imageContainer.innerHTML = `<div class="loading-spinner"></div>`;
+      imageGenerationQueue.push({ type: "taobao", item: product });
+    }
+
+    addLongPressListener(card, () => showProductActions(product.id));
+    gridEl.appendChild(card);
+  });
+
+  // 渲染完所有卡片后，触发一次队列处理器
+  processImageQueue();
+}
+
+/**
+ * 渲染“我的订单”列表
+ */
+async function renderTaobaoOrders() {
+  const listEl = document.getElementById("order-list");
+  listEl.innerHTML = "";
+  const orders = await db.taobaoOrders.reverse().sortBy("timestamp");
+
+  if (orders.length === 0) {
+    listEl.innerHTML =
+      '<p style="text-align: center; color: var(--text-secondary);">还没有任何订单记录</p>';
+    return;
+  }
+
+  for (const order of orders) {
+    const product = await db.taobaoProducts.get(order.productId);
+    if (!product) continue;
+
+    const item = document.createElement("div");
+    item.className = "order-item";
+    item.dataset.orderId = order.id;
+    item.innerHTML = `
+            <img src="${product.imageUrl}" class="product-image">
+            <div class="order-info">
+                <div class="product-name">${product.name}</div>
+                <div class="order-status">${order.status}</div>
+                <div class="order-time">${new Date(order.timestamp).toLocaleString()}</div>
+            </div>
+        `;
+    listEl.appendChild(item);
+  }
+}
+
+/**
+ * 渲染“我的”页面的余额
+ */
+function renderTaobaoBalance() {
+  const balance = state.globalSettings.userBalance || 0;
+  document.getElementById("user-balance-display").textContent =
+    `¥ ${balance.toFixed(2)}`;
+}
+
+/**
+ * 打开添加商品的方式选择弹窗
+ */
+function openAddProductChoiceModal() {
+  document.getElementById("add-product-choice-modal").classList.add("visible");
+}
+
+/**
+ * 打开手动添加/编辑商品的弹窗
+ */
+function openProductEditor(productId = null) {
+  currentEditingProductId = productId;
+  const modal = document.getElementById("product-editor-modal");
+  const titleEl = document.getElementById("product-editor-title");
+
+  // 1. 恢复输入框默认提示 (因为饿了么可能会改它)
+  document.getElementById("product-category-input").placeholder =
+    "例如：衣服, 零食...";
+
+  // 2. ★★★ 核心修复：重新绑定保存按钮 ★★★
+  // 使用克隆大法清除之前可能绑定的“饿了么”保存事件或重复的“桃宝”保存事件
+  const saveBtn = document.getElementById("save-product-btn");
+  const newSaveBtn = saveBtn.cloneNode(true);
+  saveBtn.parentNode.replaceChild(newSaveBtn, saveBtn);
+
+  // 绑定专属的桃宝保存函数
+  newSaveBtn.addEventListener("click", saveProduct);
+
+  if (productId) {
+    titleEl.textContent = "编辑商品";
+    // (异步) 加载现有商品数据
+    db.taobaoProducts.get(productId).then((product) => {
+      if (product) {
+        document.getElementById("product-name-input").value = product.name;
+        document.getElementById("product-price-input").value = product.price;
+        document.getElementById("product-image-input").value = product.imageUrl;
+        document.getElementById("product-category-input").value =
+          product.category || "";
+      }
+    });
+  } else {
+    titleEl.textContent = "添加新商品";
+    // 清空输入框
+    document.getElementById("product-name-input").value = "";
+    document.getElementById("product-price-input").value = "";
+    document.getElementById("product-image-input").value = "";
+    document.getElementById("product-category-input").value = "";
+  }
+  modal.classList.add("visible");
+}
+
+/**
+ * 保存手动添加或编辑的商品
+ */
+async function saveProduct() {
+  const name = document.getElementById("product-name-input").value.trim();
+  const price = parseFloat(
+    document.getElementById("product-price-input").value,
+  );
+  let imageUrl = document.getElementById("product-image-input").value.trim();
+  const category = document
+    .getElementById("product-category-input")
+    .value.trim();
+
+  if (!name || isNaN(price) || price <= 0) {
+    alert("请填写所有必填项（名称、有效价格）！");
+    return;
+  }
+
+  // 如果用户没有提供图片链接，保存一个空字符串。
+  // 新的渲染逻辑会自动检测到空链接并触发AI生图。
+  if (!imageUrl) {
+    imageUrl = ""; // 设置为空，让渲染器去处理
+  }
+
+  const productData = { name, price, imageUrl, category };
+
+  if (currentEditingProductId) {
+    await db.taobaoProducts.update(currentEditingProductId, productData);
+    alert("商品已更新！");
+  } else {
+    await db.taobaoProducts.add(productData);
+    alert("新商品已添加！");
+  }
+
+  document.getElementById("product-editor-modal").classList.remove("visible");
+  await renderTaobaoProducts();
+  currentEditingProductId = null;
+}
+
+/**
+ * 保存手动添加的美食
+ */
+async function saveFoodItem() {
+  const name = document.getElementById("product-name-input").value.trim();
+  const price = parseFloat(
+    document.getElementById("product-price-input").value,
+  );
+  let imageUrl = document.getElementById("product-image-input").value.trim();
+  const restaurant = document
+    .getElementById("product-category-input")
+    .value.trim();
+
+  if (!name || isNaN(price) || price <= 0) {
+    alert("请填写美食名称和有效价格！");
+    return;
+  }
+
+  // 如果用户没有提供图片链接，保存一个空字符串。
+  // 这样新的渲染逻辑就会自动检测到并触发AI生图。
+  if (!imageUrl) {
+    imageUrl = ""; // 设置为空，让渲染器去处理
+  }
+  // ★★★ 修改结束 ★★★
+
+  const foodData = {
+    name,
+    price,
+    imageUrl,
+    restaurant: restaurant || "私房小厨",
+  };
+
+  await db.elemeFoods.add(foodData);
+  alert("新美食已添加！");
+
+  document.getElementById("product-editor-modal").classList.remove("visible");
+  await renderElemeFoods();
+}
+
+/**
+ * 打开识别链接的弹窗
+ */
+function openAddFromLinkModal() {
+  document.getElementById("link-paste-area").value = "";
+  document.getElementById("add-from-link-modal").classList.add("visible");
+}
+
+/**
+ * 处理粘贴的分享文案
+ */
+async function handleAddFromLink() {
+  const text = document.getElementById("link-paste-area").value;
+  const nameMatch = text.match(/「(.+?)」/);
+
+  if (!nameMatch || !nameMatch[1]) {
+    alert("无法识别商品名称！请确保粘贴了包含「商品名」的完整分享文案。");
+    return;
+  }
+
+  const name = nameMatch[1];
+  document.getElementById("add-from-link-modal").classList.remove("visible");
+
+  const priceStr = await showCustomPrompt(
+    `商品: ${name}`,
+    "请输入价格 (元):",
+    "",
+    "number",
+  );
+  if (priceStr === null) return;
+  const price = parseFloat(priceStr);
+  if (isNaN(price) || price <= 0) {
+    alert("请输入有效的价格！");
+    return;
+  }
+
+  let imageUrl = await showCustomPrompt(
+    `商品: ${name}`,
+    "请输入图片链接 (URL, 可选，留空则由AI生成):",
+  );
+  if (imageUrl === null) return;
+
+  // 1. 如果用户没有输入图片链接
+  if (!imageUrl || !imageUrl.trim()) {
+    try {
+      // 就调用我们的AI生图函数
+      imageUrl = await generateImageForProduct(name);
+    } catch (e) {
+      console.error("调用生图函数时发生意外错误:", e);
+      imageUrl = getRandomDefaultProductImage();
+    }
+  }
+
+  const category = await showCustomPrompt(
+    `商品: ${name}`,
+    "请输入分类 (可选):",
+  );
+
+  await db.taobaoProducts.add({
+    name,
+    price,
+    imageUrl,
+    category: category || "",
+  });
+  await renderTaobaoProducts();
+  alert("商品已通过链接添加成功！");
+}
+
+/**
+ * 根据用户搜索触发AI生成商品
+ */
+async function handleSearchProductsAI() {
+  const searchTerm = productSearchInput.value.trim();
+  if (!searchTerm) {
+    alert("请输入你想搜索的商品！");
+    return;
+  }
+
+  await showCustomAlert(
+    "请稍候...",
+    `AI正在为你寻找关于“${searchTerm}”的灵感...`,
+  );
+  const { proxyUrl, apiKey, model } = state.apiConfig;
+  if (!proxyUrl || !apiKey || !model) {
+    alert("请先配置API！");
+    return;
+  }
+
+  const prompt = `
+# 任务
+你是一个虚拟购物App“桃宝”的搜索引擎。请根据用户提供的【搜索关键词】，为Ta创作一个包含5-8件相关商品的列表。
+
+# 用户搜索的关键词:
+"${searchTerm}"
+
+# 核心规则
+1.  **高度相关**: 所有商品都必须与用户的搜索关键词 "${searchTerm}" 紧密相关。
+2.  **商品多样性**: 即使是同一个主题，也要尽量展示不同款式、功能或角度的商品。
+3.  **格式铁律**: 你的回复【必须且只能】是一个严格的JSON数组，每个对象代表一件商品，【必须】包含以下字段:
+    -   \`"name"\`: 商品名称
+    -   \`"price"\`: 价格 (数字)
+    -   \`"category"\`: 商品分类
+    -   \`"imagePrompt"\`: 一个详细的、用于文生图AI的【英文提示词】，描述这张商品的【产品展示图 (product shot)】。风格要求【干净、简约、纯色或渐变背景 (clean, minimalist, solid color background)】。
+
+# JSON输出格式示例:
+[
+  {
+    "name": "赛博朋克风发光数据线",
+    "price": 69.9,
+    "category": "数码配件",
+    "imagePrompt": "A glowing cyberpunk style data cable, product shot, on a dark tech background, neon lights, high detail"
+  }
+]`;
+
+  try {
+    const messagesForApi = [{ role: "user", content: prompt }];
+
+    // 恢复对 Gemini 和 OpenAI 的兼容判断逻辑
+    const isGemini = proxyUrl === GEMINI_API_URL;
+    const requestData = isGemini
+      ? toGeminiRequestData(model, apiKey, prompt, messagesForApi, isGemini)
+      : {
+          url: `${proxyUrl}/v1/chat/completions`,
+          options: {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+              model: model,
+              messages: messagesForApi,
+              temperature: 0.8,
+              response_format: { type: "json_object" },
+            }),
+          },
+        };
+
+    const response = await fetch(requestData.url, requestData.options);
+
+    if (!response.ok) throw new Error(`API请求失败: ${await response.text()}`);
+
+    const data = await response.json();
+    const rawContent = isGemini
+      ? data.candidates[0].content.parts[0].text
+      : data.choices[0].message.content;
+    const cleanedContent = rawContent.replace(/^```json\s*|```$/g, "").trim();
+    const newProducts = JSON.parse(cleanedContent);
+
+    if (Array.isArray(newProducts) && newProducts.length > 0) {
+      displayAiGeneratedProducts(
+        newProducts,
+        `AI为你找到了关于“${searchTerm}”的宝贝`,
+      );
+    } else {
+      throw new Error("AI没有找到相关的商品。");
+    }
+  } catch (error) {
+    console.error("AI搜索商品失败:", error);
+    await showCustomAlert("搜索失败", `发生错误: ${error.message}`);
+  }
+}
+
+/**
+ * UI函数：在弹窗中显示AI生成的商品列表，并异步加载图片
+ * @param {Array} products - AI生成的商品对象数组
+ * @param {string} title - 弹窗的标题
+ */

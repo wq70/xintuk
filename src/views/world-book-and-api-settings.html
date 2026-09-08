@@ -1,0 +1,762 @@
+      <div id="world-book-screen" class="screen">
+        <div class="header">
+          <span class="back-btn" onclick="showScreen('home-screen')">‹</span>
+          <span>世界书</span>
+          <div class="header-actions">
+            <span
+              class="action-btn"
+              id="import-world-book-btn"
+              title="导入世界书"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+              </svg>
+            </span>
+
+            <span
+              class="action-btn"
+              id="manage-categories-in-edit-mode-btn"
+              style="display: none"
+              title="管理分类"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+                ></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+                <polyline points="10 9 9 9 8 9"></polyline>
+              </svg>
+            </span>
+
+            <span
+              class="action-btn btn-danger"
+              id="world-book-delete-selected-btn"
+              style="display: none"
+              title="删除已选"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path
+                  d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+                ></path>
+              </svg>
+              <span
+                id="world-book-delete-count"
+                style="font-size: 12px; margin-left: 2px"
+              ></span>
+              <!-- 用于显示数量 -->
+            </span>
+
+            <span class="action-btn" id="toggle-world-book-edit-mode-btn"
+              >编辑模式</span
+            >
+
+            <span class="action-btn" id="add-world-book-btn">+</span>
+          </div>
+        </div>
+        <div id="world-book-list"></div>
+      </div>
+
+      <div id="world-book-editor-screen" class="screen">
+        <div class="header">
+          <span class="back-btn" onclick="showScreen('world-book-screen')"
+            >‹</span
+          >
+          <span id="world-book-editor-title">编辑世界书</span>
+          <span class="save-btn" id="save-world-book-btn">保存</span>
+        </div>
+        <div class="form-container">
+          <div class="form-group">
+            <label for="world-book-name-input">书名</label>
+            <input
+              type="text"
+              id="world-book-name-input"
+              placeholder="请输入世界书的名称..."
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="world-book-category-select">分类</label>
+            <select id="world-book-category-select">
+              <!-- 选项将由JS动态生成 -->
+            </select>
+          </div>
+
+          <div class="form-group" style="height: 100%">
+            <label for="world-book-content-input">内容</label>
+            <textarea
+              id="world-book-content-input"
+              placeholder="在此处输入详细的世界观设定..."
+            ></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div id="api-settings-screen" class="screen moe-theme">
+        <div class="header">
+          <span class="back-btn" onclick="showScreen('home-screen')">‹</span>
+          <span> API设置 </span>
+          <span style="width: 30px"></span>
+        </div>
+
+        <!-- 内容滚动区域 -->
+        <div class="form-container">
+          <!-- 1. 云端大脑卡片 -->
+          <div class="moe-card">
+            <div class="moe-card-header">
+              <span class="icon">☁️</span>
+              <h3>API 连接</h3>
+            </div>
+            <div class="moe-card-body">
+              <div class="form-group">
+                <label>反代地址 (Proxy)</label>
+                <input
+                  type="text"
+                  id="proxy-url"
+                  placeholder="https://api.openai.com"
+                  class="moe-input"
+                />
+              </div>
+              <div class="form-group">
+                <label>密钥 (Key)</label>
+                <input
+                  type="password"
+                  id="api-key"
+                  placeholder="sk-..."
+                  class="moe-input"
+                />
+              </div>
+              <div class="form-group">
+                <label>模型选择 (手动输入 或 拉取后选择)</label>
+                <!-- 1. 这里的 id="model-select" 是真正的输入框，保存时只看它的值 -->
+                <input
+                  type="text"
+                  id="model-select"
+                  class="moe-input"
+                  placeholder="如 gpt-4o, claude-3-5-sonnet"
+                />
+                <select
+                  id="fetched-model-list"
+                  class="moe-input"
+                  style="
+                    margin-top: 5px;
+                    display: none;
+                    border: 1px dashed var(--accent-color);
+                  "
+                  onchange="
+                    document.getElementById('model-select').value = this.value
+                  "
+                >
+                  <option value="">▼ 点击此处选择已拉取的模型</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>预设配置</label>
+                <div class="bubble-preset-manager">
+                  <select id="api-preset-select" class="moe-input"></select>
+                  <button id="manage-api-presets-btn" class="moe-btn-small">
+                    管理
+                  </button>
+                </div>
+              </div>
+              <div class="form-group">
+                <label
+                  >温度 (随机性):
+                  <span
+                    id="temperature-value"
+                    style="color: var(--accent-color)"
+                    >0.8</span
+                  ></label
+                >
+                <input
+                  type="range"
+                  id="temperature-slider"
+                  min="0"
+                  max="2"
+                  step="0.1"
+                  value="0.8"
+                  class="moe-slider"
+                />
+              </div>
+              <button id="fetch-models-btn" class="moe-btn-secondary">
+                📡 拉取模型列表
+              </button>
+            </div>
+          </div>
+
+          <!-- 2. 语音合成卡片 -->
+          <div class="moe-card">
+            <div class="moe-card-header">
+              <span class="icon">🗣️</span>
+              <h3>Minimax 语音</h3>
+            </div>
+            <div class="moe-card-body">
+              <div class="form-group">
+                <label>Group ID</label>
+                <input type="text" id="minimax-group-id" class="moe-input" />
+              </div>
+              <div class="form-group">
+                <label>API Key</label>
+                <input type="password" id="minimax-api-key" class="moe-input" />
+              </div>
+              <div class="form-group">
+                <label>服务区域</label>
+                <select id="minimax-provider-select" class="moe-input">
+                  <option value="cn">国内版</option>
+                  <option value="io">海外版</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>语音模型</label>
+                <select
+                  id="minimax-speech-model-select"
+                  class="moe-input"
+                ></select>
+              </div>
+              <button
+                id="fetch-minimax-speech-models-btn"
+                class="moe-btn-secondary"
+              >
+                🎵 拉取语音模型
+              </button>
+            </div>
+          </div>
+
+          <!-- 3. 后台活动卡片 -->
+          <div class="moe-card">
+            <div class="moe-card-header">
+              <span class="icon">🤖</span>
+              <h3>角色后台活动</h3>
+            </div>
+            <div class="moe-card-body">
+              <div class="form-group">
+                <label class="toggle-switch-label">
+                  <span class="toggle-switch-text">启用后台活动</span>
+                  <label class="toggle-switch">
+                    <input type="checkbox" id="background-activity-switch" />
+                    <span class="slider"></span>
+                  </label>
+                </label>
+              </div>
+              <div
+                class="form-group"
+                style="
+                  margin-top: 15px;
+                  padding-top: 15px;
+                  border-top: 1px dashed #eee;
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                "
+              >
+                <div>
+                  <span class="toggle-switch-text" style="font-weight: bold"
+                    >开启系统弹窗</span
+                  >
+                  <!-- ▼▼▼ 修改后的布局：将按钮和提示语放在一行，样式更精致 ▼▼▼ -->
+                  <div
+                    style="
+                      font-size: 12px;
+                      color: #888;
+                      margin-top: 6px;
+                      display: flex;
+                      align-items: center;
+                    "
+                  >
+                    <span>iOS需添加到主屏幕，安卓需授权</span>
+                    <button
+                      id="check-notification-perm-btn"
+                      style="
+                        margin-left: 10px;
+                        padding: 2px 10px;
+                        background-color: rgba(0, 123, 255, 0.1);
+                        color: #007bff;
+                        border: 1px solid rgba(0, 123, 255, 0.2);
+                        border-radius: 12px;
+                        font-size: 11px;
+                        cursor: pointer;
+                        display: flex;
+                        align-items: center;
+                        gap: 3px;
+                      "
+                    >
+                      <span>🔍</span> 检测权限
+                    </button>
+                    <button
+                      id="test-system-notification-btn"
+                      style="
+                        margin-left: 5px;
+                        padding: 2px 10px;
+                        background-color: rgba(40, 167, 69, 0.1);
+                        color: #28a745;
+                        border: 1px solid rgba(40, 167, 69, 0.2);
+                        border-radius: 12px;
+                        font-size: 11px;
+                        cursor: pointer;
+                        display: flex;
+                        align-items: center;
+                        gap: 3px;
+                      "
+                    >
+                      <span>🔔</span> 测试发送
+                    </button>
+                  </div>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="system-notification-switch" />
+                  <span class="slider"></span>
+                </label>
+              </div>
+              <div
+                id="background-activity-details"
+                style="display: none; margin-top: 10px"
+              >
+                <div class="form-group">
+                  <label>检测间隔 (秒)</label>
+                  <input
+                    type="number"
+                    id="background-interval-input"
+                    min="30"
+                    value="60"
+                    class="moe-input center-text"
+                  />
+                </div>
+                <div class="form-group">
+                  <label>角色频率设置</label>
+                  <div
+                    id="background-activity-char-list"
+                    class="moe-list-box"
+                  ></div>
+                  <div class="moe-btn-group">
+                    <button id="bg-select-all-chars" class="moe-btn-mini">
+                      全选
+                    </button>
+                    <button id="bg-deselect-all-chars" class="moe-btn-mini">
+                      全不选
+                    </button>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>设置频率</label>
+                  <div class="moe-btn-group">
+                    <button class="moe-btn-mini bg-freq-btn" data-freq="low">
+                      低
+                    </button>
+                    <button class="moe-btn-mini bg-freq-btn" data-freq="medium">
+                      中
+                    </button>
+                    <button class="moe-btn-mini bg-freq-btn" data-freq="high">
+                      高
+                    </button>
+                    <button class="moe-btn-mini bg-freq-btn" data-freq="none">
+                      关闭
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div class="moe-divider"></div>
+              <div class="form-group">
+                <label>拉黑冷静期 (小时)</label>
+                <input
+                  type="number"
+                  id="block-cooldown-input"
+                  min="0.1"
+                  step="0.1"
+                  value="1"
+                  class="moe-input center-text"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- 4. 图像生成卡片 -->
+          <div class="moe-card">
+            <div class="moe-card-header">
+              <span class="icon">🎨</span>
+              <h3>NovelAI 生图</h3>
+            </div>
+            <div class="moe-card-body">
+              <div class="form-group">
+                <label class="toggle-switch-label">
+                  <span class="toggle-switch-text">启用图像生成</span>
+                  <label class="toggle-switch">
+                    <input type="checkbox" id="novelai-switch" />
+                    <span class="slider"></span>
+                  </label>
+                </label>
+              </div>
+              <div id="novelai-details" style="display: none; margin-top: 10px">
+                <div class="form-group">
+                  <label>模型</label>
+                  <select id="novelai-model" class="moe-input">
+                    <option value="nai-diffusion-4-curated-preview">
+                      V4.5 Curated
+                    </option>
+                    <option value="nai-diffusion-4-5-full">V4.5 Full</option>
+                    <option value="nai-diffusion-3">V3 Anime</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>API Key</label>
+                  <div style="position: relative">
+                    <input
+                      type="password"
+                      id="novelai-api-key"
+                      class="moe-input"
+                    />
+                    <span
+                      id="novelai-key-toggle"
+                      style="
+                        position: absolute;
+                        right: 10px;
+                        top: 10px;
+                        cursor: pointer;
+                      "
+                      >👀</span
+                    >
+                  </div>
+                </div>
+                <div class="moe-btn-group">
+                  <button
+                    type="button"
+                    id="novelai-settings-btn"
+                    class="moe-btn-secondary"
+                  >
+                    设置
+                  </button>
+                  <button
+                    type="button"
+                    id="novelai-test-btn"
+                    class="moe-btn-secondary"
+                  >
+                    测试
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- 4.5. Pollinations 生图卡片 (新增) -->
+          <div class="moe-card">
+            <div class="moe-card-header">
+              <span class="icon">🌸</span>
+              <h3>Pollinations 生图</h3>
+            </div>
+            <div class="moe-card-body">
+              <div class="form-group">
+                <label>API Key (可选，用于高级功能/去水印)</label>
+                <input
+                  type="password"
+                  id="pollinations-api-key"
+                  placeholder="Bearer ..."
+                  class="moe-input"
+                />
+                <p style="font-size: 12px; color: #888; margin-top: 5px">
+                  * 如果留空，将使用免费公开接口 (可能包含水印或受限)。
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 5. 存储与备份卡片 -->
+          <div class="moe-card">
+            <div class="moe-card-header">
+              <span class="icon">💾</span>
+              <h3>存储与备份</h3>
+            </div>
+            <div class="moe-card-body">
+              <div class="form-group">
+                <label
+                  >图片压缩质量:
+                  <span id="image-quality-value">0.7</span></label
+                >
+                <input
+                  type="range"
+                  id="image-quality-slider"
+                  min="0.1"
+                  max="1.0"
+                  step="0.1"
+                  value="0.7"
+                  class="moe-slider"
+                />
+              </div>
+              <button class="moe-btn-secondary" id="compress-all-images-btn">
+                📉 一键压缩图片
+              </button>
+              <p
+                id="image-data-size-display"
+                style="
+                  text-align: center;
+                  font-size: 12px;
+                  color: #aaa;
+                  margin-top: 5px;
+                "
+              >
+                ...
+              </p>
+
+              <div class="moe-divider"></div>
+
+              <h4
+                style="
+                  font-size: 14px;
+                  margin-bottom: 10px;
+                  color: var(--accent-color);
+                "
+              >
+                ☁️ GitHub 云备份
+              </h4>
+              <div class="form-group">
+                <input
+                  type="password"
+                  id="github-token"
+                  placeholder="Token"
+                  class="moe-input"
+                  style="margin-bottom: 5px"
+                />
+                <input
+                  type="text"
+                  id="github-username"
+                  placeholder="用户名"
+                  class="moe-input"
+                  style="margin-bottom: 5px"
+                />
+                <input
+                  type="text"
+                  id="github-repo"
+                  placeholder="仓库名"
+                  class="moe-input"
+                  style="margin-bottom: 5px"
+                />
+                <input
+                  type="text"
+                  id="github-path"
+                  placeholder="路径 (可选)"
+                  class="moe-input"
+                />
+              </div>
+              <div class="form-group">
+                <label class="toggle-switch-label">
+                  <span class="toggle-switch-text">自动备份 </span>
+                  <input type="checkbox" id="github-auto-backup-switch" />
+                  <span class="toggle-switch-slider"></span>
+                </label>
+              </div>
+              <!-- 在 github-path 输入框下方插入 -->
+              <div class="form-group" style="margin-top: 5px">
+                <label>自动备份模式</label>
+                <div style="display: flex; gap: 10px">
+                  <select
+                    id="github-backup-mode"
+                    class="moe-input"
+                    style="flex: 1"
+                  >
+                    <option value="full">全量</option>
+                    <option value="stream">流式 (分片/稳定)</option>
+                  </select>
+                  <input
+                    type="number"
+                    id="github-backup-interval"
+                    class="moe-input"
+                    style="width: 80px"
+                    placeholder="分钟"
+                    value="30"
+                    min="5"
+                  />
+                  <span style="align-self: center; font-size: 12px; color: #888"
+                    >分钟</span
+                  >
+                </div>
+              </div>
+
+              <div class="moe-btn-group">
+                <button id="manual-github-backup-btn" class="moe-btn-secondary">
+                  ☁️ 上传 (全量)
+                </button>
+                <button
+                  id="manual-github-restore-btn"
+                  class="moe-btn-secondary"
+                >
+                  📥 恢复 (全量)
+                </button>
+              </div>
+              <div class="moe-btn-group" style="margin-top: 10px">
+                <button
+                  id="git-stream-upload-btn"
+                  class="moe-btn-secondary"
+                  style="background-color: #6f42c1; color: white"
+                >
+                  🌊 Git流式上传
+                </button>
+                <button
+                  id="git-stream-restore-btn"
+                  class="moe-btn-secondary"
+                  style="background-color: #6f42c1; color: white"
+                >
+                  🎣 Git流式导入
+                </button>
+              </div>
+              <p style="font-size: 12px; color: #999; margin-top: 5px">
+                *
+                流式模式会将数据拆分为多个文件(按表)上传，解决大文件导致崩溃的问题。
+              </p>
+
+              <div class="moe-divider"></div>
+
+              <h4
+                style="
+                  font-size: 14px;
+                  margin-bottom: 10px;
+                  color: var(--accent-color);
+                "
+              >
+                📦 本地备份
+              </h4>
+              <div class="moe-btn-group">
+                <button class="moe-btn-secondary" id="export-data-btn">
+                  导出
+                </button>
+                <button class="moe-btn-secondary" id="import-btn">导入</button>
+                <button class="moe-btn-secondary" id="export-data-stream-btn">
+                  流式导出
+                </button>
+              </div>
+              <button
+                class="moe-btn-secondary"
+                id="advanced-transfer-btn"
+                style="margin-top: 8px; width: 100%"
+              >
+                高级导入/导出
+              </button>
+
+              <div class="moe-divider"></div>
+              <button class="moe-btn-danger" id="clear-orphaned-data-btn">
+                🧹 清理失效数据
+              </button>
+              <div class="moe-divider"></div>
+              <button
+                class="moe-btn-secondary"
+                id="repair-data-btn"
+                style="
+                  background-color: #ff9800;
+                  color: white;
+                  margin-bottom: 10px;
+                  width: 100%;
+                  font-weight: bold;
+                "
+              >
+                🔧 一键修复 (修复数据结构错误)
+              </button>
+              <button
+                class="moe-btn-danger"
+                id="factory-reset-btn"
+                style="
+                  background-color: #c82333;
+                  margin-top: 10px;
+                  width: 100%;
+                  font-weight: bold;
+                "
+              >
+                🧨 初始化 (清空全部数据)
+              </button>
+            </div>
+          </div>
+
+          <div style="text-align: center; margin-bottom: 15px; margin-top: 5px">
+            <a
+              href="https://jcny642xl7ll.feishu.cn/wiki/KGsnwECKji2xdxkCqDbcZNOnndd"
+              target="_blank"
+              style="
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                padding: 10px 20px;
+                background-color: rgba(255, 255, 255, 0.9);
+                color: var(--accent-color, #007bff);
+                text-decoration: none;
+                border-radius: 25px;
+                font-size: 14px;
+                font-weight: 600;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+                border: 1px solid rgba(0, 0, 0, 0.05);
+                transition: transform 0.2s;
+              "
+            >
+              <span>📖</span> 兔k写的一些教程
+            </a>
+          </div>
+
+          <div style="margin: 10px 0; text-align: center">
+            <button
+              onclick="window.openBugStation()"
+              style="
+                background: #fff0f6;
+                color: #eb2f96;
+                border: 2px dashed #ffadd2;
+                border-radius: 15px;
+                padding: 8px 20px;
+                font-size: 13px;
+                cursor: pointer;
+                display: inline-flex;
+                align-items: center;
+                gap: 5px;
+              "
+            >
+              🚑 报错急救站
+              <span style="font-size: 10px; opacity: 0.7">(点我复制错误)</span>
+            </button>
+          </div>
+
+          <!-- 底部留白，防止被悬浮按钮遮挡 -->
+          <div style="height: 80px"></div>
+        </div>
+
+        <!-- ★★★ 萌系悬浮保存按钮 ★★★ -->
+        <button id="save-api-settings-btn" class="moe-fab-save">
+          💾<span style="font-size: 12px; display: block; margin-top: -2px"
+            >保存</span
+          >
+        </button>
+
+        <!-- 隐藏的 input -->
+        <input
+          id="import-data-input"
+          type="file"
+          accept="application/json"
+          hidden
+        />
+      </div>
+

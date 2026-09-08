@@ -1,0 +1,1075 @@
+    <div id="npc-management-screen" class="screen">
+      <div class="header">
+        <span class="back-btn" id="back-from-npc-management">‹</span>
+        <span id="npc-management-title">NPC 库管理</span>
+        <span class="action-btn" id="add-new-npc-btn">+</span>
+      </div>
+      <div class="list-container" id="npc-management-list">
+        <!-- NPC列表将由JS动态生成在这里 -->
+      </div>
+    </div>
+
+    <!-- 1. 论坛主屏幕 (显示所有小组) -->
+    <div id="forum-screen" class="screen">
+      <div class="header">
+        <span class="back-btn" onclick="showScreen('home-screen')">‹</span>
+        <span>圈子</span>
+        <div class="header-actions">
+          <span
+            class="action-btn filter-btn"
+            id="forum-filter-btn"
+            title="筛选"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polygon
+                points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"
+              ></polygon>
+            </svg>
+          </span>
+          <span class="action-btn" id="open-forum-bookshelf-btn" title="书架">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              width="22"
+              height="22"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M4 3h12.5a1.5 1.5 0 0 1 1.5 1.5V21" />
+              <path d="M4 21V4.5A1.5 1.5 0 0 1 5.5 3H18" />
+              <path d="M9 7h6" />
+              <path d="M9 11h6" />
+              <path d="M9 15h6" />
+              <path d="M4 21h16" />
+            </svg>
+          </span>
+
+          <span
+            class="action-btn"
+            id="create-group-btn"
+            style="font-size: 28px; font-weight: 300"
+            >+</span
+          >
+        </div>
+      </div>
+      <div
+        id="forum-group-list"
+        class="list-container"
+        style="
+          padding: 15px;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 15px;
+          align-content: start;
+        "
+      >
+        <!-- 小组列表将由JS动态生成在这里 -->
+      </div>
+    </div>
+
+    <div id="group-screen" class="screen">
+      <div class="header">
+        <span class="back-btn" id="back-to-forum-list">‹</span>
+        <span id="group-screen-title">小组名称</span>
+        <div class="header-actions">
+          <span
+            class="action-btn filter-btn"
+            id="group-filter-btn"
+            title="筛选"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polygon
+                points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"
+              ></polygon>
+            </svg>
+          </span>
+
+          <span
+            class="action-btn"
+            id="generate-group-content-btn"
+            title="生成内容"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>
+            </svg>
+          </span>
+          <span
+            class="action-btn"
+            id="create-forum-post-btn"
+            style="font-size: 28px; font-weight: 300"
+            >+</span
+          >
+        </div>
+      </div>
+      <!-- 同人文创作控制台 (无按钮版) -->
+      <div id="fanfic-preference-bar" style="display: none">
+        <!-- 1. 顶部标题栏 -->
+        <div id="fanfic-bar-header">
+          <span class="bar-title">🪄 同人创作控制台</span>
+          <span id="fanfic-bar-toggle-icon">▼</span>
+        </div>
+
+        <!-- 2. 可折叠的内容区域 -->
+        <div id="fanfic-bar-content">
+          <!-- 预设管理 -->
+          <div class="fanfic-row presets-row">
+            <select id="fanfic-preset-select">
+              <option value="">-- 读取配置 --</option>
+            </select>
+            <button id="save-fanfic-preset-btn" class="mini-btn">保存</button>
+            <button id="delete-fanfic-preset-btn" class="mini-btn danger">
+              删除
+            </button>
+          </div>
+
+          <!-- CP 选择 -->
+          <div class="fanfic-row cp-row">
+            <select id="fanfic-char1-select"></select>
+            <span class="cp-symbol">×</span>
+            <select id="fanfic-char2-select"></select>
+          </div>
+
+          <!-- 核心参数 -->
+          <div class="fanfic-row params-row">
+            <div class="input-group">
+              <label>期望字数</label>
+              <input
+                type="text"
+                id="fanfic-wordcount-input"
+                placeholder="例: 3000字"
+              />
+            </div>
+            <div class="input-group">
+              <label>文章类型</label>
+              <input
+                type="text"
+                id="fanfic-type-input"
+                placeholder="例: 甜文/ABO"
+              />
+            </div>
+            <div class="input-group">
+              <label>篇幅</label>
+              <select id="fanfic-length-select">
+                <option value="short">短篇</option>
+                <option value="long">长篇连载</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- 写作规范 -->
+          <div class="fanfic-row full-width">
+            <label>文风 / 写作规范</label>
+            <input
+              type="text"
+              id="fanfic-style-input"
+              placeholder="例: 心理描写细腻，第一人称..."
+            />
+          </div>
+
+          <!-- 世界观 -->
+          <div class="fanfic-row full-width">
+            <label>世界观 / 剧情梗概</label>
+            <textarea
+              id="fanfic-worldview-input"
+              rows="2"
+              placeholder="在这里输入背景设定..."
+            ></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div id="group-post-list" class="list-container" style="padding-top: 0">
+        <!-- 帖子列表将由JS动态生成在这里 -->
+      </div>
+    </div>
+
+    <!-- 3. 单个帖子页面 (显示帖子内容和评论) -->
+    <div id="post-screen" class="screen">
+      <div class="header">
+        <span class="back-btn" id="back-to-group-screen">‹</span>
+        <span>帖子详情</span>
+        <div class="header-actions">
+          <span class="action-btn" id="repost-to-chat-btn">转载</span>
+        </div>
+      </div>
+      <div
+        id="post-detail-content"
+        class="list-container"
+        style="padding: 20px"
+      >
+        <!-- 帖子和评论将由JS动态生成在这里 -->
+      </div>
+      <!-- 帖子页的评论输入框 -->
+      <div
+        id="post-comment-input-area"
+        class="chat-input-area"
+        style="visibility: visible"
+      >
+        <div class="chat-input-main-row">
+          <textarea
+            id="post-comment-input"
+            rows="1"
+            placeholder="发布你的评论..."
+          ></textarea>
+          <button id="send-post-comment-btn" class="action-button">发送</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="forum-bookshelf-screen" class="screen">
+      <div class="header">
+        <span class="back-btn" id="back-from-forum-bookshelf">?</span>
+        <span>圈子书架</span>
+      </div>
+      <div
+        id="forum-bookshelf-list"
+        class="list-container forum-bookshelf-list"
+        style="padding-top: 0"
+      >
+        <!-- 追更的长篇会在这里展示 -->
+      </div>
+    </div>
+
+    <div id="forum-series-detail-screen" class="screen">
+      <div class="header">
+        <span class="back-btn" id="back-from-series-detail">?</span>
+        <span id="forum-series-detail-title">连载详情</span>
+        <div class="header-actions">
+          <span class="action-btn" id="series-next-chapter-btn">追更</span>
+        </div>
+      </div>
+      <div
+        id="forum-series-meta"
+        class="list-container"
+        style="padding-top: 0"
+      ></div>
+      <div
+        id="forum-series-chapter-list"
+        class="list-container forum-series-chapter-list"
+        style="padding-top: 0"
+      ></div>
+    </div>
+
+    <div id="forum-filter-modal" class="modal">
+      <div class="modal-content" style="height: auto; max-height: 60%">
+        <div class="modal-header">
+          <span>按分类筛选</span>
+        </div>
+        <div class="modal-body">
+          <div id="forum-filter-category-list">
+            <!-- 分类标签将由JS动态生成在这里 -->
+          </div>
+        </div>
+        <div class="modal-footer" style="justify-content: space-between">
+          <button class="cancel" id="reset-forum-filter-btn" style="width: 30%">
+            重置
+          </button>
+          <button
+            class="cancel"
+            id="cancel-forum-filter-btn"
+            style="width: 30%"
+          >
+            取消
+          </button>
+          <button class="save" id="apply-forum-filter-btn" style="width: 30%">
+            应用
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 自定义头像框管理模态框 -->
+    <div id="custom-frame-manager-modal" class="modal">
+      <div class="modal-content" style="height: 70%">
+        <div class="modal-header">
+          <span>管理我的头像框</span>
+          <button id="upload-custom-frame-btn" class="action-button">
+            上传
+          </button>
+        </div>
+        <div class="modal-body" style="padding: 15px">
+          <div
+            id="custom-frame-grid"
+            style="
+              display: grid;
+              grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+              gap: 15px;
+            "
+          >
+            <!-- 自定义头像框将由JS动态生成在这里 -->
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="save" id="close-frame-manager-btn" style="width: 100%">
+            关闭
+          </button>
+        </div>
+      </div>
+    </div>
+    <input
+      type="file"
+      id="custom-frame-upload-input"
+      accept="image/png, image/gif"
+      hidden
+      multiple
+    />
+
+    <!-- 头像框选择模态框 -->
+    <div id="avatar-frame-modal" class="modal">
+      <div class="modal-content" style="height: 70%">
+        <div class="modal-header">
+          <span>选择头像框</span>
+
+          <button id="manage-custom-frames-btn" class="action-button">
+            管理
+          </button>
+        </div>
+        <div class="modal-body" style="padding: 15px">
+          <div id="avatar-frame-grid" class="frame-grid">
+            <!-- 头像框选项（包括“无”和自定义的）会在这里生成 -->
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="cancel-frame-settings-btn">取消</button>
+          <button class="save" id="save-frame-settings-btn">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="send-location-modal" class="modal">
+      <div
+        class="modal-content"
+        style="width: 300px; height: auto; max-height: 80%"
+      >
+        <div class="modal-header">
+          <span>发送定位与轨迹</span>
+        </div>
+        <div class="modal-body" style="padding-bottom: 5px">
+          <!-- 核心信息 -->
+          <div class="form-group">
+            <label for="user-location-input">我的位置 (起点)</label>
+            <input
+              type="text"
+              id="user-location-input"
+              placeholder="例如：市中心的咖啡馆"
+            />
+          </div>
+          <div class="form-group">
+            <label for="ai-location-input">Ta的位置 (终点)</label>
+            <input
+              type="text"
+              id="ai-location-input"
+              placeholder="例如：海边的灯塔"
+            />
+          </div>
+          <div class="form-group">
+            <label for="distance-input">相距</label>
+            <input
+              type="text"
+              id="distance-input"
+              placeholder="例如：约5公里 (必填)"
+            />
+          </div>
+
+          <hr style="opacity: 0.2" />
+
+          <!-- 行动轨迹输入区 -->
+          <div class="form-group">
+            <label>行动轨迹 (可选，按顺序填写)</label>
+            <div
+              id="trajectory-points-container"
+              style="display: flex; flex-direction: column; gap: 8px"
+            >
+              <!-- JS会在这里动态添加输入框 -->
+            </div>
+            <button
+              id="add-trajectory-point-btn"
+              class="form-button form-button-secondary"
+              style="margin-top: 12px"
+            >
+              + 添加途经点
+            </button>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="location-cancel-btn">取消</button>
+          <button class="save" id="location-confirm-btn">发送</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 粘贴悬浮歌词栏设置模态框 -->
+    <div id="lyrics-settings-modal" class="modal">
+      <div class="modal-content" style="height: auto">
+        <div class="modal-header">
+          <span>悬浮歌词设置</span>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="lyrics-font-size-slider"
+              >字体大小: <span id="lyrics-font-size-value">14px</span></label
+            >
+            <input
+              type="range"
+              id="lyrics-font-size-slider"
+              min="12"
+              max="24"
+              value="14"
+              style="width: 100%"
+            />
+          </div>
+          <div class="form-group">
+            <label for="lyrics-bg-opacity-slider"
+              >背景不透明度: <span id="lyrics-bg-opacity-value">0%</span></label
+            >
+            <input
+              type="range"
+              id="lyrics-bg-opacity-slider"
+              min="0"
+              max="100"
+              value="0"
+              style="width: 100%"
+            />
+          </div>
+          <div class="form-group">
+            <label for="lyrics-font-color-picker">字体颜色</label>
+            <input
+              type="color"
+              id="lyrics-font-color-picker"
+              value="#FFFFFF"
+              style="width: 100%; height: 40px"
+            />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="reset-lyrics-settings-btn">
+            恢复默认
+          </button>
+          <button class="save" id="close-lyrics-settings-btn">完成</button>
+        </div>
+      </div>
+    </div>
+    <div id="music-source-selector-modal" class="modal">
+      <div class="modal-content" style="height: auto">
+        <div class="modal-header">
+          <span>选择搜索源</span>
+        </div>
+        <div class="modal-body" style="text-align: left; padding: 20px">
+          <!-- ▼▼▼ 修改/新增部分开始 ▼▼▼ -->
+          <label style="display: block; margin-bottom: 15px; cursor: pointer">
+            <input type="radio" name="search-source" value="all" checked />
+            聚合搜索 (网易云 + QQ音乐)
+          </label>
+          <label style="display: block; margin-bottom: 15px; cursor: pointer">
+            <input type="radio" name="search-source" value="netease" /> 仅网易云
+            (vkeys接口)
+          </label>
+          <label style="display: block; margin-bottom: 15px; cursor: pointer">
+            <input type="radio" name="search-source" value="tencent" /> 仅QQ音乐
+            (vkeys接口)
+          </label>
+          <!-- 新增 GD 音乐台的选项 -->
+          <label
+            style="
+              display: block;
+              cursor: pointer;
+              color: #ff5722;
+              font-weight: bold;
+            "
+          >
+            <input type="radio" name="search-source" value="gdstudio" />
+            GD音乐台 (推荐)
+          </label>
+          <!-- ▲▲▲ 修改/新增部分结束 ▲▲▲ -->
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="cancel-source-select-btn">取消</button>
+          <button class="save" id="confirm-source-select-btn">开始搜索</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="weibo-following-modal" class="modal">
+      <div class="modal-content" style="height: 60%">
+        <div class="modal-header">
+          <span>关注列表</span>
+        </div>
+        <div class="modal-body" style="padding: 0">
+          <div id="weibo-following-list-container">
+            <!-- 关注列表将由JS动态生成在这里 -->
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button
+            class="save"
+            id="close-following-list-btn"
+            style="width: 100%"
+          >
+            关闭
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 塔罗牌占卜主模态框 -->
+    <div id="tarot-divination-modal" class="modal">
+      <div class="modal-content" style="height: 85%; width: 95%">
+        <!-- 1. 占卜设置界面 -->
+        <div id="tarot-setup-view">
+          <div class="modal-header">
+            <span>塔罗牌占卜</span>
+            <div>
+              <span
+                id="tarot-history-btn"
+                class="action-btn"
+                style="font-size: 16px"
+                >历史</span
+              >
+              <span
+                id="close-tarot-modal-btn"
+                class="action-btn"
+                style="font-size: 16px"
+                >关闭</span
+              >
+            </div>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label for="tarot-question-input">您的问题或关注点</label>
+              <textarea
+                id="tarot-question-input"
+                rows="2"
+                placeholder="例如：我近期的桃花运如何？"
+              ></textarea>
+            </div>
+            <div class="form-group">
+              <label for="tarot-spread-select">选择牌阵</label>
+              <select id="tarot-spread-select">
+                <option value="single">单张牌 - 快速指引</option>
+                <option value="three_past_present_future">
+                  三张牌 - 过去/现在/未来
+                </option>
+                <option value="three_situation_challenge_advice">
+                  三张牌 - 情境/挑战/建议
+                </option>
+                <option value="celtic_cross">
+                  凯尔特十字 - 深度分析 (10张牌)
+                </option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>牌面方向</label>
+              <div style="display: flex; gap: 20px">
+                <label
+                  ><input
+                    type="radio"
+                    name="tarot-orientation"
+                    value="upright"
+                    checked
+                  />
+                  仅正位</label
+                >
+                <label
+                  ><input
+                    type="radio"
+                    name="tarot-orientation"
+                    value="reversed"
+                  />
+                  包含逆位</label
+                >
+              </div>
+            </div>
+            <button
+              id="draw-tarot-cards-btn"
+              class="form-button"
+              style="margin-top: 20px"
+            >
+              洗牌并抽牌
+            </button>
+          </div>
+        </div>
+
+        <!-- 2. 占卜结果界面 (默认隐藏) -->
+        <div
+          id="tarot-result-view"
+          style="
+            display: none;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+          "
+        >
+          <div class="modal-header">
+            <span
+              id="back-to-tarot-setup-btn"
+              class="action-btn"
+              style="font-size: 16px"
+              >返回</span
+            >
+            <span>占卜结果</span>
+          </div>
+          <div class="modal-body" id="tarot-result-display">
+            <!-- 结果将由JS动态生成在这里 -->
+          </div>
+          <div class="modal-footer">
+            <button id="send-tarot-result-btn" class="save" style="width: 100%">
+              发给塔罗师解读
+            </button>
+          </div>
+        </div>
+
+        <!-- 3. 历史记录界面 (默认隐藏) -->
+        <div
+          id="tarot-history-view"
+          style="
+            display: none;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+          "
+        >
+          <div class="modal-header">
+            <span
+              id="back-to-tarot-main-btn"
+              class="action-btn"
+              style="font-size: 16px"
+              >返回</span
+            >
+            <span>占卜历史</span>
+          </div>
+          <div class="modal-body" id="tarot-history-list">
+            <!-- 历史记录将由JS动态生成在这里 -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. 切换角色的弹窗 -->
+    <div id="ls-char-selector-modal" class="modal">
+      <div class="modal-content" style="height: 60%">
+        <div class="modal-header">
+          <span>选择空间</span>
+        </div>
+        <div class="modal-body" id="ls-char-selector-list" style="padding: 0">
+          <!-- 角色列表会由JS动态生成 -->
+        </div>
+        <div class="modal-footer">
+          <button
+            class="cancel"
+            id="ls-cancel-switch-char-btn"
+            style="width: 100%"
+          >
+            取消
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. 发布说说的弹窗 -->
+    <div id="ls-create-moment-modal" class="modal">
+      <div class="modal-content" style="height: auto">
+        <div class="modal-header">
+          <span>想对Ta说...</span>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <textarea
+              id="ls-moment-content-input"
+              rows="5"
+              placeholder="在这里写下你们的私密话语..."
+            ></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="ls-cancel-moment-btn">取消</button>
+          <button class="save" id="ls-confirm-moment-btn">发布</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. 创建相册/上传照片的弹窗 (这是修改后的版本) -->
+    <div id="ls-create-album-modal" class="modal">
+      <div class="modal-content" style="height: auto">
+        <div class="modal-header">
+          <!-- 标题已修改 -->
+          <span id="ls-album-modal-title">上传照片</span>
+        </div>
+        <div class="modal-body">
+          <!-- 新增：模式切换开关 (复用动态的样式) -->
+          <div class="post-mode-switcher">
+            <button id="ls-switch-to-image-mode" class="mode-btn active">
+              上传图片
+            </button>
+            <button id="ls-switch-to-text-image-mode" class="mode-btn">
+              使用文字图
+            </button>
+          </div>
+
+          <!-- 模式1: 上传图片 -->
+          <div id="ls-image-mode-content" class="post-mode-content active">
+            <div class="form-group">
+              <label>选择照片 (仅限单张)</label>
+              <div id="ls-photo-preview-container"></div>
+              <button
+                class="form-button form-button-secondary"
+                id="ls-select-photos-btn"
+              >
+                选择照片
+              </button>
+              <!-- 关键：这里的 input 移除了 multiple 属性，现在只能单选 -->
+              <input type="file" id="ls-photo-input" accept="image/*" hidden />
+            </div>
+            <div class="form-group">
+              <label>图片描述 (必填)</label>
+              <textarea
+                id="ls-photo-desc-input"
+                rows="3"
+                placeholder="为这张照片写下注脚..."
+              ></textarea>
+            </div>
+          </div>
+
+          <!-- 模式2: 使用文字图 -->
+          <div
+            id="ls-text-image-mode-content"
+            class="post-mode-content"
+            style="display: none"
+          >
+            <div class="form-group">
+              <label>文字图描述 (必填)</label>
+              <textarea
+                id="ls-text-image-desc-input"
+                rows="5"
+                placeholder="在这里写下你的心情或故事..."
+              ></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="ls-cancel-album-btn">取消</button>
+          <button class="save" id="ls-confirm-album-btn">确认上传</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 情侣空间-写情书/回信的弹窗 -->
+    <div id="ls-create-letter-modal" class="modal">
+      <div class="modal-content" style="height: auto">
+        <div class="modal-header">
+          <span id="ls-letter-modal-title">给Ta写一封信</span>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="ls-letter-recipient-input">收信人</label>
+            <!-- 收信人通常是固定的，所以我们禁用这个输入框 -->
+            <input type="text" id="ls-letter-recipient-input" disabled />
+          </div>
+          <div class="form-group">
+            <label for="ls-letter-content-input">情书内容</label>
+            <textarea
+              id="ls-letter-content-input"
+              rows="8"
+              placeholder="在这里写下你的心意..."
+            ></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="ls-cancel-letter-btn">取消</button>
+          <button class="save" id="ls-confirm-letter-btn">寄出</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 情侣空间-情书查看器 -->
+    <div id="ls-letter-viewer-modal" class="modal">
+      <div class="ls-letter-viewer-content">
+        <!-- 头部：收信人信息 -->
+        <div class="letter-viewer-header">
+          <img id="ls-viewer-recipient-avatar" class="meta-avatar" />
+          <div class="recipient-info">
+            <div class="label">To my dear:</div>
+            <div id="ls-viewer-recipient-name" class="name"></div>
+          </div>
+        </div>
+        <!-- 中间：信件正文 -->
+        <div id="ls-viewer-body" class="letter-viewer-body">
+          <!-- JS会在这里填充信件内容 -->
+        </div>
+        <!-- 底部：发信人信息和操作按钮 -->
+        <div class="letter-viewer-footer">
+          <div class="sender-info">
+            <div id="ls-viewer-sender-name"></div>
+            <div id="ls-viewer-timestamp" class="timestamp"></div>
+          </div>
+          <div class="letter-actions">
+            <button id="ls-close-letter-viewer-btn">关闭</button>
+            <button id="ls-reply-letter-btn" class="primary">回信</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 情侣空间设置弹窗 -->
+    <div id="ls-settings-modal" class="modal">
+      <div class="modal-content" style="height: auto">
+        <div class="modal-header">
+          <span>情侣空间设置</span>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="ls-start-date-input">我们在一起的第一天</label>
+            <input
+              type="date"
+              id="ls-start-date-input"
+              style="width: 100%; padding: 10px; box-sizing: border-box"
+            />
+          </div>
+
+          <hr style="opacity: 0.2; margin: 20px 0" />
+          <div class="form-group">
+            <label>危险操作</label>
+            <div style="display: flex; gap: 10px">
+              <button
+                id="ls-cancel-space-btn"
+                class="form-button form-button-secondary"
+                style="
+                  background-color: #ffe5e5;
+                  color: #ff3b30;
+                  border-color: #ffc2d1;
+                  flex: 1;
+                  margin: 0;
+                "
+              >
+                取消空间
+              </button>
+              <button
+                id="ls-disconnect-space-btn"
+                class="form-button form-button-secondary"
+                style="
+                  background-color: #ff3b30;
+                  color: white;
+                  border-color: #ff3b30;
+                  flex: 1;
+                  margin: 0;
+                "
+              >
+                解除关系
+              </button>
+            </div>
+            <p style="font-size: 12px; color: #8a8a8a; margin-top: 8px">
+              <strong>取消空间</strong>:
+              将空间变为未启用状态，但保留所有数据。不会通知对方。<br />
+              <strong>解除关系</strong>:
+              同样会取消空间，但会通知对方关系已解除，对方会对此发表意见。
+            </p>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="ls-settings-cancel-btn">取消</button>
+          <button class="save" id="ls-settings-save-btn">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 情侣空间-提问弹窗 -->
+    <div id="ls-ask-question-modal" class="modal">
+      <div class="modal-content" style="height: auto">
+        <div class="modal-header">
+          <span>发起一个提问</span>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <textarea
+              id="ls-question-content-input"
+              rows="5"
+              placeholder="向Ta提个问题吧..."
+            ></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="ls-cancel-ask-btn">取消</button>
+          <button class="save" id="ls-confirm-ask-btn">向Ta提问</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 情侣空间-回答弹窗 -->
+    <div id="ls-answer-question-modal" class="modal">
+      <div class="modal-content" style="height: auto">
+        <div class="modal-header">
+          <span>回答Ta的问题</span>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>问题：</label>
+            <p
+              id="ls-answer-question-text"
+              style="
+                background-color: #f0f2f5;
+                padding: 10px;
+                border-radius: 8px;
+              "
+            ></p>
+          </div>
+          <div class="form-group">
+            <label for="ls-answer-content-input">你的回答：</label>
+            <textarea
+              id="ls-answer-content-input"
+              rows="5"
+              placeholder="认真回答哦..."
+            ></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="ls-cancel-answer-btn">取消</button>
+          <button class="save" id="ls-confirm-answer-btn">确认回答</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1. 这是播放器专属的音频引擎 -->
+    <audio id="ls-audio-player" style="display: none"></audio>
+
+    <!-- 2. 这是播放器的主窗口界面 -->
+    <div id="ls-music-player-overlay" class="modal">
+      <div class="music-player-window">
+        <!-- 封面和歌词的切换容器 -->
+        <div
+          id="ls-display-area"
+          style="
+            width: 192px;
+            height: 192px;
+            margin-bottom: 20px;
+            cursor: pointer;
+          "
+        >
+          <!-- 歌曲封面 -->
+          <img
+            id="ls-album-cover"
+            src="https://i.postimg.cc/pT2xKzPz/album-cover-placeholder.png"
+            alt="歌曲封面"
+            style="
+              width: 100%;
+              height: 100%;
+              border-radius: 12px;
+              box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            "
+          />
+
+          <!-- 歌词容器 -->
+          <div
+            id="ls-lyrics-container"
+            style="
+              display: none;
+              width: 100%;
+              height: 100%;
+              overflow: hidden;
+              text-align: center;
+              color: #333;
+              font-weight: 500;
+            "
+          >
+            <div id="ls-lyrics-list" style="transition: transform 0.5s ease">
+              <!-- 歌词会显示在这里 -->
+            </div>
+          </div>
+        </div>
+
+        <!-- 歌曲信息 -->
+        <div id="ls-song-title" style="font-size: 18px; font-weight: 600">
+          暂无歌曲
+        </div>
+        <div
+          id="ls-artist"
+          style="font-size: 14px; color: #666; margin-bottom: 15px"
+        >
+          ...
+        </div>
+
+        <!-- 进度条 -->
+        <div class="music-progress-bar-container" style="width: 100%">
+          <div id="ls-current-time" class="time-display">0:00</div>
+          <div class="progress-bar" id="ls-progress-bar">
+            <div id="ls-progress-fill" class="progress-bar-fill"></div>
+          </div>
+          <div id="ls-total-time" class="time-display">0:00</div>
+        </div>
+
+        <!-- 控制按钮 -->
+        <div class="music-controls" style="margin-bottom: 15px">
+          <button id="ls-prev-btn">◀</button>
+          <button id="ls-play-pause-btn" class="play-pause-btn">▶</button>
+          <button id="ls-next-btn">▶</button>
+        </div>
+
+        <!-- 底部操作按钮 -->
+        <div class="music-bottom-actions" style="width: 100%">
+          <button
+            id="ls-playlist-btn"
+            style="
+              background-color: rgba(0, 123, 255, 0.1);
+              color: var(--accent-color);
+              margin-right: 5px;
+            "
+          >
+            播放列表
+          </button>
+          <button
+            id="ls-close-player-btn"
+            style="
+              background-color: rgba(0, 0, 0, 0.05);
+              color: #333;
+              margin-left: 5px;
+            "
+          >
+            关闭
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. 这是播放列表的侧滑面板 -->
+    <div id="ls-music-playlist-panel" class="music-playlist-panel">
+      <div class="playlist-header">
+        <span class="panel-btn" id="ls-close-playlist-btn">返回</span>
+        <span>播放列表</span>
+        <span
+          class="panel-btn"
+          id="ls-clear-playlist-btn"
+          style="color: #ff3b30"
+          >清空</span
+        >
+      </div>

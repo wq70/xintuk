@@ -1,0 +1,862 @@
+                  member.originalName = member.name; // 将旧的 name 作为 originalName
+                  member.groupNickname = member.name; // 同时创建一个初始的 groupNickname
+                  delete member.name; // 删除旧的、有歧义的 name 字段
+                  needsUpdate = true; // 标记需要存回数据库
+                }
+              });
+              console.log(`迁移完成 for "${chat.name}"`);
+            }
+
+            // 检查1：如果是一个单聊，并且没有 status 属性
+            if (!chat.isGroup && !chat.status) {
+              // 就为它补上一个默认的 status 对象
+              chat.status = {
+                text: "在线",
+                lastUpdate: Date.now(),
+                isBusy: false,
+              };
+              console.log(`为旧角色 "${chat.name}" 补全了status属性。`);
+            }
+
+            // 检查2：兼容最新的“关系”功能
+            if (!chat.isGroup && !chat.relationship) {
+              // 如果是单聊，且没有 relationship 对象，就补上一个默认的
+              chat.relationship = {
+                status: "friend",
+                blockedTimestamp: null,
+                applicationReason: "",
+              };
+              console.log(`为旧角色 "${chat.name}" 补全了 relationship 属性。`);
+            }
+
+            if (
+              !chat.isGroup &&
+              (!chat.settings || !chat.settings.aiAvatarLibrary)
+            ) {
+              if (!chat.settings) chat.settings = {}; // 以防万一连settings都没有
+              chat.settings.aiAvatarLibrary = [];
+              console.log(
+                `为旧角色 "${chat.name}" 补全了aiAvatarLibrary属性。`,
+              );
+            }
+
+            // 兼容旧数据：为没有总结设置的聊天添加默认值
+            if (!chat.settings.summary) {
+              chat.settings.summary = {
+                enabled: false,
+                mode: "auto",
+                count: 20,
+                prompt:
+                  "请你以第三人称的视角，客观、冷静、不带任何感情色彩地总结以下对话的核心事件和信息。禁止进行任何角色扮演或添加主观评论。",
+                lastSummaryIndex: -1, // -1表示从未总结过
+              };
+            }
+
+            // 兼容旧数据：为没有NPC库的单聊角色添加空的NPC库
+            if (!chat.isGroup && !chat.npcLibrary) {
+              chat.npcLibrary = [];
+              console.log(`为旧角色 "${chat.name}" 补全了 npcLibrary 属性。`);
+            }
+
+            // 兼容旧数据：为没有微博设置的单聊角色添加空的微博设置
+            if (
+              !chat.isGroup &&
+              (!chat.settings.weiboProfession ||
+                typeof chat.settings.weiboInstruction === "undefined")
+            ) {
+              chat.settings.weiboProfession = "";
+              chat.settings.weiboInstruction = "";
+              console.log(`为旧角色 "${chat.name}" 补全了微博设置属性。`);
+            }
+
+            if (!chat.musicData) chat.musicData = { totalTime: 0 };
+            if (
+              chat.settings &&
+              chat.settings.linkedWorldBookId &&
+              !chat.settings.linkedWorldBookIds
+            ) {
+              chat.settings.linkedWorldBookIds = [
+                chat.settings.linkedWorldBookId,
+              ];
+              delete chat.settings.linkedWorldBookId;
+            }
+
+            // 兼容旧数据，为没有 isPinned 属性的聊天添加默认值
+            if (typeof chat.isPinned === "undefined") {
+              chat.isPinned = false;
+            }
+
+            // 统一修复并初始化所有角色的手机数据
+            if (!chat.isGroup) {
+              // 第一步：确保最外层的 characterPhoneData 对象存在
+              if (!chat.characterPhoneData) {
+                chat.characterPhoneData = {}; // 如果不存在，就创建一个空的
+              }
+
+              // 第二步：逐一检查并补全所有APP的数据结构
+              // 这样无论角色多老，都能确保所有字段都存在
+              if (!chat.characterPhoneData.widgets)
+                chat.characterPhoneData.widgets = {};
+              if (!chat.characterPhoneData.lastGenerated)
+                chat.characterPhoneData.lastGenerated = null;
+              if (!chat.characterPhoneData.chats)
+                chat.characterPhoneData.chats = {};
+              if (!chat.characterPhoneData.shoppingCart)
+                chat.characterPhoneData.shoppingCart = [];
+              if (!chat.characterPhoneData.memos)
+                chat.characterPhoneData.memos = [];
+              if (!chat.characterPhoneData.browserHistory)
+                chat.characterPhoneData.browserHistory = [];
+              if (!chat.characterPhoneData.photoAlbum)
+                chat.characterPhoneData.photoAlbum = [];
+              if (!chat.characterPhoneData.bank)
+                chat.characterPhoneData.bank = { balance: 0, transactions: [] };
+              if (!chat.characterPhoneData.trajectory)
+                chat.characterPhoneData.trajectory = [];
+              if (!chat.characterPhoneData.appUsage)
+                chat.characterPhoneData.appUsage = [];
+              if (!chat.characterPhoneData.diary)
+                chat.characterPhoneData.diary = [];
+              if (!chat.characterPhoneData.appWallpaper) {
+                chat.characterPhoneData.appWallpaper = "";
+              }
+            }
+
+            // 兼容旧数据，为没有后台活动设置的群聊添加默认值
+            if (
+              chat.isGroup &&
+              (!chat.settings ||
+                typeof chat.settings.backgroundActivity === "undefined")
+            ) {
+              if (!chat.settings) chat.settings = {}; // 以防万一连settings都没有
+              chat.settings.backgroundActivity = {
+                enabled: false,
+                interval: 120, // 默认120秒
+                lastActivityTimestamp: 0,
+              };
+            }
+
+            // 兼容旧数据：为没有情侣头像设置的角色添加默认值
+            if (typeof chat.settings.isCoupleAvatar === "undefined") {
+              chat.settings.isCoupleAvatar = false;
+              chat.settings.coupleAvatarDescription = "";
+            }
+
+            // 1. 为所有角色（包括新旧数据）确保有 petAdopted 标志
+            if (
+              !chat.isGroup &&
+              typeof chat.settings.petAdopted === "undefined"
+            ) {
+              // 如果 pet 对象已存在，说明是老用户，默认已领养
+              if (chat.settings.pet && chat.settings.pet.type !== "无") {
+                chat.settings.petAdopted = true;
+              } else {
+                // 如果没有 pet 对象，说明是新用户或之前就没用宠物，默认未领养
+                chat.settings.petAdopted = false;
+              }
+              console.log(
+                `为角色 "${chat.name}" 初始化了宠物领养状态: ${chat.settings.petAdopted}`,
+              );
+            }
+
+            // 2. 兼容旧的 pet 对象，确保新字段存在（这段代码和之前一样，保留即可）
+            if (!chat.isGroup && chat.settings.pet) {
+              if (typeof chat.settings.pet.persona === "undefined") {
+                chat.settings.pet.persona =
+                  "一只可爱的小宠物，对世界充满好奇。";
+              }
+              if (!chat.settings.pet.petChatHistory) {
+                chat.settings.pet.petChatHistory = [];
+              }
+              if (!chat.settings.pet.status) {
+                chat.settings.pet.status = {
+                  hunger: 100,
+                  happiness: 100,
+                  intimacyToUser: 50,
+                  intimacyToChar: 50,
+                  lastUpdated: Date.now(),
+                };
+              } else {
+                if (
+                  typeof chat.settings.pet.status.intimacyToUser === "undefined"
+                )
+                  chat.settings.pet.status.intimacyToUser = 50;
+                if (
+                  typeof chat.settings.pet.status.intimacyToChar === "undefined"
+                )
+                  chat.settings.pet.status.intimacyToChar = 50;
+                if (typeof chat.settings.pet.status.lastUpdated === "undefined")
+                  chat.settings.pet.status.lastUpdated = Date.now();
+              }
+            }
+
+            // 兼容旧数据：为没有记忆互通设置的聊天添加一个空的数组
+            if (!chat.settings.linkedMemories) {
+              chat.settings.linkedMemories = [];
+            }
+
+            // 为旧数据添加默认的记忆条数设置
+            if (typeof chat.settings.linkMemoryDepth === "undefined") {
+              chat.settings.linkMemoryDepth = 5;
+            }
+
+            // 兼容线下模式设置
+            if (!chat.settings.offlineMode) {
+              chat.settings.offlineMode = {
+                enabled: false,
+                prompt: "",
+                style: "",
+                wordCount: 300,
+                presets: [],
+              };
+            }
+
+            if (!chat.isGroup) {
+              // 只为单聊角色添加
+              if (!chat.characterPhoneData) {
+                chat.characterPhoneData = {}; // 以防万一连 characterPhoneData 都没有
+              }
+              if (!chat.characterPhoneData.wallpaper) {
+                chat.characterPhoneData.wallpaper = ""; // 初始化壁纸为空
+              }
+              if (!chat.characterPhoneData.appIcons) {
+                chat.characterPhoneData.appIcons = {}; // 初始化App图标为空对象
+              }
+            }
+            // 为旧角色数据兼容微博独立设置
+            if (!chat.isGroup) {
+              if (!chat.settings.weiboNickname) {
+                chat.settings.weiboNickname = chat.name; // 默认使用角色名作为微博昵称
+              }
+              if (!chat.settings.weiboAvatar) {
+                chat.settings.weiboAvatar = chat.settings.aiAvatar; // 默认使用AI头像
+              }
+              if (!chat.settings.weiboAvatarFrame) {
+                chat.settings.weiboAvatarFrame =
+                  chat.settings.aiAvatarFrame || ""; // 默认使用AI头像框
+              }
+              if (!chat.settings.weiboBackground) {
+                chat.settings.weiboBackground =
+                  "https://i.postimg.cc/mk93Y3j1/weibo-bg-default.jpg"; // 给一个默认背景
+              }
+              // weiboProfession 和 weiboInstruction 之前已经兼容过了，这里不用重复
+            }
+            // 兼容旧数据：为没有微博设置的单聊角色添加空的微博设置
+            if (
+              !chat.isGroup &&
+              (!chat.settings.weiboProfession ||
+                typeof chat.settings.weiboInstruction === "undefined")
+            ) {
+              chat.settings.weiboProfession = "";
+              chat.settings.weiboInstruction = "";
+              console.log(`为旧角色 "${chat.name}" 补全了微博设置属性。`);
+            }
+
+            // 为旧角色数据兼容微博粉丝/关注数
+            if (
+              !chat.isGroup &&
+              (typeof chat.settings.weiboFansCount === "undefined" ||
+                typeof chat.settings.weiboFollowingCount === "undefined")
+            ) {
+              const initialStats = getInitialWeiboStats(chat);
+              chat.settings.weiboFansCount = initialStats.fans;
+              chat.settings.weiboFollowingCount = initialStats.following;
+              console.log(`为旧角色 "${chat.name}" 初始化了微博数据。`);
+            }
+
+            if (
+              !chat.isGroup &&
+              (!chat.settings ||
+                typeof chat.settings.minimaxVoiceId === "undefined")
+            ) {
+              if (!chat.settings) chat.settings = {};
+              chat.settings.minimaxVoiceId = ""; // 默认为空
+              console.log(
+                `为旧角色 "${chat.name}" 补全了 minimaxVoiceId 属性。`,
+              );
+            }
+
+            // 兼容旧数据：为没有火花设置的聊天添加默认值
+            if (!chat.settings.streak) {
+              chat.settings.streak = {
+                enabled: false,
+                initialDays: 0, // 【新】用户填写的初始天数
+                currentDays: 0, // 当前的火花天数
+                extinguishThreshold: 1, // 【新】熄灭阈值，默认1天
+                lastInteractionDate: null, // 上次互动日期
+              };
+              console.log(
+                `为角色 "${chat.name}" 补全了增强版火花(streak)设置。`,
+              );
+            } else if (
+              typeof chat.settings.streak.extinguishThreshold === "undefined"
+            ) {
+              // 兼容你上个版本的数据，为它们也加上熄灭阈值
+              chat.settings.streak.extinguishThreshold = 1;
+              console.log(`为角色 "${chat.name}" 的旧火花设置添加了熄灭阈值。`);
+            }
+
+            // 兼容旧的群聊数据，为它们添加群主、管理员和头衔属性
+            if (chat.isGroup) {
+              if (typeof chat.settings.groupAnnouncement === "undefined") {
+                chat.settings.groupAnnouncement = "";
+              }
+
+              // 如果没有ownerId，则默认创建者（也就是你）为群主
+              if (!chat.ownerId) {
+                chat.ownerId = "user"; // 我们假设用户的ID为 'user'
+              }
+              // 遍历所有成员，为他们添加新属性
+              if (chat.members && Array.isArray(chat.members)) {
+                chat.members.forEach((member) => {
+                  if (typeof member.isAdmin === "undefined") {
+                    member.isAdmin = false; // 默认不是管理员
+                  }
+                  if (typeof member.groupTitle === "undefined") {
+                    member.groupTitle = ""; // 默认没有头衔
+                  }
+                });
+              }
+              // 为用户自己也添加管理员和头衔的默认属性
+              if (chat.settings) {
+                if (typeof chat.settings.isUserAdmin === "undefined") {
+                  chat.settings.isUserAdmin = false;
+                }
+                if (typeof chat.settings.myGroupTitle === "undefined") {
+                  chat.settings.myGroupTitle = "";
+                }
+              }
+            }
+
+            // 在 loadAllDataFromDB 函数的 forEach 循环内，acc[chat.id] = chat; 之前添加：
+
+            // 为旧数据兼容心声面板样式设置
+            if (!chat.settings.innerVoiceStyles) {
+              chat.settings.innerVoiceStyles = {
+                clothingColor: "#f0a1a8",
+                behaviorColor: "#81c784",
+                thoughtsColor: "#64b5f6",
+                naughtyColor: "#ba68c8",
+                cardBgColor: "#ffffff",
+                cardOpacity: 0.7,
+              };
+            }
+            // 为旧数据兼容图标颜色设置
+            if (
+              chat.settings.innerVoiceStyles &&
+              typeof chat.settings.innerVoiceStyles.iconColor === "undefined"
+            ) {
+              chat.settings.innerVoiceStyles.iconColor = "#ff8a80"; // 默认粉红色
+            }
+
+            // 兼容亲密值系统：为旧数据添加互动统计和已解锁徽章
+            if (!chat.interactionStats) {
+              chat.interactionStats = {};
+            }
+            if (!chat.unlockedSymbols) {
+              chat.unlockedSymbols = [];
+            }
+
+            // 兼容亲密值系统：为旧数据添加佩戴徽章的字段
+            if (
+              chat.settings &&
+              typeof chat.settings.selectedIntimacyBadge === "undefined"
+            ) {
+              chat.settings.selectedIntimacyBadge = ""; // 默认为空，不佩戴
+            }
+
+            if (!chat.isGroup && chat.settings) {
+              if (typeof chat.settings.language_boost === "undefined") {
+                chat.settings.language_boost = null; // 默认为null
+              }
+              if (typeof chat.settings.speed === "undefined") {
+                chat.settings.speed = 1.0; // 默认为1.0
+              }
+            }
+            // 为旧数据补全情侣头像库
+            if (!chat.isGroup && !chat.settings.coupleAvatarLibrary) {
+              chat.settings.coupleAvatarLibrary = [];
+              console.log(
+                `为旧角色 "${chat.name}" 补全了情侣头像库(coupleAvatarLibrary)属性。`,
+              );
+            }
+            acc[chat.id] = chat;
+            return acc;
+          }, {});
+
+          state.apiConfig = apiConfig || {
+            id: "main",
+            proxyUrl: "",
+            apiKey: "",
+            model: "",
+            temperature: 0.8, // 新增：为温度设置一个默认值 0.8
+            minimaxGroupId: "",
+            minimaxApiKey: "",
+            minimaxProvider: "cn",
+            minimaxSpeechModel: "speech-01-turbo",
+            pollinationsApiKey: "", // <--- 新增这一行
+          };
+
+          // 兼容旧数据，如果加载的设置里没有温度，也给一个默认值
+          if (typeof state.apiConfig.temperature === "undefined") {
+            state.apiConfig.temperature = 0.8;
+          }
+
+          state.globalSettings = globalSettings || {
+            id: "main",
+            quickReplies: ["你好", "继续", "有趣"],
+            ringtoneUrl: "https://files.catbox.moe/3w7gla.mp3",
+            notificationSoundUrl: "https://files.catbox.moe/k369mf.mp3", // <-- 在这里新增这一行
+            widgetData: {},
+            wallpaper: "linear-gradient(135deg, #89f7fe, #66a6ff)",
+            lockscreenWallpaper: "linear-gradient(135deg, #764ba2, #667eea)",
+            password: "",
+            fontUrl: "",
+            enableBackgroundActivity: false,
+            backgroundActivityInterval: 60,
+            blockCooldownHours: 1,
+            appIcons: { ...DEFAULT_APP_ICONS },
+            appLabels: {},
+            ringtoneUrl: "https://files.catbox.moe/3w7gla.mp3",
+            notificationSoundUrl: "https://files.catbox.moe/k369mf.mp3",
+            widgetData: {}, // 【核心修改】在这里新增一个空对象，用来存放你的自定义内容
+            // 在 state.globalSettings 的初始化对象里添加：
+            homeAvatarFrame: "", // 为主屏幕头像框添加默认空值
+
+            globalChatBackground: "",
+            homeIconWidgetTextColor: "#FFFFFF", // <-- 修改这里的名字
+            imageCompressionQuality: 0.7,
+            userBalance: 520,
+
+            homeAvatarFrame: "", // 为主屏幕头像框添加默认空值
+          };
+          // 确保即使从旧数据库加载，这个属性也存在
+          if (!state.globalSettings.widgetData) {
+            state.globalSettings.widgetData = {};
+          }
+
+          if (!state.globalSettings.homeIconWidgetTextColor) {
+            // <-- 修改这里的名字
+            state.globalSettings.homeIconWidgetTextColor = "#FFFFFF";
+          }
+          // 兼容字体阴影设置
+          if (
+            typeof state.globalSettings.removeHomeFontShadow === "undefined"
+          ) {
+            state.globalSettings.removeHomeFontShadow = false;
+          }
+
+          // 兼容旧数据：如果加载的设置里没有appLabels，就给它一个空对象
+          if (!state.globalSettings.appLabels) {
+            state.globalSettings.appLabels = {};
+          }
+
+          if (
+            typeof state.globalSettings.imageCompressionQuality === "undefined"
+          ) {
+            state.globalSettings.imageCompressionQuality = 0.7;
+          }
+
+          // 加载歌词栏设置，如果不存在则使用默认值
+          lyricsBarSettings =
+            state.globalSettings.lyricsBarSettings || lyricsBarSettings;
+          // 兼容旧数据：初始化快捷回复 (默认为空)
+          if (!state.globalSettings.quickReplies) {
+            state.globalSettings.quickReplies = [];
+          }
+
+          // 合并已保存的图标和默认图标，防止更新后旧数据丢失新图标
+          state.globalSettings.appIcons = {
+            ...DEFAULT_APP_ICONS,
+            ...(state.globalSettings.appIcons || {}),
+          };
+
+          state.userStickers = userStickers || [];
+          userStickerCategories = localUserStickerCategories || [];
+          state.charStickers = charStickers || [];
+          state.worldBooks = worldBooks || [];
+          currentDatingScenes = datingScenes || [];
+          // 加载播放列表并注入“隐形”保活音频
+          window.state.musicState.playlist = musicLib?.playlist || [];
+
+          const keepAliveUrl = "https://files.catbox.moe/7jn7bp.mp3";
+
+          // 检查列表中是否已经有这个音频了
+          const existingKeepAliveIndex =
+            window.state.musicState.playlist.findIndex(
+              (t) => t.src === keepAliveUrl,
+            );
+
+          // 如果已经存在，先删掉旧的，确保它永远在第一位且信息最新
+          if (existingKeepAliveIndex > -1) {
+            window.state.musicState.playlist.splice(existingKeepAliveIndex, 1);
+          }
+
+          // 创建保活专用对象
+          const keepAliveTrack = {
+            name: "【后台保活模式】(静音)",
+            artist: "点击播放以保持后台运行",
+            src: keepAliveUrl,
+            // 使用 API设置 的图标作为封面
+            cover:
+              "https://i.postimg.cc/y8YfDNNr/D9FD94FC0A3523D02D9EE3A7B0F57396.png",
+            isLocal: false,
+            lrcContent:
+              "[00:00.00]⚠️ 后台保活运行中...\n[00:02.00]此音频无声\n[00:05.00]用于防止API请求中断\n[99:99.99]End",
+            isTemporary: false,
+            addedTimestamp: Date.now(),
+            // ★★★ 核心标记：这是一个保活音轨 ★★★
+            isKeepAlive: true,
+          };
+
+          // 强制插到播放列表的第 0 位
+          window.state.musicState.playlist.unshift(keepAliveTrack);
+
+          state.personaPresets = personaPresets || [];
+          state.apiPresets = apiPresets || [];
+          state.bubbleStylePresets = bubbleStylePresets || [];
+
+          state.qzoneSettings = qzoneSettings || {
+            id: "main",
+            nickname: "{{user}}",
+            avatar: "https://files.catbox.moe/q6z5fc.jpeg",
+            banner: "https://files.catbox.moe/r5heyt.gif",
+            weiboAvatar: "https://files.catbox.moe/q6z5fc.jpeg",
+            weiboNickname: "你的昵称",
+            weiboFansCount: "0",
+            weiboBackground:
+              "https://i.postimg.cc/mk93Y3j1/weibo-bg-default.jpg",
+
+            weiboUserProfession: "点击设置职业",
+            weiboUserPersona: "一个普通的微博用户。",
+            weiboUserPersonaPresets: [],
+          };
+          // 兼容旧数据，如果加载进来的数据没有这些新字段，就补上默认值
+          if (!state.qzoneSettings.weiboAvatar)
+            state.qzoneSettings.weiboAvatar =
+              state.qzoneSettings.avatar ||
+              "https://files.catbox.moe/q6z5fc.jpeg";
+          if (!state.qzoneSettings.weiboNickname)
+            state.qzoneSettings.weiboNickname =
+              state.qzoneSettings.nickname || "你的昵称";
+          if (!state.qzoneSettings.weiboFansCount)
+            state.qzoneSettings.weiboFansCount = "0";
+          if (!state.qzoneSettings.weiboBackground)
+            state.qzoneSettings.weiboBackground =
+              "https://i.postimg.cc/mk93Y3j1/weibo-bg-default.jpg";
+
+          if (!state.qzoneSettings.weiboUserProfession)
+            state.qzoneSettings.weiboUserProfession = "点击设置职业";
+          if (!state.qzoneSettings.weiboUserPersona)
+            state.qzoneSettings.weiboUserPersona = "一个普通的微博用户。";
+          if (!state.qzoneSettings.weiboUserPersonaPresets)
+            state.qzoneSettings.weiboUserPersonaPresets = [];
+
+          if (!state.qzoneSettings.weiboAvatarFrame)
+            state.qzoneSettings.weiboAvatarFrame = "";
+
+          allFavoriteItems = initialFavorites || [];
+
+          if (
+            typeof state.globalSettings.notificationSoundUrl === "undefined"
+          ) {
+            state.globalSettings.notificationSoundUrl =
+              "https://files.catbox.moe/k369mf.mp3";
+          }
+        }
+
+        async function saveGlobalPlaylist() {
+          // 1. 在保存前，先从当前播放列表中过滤掉所有被标记为 isTemporary 的歌曲
+          const permanentPlaylist = state.musicState.playlist.filter(
+            (track) => !track.isTemporary,
+          );
+
+          // 2. 只将这个“永久播放列表”保存到数据库中
+          await db.musicLibrary.put({
+            id: "main",
+            playlist: permanentPlaylist,
+          });
+          console.log("已将永久播放列表保存到数据库。");
+        }
+
+        function formatTimestamp(timestamp) {
+          if (!timestamp) return "";
+          const date = new Date(timestamp);
+          const hours = String(date.getHours()).padStart(2, "0");
+          const minutes = String(date.getMinutes()).padStart(2, "0");
+          return `${hours}:${minutes}`;
+        }
+        /**
+         * 显示系统/应用内通知
+         * @param {string} chatId - 聊天ID
+         * @param {string} messageContent - 消息内容
+         * @param {string} specificAvatarUrl - [新增参数] 指定的具体头像URL（用于群聊显示发言人头像）
+         */
+        async function showNotification(
+          chatId,
+          messageContent,
+          specificAvatarUrl = null,
+        ) {
+          // 播放音效
+          playNotificationSound();
+
+          // 清除旧的应用内顶部横幅计时器
+          clearTimeout(notificationTimeout);
+
+          const chat = state.chats[chatId];
+          if (!chat) return;
+
+          // 1. 准备通知数据
+          // 逻辑修改：如果传入了 specificAvatarUrl，就直接用；否则按原逻辑（群用群头像，单聊用AI头像）
+          let avatarUrl = specificAvatarUrl;
+
+          if (!avatarUrl) {
+            avatarUrl = chat.isGroup
+              ? chat.settings.groupAvatar || defaultGroupAvatar
+              : chat.settings.aiAvatar || defaultAvatar;
+          }
+
+          const notifName =
+            !chat.isGroup && chat.settings.remarkName
+              ? chat.settings.remarkName
+              : chat.name;
+
+          // 2. 检测是否需要发送系统弹窗 (原生通知)
+          const isSystemNotifyEnabled =
+            state.globalSettings.enableSystemNotifications === true;
+          const hasPermission =
+            "Notification" in window && Notification.permission === "granted";
+
+          if (isSystemNotifyEnabled && hasPermission) {
+            const isChatActive =
+              document.getElementById("chat-interface-screen") &&
+              document
+                .getElementById("chat-interface-screen")
+                .classList.contains("active") &&
+              state.activeChatId === chatId;
+
+            if (document.hidden || !isChatActive) {
+              const options = {
+                body: messageContent,
+                icon: avatarUrl, // 这里也会自动使用正确的头像
+                tag: chatId,
+                renotify: true,
+                silent: true,
+                badge:
+                  "https://i.postimg.cc/Kj8JnRcp/267611-CC01-F8-A3-B4910-A2-C2-FFDE479-DC.jpg",
+              };
+
+              try {
+                if ("serviceWorker" in navigator) {
+                  const reg = await navigator.serviceWorker.getRegistration();
+                  if (reg) {
+                    await reg.showNotification(notifName, options);
+                  } else {
+                    new Notification(notifName, options);
+                  }
+                } else {
+                  new Notification(notifName, options);
+                }
+              } catch (e) {
+                console.error("系统通知发送失败:", e.message);
+              }
+            }
+          }
+
+          // 3. 应用内顶部横幅 (网页内弹窗)
+          const bar = document.getElementById("notification-bar");
+          const avatarImg = document.getElementById("notification-avatar");
+
+          // 这里设置图片
+          if (avatarImg) avatarImg.src = avatarUrl;
+
+          const contentDiv = document.getElementById("notification-content");
+          if (contentDiv) {
+            contentDiv.querySelector(".name").textContent = notifName;
+            contentDiv.querySelector(".message").textContent = messageContent;
+          }
+
+          if (bar) {
+            const newBar = bar.cloneNode(true);
+            bar.parentNode.replaceChild(newBar, bar);
+
+            newBar.addEventListener("click", () => {
+              openChat(chatId);
+              newBar.classList.remove("visible");
+            });
+
+            newBar.classList.add("visible");
+            notificationTimeout = setTimeout(() => {
+              newBar.classList.remove("visible");
+            }, 4000);
+          }
+        }
+
+        /**
+         * 显示一个包含多个选项的操作菜单模态框
+         * 这是让图片编辑时能够选择“本地上传”或“URL”的关键函数！
+         * @param {string} title - 模态框的标题
+         * @param {Array<object>} options - 按钮选项数组, e.g., [{ text: '按钮文字', value: '返回值' }]
+         * @returns {Promise<string|null>} - 返回用户点击按钮的value，如果取消则返回null
+         */
+        function showChoiceModal(title, options) {
+          return new Promise((resolve) => {
+            // 复用你现有的自定义模态框
+            const modal = document.getElementById("preset-actions-modal");
+            const footer = modal.querySelector(".custom-modal-footer");
+
+            // 清空旧按钮并动态创建新按钮
+            footer.innerHTML = "";
+
+            options.forEach((option) => {
+              const button = document.createElement("button");
+              button.textContent = option.text;
+              button.onclick = () => {
+                modal.classList.remove("visible");
+                resolve(option.value); // 返回被点击按钮的值
+              };
+              footer.appendChild(button);
+            });
+
+            // 添加一个标准的取消按钮
+            const cancelButton = document.createElement("button");
+            cancelButton.textContent = "取消";
+            cancelButton.style.marginTop = "8px";
+            cancelButton.style.borderRadius = "8px";
+            cancelButton.style.backgroundColor = "#f0f0f0";
+            cancelButton.onclick = () => {
+              modal.classList.remove("visible");
+              resolve(null); // 用户取消，返回 null
+            };
+            footer.appendChild(cancelButton);
+            modal.style.zIndex = "10005";
+            modal.classList.add("visible");
+          });
+        }
+
+        /**
+         * 【全新重构】检查并删除所有失效的API歌曲
+         * 核心逻辑：不再依赖任何标签，直接根据链接特征识别需要检查的歌曲。
+         */
+        async function deleteExpiredSearchedSongs() {
+          await showCustomAlert(
+            "请稍候...",
+            "正在检查播放列表中所有在线歌曲的有效性...",
+          );
+
+          // 1. 不再寻找 isTemporary 标签
+          // 而是直接找出所有 src 链接来自于 API 服务器的歌曲。
+          // 这是一个绝对可靠的识别方法，无论它有没有被正确保存。
+          const songsToCheck = state.musicState.playlist.filter(
+            (track) => track.src && track.src.includes("api.vkeys.cn"),
+          );
+
+          if (songsToCheck.length === 0) {
+            await showCustomAlert("提示", "播放列表中没有需要检查的在线歌曲。");
+            return;
+          }
+
+          const songsToDelete = [];
+          const twentyFourHoursAgo = Date.now() - 24 * 60 * 60 * 1000;
+
+          // 2. 对每一首识别出的歌曲，进行严格的“体检”
+          await Promise.all(
+            songsToCheck.map(async (track) => {
+              // 条件1：检查链接本身是否已经失效（无法播放）
+              const isUrlInvalid = !(await checkAudioAvailability(track.src));
+
+              // 条件2：检查添加时间是否超过24小时（作为双重保险）
+              const isOlderThan24h =
+                track.addedTimestamp &&
+                track.addedTimestamp < twentyFourHoursAgo;
+
+              if (isUrlInvalid || isOlderThan24h) {
+                songsToDelete.push(track);
+                console.log(
+                  `标记删除: ${track.name} (原因: ${
+                    isUrlInvalid ? "链接失效" : ""
+                  } ${isOlderThan24h ? "超过24小时" : ""})`,
+                );
+              }
+            }),
+          );
+
+          // 3. 根据检查结果进行反馈和操作 (这部分逻辑不变)
+          if (songsToDelete.length === 0) {
+            await showCustomAlert(
+              "检查完成",
+              "播放列表中的所有在线歌曲当前均有效。",
+            );
+            return;
+          }
+
+          const confirmed = await showCustomConfirm(
+            "确认清理",
+            `检测到 ${songsToDelete.length} 首已失效的在线歌曲。确定要将它们从列表中移除吗？`,
+            { confirmButtonClass: "btn-danger" },
+          );
+
+          if (!confirmed) return;
+
+          // 执行删除...
+          const currentTrack =
+            state.musicState.currentIndex > -1
+              ? state.musicState.playlist[state.musicState.currentIndex]
+              : null;
+          state.musicState.playlist = state.musicState.playlist.filter(
+            (track) => !songsToDelete.includes(track),
+          );
+          const newIndex = currentTrack
+            ? state.musicState.playlist.findIndex(
+                (t) =>
+                  t.src === currentTrack.src && t.name === currentTrack.name,
+              )
+            : -1;
+
+          if (newIndex === -1) {
+            if (state.musicState.isPlaying) {
+              audioPlayer.pause();
+              audioPlayer.src = "";
+            }
+            state.musicState.isPlaying = false;
+            if (state.musicState.playlist.length > 0) {
+              playSong(0);
+            } else {
+              state.musicState.currentIndex = -1;
+              updatePlayerUI();
+            }
+          } else {
+            state.musicState.currentIndex = newIndex;
+            updatePlayerUI();
+          }
+
+          await saveGlobalPlaylist();
+          updatePlaylistUI();
+          await showCustomAlert(
+            "清理完成",
+            `${songsToDelete.length} 首歌曲已从列表中移除。`,
+          );
+        }
+
+        /**
+         * 更新所有时钟（状态栏和锁屏）
+         */
+        function updateClock() {
+          const now = new Date();
+          const timeString = now.toLocaleTimeString("zh-CN", {
+            hour: "2-digit",
+            minute: "2-digit",
+          });
+          const dateString = now.toLocaleDateString("zh-CN", {
+            weekday: "long",
+            month: "long",
+            day: "numeric",
+          });
+
+          // 更新状态栏时钟 (这个元素一直存在)
+          const statusBarTime = document.getElementById("status-bar-time");
+          if (statusBarTime) {
+            statusBarTime.textContent = timeString;
+          }
+
+          // 更新锁屏时钟 (只有当锁屏元素存在时才更新，避免报错)

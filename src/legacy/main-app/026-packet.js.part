@@ -1,0 +1,904 @@
+          if (!freshChat) return;
+
+          state.chats[currentChatId] = freshChat;
+          const packet = freshChat.history.find(
+            (m) => m.timestamp === timestamp,
+          );
+          if (!packet) return;
+
+          const myNickname = freshChat.settings.myNickname || "我";
+          const hasClaimed = packet.claimedBy && packet.claimedBy[myNickname];
+
+          // 如果是专属红包且不是给我的，或已领完，或已领过，都只显示详情
+          if (
+            (packet.packetType === "direct" &&
+              packet.receiverName !== myNickname) ||
+            packet.isFullyClaimed ||
+            hasClaimed
+          ) {
+            showRedPacketDetails(packet);
+          } else {
+            // 核心流程：先尝试打开红包
+            const claimedAmount = await handleOpenRedPacket(packet);
+
+            // 如果成功打开（claimedAmount不为null）
+            if (claimedAmount !== null) {
+              // **关键：在数据更新后，再重新渲染UI**
+              renderChatInterface(currentChatId);
+
+              // 显示成功提示
+              await showCustomAlert(
+                "恭喜！",
+                `你领取了 ${packet.senderName} 的红包，金额为 ${claimedAmount.toFixed(2)} 元。`,
+              );
+            }
+
+            // 无论成功与否，最后都显示详情页
+            // 此时需要从state中获取最新的packet对象，因为它可能在handleOpenRedPacket中被更新了
+            const updatedPacket = state.chats[currentChatId].history.find(
+              (m) => m.timestamp === timestamp,
+            );
+            showRedPacketDetails(updatedPacket);
+          }
+        }
+
+        /**
+         * 处理用户打开红包的逻辑
+         */
+        async function handleOpenRedPacket(packet) {
+          const chat = state.chats[state.activeChatId];
+          const myNickname = chat.settings.myNickname || "我";
+
+          // 1. 检查红包是否还能领
+          const remainingCount =
+            packet.count - Object.keys(packet.claimedBy || {}).length;
+          if (remainingCount <= 0) {
+            packet.isFullyClaimed = true;
+            await db.chats.put(chat);
+            await showCustomAlert("手慢了", "红包已被领完！");
+            return null; // 返回null表示领取失败
+          }
+
+          // 2. 计算领取金额
+          let claimedAmount = 0;
+          const remainingAmount =
+            packet.totalAmount -
+            Object.values(packet.claimedBy || {}).reduce(
+              (sum, val) => sum + val,
+              0,
+            );
+          if (packet.packetType === "lucky") {
+            if (remainingCount === 1) {
+              claimedAmount = remainingAmount;
+            } else {
+              const min = 0.01;
+              const max = remainingAmount - (remainingCount - 1) * min;
+              claimedAmount = Math.random() * (max - min) + min;
+            }
+          } else {
+            claimedAmount = packet.totalAmount;
+          }
+          claimedAmount = parseFloat(claimedAmount.toFixed(2));
+
+          // 3. 更新红包数据
+          if (!packet.claimedBy) packet.claimedBy = {};
+          packet.claimedBy[myNickname] = claimedAmount;
+
+          const isNowFullyClaimed =
+            Object.keys(packet.claimedBy).length >= packet.count;
+          if (isNowFullyClaimed) {
+            packet.isFullyClaimed = true;
+          }
+
+          // 4. 构建系统消息和AI指令
+          let hiddenMessageContent = "";
+
+          // 如果红包被领完了，就准备“战报”
+          if (isNowFullyClaimed) {
+            const finishedMessage = {
+              role: "system",
+              type: "pat_message",
+              content: `${packet.senderName} 的红包已被领完`,
+              timestamp: Date.now() + 1,
+            };
+            chat.history.push(finishedMessage);
+
+            hiddenMessageContent = `[系统提示：用户 (${myNickname}) 领取了最后一个红包，现在 ${packet.senderName} 的红包已被领完。`;
+
+            let luckyKing = { name: "", amount: -1 };
+            if (packet.packetType === "lucky" && packet.count > 1) {
+              Object.entries(packet.claimedBy).forEach(([name, amount]) => {
+                if (amount > luckyKing.amount) {
+                  luckyKing = { name, amount };
+                }
+              });
+            }
+            if (luckyKing.name) {
+              hiddenMessageContent += ` 手气王是 ${luckyKing.name}！`;
+            }
+            hiddenMessageContent += " 请对此事件发表评论。]";
+          }
+          // 如果还没被领完
+          else {
+            hiddenMessageContent = `[系统提示：用户 (${myNickname}) 刚刚领取了红包 (时间戳: ${packet.timestamp})。红包还未领完。]`;
+          }
+
+          // 创建并添加给AI看的隐藏消息
+          const hiddenMessage = {
+            role: "system",
+            content: hiddenMessageContent,
+            timestamp: Date.now() + 2,
+            isHidden: true,
+          };
+          chat.history.push(hiddenMessage);
+
+          // 5. 保存到数据库
+          await db.chats.put(chat);
+
+          // 6. 返回领取的金额，用于后续弹窗
+          return claimedAmount;
+        }
+
+        /**
+         * 显示红包领取详情的模态框
+         */
+        async function showRedPacketDetails(packet) {
+          // 1. 直接检查传入的packet对象是否存在，无需再查找
+          if (!packet) {
+            console.error("showRedPacketDetails收到了无效的packet对象");
+            return;
+          }
+
+          const chat = state.chats[state.activeChatId];
+          if (!chat) return;
+
+          const modal = document.getElementById("red-packet-details-modal");
+          const myNickname = chat.settings.myNickname || "我";
+
+          // 2. 后续所有逻辑保持不变，直接使用传入的packet对象
+          document.getElementById("rp-details-sender").textContent =
+            packet.senderName;
+          document.getElementById("rp-details-greeting").textContent =
+            packet.greeting || "恭喜发财，大吉大利！";
+
+          const myAmountEl = document.getElementById("rp-details-my-amount");
+          if (packet.claimedBy && packet.claimedBy[myNickname]) {
+            myAmountEl.querySelector("span:first-child").textContent =
+              packet.claimedBy[myNickname].toFixed(2);
+            myAmountEl.style.display = "block";
+          } else {
+            myAmountEl.style.display = "none";
+          }
+
+          const claimedCount = Object.keys(packet.claimedBy || {}).length;
+          const claimedAmountSum = Object.values(packet.claimedBy || {}).reduce(
+            (sum, val) => sum + val,
+            0,
+          );
+          let summaryText = `${claimedCount}/${packet.count}个红包，共${claimedAmountSum.toFixed(
+            2,
+          )}/${packet.totalAmount.toFixed(2)}元。`;
+          if (!packet.isFullyClaimed && claimedCount < packet.count) {
+            const timeLeft = Math.floor(
+              (packet.timestamp + 24 * 60 * 60 * 1000 - Date.now()) /
+                (1000 * 60 * 60),
+            );
+            if (timeLeft > 0)
+              summaryText += ` 剩余红包将在${timeLeft}小时内退还。`;
+          }
+          document.getElementById("rp-details-summary").textContent =
+            summaryText;
+
+          const listEl = document.getElementById("rp-details-list");
+          listEl.innerHTML = "";
+          const claimedEntries = Object.entries(packet.claimedBy || {});
+
+          let luckyKing = { name: "", amount: -1 };
+          if (
+            packet.packetType === "lucky" &&
+            packet.isFullyClaimed &&
+            claimedEntries.length > 1
+          ) {
+            claimedEntries.forEach(([name, amount]) => {
+              if (amount > luckyKing.amount) {
+                luckyKing = { name, amount };
+              }
+            });
+          }
+
+          claimedEntries.sort((a, b) => b[1] - a[1]);
+
+          claimedEntries.forEach(([name, amount]) => {
+            const item = document.createElement("div");
+            item.className = "rp-details-item";
+            let luckyTag = "";
+            if (luckyKing.name && name === luckyKing.name) {
+              luckyTag = '<span class="lucky-king-tag">手气王</span>';
+            }
+            item.innerHTML = `
+			            <span class="name">${name}</span>
+			            <span class="amount">${amount.toFixed(2)} 元</span>
+			            ${luckyTag}
+			        `;
+            listEl.appendChild(item);
+          });
+
+          modal.classList.add("visible");
+        }
+
+        // 绑定关闭详情按钮的事件
+        document
+          .getElementById("close-rp-details-btn")
+          .addEventListener("click", () => {
+            document
+              .getElementById("red-packet-details-modal")
+              .classList.remove("visible");
+          });
+
+        // 供全局调用的函数，以便红包卡片上的 onclick 能找到它
+        window.handlePacketClick = handlePacketClick;
+
+        // 投票功能核心函数
+        /**
+         * 打开创建投票的模态框并初始化
+         */
+        function openCreatePollModal() {
+          const modal = document.getElementById("create-poll-modal");
+          document.getElementById("poll-question-input").value = "";
+          const optionsContainer = document.getElementById(
+            "poll-options-container",
+          );
+          optionsContainer.innerHTML = "";
+
+          // 默认创建两个空的选项框
+          addPollOptionInput();
+          addPollOptionInput();
+
+          modal.classList.add("visible");
+        }
+
+        /**
+         * 在模态框中动态添加一个选项输入框
+         */
+        function addPollOptionInput() {
+          const container = document.getElementById("poll-options-container");
+          const wrapper = document.createElement("div");
+          wrapper.className = "poll-option-input-wrapper";
+          wrapper.innerHTML = `
+			        <input type="text" class="poll-option-input" placeholder="选项内容...">
+			        <button class="remove-option-btn">-</button>
+			    `;
+
+          wrapper
+            .querySelector(".remove-option-btn")
+            .addEventListener("click", () => {
+              // 确保至少保留两个选项
+              if (container.children.length > 2) {
+                wrapper.remove();
+              } else {
+                alert("投票至少需要2个选项。");
+              }
+            });
+
+          container.appendChild(wrapper);
+        }
+
+        /**
+         * 用户确认发起投票
+         */
+        async function sendPoll() {
+          if (!state.activeChatId) return;
+
+          const question = document
+            .getElementById("poll-question-input")
+            .value.trim();
+          if (!question) {
+            alert("请输入投票问题！");
+            return;
+          }
+
+          const options = Array.from(
+            document.querySelectorAll(".poll-option-input"),
+          )
+            .map((input) => input.value.trim())
+            .filter((text) => text); // 过滤掉空的选项
+
+          if (options.length < 2) {
+            alert("请至少输入2个有效的投票选项！");
+            return;
+          }
+
+          const chat = state.chats[state.activeChatId];
+          const myNickname = chat.isGroup
+            ? chat.settings.myNickname || "我"
+            : "我";
+
+          const newPollMessage = {
+            role: "user",
+            senderName: myNickname,
+            type: "poll",
+            timestamp: Date.now(),
+            question: question,
+            options: options,
+            votes: {}, // 初始投票为空
+            isClosed: false,
+          };
+
+          chat.history.push(newPollMessage);
+          await db.chats.put(chat);
+
+          appendMessage(newPollMessage, chat);
+          renderChatList();
+
+          document
+            .getElementById("create-poll-modal")
+            .classList.remove("visible");
+        }
+
+        /**
+         * 处理用户投票，并将事件作为隐藏消息存入历史记录
+         * @param {number} timestamp - 投票消息的时间戳
+         * @param {string} choice - 用户选择的选项文本
+         */
+        async function handleUserVote(timestamp, choice) {
+          const chat = state.chats[state.activeChatId];
+          const poll = chat.history.find((m) => m.timestamp === timestamp);
+          const myNickname = chat.isGroup
+            ? chat.settings.myNickname || "我"
+            : "我";
+
+          // 1. 如果投票不存在或已关闭，直接返回
+          if (!poll || poll.isClosed) {
+            // 如果是已关闭的投票，则直接显示结果
+            if (poll && poll.isClosed) {
+              showPollResults(timestamp);
+            }
+            return;
+          }
+
+          // 2. 检查用户是否点击了已经投过的同一个选项
+          const isReclickingSameOption =
+            poll.votes[choice] && poll.votes[choice].includes(myNickname);
+
+          // 3. 如果不是重复点击，才执行投票逻辑
+          if (!isReclickingSameOption) {
+            // 移除旧投票（如果用户改选）
+            for (const option in poll.votes) {
+              const voterIndex = poll.votes[option].indexOf(myNickname);
+              if (voterIndex > -1) {
+                poll.votes[option].splice(voterIndex, 1);
+              }
+            }
+            // 添加新投票
+            if (!poll.votes[choice]) {
+              poll.votes[choice] = [];
+            }
+            poll.votes[choice].push(myNickname);
+          }
+
+          // 4. 现在只处理用户投票事件，不再检查是否结束
+          let hiddenMessageContent = null;
+
+          // 只有在用户真正投票或改票时，才生成提示
+          if (!isReclickingSameOption) {
+            hiddenMessageContent = `[系统提示：用户 (${myNickname}) 刚刚投票给了 “${choice}”。]`;
+          }
+
+          // 5. 如果有需要通知AI的事件，则创建并添加隐藏消息
+          if (hiddenMessageContent) {
+            const hiddenMessage = {
+              role: "system",
+              content: hiddenMessageContent,
+              timestamp: Date.now(),
+              isHidden: true,
+            };
+            chat.history.push(hiddenMessage);
+          }
+
+          // 6. 保存数据并更新UI
+          await db.chats.put(chat);
+          renderChatInterface(state.activeChatId);
+        }
+
+        /**
+         * 用户结束投票，并将事件作为隐藏消息存入历史记录
+         * @param {number} timestamp - 投票消息的时间戳
+         */
+        async function endPoll(timestamp) {
+          const chat = state.chats[state.activeChatId];
+          const poll = chat.history.find((m) => m.timestamp === timestamp);
+          if (!poll || poll.isClosed) return;
+
+          const confirmed = await showCustomConfirm(
+            "结束投票",
+            "确定要结束这个投票吗？结束后将无法再进行投票。",
+          );
+          if (confirmed) {
+            poll.isClosed = true;
+
+            const resultSummary = poll.options
+              .map((opt) => `“${opt}”(${poll.votes[opt]?.length || 0}票)`)
+              .join("，");
+            const hiddenMessageContent = `[系统提示：用户手动结束了投票！最终结果为：${resultSummary}。]`;
+
+            const hiddenMessage = {
+              role: "system",
+              content: hiddenMessageContent,
+              timestamp: Date.now(),
+              isHidden: true,
+            };
+            chat.history.push(hiddenMessage);
+
+            // 只保存数据和更新UI，不调用 triggerAiResponse()
+            await db.chats.put(chat);
+            renderChatInterface(state.activeChatId);
+          }
+        }
+
+        /**
+         * 显示投票结果详情
+         * @param {number} timestamp - 投票消息的时间戳
+         */
+        function showPollResults(timestamp) {
+          const chat = state.chats[state.activeChatId];
+          const poll = chat.history.find((m) => m.timestamp === timestamp);
+          if (!poll || !poll.isClosed) return;
+
+          let resultsHtml = `<p><strong>${poll.question}</strong></p><hr style="opacity: 0.2; margin: 10px 0;">`;
+
+          if (Object.keys(poll.votes).length === 0) {
+            resultsHtml += '<p style="color: #8a8a8a;">还没有人投票。</p>';
+          } else {
+            poll.options.forEach((option) => {
+              const voters = poll.votes[option] || [];
+              resultsHtml += `
+			                <div style="margin-bottom: 15px;">
+			                    <p style="font-weight: 500; margin: 0 0 5px 0;">${option} (${voters.length}票)</p>
+			                    <p style="font-size: 13px; color: #555; margin: 0; line-height: 1.5;">
+			                        ${voters.length > 0 ? voters.join("、 ") : "无人投票"}
+			                    </p>
+			                </div>
+			            `;
+            });
+          }
+
+          showCustomAlert("投票结果", resultsHtml);
+        }
+
+        // AI头像库管理功能函数
+
+        /**
+         * 打开AI头像库管理模态框
+         */
+        function openAiAvatarLibraryModal() {
+          if (!state.activeChatId) return;
+          const chat = state.chats[state.activeChatId];
+          document.getElementById("ai-avatar-library-title").textContent =
+            `“${chat.name}”的头像库`;
+          renderAiAvatarLibrary();
+          document
+            .getElementById("ai-avatar-library-modal")
+            .classList.add("visible");
+        }
+
+        /**
+         * 渲染AI头像库的内容
+         */
+        function renderAiAvatarLibrary() {
+          const grid = document.getElementById("ai-avatar-library-grid");
+          grid.innerHTML = "";
+          const chat = state.chats[state.activeChatId];
+          const library = chat.settings.aiAvatarLibrary || [];
+
+          if (library.length === 0) {
+            grid.innerHTML =
+              '<p style="color: var(--text-secondary); grid-column: 1 / -1; text-align: center;">这个头像库还是空的，点击右上角“添加”吧！</p>';
+            return;
+          }
+
+          library.forEach((avatar, index) => {
+            const item = document.createElement("div");
+            item.className = "sticker-item"; // 复用表情面板的样式
+            item.style.backgroundImage = `url(${avatar.url})`;
+            item.title = avatar.name;
+
+            const deleteBtn = document.createElement("div");
+            deleteBtn.className = "delete-btn";
+            deleteBtn.innerHTML = "×";
+            deleteBtn.style.display = "block"; // 总是显示删除按钮
+            deleteBtn.onclick = async (e) => {
+              e.stopPropagation();
+              const confirmed = await showCustomConfirm(
+                "删除头像",
+                `确定要从头像库中删除“${avatar.name}”吗？`,
+                {
+                  confirmButtonClass: "btn-danger",
+                },
+              );
+              if (confirmed) {
+                chat.settings.aiAvatarLibrary.splice(index, 1);
+                await db.chats.put(chat);
+                renderAiAvatarLibrary();
+              }
+            };
+            item.appendChild(deleteBtn);
+            grid.appendChild(item);
+          });
+        }
+
+        /**
+         * 向当前AI的头像库中添加新头像 (修改版：支持本地和URL)
+         */
+        async function addAvatarToLibrary() {
+          const name = await showCustomPrompt(
+            "添加头像",
+            "请为这个头像起个名字（例如：开心、哭泣）",
+          );
+          if (!name || !name.trim()) return;
+
+          // 1. 弹出选择框，让用户选是本地还是URL
+          const choice = await showChoiceModal("选择图片来源", [
+            { text: "📁 本地上传", value: "local" },
+            { text: "🌐 网络URL", value: "url" },
+          ]);
+
+          let finalUrl = null;
+
+          // 2. 根据选择执行不同逻辑
+          if (choice === "local") {
+            // 调用现有的本地上传辅助函数 (代码里原本就有的)
+            finalUrl = await uploadImageLocally();
+          } else if (choice === "url") {
+            finalUrl = await showCustomPrompt(
+              "添加头像",
+              "请输入头像的图片URL",
+              "",
+              "url",
+            );
+          }
+
+          // 3. 如果没获取到图片(用户取消了)，直接结束
+          if (!finalUrl) return;
+
+          const chat = state.chats[state.activeChatId];
+          if (!chat.settings.aiAvatarLibrary) {
+            chat.settings.aiAvatarLibrary = [];
+          }
+
+          // 4. 保存到数据库
+          chat.settings.aiAvatarLibrary.push({
+            name: name.trim(),
+            url: finalUrl.trim(),
+          });
+          await db.chats.put(chat);
+          renderAiAvatarLibrary();
+        }
+
+        /**
+         * 关闭AI头像库管理模态框
+         */
+        function closeAiAvatarLibraryModal() {
+          document
+            .getElementById("ai-avatar-library-modal")
+            .classList.remove("visible");
+        }
+
+        /**
+         * 渲染主屏幕个人资料卡的头像框
+         */
+        function renderHomeScreenProfileFrame() {
+          // 1. 获取保存的头像框URL
+          const frameUrl = state.globalSettings.homeAvatarFrame || "";
+          // 2. 找到头像框的img元素
+          const frameImg = document.getElementById("profile-avatar-frame");
+          if (frameImg) {
+            // 3. 如果URL存在，就显示它
+            if (frameUrl) {
+              frameImg.src = frameUrl;
+              frameImg.style.display = "block";
+            } else {
+              // 4. 如果URL为空（即选择了“无”），就隐藏它
+              frameImg.src = "";
+              frameImg.style.display = "none";
+            }
+          }
+        }
+
+        function applyWidgetData() {
+          if (!state.globalSettings.widgetData) return;
+          for (const elementId in state.globalSettings.widgetData) {
+            const element = document.getElementById(elementId);
+            const savedValue = state.globalSettings.widgetData[elementId];
+            if (element) {
+              if (element.tagName === "IMG") {
+                element.src = savedValue;
+              }
+
+              // 如果是地点这个特殊元素，就用 innerHTML 来正确显示图标
+              else if (elementId === "profile-location") {
+                element.innerHTML = savedValue;
+              } else {
+                // 其他普通文本元素，保持原来的逻辑不变
+                element.textContent = savedValue;
+              }
+            }
+          }
+        }
+
+        /**
+         * 打开文件选择器，并返回本地图片的Base64编码
+         * @returns {Promise<string|null>} - 返回图片的Base64 Data URL，如果用户取消则返回null
+         */
+        function uploadImageLocally() {
+          return new Promise((resolve) => {
+            const input = document.createElement("input");
+            input.type = "file";
+            input.accept = "image/*"; // 只接受图片文件
+
+            input.onchange = (e) => {
+              const file = e.target.files[0];
+              if (file) {
+                const reader = new FileReader();
+                reader.onload = (readerEvent) => {
+                  resolve(readerEvent.target.result); // 返回Base64字符串
+                };
+                reader.readAsDataURL(file);
+              } else {
+                resolve(null); // 用户关闭了文件选择框
+              }
+            };
+
+            input.click();
+          });
+        }
+
+        async function handleEditText(element) {
+          const elementId = element.id;
+          const placeholder = element.dataset.placeholder || "请输入新的内容：";
+          const textSpan = element.querySelector("span");
+          const isComplexElement = !!textSpan;
+          const targetElement = isComplexElement ? textSpan : element;
+          const currentValue = targetElement.textContent;
+
+          const newValue = await showCustomPrompt(
+            "修改文字",
+            "请输入新的内容：",
+            currentValue === placeholder ? "" : currentValue,
+          );
+
+          if (newValue !== null) {
+            const trimmedValue = newValue.trim();
+            targetElement.textContent = trimmedValue
+              ? trimmedValue
+              : placeholder;
+            state.globalSettings.widgetData[elementId] = isComplexElement
+              ? element.innerHTML
+              : targetElement.textContent;
+            await db.globalSettings.put(state.globalSettings);
+          }
+        }
+
+        /**
+         * 触发指定群聊的后台AI互动
+         * @param {string} chatId - 要触发互动的群聊ID
+         */
+        async function triggerGroupAiAction(chatId) {
+          const chat = state.chats[chatId];
+          if (!chat || !chat.isGroup) return;
+
+          const { proxyUrl, apiKey, model } = state.apiConfig;
+          if (!proxyUrl || !apiKey || !model) {
+            console.warn(`群聊 "${chat.name}" 后台活动失败：API未配置。`);
+            return;
+          }
+
+          // added by lrq 251027
+          const maxMemory = chat.settings.maxMemory || 10;
+          const historySlice = chat.history
+            .filter((msg) => !msg.isHidden)
+            .slice(-maxMemory);
+
+          // 2. 格式化这些记录，让AI能看懂
+          const recentContextSummary = historySlice
+            .map((msg) => {
+              // 判断是谁说的话
+              const sender =
+                msg.role === "user"
+                  ? chat.isGroup
+                    ? chat.settings.myNickname || "我"
+                    : "我"
+                  : msg.senderName || chat.name;
+
+              // 处理不同类型的消息内容
+              let contentText = "";
+              if (
+                typeof msg.content === "string" &&
+                STICKER_REGEX.test(msg.content)
+              ) {
+                contentText = `[发送了一个表情: ${msg.meaning || "无描述"}]`;
+              } else if (Array.isArray(msg.content)) {
+                contentText = "[发送了一张图片]";
+              } else if (
+                typeof msg.content === "object" &&
+                msg.content !== null
+              ) {
+                contentText = `[发送了一条特殊消息: ${msg.type || "未知类型"}]`;
+              } else {
+                contentText = String(msg.content);
+              }
+
+              // updated by lrq 251029 给每条消息记录添加发送日期时间
+              const messageDate = new Date(msg.timestamp);
+              const formattedDate = messageDate.toLocaleDateString();
+
+              return `[${formattedDate}] ${sender}: ${contentText}`;
+            })
+            .join("\n");
+
+          // added by lrq 251027 获取记忆互通的聊天记录
+          let linkedMemoryContext = "";
+          if (
+            chat.settings.linkedMemories &&
+            chat.settings.linkedMemories.length > 0
+          ) {
+            const contextPromises = chat.settings.linkedMemories.map(
+              async (link) => {
+                const linkedChat = state.chats[link.chatId];
+                if (!linkedChat) return "";
+
+                const freshLinkedChat = await db.chats.get(link.chatId);
+                if (!freshLinkedChat) return "";
+
+                const recentHistory = freshLinkedChat.history
+                  .filter((msg) => !msg.isHidden)
+                  .slice(-link.depth);
+
+                if (recentHistory.length === 0) return "";
+
+                const formattedMessages = recentHistory
+                  .map(
+                    (msg) =>
+                      `  - ${formatMessageForContext(msg, freshLinkedChat)}`,
+                  )
+                  .join("\n");
+
+                return `\n## 附加上下文：来自与“${linkedChat.name}”的最近对话内容 (仅你可见)\n${formattedMessages}`;
+              },
+            );
+
+            const allContexts = await Promise.all(contextPromises);
+            linkedMemoryContext = allContexts.filter(Boolean).join("\n");
+          }
+
+          try {
+            const lastMessage = chat.history.slice(-1)[0];
+            const timeSinceLastMessage = lastMessage
+              ? (Date.now() - lastMessage.timestamp) / 1000 / 60
+              : Infinity; // in minutes
+
+            const membersList = chat.members
+              .map((m) => `- ${m.groupNickname} (人设: ${m.persona})`)
+              .join("\n");
+            const myNickname = chat.settings.myNickname || "我";
+
+            let worldBookContent = "";
+            if (
+              chat.settings.linkedWorldBookIds &&
+              chat.settings.linkedWorldBookIds.length > 0
+            ) {
+              const linkedContents = chat.settings.linkedWorldBookIds
+                .map((bookId) => {
+                  const worldBook = state.worldBooks.find(
+                    (wb) => wb.id === bookId,
+                  );
+                  return worldBook && worldBook.content
+                    ? `\n\n## 世界书: ${worldBook.name}\n${worldBook.content}`
+                    : "";
+                })
+                .filter(Boolean)
+                .join("");
+              if (linkedContents) {
+                worldBookContent = `\n\n# 核心世界观设定 (你必须严格遵守)\n${linkedContents}\n`;
+              }
+            }
+            let musicContext = "";
+            // 注意：后台群聊活动通常不与特定的“一起听歌”会话绑定，因此这里我们提供一个空的音乐上下文。
+            // 如果未来需要更复杂的功能，可以在此扩展。
+
+            const countdownContext = await getCountdownContext();
+
+            let sharedContext = "";
+            // 后台群聊活动中不存在用户分享聊天记录的上下文，因此这里为空。
+
+            const now = new Date();
+            const currentTime = now.toLocaleTimeString("zh-CN", {
+              hour: "numeric",
+              minute: "numeric",
+              hour12: true,
+            });
+
+            const summaryContext = chat.history
+              .filter((msg) => msg.type === "summary")
+              .map((s) => s.content)
+              .join("\n");
+            const replyRange = chat.settings.replyCountRange || {
+              min: 3,
+              max: 8,
+            }; // 群聊默认多一点
+            const replyCountInstruction = `本次后台互动，生成的总消息条数应控制在【${replyRange.min} 到 ${replyRange.max} 条】之间。`;
+            // updated by lrq 251027
+            const systemPrompt = `
+			# 任务
+			你是一个群聊后台模拟器。当前时间是${currentTime}，群聊 "${chat.name}" 已经沉寂了 ${Math.round(
+        timeSinceLastMessage,
+      )} 分钟，用户(昵称: "${chat.settings.myNickname || "我"}")不在线。
+			你的任务是根据下方每个角色的人设，在他们之间【自发地】生成一段自然的对话。
+			# 【对话节奏铁律 (至关重要！)】
+			你的回复【必须】模拟真人的打字和思考习惯。你应该将你想说的话，拆分成${replyCountInstruction}条消息气泡来发送，**绝对不要一次性发送一大段文字！** 每条消息最好不要超过30个字，这会让对话看起来更自然、更真实。
+			**角色回复顺序不固定，可以交叉回复，例如角色A、角色B、角色B、角色A、角色C这样的交叉顺序。不一定要一个人全部说完了才轮到下一个人。角色之间【必须】有互动对话。**
+			# 核心规则
+			1.  **【【【身份铁律】】】**: 用户【绝对不在场】。你【绝对不能】生成与用户对话的内容。整段对话必须是AI角色之间的互动。你的唯一任务是扮演【且仅能扮演】下方“群成员列表”中明确列出的角色。【绝对禁止】扮演任何未在“群成员列表”中出现的角色。
+			    # 群成员列表及人设 (name字段是你要使用的【本名】)
+			    ${chat.members.map((m) => `- **${m.originalName}**: (群昵称为: ${m.groupNickname}) 人设: ${m.persona}`).join("\n")}
+			2.  **【【【输出格式】】】**: 你的回复【必须】是一个JSON数组格式的字符串。数组中的【每一个元素都必须是一个带有 "type" 和 "name" 字段的JSON对象】。
+			3.  **角色扮演**: 严格遵守下方“群成员列表及人设”中的每一个角色的设定。
+			4.  **禁止出戏**: 绝不能透露你是AI、模型，或提及“扮演”、“生成”等词语。
+			5.  **自然性**: 对话应该简短（2-5条消息即可），符合逻辑和角色性格。可以是闲聊、讨论某个话题，或者对之前聊天内容的延续。不要每次都生成所有人的发言。
+
+			## 你可以使用的操作指令 (JSON数组中的元素):
+			-   **发送文本**: \`{"type": "text", "name": "角色名", "message": "文本内容"}\`
+			-   **发送表情**: \`{"type": "sticker", "name": "角色名",  "sticker_name": "表情的名字"}\`
+			-   **发送图片**: \`{"type": "ai_image", "name": "角色名", "description": "图片描述"}\`
+			-   **发送语音**: \`{"type": "voice_message", "name": "角色名", "content": "语音内容"}\`
+			-   **发起外卖代付**: \`{"type": "waimai_request", "name": "角色名", "productInfo": "一杯奶茶", "amount": 18}\` (向【群友】发起)
+			-   **拍一拍群友**: \`{"type": "pat_user", "name": "你的角色名", "targetName": "【被拍的群友名】", "suffix": "(可选)你想加的后缀"}\`
+			-   **发红包**: \`{"type": "red_packet", "packetType": "lucky", "name": "你的角色名", ...}\`
+			-   **发起投票**: \`{"type": "poll", "name": "你的角色名", ...}\`
+
+			# 如何处理后台互动中的【拍一拍】:
+			-   后台活动中的 "pat_user" 指令【只能用于拍群内的其他AI角色】。
+			-   你【必须】在指令中加入一个 \`"targetName"\` 字段，值为被你拍的那个角色的名字。
+			-   例如: \`{"type": "pat_user", "name": "角色A", "targetName": "角色B"}\`
+			-   系统会自动生成 "角色A 拍了拍 角色B" 的提示。
+
+			${worldBookContent}
+			${musicContext}
+			${countdownContext} 
+			${sharedContext}
+			# 群成员列表及人设
+			${membersList}
+			# 用户的角色
+			- **${myNickname}**: ${chat.settings.myPersona}
+			# 对话历史参考
+			${recentContextSummary}
+            ${summaryContext}
+			${linkedMemoryContext}
+
+			现在，请严格遵守以上所有规则，开始你的模拟。`;
+
+            const messagesPayload = [{ role: "user", content: systemPrompt }];
+
+            let isGemini = proxyUrl === GEMINI_API_URL;
+            let geminiConfig = toGeminiRequestData(
+              model,
+              apiKey,
+              systemPrompt,
+              messagesPayload,
+              isGemini,
+            );
+
+            const response = isGemini
+              ? await fetch(geminiConfig.url, geminiConfig.data)
+              : await fetch(`${proxyUrl}/v1/chat/completions`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${apiKey}`,
+                  },
+                  body: JSON.stringify({
+                    model: model,
+                    messages: messagesPayload,
+                    temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+                  }),
+                });
+

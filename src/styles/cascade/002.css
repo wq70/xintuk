@@ -1,0 +1,1596 @@
+
+.transfer-content {
+  background-color: #fff0f5;
+  border-radius: 20px;
+  width: 290px;
+  padding: 20px;
+  box-shadow: 0 5px 25px rgba(255, 105, 180, 0.3);
+  text-align: center;
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100" opacity="0.05"><path d="M50,4 C35,4 28,15 28,24 C28,33 35,32 35,40 C35,48 28,49 28,57 C28,65 35,66 35,74 C35,82 28,83 28,91 C28,99 35,100 50,100 C65,100 72,99 72,91 C72,83 65,82 65,74 C65,66 72,65 72,57 C72,49 65,48 65,40 C65,32 72,33 72,24 C72,15 65,4 50,4 Z" fill="%23FF69B4"/></svg>');
+  background-repeat: no-repeat;
+  background-position: top right;
+  background-size: 80px;
+}
+.transfer-header {
+  font-size: 20px;
+  font-weight: bold;
+  color: #a35c7b;
+  margin-bottom: 20px;
+}
+.transfer-input-group {
+  margin-bottom: 15px;
+  text-align: left;
+}
+.transfer-input-group label {
+  display: block;
+  font-size: 14px;
+  color: #ff85b3;
+  margin-bottom: 5px;
+  font-weight: 500;
+}
+.transfer-input-group input {
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  border: 2px solid #ffcce0;
+  background-color: #fff;
+  font-size: 16px;
+  box-sizing: border-box;
+}
+.transfer-input-group input:focus {
+  border-color: #ff85b3;
+  outline: none;
+}
+.transfer-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+.transfer-actions button {
+  flex: 1;
+  padding: 12px;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+.transfer-actions button:active {
+  transform: scale(0.95);
+}
+#transfer-cancel-btn {
+  background-color: #ffdde9;
+  color: #a35c7b;
+}
+#transfer-confirm-btn {
+  background-color: #ff85b3;
+  color: white;
+}
+.message-bubble.is-transfer .content {
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  border: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  cursor: pointer;
+}
+.transfer-card {
+  width: 200px;
+  border-radius: 12px;
+  padding: 12px;
+  color: white;
+  position: relative;
+  overflow: hidden;
+}
+.transfer-card::before {
+  content: "🐾";
+  position: absolute;
+  right: 10px;
+  top: 5px;
+  font-size: 30px;
+  opacity: 0.2;
+  transform: rotate(15deg);
+}
+.message-bubble.user .transfer-card {
+  background: radial-gradient(circle at top left, #ffc5d5, #ff85b3);
+}
+.message-bubble.ai .transfer-card {
+  background: radial-gradient(circle at top left, #a1c4fd, #c2e9fb);
+}
+.transfer-title {
+  font-size: 16px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.transfer-amount {
+  font-size: 28px;
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+.transfer-note {
+  font-size: 13px;
+  opacity: 0.9;
+  border-top: 1px solid rgba(255, 255, 255, 0.3);
+  padding-top: 8px;
+  margin-top: 8px;
+  word-break: break-all;
+}
+
+/* RealImag真实图片样式 */
+.realimag-image {
+  max-width: 250px;
+  max-height: 250px;
+  width: auto;
+  height: auto;
+  display: block;
+  border-radius: 10px;
+  object-fit: cover;
+  background-color: #f8f8f8;
+  min-width: 100px;
+  min-height: 100px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease;
+}
+
+.realimag-image:hover {
+  transform: scale(1.02);
+}
+
+.message-bubble.is-realimag .content {
+  padding: 5px;
+  background: transparent;
+  box-shadow: none;
+  border: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+#listen-together-btn img.rotating {
+  animation: spin 2s linear infinite;
+}
+#listen-together-btn img.paused {
+  animation-play-state: paused;
+}
+#music-player-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 50;
+  display: none;
+  justify-content: center;
+  align-items: center;
+  background-color: rgba(0, 0, 0, 0.3);
+}
+#music-player-overlay.visible {
+  display: flex;
+}
+.music-player-window {
+  width: 90%;
+  background-color: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 20px;
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  padding: 25px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: #1f1f1f;
+  position: relative;
+}
+#music-playlist-btn {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  font-size: 24px;
+  cursor: pointer;
+  color: #333;
+}
+#music-time-counter {
+  font-size: 12px;
+  color: #555;
+  margin-bottom: 20px;
+}
+#music-player-song-title {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 5px;
+  text-align: center;
+}
+#music-player-artist {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 25px;
+}
+.music-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  width: 100%;
+  margin-bottom: 30px;
+}
+.music-controls button {
+  background: none;
+  border: none;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  color: #333;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: transform 0.2s;
+}
+.music-controls button:active {
+  transform: scale(0.9);
+}
+.music-controls .play-pause-btn {
+  font-size: 24px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background-color: rgba(0, 0, 0, 0.05);
+}
+.music-bottom-actions {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+}
+.music-bottom-actions button {
+  flex: 1;
+  padding: 12px 0;
+  border: none;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+}
+#music-exit-btn {
+  background-color: rgba(255, 100, 100, 0.7);
+  color: white;
+  margin-right: 5px;
+}
+#music-return-btn {
+  background-color: rgba(0, 123, 255, 0.7);
+  color: white;
+  margin-left: 5px;
+}
+
+#music-playlist-panel {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 70%;
+  background-color: rgba(242, 242, 247, 0.9);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border-top: 1px solid var(--border-color);
+  border-radius: 20px 20px 0 0;
+  z-index: 210;
+  display: flex;
+  flex-direction: column;
+  transform: translateY(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  visibility: hidden;
+}
+#music-playlist-panel.visible {
+  transform: translateY(0);
+  visibility: visible;
+}
+.playlist-header {
+  padding: 15px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border-color);
+  font-weight: 600;
+}
+.playlist-header .panel-btn {
+  font-size: 16px;
+  cursor: pointer;
+  color: var(--accent-color);
+}
+.playlist-body {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 10px 0;
+}
+.playlist-item {
+  padding: 10px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  border-bottom: 1px solid #eee;
+}
+.playlist-item.playing {
+  background-color: rgba(0, 123, 255, 0.1);
+}
+.playlist-item-info .title {
+  font-weight: 500;
+  font-size: 15px;
+}
+.playlist-item-info .artist {
+  font-size: 12px;
+  color: #666;
+}
+.playlist-item .delete-track-btn {
+  color: #ff3b30;
+  font-size: 20px;
+  padding: 5px;
+}
+
+/* Persona Library Styles */
+#persona-library-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 15px;
+  padding: 10px;
+}
+.persona-preset-item {
+  aspect-ratio: 1 / 1;
+  border-radius: 12px;
+  background-size: cover;
+  background-position: center;
+  cursor: pointer;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+.persona-preset-item:hover {
+  transform: scale(1.08);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+.modal-header .action-button {
+  font-size: 16px;
+  color: var(--accent-color);
+  font-weight: 600;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 5px;
+}
+
+/* Battery Alert Modal Styles */
+#battery-alert-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.4);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+#battery-alert-modal.visible {
+  display: flex;
+  opacity: 1;
+}
+.battery-alert-content {
+  background-color: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  width: 280px;
+  border-radius: 15px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+  text-align: center;
+  padding: 20px;
+  cursor: pointer;
+  transform: scale(0.9);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+#battery-alert-modal.visible .battery-alert-content {
+  transform: scale(1);
+}
+#battery-alert-image {
+  max-width: 100px;
+  max-height: 100px;
+  margin-bottom: 15px;
+}
+#battery-alert-text {
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* 这是你要添加的新样式 */
+#font-preview {
+  transition: font-family 0.3s ease;
+}
+
+/* === 聊天列表界面新增样式 (这是新添加的) === */
+#chat-list-screen {
+}
+
+.chat-list-view {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.2s,
+    visibility 0.2s;
+  z-index: 1;
+}
+.chat-list-view.active {
+  opacity: 1;
+  visibility: visible;
+  z-index: 2;
+}
+
+#messages-view {
+  overflow-y: auto;
+}
+
+/* 底部导航栏样式 */
+#chat-list-bottom-nav {
+  position: absolute; /* 让它固定在底部 */
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  z-index: 15; /* 确保它在视图之上 */
+  display: flex;
+  border-top: 1px solid var(--border-color);
+  background-color: rgba(247, 247, 247, 0.9);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.nav-item {
+  flex: 1;
+  text-align: center;
+  padding: 13px 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.nav-item.active {
+  color: var(--accent-color);
+  font-weight: 600;
+}
+
+/* === 动态界面 (QZone) 样式 (这是新添加的) === */
+#qzone-screen {
+  background-color: #f0f2f5;
+}
+
+.qzone-header {
+  /* position: absolute;  <-- 把这个改成 relative */
+  position: relative;
+  z-index: 10; /* z-index 保持，或者可以更高 */
+  flex-shrink: 0; /* 防止被压缩 */
+  padding: 15px 20px;
+  padding-top: 45px;
+  background-color: rgba(247, 247, 247, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 18px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.qzone-header .back-btn {
+  font-size: 24px;
+  cursor: pointer;
+  color: var(--accent-color);
+}
+
+.qzone-header span:nth-child(2) {
+  /* "好友动态"文字 */
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.qzone-content {
+  flex-grow: 1;
+  overflow-y: auto;
+  /* padding-top: 80px;  <-- 删除这个，因为header不再是absolute了 */
+}
+
+.qzone-profile-header {
+  position: relative;
+  margin-bottom: 20px;
+}
+
+.qzone-banner-container {
+  width: 100%;
+  height: 180px; /* 背景板高度 */
+  position: relative;
+}
+
+#qzone-banner-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.qzone-user-info {
+  position: absolute;
+  bottom: -30px; /* 让头像和昵称区域向下偏移，一半在背景板内，一半在外 */
+  left: 20px;
+  display: flex;
+  align-items: flex-end; /* 让昵称和头像底部对齐 */
+  gap: 10px;
+}
+
+.qzone-avatar-container {
+  position: relative;
+}
+
+#qzone-avatar-img {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  border: 3px solid white;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  object-fit: cover;
+}
+
+#qzone-nickname {
+  font-size: 18px;
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  padding-bottom: 5px; /* 微调位置 */
+}
+
+/* === 让编辑功能更“隐形” === */
+#qzone-banner-container,
+#qzone-avatar-container,
+#qzone-nickname {
+  cursor: pointer; /* 鼠标悬停时显示为可点击手势 */
+  transition: opacity 0.2s;
+}
+#qzone-banner-container:hover,
+#qzone-avatar-container:hover,
+#qzone-nickname:hover {
+  opacity: 0.85; /* 悬停时稍微变暗，给用户反馈 */
+}
+/* 隐藏掉旧的、独立的编辑按钮 */
+/* === 控制 Header 和 Bottom Nav 的显隐 === */
+/* 默认隐藏动态界面的 Header */
+#qzone-screen .qzone-header {
+  display: none;
+}
+/* 当动态视图激活时，显示它的Header */
+#qzone-screen.active .qzone-header {
+  display: flex;
+}
+
+.chat-group-container:first-child {
+  margin-top: 10px;
+}
+
+/* ▲▲▲ 新样式替换结束 ▲▲▲ */
+
+/* ▼▼▼ 把所有这些新样式粘贴到 <style> 的末尾 ▼▼▼ */
+
+/* === 动态功能栏样式 === */
+.qzone-actions-bar {
+  display: flex;
+  justify-content: space-around;
+  padding: 10px 0;
+  margin: 40px 15px 15px 15px; /* 上边距更大，为浮动的头像留出空间 */
+  background-color: var(--secondary-bg);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.action-item {
+  flex: 1;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 8px 0;
+  position: relative;
+}
+
+/* 用伪元素创建分隔线 */
+.action-item:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1px;
+  height: 20px;
+  background-color: var(--border-color);
+}
+
+/* === 动态帖子列表样式 === */
+#qzone-posts-list {
+  padding: 0 15px 20px 15px; /* 左右和底部留出边距 */
+  display: flex;
+  flex-direction: column;
+  gap: 20px; /* 帖子之间的间距 */
+}
+
+.qzone-post-item {
+  background-color: var(--secondary-bg);
+  border-radius: 12px;
+  padding: 15px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.post-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.post-header .post-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.post-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.post-info .post-nickname {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--text-primary);
+}
+
+.post-info .post-timestamp {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.post-content {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #333;
+  white-space: pre-wrap; /* 让换行符生效 */
+  word-break: break-word; /* 防止长单词溢出 */
+}
+
+/* ▲▲▲ 新样式结束 ▲▲▲ */
+
+/* ▼▼▼ 新样式粘贴到末尾 ▼▼▼ */
+
+/* === 发布动态模态框样式 === */
+#post-public-text {
+  min-height: 80px; /* 确保文本域有足够的高度 */
+  resize: vertical;
+}
+
+.post-image-preview-container {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9; /* 保持16:9的预览比例 */
+  background-color: #f0f2f5;
+  border: 2px dashed var(--border-color);
+  border-radius: 8px;
+  margin-bottom: 15px;
+  display: none; /* 默认隐藏 */
+  justify-content: center;
+  align-items: center;
+}
+.post-image-preview-container.visible {
+  display: flex; /* 上传后显示 */
+}
+
+#post-image-preview {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 6px;
+}
+
+#post-remove-image-btn {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background-color: #ff3b30;
+  color: white;
+  border: 2px solid white;
+  font-size: 16px;
+  line-height: 20px;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+.post-image-upload-options {
+  display: flex;
+  gap: 10px;
+}
+
+.post-image-upload-options button {
+  flex: 1;
+  margin-top: 0;
+}
+
+/* ▲▲▲ 新样式结束 ▲▲▲ */
+
+/* ▼▼▼ 新样式 ▼▼▼ */
+
+/* === 发布动态模态框 - 模式切换样式 === */
+.post-mode-switcher {
+  display: flex;
+  margin-bottom: 20px;
+  background-color: #e9ecef;
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.mode-btn {
+  flex: 1;
+  padding: 8px;
+  border: none;
+  background-color: transparent;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.mode-btn.active {
+  background-color: var(--secondary-bg);
+  color: var(--text-primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.post-mode-content {
+  display: none; /* 默认都隐藏 */
+}
+
+.post-mode-content.active {
+  display: block; /* 激活的才显示 */
+}
+
+/* ▲▲▲ 新样式结束 ▲▲▲ */
+
+/* === 相册页面背景色 === */
+#album-screen {
+  background-color: #f0f2f5; /* 使用一个柔和的浅灰色，比纯白更护眼 */
+}
+
+/* === 相册页面网格布局 === */
+#album-grid-page {
+  padding: 15px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr); /* 每行显示2个相册 */
+  gap: 15px;
+}
+
+/* === 相册项目样式 (美化) === */
+.album-item {
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+  border-radius: 8px; /* 给整个项目也加个圆角 */
+}
+
+.album-item:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+}
+
+.album-cover {
+  aspect-ratio: 1 / 1; /* 保持封面为正方形 */
+  background-size: cover;
+  background-position: center;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  background-color: #f0f2f5; /* 封面加载前的占位颜色 */
+}
+
+.album-info {
+  text-align: center;
+}
+
+.album-name {
+  font-weight: 500;
+  margin: 0 0 4px 0;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis; /* 防止长名字换行 */
+}
+
+.album-count {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* ▲▲▲ 新的 CSS 粘贴结束 ▲▲▲ */
+
+/* ▼▼▼ 请将这些新样式粘贴到 <style> 的末尾 ▼▼▼ */
+
+/* === 相册照片详情页 === */
+#album-photos-screen {
+  background-color: #f0f2f5;
+}
+
+#photos-grid-page {
+  padding: 15px;
+  display: grid;
+  /* 每行显示3张照片，并保持间距 */
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.photo-item {
+  position: relative; /* 为了定位删除按钮 */
+  aspect-ratio: 1 / 1; /* 保持照片为正方形 */
+  border-radius: 6px;
+  overflow: hidden; /* 防止图片溢出圆角 */
+  background-color: #e9ecef; /* 图片加载前的占位符颜色 */
+}
+
+.photo-item .photo-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* 保证图片填满容器且不变形 */
+  cursor: pointer;
+}
+
+/* 删除按钮的样式 */
+.photo-item .photo-delete-btn {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 22px;
+  height: 22px;
+  background-color: rgba(0, 0, 0, 0.6);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  font-size: 16px;
+  line-height: 22px;
+  text-align: center;
+  cursor: pointer;
+  opacity: 0; /* 默认隐藏 */
+  transition: opacity 0.2s ease;
+}
+
+/* 鼠标悬停在照片上时显示删除按钮 */
+.photo-item:hover .photo-delete-btn {
+  opacity: 1;
+}
+
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+
+/* === 图片查看器模态框样式 === */
+#photo-viewer-modal {
+  background-color: rgba(0, 0, 0, 0.85);
+  z-index: 1002;
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
+}
+
+.photo-viewer-content {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+}
+
+#photo-viewer-image {
+  max-width: 90vw; /* 图片最大宽度为视口的90% */
+  max-height: 85vh; /* 图片最大高度为视口的85% */
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  /* 为图片的切换添加一点平滑的淡入淡出效果 */
+  transition: opacity 0.2s ease-in-out;
+}
+
+/* 关闭按钮 */
+#photo-viewer-close-btn {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: none;
+  border: none;
+  color: white;
+  font-size: 40px;
+  font-weight: 200;
+  cursor: pointer;
+  line-height: 1;
+  text-shadow: 0 0 5px black;
+}
+
+/* 左右导航箭头 */
+#photo-viewer-modal .nav-arrow {
+  position: absolute; /* 现在我们用绝对定位来控制箭头 */
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 50px; /* 在手机屏幕上，可以稍微小一点 */
+  font-weight: 100;
+  cursor: pointer;
+  padding: 10px; /* 调整内边距 */
+  user-select: none;
+  transition: color 0.2s;
+  z-index: 1003; /* 确保箭头在最上层 */
+}
+
+#photo-viewer-prev-btn {
+  left: 5px; /* 定位左箭头 */
+}
+
+#photo-viewer-next-btn {
+  right: 5px; /* 定位右箭头 */
+}
+
+#photo-viewer-modal .nav-arrow:hover {
+  color: white;
+}
+
+/* 当箭头被禁用时（比如第一张或最后一张） */
+#photo-viewer-modal .nav-arrow:disabled {
+  color: rgba(255, 255, 255, 0.2);
+  cursor: default;
+}
+
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+
+/* ▼▼▼ 请将这些新样式粘贴到 <style> 的末尾 ▼▼▼ */
+
+/* ▼▼▼ 请用这块新CSS替换掉上一版的交互区CSS ▼▼▼ */
+
+/* === 帖子内容区 - 相对定位容器 === */
+/* === 帖子内容区 === */
+.post-main-content {
+  /* 它现在只是一个普通的内容容器，不再需要特殊样式了 */
+}
+
+/* === 帖子互动图标区 (新样式) === */
+.post-feedback-icons {
+  display: flex;
+  justify-content: flex-end; /* 让图标靠右对齐 */
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0; /* 核心修改：给图标区域上下各8px的留白 */
+}
+
+.action-icon {
+  cursor: pointer;
+  color: var(--text-secondary); /* 默认灰色 */
+  transition: all 0.2s ease-in-out;
+}
+
+.action-icon svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* 图标激活(点赞/收藏后)的样式 */
+.action-icon.active {
+  color: #ff5252; /* 激活后变红色 */
+  transform: scale(1.1); /* 轻微放大 */
+}
+
+.action-icon.active.favorite {
+  color: #ffc107; /* 收藏用黄色 */
+}
+
+.action-icon.active svg {
+  fill: currentColor; /* 激活后填充颜色 */
+}
+
+/* 点击时的动画效果 */
+.animate-like {
+  animation: like-bounce 0.4s ease-in-out;
+}
+
+@keyframes like-bounce {
+  0% {
+    transform: scale(1);
+  }
+  25% {
+    transform: scale(0.8);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  75% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1.1);
+  }
+}
+
+/* === 帖子底部评论区样式 (现在是独立部分) === */
+.post-footer {
+  margin-top: 15px;
+  padding-top: 10px;
+  border-top: 1px solid #f0f0f0; /* 用一条浅色线分隔 */
+  display: flex;
+  align-items: center;
+  gap: 8px; /* 调整整体间距 */
+}
+
+/* 评论区容器 */
+.comment-section {
+  flex-grow: 1; /* 占据大部分空间 */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.comment-section .comment-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.comment-section .comment-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background-color: #f0f2f5;
+  border-radius: 14px;
+  font-size: 13px;
+  outline: none;
+}
+
+/* 新增的发送按钮样式 */
+.comment-send-btn {
+  flex-shrink: 0; /* 防止被压缩 */
+  padding: 8px 15px;
+  border: none;
+  background-color: var(--accent-color);
+  color: white;
+  border-radius: 14px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+
+/* ▼▼▼ 请将这段新样式粘贴到 <style> 的末尾 ▼▼▼ */
+
+/* === 未读消息小红点通用样式 === */
+.unread-indicator {
+  position: absolute;
+  top: -8px;
+  right: -15px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  background-color: #ff3b30;
+  color: white;
+  font-size: 11px;
+  font-weight: bold;
+  line-height: 18px;
+  text-align: center;
+  border-radius: 9px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  display: none;
+  z-index: 1;
+}
+
+/* 聊天界面返回按钮上的小红点 (只显示点，不显示数字) */
+.back-btn-indicator {
+  top: 0;
+  right: -8px; /* 放到返回箭头右上角 */
+  width: 10px;
+  height: 10px;
+  min-width: 10px;
+  padding: 0;
+  border-radius: 50%;
+}
+
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+
+/* ▼▼▼ 请将这段新样式粘贴到 <style> 的末尾 ▼▼▼ */
+
+/* === 评论列表容器 === */
+.post-comments-container {
+  padding: 10px 0; /* 上下留白 */
+  display: flex;
+  flex-direction: column;
+  gap: 8px; /* 评论之间的间距 */
+  font-size: 13px; /* 统一评论区字体大小 */
+}
+
+/* 每一条评论 */
+.comment-item {
+  line-height: 1.5;
+}
+
+/* 评论者的名字，加粗并使用主题色 */
+.comment-item .commenter-name {
+  font-weight: 600;
+  color: var(--accent-color);
+  cursor: pointer;
+  margin-right: 5px; /* 和评论内容之间留点空隙 */
+}
+
+/* 评论内容 */
+.comment-item .comment-text {
+  color: var(--text-primary);
+  word-break: break-word;
+}
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+
+/* ▼▼▼ 请将这段新样式粘贴到 <style> 的末尾 ▼▼▼ */
+
+/* === 帖子点赞区域样式 === */
+.post-likes-section {
+  display: flex;
+  align-items: center;
+  gap: 6px; /* 图标和文字的间距 */
+  padding: 8px 10px; /* 内边距 */
+  font-size: 13px;
+  color: var(--accent-color); /* 使用主题蓝色 */
+  background-color: #f0f5fa; /* 给一个淡淡的背景色 */
+  border-top: 1px solid #e9eef3;
+  border-bottom: 1px solid #e9eef3;
+  margin-top: 5px; /* 和上方的图标保持一点距离 */
+}
+
+.post-likes-section .like-icon {
+  width: 16px;
+  height: 16px;
+  fill: currentColor; /* 让SVG图标继承父元素的颜色 */
+  flex-shrink: 0; /* 防止图标被压缩 */
+}
+
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+
+/* ▼▼▼ 请将这段新样式粘贴到 <style> 的末尾 ▼▼▼ */
+
+/* === @提及 弹出菜单样式 === */
+.at-mention-popup {
+  position: absolute; /* 相对于父元素定位 */
+  bottom: 100%; /* 显示在输入框的上方 */
+  left: 40px; /* 和输入框左侧对齐 (考虑了头像宽度) */
+  width: calc(100% - 40px); /* 宽度和输入框差不多 */
+  max-height: 120px;
+  overflow-y: auto;
+  background-color: var(--secondary-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+  display: none; /* 默认隐藏 */
+}
+
+.at-mention-item {
+  padding: 8px 12px;
+  font-size: 14px;
+  cursor: pointer;
+  color: var(--text-primary);
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.at-mention-item:last-child {
+  border-bottom: none;
+}
+
+.at-mention-item:hover {
+  background-color: #f5f5f5;
+}
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+
+/* ▼▼▼ 请将这段新样式粘贴到 <style> 的末尾 ▼▼▼ */
+
+/* ▼▼▼ 请用下面这段【新样式】替换掉你现有的 #favorites-list 样式 ▼▼▼ */
+
+/* 让收藏视图成为一个flex容器, 从上到下排列 */
+#favorites-view {
+  display: flex;
+  flex-direction: column;
+}
+
+/* 确保收藏页的header高度固定，不被压缩 */
+#favorites-view > .header {
+  flex-shrink: 0;
+}
+
+/* === 收藏列表样式 (修正后) === */
+#favorites-list {
+  flex-grow: 1;
+  overflow-y: auto;
+  overflow-x: hidden; /* <-- 新增这行，禁止水平滚动 */
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+/* ▲▲▲ 替换结束 ▲▲▲ */
+
+.favorite-item-card {
+  background-color: var(--secondary-bg);
+  border-radius: 12px;
+  padding: 15px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  position: relative; /* 为了定位删除按钮 */
+}
+
+/* 卡片头部，包含头像、名字和来源 */
+.fav-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.fav-card-header .avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.fav-card-header .info {
+  flex-grow: 1;
+}
+
+.fav-card-header .name {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.fav-card-header .source {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* 卡片内容 */
+.fav-card-content {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #333;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.fav-card-content .chat-image {
+  margin-top: 8px; /* 图片和文字的间距 */
+}
+
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+
+/* ▼▼▼ 请将这段新样式粘贴到 <style> 的末尾 ▼▼▼ */
+
+/* === 搜索栏样式 === */
+.search-bar-container {
+  padding: 10px 15px;
+  background-color: #f9f9f9; /* 和列表背景色保持一致 */
+  position: relative; /* 为了定位清除按钮 */
+  flex-shrink: 0;
+}
+
+#favorites-search-input {
+  width: 100%;
+  padding: 10px 30px 10px 15px; /* 右侧留出清除按钮的位置 */
+  font-size: 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 18px; /* 圆角矩形，更现代化 */
+  background-color: var(--secondary-bg);
+  box-sizing: border-box;
+  outline: none;
+}
+#favorites-search-input:focus {
+  border-color: var(--accent-color);
+}
+
+.search-clear-btn {
+  position: absolute;
+  right: 25px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #ccc;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  line-height: 20px;
+  text-align: center;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+
+/* === 聊天界面多选操作栏优化 === */
+#chat-interface-screen .header .selection-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+#chat-interface-screen .selection-controls .action-btn {
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 5px;
+}
+
+/* === 收藏页面多选模式样式 === */
+#favorites-view.selection-mode .favorite-item-card {
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+/* 选择框的样式 */
+.favorite-item-card::before {
+  content: "";
+  position: absolute;
+  left: -25px; /* 把它放在卡片左边外面 */
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  border: 2px solid #ccc;
+  border-radius: 50%;
+  background-color: white;
+  transition: all 0.2s ease;
+  opacity: 0; /* 默认隐藏 */
+}
+
+/* 进入选择模式时，卡片向右移动，露出选择框 */
+#favorites-view.selection-mode .favorite-item-card {
+  transform: translateX(35px);
+}
+#favorites-view.selection-mode .favorite-item-card::before {
+  opacity: 1;
+}
+
+/* 选中后的样式 */
+#favorites-view.selection-mode .favorite-item-card.selected::before {
+  background-color: var(--accent-color);
+  border-color: var(--accent-color);
+  content: "✔";
+  color: white;
+  font-size: 14px;
+  text-align: center;
+  line-height: 20px;
+}
+
+/* 底部操作栏 (终极修正版) */
+#favorites-action-bar {
+  position: absolute; /* ★ 改为 absolute，相对于 #phone-screen 定位 */
+  bottom: 0;
+  left: 0;
+  right: 0; /* ★ 新增 right: 0，和 left: 0 一起撑满宽度 */
+  width: auto; /* ★ 改为 auto，让 left/right 决定宽度 */
+  padding: 10px 15px;
+  padding-bottom: calc(
+    10px + env(safe-area-inset-bottom)
+  ); /* 适配iPhone底部安全区 */
+  background-color: rgba(247, 247, 247, 0.9);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-top: 1px solid var(--border-color);
+  box-sizing: border-box;
+  z-index: 5;
+  display: none;
+  /* max-width 已经不需要了，因为父元素已经限制了宽度 */
+}
+
+#favorites-action-bar .action-bar-btn {
+  width: 100%;
+  padding: 12px;
+  border-radius: 8px;
+  border: none;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  background-color: #ff3b30;
+  color: white;
+}
+
+/* === 【修正】聊天界面头部控件切换逻辑 === */
+
+/* 默认状态：隐藏多选控件 */
+#chat-interface-screen .header .selection-controls {
+  display: none;
+}
+
+/* 默认状态：显示默认控件，并让它撑满整个头部 */
+#chat-interface-screen .header .default-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+/* 当进入多选模式时：隐藏默认控件 */
+#chat-interface-screen.selection-mode .header .default-controls {
+  display: none;
+}
+
+/* 当进入多选模式时：显示多选控件，并让它撑满整个头部 */
+#chat-interface-screen.selection-mode .header .selection-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+/* ▼▼▼ 请将这段新样式粘贴到 <style> 的末尾 ▼▼▼ */
+
+/* === 修正：放大所有主要的“+”号按钮 === */
+#add-chat-btn,
+#add-world-book-btn,
+#create-album-btn-page {
+  font-size: 28px; /* 显著增大字体大小，使其视觉上与旁边的图标匹配 */
+  font-weight: 300; /* 使用更细的字重，让加号看起来更清爽，不显粗笨 */
+  position: relative; /* 允许进行位置微调 */
+  top: -1px; /* 字体放大后，通常需要稍微向上移动一点，使其视觉上更居中 */
+}
+
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+
+/* ▼▼▼ 请将这些新样式粘贴到 <style> 的末尾 ▼▼▼ */
+
+/* 预览区容器样式 */
+#settings-preview-area {
+  width: 100%;
+  height: 180px; /* 给一个固定的高度 */
+  background-color: #f0f2f5;
+  border-radius: 8px;
+  padding: 15px;
+  box-sizing: border-box;
+  overflow: hidden; /* 防止内容溢出 */
+  display: flex;
+  flex-direction: column;
+  gap: 10px; /* 预览气泡之间的间距 */
+  border: 1px solid var(--border-color);
+  position: relative; /* 为了定位背景 */
+}
+
+/* 预览区的背景，可以和真实聊天界面同步 */
+#settings-preview-area::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  z-index: 1;
+  opacity: 0.8;
+}
+
+/* 让预览气泡在背景之上 */
+#settings-preview-area .message-wrapper {
+  position: relative;
+  z-index: 2;
+}
+
+/* 预览区内使用的头像要小一点 */
+#settings-preview-area .message-bubble .avatar {
+  width: 30px;
+  height: 30px;
+}
+
+#settings-preview-area .message-bubble .timestamp {
+  display: none; /* 预览区不需要显示时间戳 */
+}
+
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+
+/* ▼▼▼ 请将这段新CSS粘贴到 <style> 的末尾 ▼▼▼ */
+.existing-group-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.existing-group-item .group-name {
+  font-weight: 500;
+}
+
+.existing-group-item .delete-group-btn {
+  color: #ff3b30;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 5px;
+}
+/* ▲▲▲ 新CSS粘贴结束 ▲▲▲ */
+
+/* ▼▼▼ 请将这段新CSS粘贴到 <style> 的末尾 ▼▼▼ */
+.chat-group-container {
+  border-bottom: 1px solid var(--border-color);
+}
+.chat-group-container:first-child {
+  border-top: 1px solid var(--border-color);
+}
+
+.chat-group-header {
+  display: flex;
+  align-items: center;
+  padding: 12px 15px;
+  cursor: pointer;
+  background-color: var(--secondary-bg); /* <-- 修改这里，使用变量 */
+}
+
+.chat-group-header .arrow {
+  font-size: 14px;
+  margin-right: 8px;
+  transition: transform 0.2s ease;
+}
+
+.chat-group-header.collapsed .arrow {
+  transform: rotate(-90deg);
+}
+
+.chat-group-header .group-name {
+  font-weight: 600;
+  font-size: 15px;
+}

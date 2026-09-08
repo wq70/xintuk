@@ -1,0 +1,758 @@
+                    chat.loversSpaceData.moments.push(newMoment);
+                    console.log(`AI 在情侣空间发布了说说: ${msgData.content}`);
+                  }
+                  continue; // 这是一个后台操作，不需要在聊天界面显示，所以用 continue 跳过
+                }
+
+                case "ls_comment": {
+                  const { momentIndex, commentText } = msgData;
+                  if (chat.loversSpaceData && chat.loversSpaceData.moments) {
+                    // AI返回的 index 是从0开始代表最新的，我们需要转换成真实索引
+                    const realIndex =
+                      chat.loversSpaceData.moments.length - 1 - momentIndex;
+                    if (
+                      realIndex >= 0 &&
+                      realIndex < chat.loversSpaceData.moments.length
+                    ) {
+                      const momentToComment =
+                        chat.loversSpaceData.moments[realIndex];
+                      if (!momentToComment.comments) {
+                        momentToComment.comments = [];
+                      }
+                      momentToComment.comments.push({
+                        author: chat.name,
+                        text: commentText,
+                      });
+                      console.log(
+                        `AI 评论了情侣空间说说 (索引: ${realIndex}): ${commentText}`,
+                      );
+                    }
+                  }
+                  continue; // 同样是后台操作
+                }
+                case "ls_photo": {
+                  // 这是处理AI发相册的逻辑
+                  if (chat.loversSpaceData) {
+                    if (!chat.loversSpaceData.photos) {
+                      chat.loversSpaceData.photos = [];
+                    }
+                    const newPhoto = {
+                      author: "char",
+                      type: "text_image",
+                      description: msgData.description,
+                      timestamp: Date.now(),
+                    };
+                    chat.loversSpaceData.photos.push(newPhoto);
+                    console.log(
+                      `AI 在情侣空间发布了照片(文字图): ${msgData.description}`,
+                    );
+                  }
+                  continue; // 继续处理AI可能返回的其他指令
+                }
+                case "ls_photo_comment": {
+                  const { photoTimestamp, commentText } = msgData;
+                  console.log("🔍 [调试] 收到AI评论照片指令:", msgData);
+
+                  if (chat.loversSpaceData && chat.loversSpaceData.photos) {
+                    // 1. 查找照片 (使用 == 而不是 === 以兼容字符串/数字格式的时间戳)
+                    const targetPhoto = chat.loversSpaceData.photos.find(
+                      (p) => p.timestamp == photoTimestamp,
+                    );
+
+                    if (targetPhoto) {
+                      // 2. 确保评论数组存在
+                      if (!targetPhoto.comments) targetPhoto.comments = [];
+
+                      // 3. 添加评论对象
+                      targetPhoto.comments.push({
+                        author: chat.name, // 使用当前角色名
+                        text: commentText,
+                        timestamp: Date.now(),
+                      });
+
+                      console.log(`✅ [成功] AI评论已写入内存: ${commentText}`);
+
+                      // 4. 【重要】保存到数据库 (这是关键，否则刷新就没了)
+                      await db.chats.put(chat);
+
+                      // 5. 【UI刷新】检查当前是否正好打开了这张照片的详情页
+                      const detailModal = document.getElementById(
+                        "ls-photo-detail-modal",
+                      );
+
+                      // 检查弹窗是否可见
+                      if (
+                        detailModal &&
+                        detailModal.classList.contains("visible")
+                      ) {
+                        // 获取当前弹窗正在查看的照片时间戳
+                        const currentViewingTimestamp =
+                          detailModal.dataset.currentTimestamp;
+
+                        // 如果正在看的就是这张照片，立即重绘评论列表
+                        if (currentViewingTimestamp == photoTimestamp) {
+                          console.log(
+                            "🔄 [UI刷新] 当前正查看该照片，立即刷新评论区",
+                          );
+                          renderLSPhotoComments(targetPhoto);
+                        }
+                      }
+                    } else {
+                      console.warn(
+                        "❌ [失败] 未找到对应时间戳的照片:",
+                        photoTimestamp,
+                      );
+                    }
+                  }
+                  continue; // 这是一个后台操作，跳过生成普通聊天气泡
+                }
+
+                case "ls_letter": {
+                  // 这是处理AI写情书的逻辑
+                  if (chat.loversSpaceData) {
+                    if (!chat.loversSpaceData.loveLetters) {
+                      chat.loversSpaceData.loveLetters = [];
+                    }
+                    const newLetter = {
+                      id: "letter_" + Date.now(),
+                      senderId: chat.id,
+                      senderName: chat.name,
+                      senderAvatar: chat.settings.aiAvatar,
+                      recipientName: chat.settings.myNickname || "我",
+                      recipientAvatar: chat.settings.myAvatar,
+                      content: msgData.content,
+                      timestamp: Date.now(),
+                    };
+                    chat.loversSpaceData.loveLetters.push(newLetter);
+                    console.log(`AI 在情侣空间写了情书: ${msgData.content}`);
+                  }
+                  continue; // 继续处理AI可能返回的其他指令
+                }
+
+                case "ls_diary_entry": {
+                  const { emoji, diary } = msgData;
+                  if (emoji && diary) {
+                    const today = new Date().toISOString().split("T")[0]; // 获取 YYYY-MM-DD 格式的今天日期
+
+                    // 确保数据结构存在
+                    if (!chat.loversSpaceData.emotionDiaries) {
+                      chat.loversSpaceData.emotionDiaries = {};
+                    }
+                    if (!chat.loversSpaceData.emotionDiaries[today]) {
+                      chat.loversSpaceData.emotionDiaries[today] = {};
+                    }
+
+                    // 保存AI的日记和表情
+                    chat.loversSpaceData.emotionDiaries[today].charEmoji =
+                      emoji;
+                    chat.loversSpaceData.emotionDiaries[today].charDiary =
+                      diary;
+
+                    console.log(`AI 在情侣空间记录了日记: ${emoji} ${diary}`);
+                  }
+                  continue; // 这只是一个后台操作，不需要在聊天界面生成消息，所以用 continue 跳过
+                }
+
+                case "ls_share": {
+                  if (chat.loversSpaceData) {
+                    if (!chat.loversSpaceData.shares) {
+                      chat.loversSpaceData.shares = [];
+                    }
+                    const newShare = {
+                      author: "char", // 标记是AI发的
+                      timestamp: Date.now(),
+                      ...msgData, // 将AI返回的所有分享信息（type, shareType, title, artist等）都复制过来
+                    };
+                    chat.loversSpaceData.shares.push(newShare);
+                    console.log(
+                      `AI 在情侣空间分享了 [${msgData.shareType}]: ${msgData.title}`,
+                    );
+                  }
+                  continue; // 同样是后台操作
+                }
+
+                // 这是AI主动发起邀请的逻辑
+                case "lovers_space_invitation": {
+                  // 检查是否已经开启，防止AI重复邀请
+                  if (!chat.loversSpaceData) {
+                    aiMessage = {
+                      ...baseMessage,
+                      type: "lovers_space_invitation",
+                      content: `${chat.name} 向你发出了一个情侣空间邀请`, // 这句话主要用于调试和历史记录
+                      status: "pending", // 状态：pending, accepted, rejected
+                    };
+                  }
+                  // 如果AI已经发了邀请，这里就不再创建aiMessage，相当于跳过
+                  break;
+                }
+
+                // 这是AI回应你的邀请的逻辑
+                case "lovers_space_response": {
+                  const invitationMsg = chat.history.find(
+                    (m) =>
+                      m.type === "lovers_space_invitation" &&
+                      m.status === "pending",
+                  );
+                  if (invitationMsg) {
+                    invitationMsg.status =
+                      msgData.decision === "accept" ? "accepted" : "rejected";
+
+                    // 1. 创建AI想说的那句话的消息
+                    if (msgData.responseText) {
+                      const responseMessage = {
+                        ...baseMessage,
+                        type: "text",
+                        content: msgData.responseText,
+                      };
+                      chat.history.push(responseMessage);
+                      if (isViewingThisChat) {
+                        appendMessage(responseMessage, chat);
+                      }
+                    }
+
+                    // 2. 根据同意或拒绝，执行后续操作
+                    if (msgData.decision === "accept") {
+                      // 同意后，为这个角色创建情侣空间数据
+                      chat.loversSpaceData = {
+                        background:
+                          "https://i.postimg.cc/k495F4W5/profile-banner.jpg",
+                        relationshipStartDate: null,
+                        moments: [],
+                        photos: [],
+                        albums: [],
+                        loveLetters: [],
+                        shares: [],
+                        questions: [],
+                      };
+                      // 并发送一条系统通知
+                      const systemNotice = {
+                        role: "system",
+                        type: "pat_message",
+                        content: `[系统：你和“${chat.name}”的情侣空间已成功开启！]`,
+                        timestamp: Date.now(),
+                      };
+                      chat.history.push(systemNotice);
+                      if (isViewingThisChat) {
+                        appendMessage(systemNotice, chat);
+                      }
+                    }
+                  }
+                  // 处理完后，不再需要生成新的aiMessage，所以用 continue 跳过
+                  continue;
+                }
+
+                case "qzone_post":
+                  const newPost = {
+                    type: msgData.postType,
+                    content: msgData.content || "",
+                    publicText: msgData.publicText || "",
+                    hiddenContent: msgData.hiddenContent || "",
+                    timestamp: Date.now(),
+                    authorId: chatId,
+                    authorGroupId: chat.groupId,
+                    visibleGroupIds: null,
+                  };
+
+                  // 如果是realimag类型，生成真实图片URL（支持1-9张图片）
+                  if (msgData.postType === "realimag" && msgData.prompt) {
+                    // 支持 prompt 为数组（多张图片）或字符串（单张图片）
+                    const prompts = Array.isArray(msgData.prompt)
+                      ? msgData.prompt.slice(0, 9)
+                      : [msgData.prompt];
+
+                    const pollApiKey = state.apiConfig.pollinationsApiKey;
+                    const generatedImageUrls = [];
+
+                    // 使用 Promise.all 并行处理请求，提高速度
+                    await Promise.all(
+                      prompts.map(async (prompt) => {
+                        const encodedPrompt = encodeURIComponent(prompt);
+                        const url = `https://image.pollinations.ai/prompt/${encodedPrompt}?nologo=true&width=1024&height=1024`;
+
+                        try {
+                          if (pollApiKey) {
+                            // 如果有 Key，使用 fetch 获取并转为 Base64
+                            const res = await fetch(url, {
+                              headers: {
+                                Authorization: `Bearer ${pollApiKey}`,
+                              },
+                            });
+                            if (res.ok) {
+                              const blob = await res.blob();
+                              const base64 = await new Promise((resolve) => {
+                                const reader = new FileReader();
+                                reader.onloadend = () => resolve(reader.result);
+                                reader.readAsDataURL(blob);
+                              });
+                              generatedImageUrls.push(base64);
+                            } else {
+                              console.warn(
+                                `Pollinations fetch failed: ${res.status}, falling back to URL`,
+                              );
+                              generatedImageUrls.push(url);
+                            }
+                          } else {
+                            // 没有 Key，直接使用 URL
+                            generatedImageUrls.push(url);
+                          }
+                        } catch (e) {
+                          console.error(
+                            "Pollinations image generation error:",
+                            e,
+                          );
+                          generatedImageUrls.push(url); // 出错时回退到 URL 尝试
+                        }
+                      }),
+                    );
+
+                    newPost.imageUrls = generatedImageUrls;
+
+                    // 保持向后兼容，单张图片时也设置 imageUrl
+                    if (generatedImageUrls.length === 1) {
+                      newPost.imageUrl = generatedImageUrls[0];
+                    }
+
+                    newPost.prompt = msgData.prompt;
+                    newPost.imageCount = generatedImageUrls.length;
+                    console.log(
+                      `动态RealImag图片生成完成: ${generatedImageUrls.length}张`,
+                    );
+                  }
+
+                  // 如果是naiimag类型，调用NovelAI API生成高质量图片（限制最多2张）
+                  if (msgData.postType === "naiimag" && msgData.prompt) {
+                    try {
+                      // 支持 prompt 为数组（多张图片）或字符串（单张图片）
+                      // 动态限制最多2张NAI图片
+                      const prompts = Array.isArray(msgData.prompt)
+                        ? msgData.prompt.slice(0, 2)
+                        : [msgData.prompt];
+                      console.log(
+                        `📸 动态NovelAI图片生成开始，共${prompts.length}张图片`,
+                      );
+
+                      // 存储生成的图片URL
+                      const generatedImageUrls = [];
+
+                      // 逐个生成图片
+                      for (let i = 0; i < prompts.length; i++) {
+                        const aiPrompt = prompts[i];
+                        console.log(`生成第${i + 1}张图片，prompt:`, aiPrompt);
+
+                        // 获取角色的NAI提示词配置（系统或角色专属）
+                        const naiPrompts = getCharacterNAIPrompts(chat.id);
+
+                        // 构建最终的提示词：AI的prompt + 配置的提示词
+                        const finalPositivePrompt =
+                          aiPrompt + ", " + naiPrompts.positive;
+                        const finalNegativePrompt = naiPrompts.negative;
+
+                        console.log(
+                          `📝 使用${naiPrompts.source === "character" ? "角色专属" : "系统"}提示词配置`,
+                        );
+                        console.log("最终正面提示词:", finalPositivePrompt);
+                        console.log("最终负面提示词:", finalNegativePrompt);
+
+                        // 获取NAI设置（从localStorage读取）
+                        const apiKey = localStorage.getItem("novelai-api-key");
+                        const model =
+                          localStorage.getItem("novelai-model") ||
+                          "nai-diffusion-4-5-full";
+                        const settings = getNovelAISettings();
+
+                        if (!apiKey) {
+                          throw new Error(
+                            "NovelAI API Key未配置。请在NovelAI设置中填写API Key。",
+                          );
+                        }
+
+                        const [width, height] = settings.resolution
+                          .split("x")
+                          .map(Number);
+
+                        // ★★★ V4/V4.5 和 V3 使用不同的请求体格式 ★★★
+                        let requestBody;
+
+                        if (model.includes("nai-diffusion-4")) {
+                          // V4/V4.5 使用新格式 (params_version: 3)
+                          requestBody = {
+                            input: finalPositivePrompt,
+                            model: model,
+                            action: "generate",
+                            parameters: {
+                              params_version: 3, // V4必须使用版本3
+                              width: width,
+                              height: height,
+                              scale: settings.cfg_scale,
+                              sampler: settings.sampler,
+                              steps: settings.steps,
+                              seed:
+                                settings.seed === -1
+                                  ? Math.floor(Math.random() * 9999999999)
+                                  : settings.seed,
+                              n_samples: 1,
+                              ucPreset: settings.uc_preset,
+                              qualityToggle: settings.quality_toggle,
+                              autoSmea: false,
+                              dynamic_thresholding: false,
+                              controlnet_strength: 1,
+                              legacy: false,
+                              add_original_image: true,
+                              cfg_rescale: 0,
+                              noise_schedule: "karras", // V4使用karras
+                              legacy_v3_extend: false,
+                              skip_cfg_above_sigma: null,
+                              use_coords: false,
+                              legacy_uc: false,
+                              normalize_reference_strength_multiple: true,
+                              inpaintImg2ImgStrength: 1,
+                              characterPrompts: [],
+                              // V4专用提示词格式
+                              v4_prompt: {
+                                caption: {
+                                  base_caption: finalPositivePrompt,
+                                  char_captions: [],
+                                },
+                                use_coords: false,
+                                use_order: true,
+                              },
+                              // V4专用负面提示词格式
+                              v4_negative_prompt: {
+                                caption: {
+                                  base_caption: finalNegativePrompt,
+                                  char_captions: [],
+                                },
+                                legacy_uc: false,
+                              },
+                              negative_prompt: finalNegativePrompt,
+                              deliberate_euler_ancestral_bug: false,
+                              prefer_brownian: true,
+                              // 注意：不包含 stream 参数，使用标准ZIP响应而非msgpack流
+                            },
+                          };
+                        } else {
+                          // V3 及更早版本使用旧格式
+                          requestBody = {
+                            input: finalPositivePrompt,
+                            model: model,
+                            action: "generate",
+                            parameters: {
+                              width: width,
+                              height: height,
+                              scale: settings.cfg_scale,
+                              sampler: settings.sampler,
+                              steps: settings.steps,
+                              seed:
+                                settings.seed === -1
+                                  ? Math.floor(Math.random() * 9999999999)
+                                  : settings.seed,
+                              n_samples: 1,
+                              ucPreset: settings.uc_preset,
+                              qualityToggle: settings.quality_toggle,
+                              sm: settings.smea,
+                              sm_dyn: settings.smea_dyn,
+                              dynamic_thresholding: false,
+                              controlnet_strength: 1,
+                              legacy: false,
+                              add_original_image: false,
+                              cfg_rescale: 0,
+                              noise_schedule: "native",
+                              negative_prompt: finalNegativePrompt,
+                            },
+                          };
+                        }
+
+                        console.log("🚀 发送NAI请求:", requestBody);
+
+                        // 根据模型选择不同的API端点
+                        let apiUrl;
+
+                        // V4/V4.5 模型使用流式端点
+                        if (model.includes("nai-diffusion-4")) {
+                          // V4/V4.5 默认使用流式端点
+                          apiUrl =
+                            "https://image.novelai.net/ai/generate-image-stream";
+                        } else {
+                          // V3 及更早版本使用标准端点
+                          apiUrl =
+                            "https://image.novelai.net/ai/generate-image";
+                        }
+
+                        let corsProxy = settings.cors_proxy;
+
+                        // 如果选择了自定义代理，使用自定义URL
+                        if (corsProxy === "custom") {
+                          corsProxy = settings.custom_proxy_url || "";
+                        }
+
+                        // 如果有代理，添加到URL前面
+                        if (corsProxy && corsProxy !== "") {
+                          apiUrl = corsProxy + encodeURIComponent(apiUrl);
+                        }
+
+                        const response = await fetch(apiUrl, {
+                          method: "POST",
+                          headers: {
+                            "Content-Type": "application/json",
+                            Authorization: "Bearer " + apiKey,
+                          },
+                          body: JSON.stringify(requestBody),
+                        });
+
+                        console.log("Response status:", response.status);
+                        console.log("Response headers:", [
+                          ...response.headers.entries(),
+                        ]);
+
+                        if (!response.ok) {
+                          const errorText = await response.text();
+                          console.error("API错误响应:", errorText);
+                          throw new Error(
+                            `API请求失败 (${response.status}): ${errorText}`,
+                          );
+                        }
+
+                        // NovelAI API返回的是ZIP文件，需要解压
+                        const contentType =
+                          response.headers.get("content-type");
+                        console.log("Content-Type:", contentType);
+
+                        // 检查是否为 SSE 流式响应
+                        let zipBlob;
+                        let imageDataUrl;
+                        if (
+                          contentType &&
+                          contentType.includes("text/event-stream")
+                        ) {
+                          console.log("检测到 SSE 流式响应，开始解析...");
+
+                          // 读取整个流
+                          const text = await response.text();
+                          console.log("收到 SSE 数据，大小:", text.length);
+
+                          // 解析 SSE 格式，提取最后的 data: 行
+                          const lines = text.trim().split("\n");
+                          let base64Data = null;
+
+                          for (let i = lines.length - 1; i >= 0; i--) {
+                            const line = lines[i].trim();
+                            if (
+                              line.startsWith("data: ") &&
+                              line !== "data: [DONE]"
+                            ) {
+                              const dataContent = line.substring(6); // 移除 'data: ' 前缀
+
+                              // 尝试解析 JSON
+                              try {
+                                const jsonData = JSON.parse(dataContent);
+
+                                // V4.5 流式端点：event_type 为 "final" 时包含最终图片
+                                if (
+                                  jsonData.event_type === "final" &&
+                                  jsonData.image
+                                ) {
+                                  base64Data = jsonData.image;
+                                  console.log("✅ 找到 final 事件的图片数据");
+                                  break;
+                                }
+
+                                // 兼容其他格式
+                                if (jsonData.data) {
+                                  base64Data = jsonData.data;
+                                  console.log("从 JSON.data 中提取图片数据");
+                                  break;
+                                }
+                                if (jsonData.image) {
+                                  base64Data = jsonData.image;
+                                  console.log("从 JSON.image 中提取图片数据");
+                                  break;
+                                }
+                              } catch (e) {
+                                // 如果不是 JSON，直接作为 base64 数据
+                                base64Data = dataContent;
+                                console.log("直接使用 base64 数据");
+                                break;
+                              }
+                            }
+                          }
+
+                          if (!base64Data) {
+                            throw new Error("无法从 SSE 响应中提取图片数据");
+                          }
+
+                          // V4.5 流式端点返回的是 PNG base64，不是 ZIP
+                          // 检查是否为 PNG (以 iVBORw0KGgo 开头) 或 JPEG (以 /9j/ 开头)
+                          const isPNG = base64Data.startsWith("iVBORw0KGgo");
+                          const isJPEG = base64Data.startsWith("/9j/");
+
+                          if (isPNG || isJPEG) {
+                            console.log(
+                              "✅ 检测到直接的图片 base64 数据 (PNG/JPEG)",
+                            );
+                            // 将 base64 转为 Blob
+                            const binaryString = atob(base64Data);
+                            const bytes = new Uint8Array(binaryString.length);
+                            for (let i = 0; i < binaryString.length; i++) {
+                              bytes[i] = binaryString.charCodeAt(i);
+                            }
+                            const imageBlob = new Blob([bytes], {
+                              type: isPNG ? "image/png" : "image/jpeg",
+                            });
+                            console.log(
+                              "图片 Blob 创建成功，大小:",
+                              imageBlob.size,
+                            );
+
+                            // 转换为dataURL用于后续处理
+                            const reader = new FileReader();
+                            imageDataUrl = await new Promise(
+                              (resolve, reject) => {
+                                reader.onloadend = () => resolve(reader.result);
+                                reader.onerror = reject;
+                                reader.readAsDataURL(imageBlob);
+                              },
+                            );
+                            console.log("✅ 图片转换成功！🎨");
+                          } else {
+                            // 否则当作 ZIP 处理
+                            console.log("当作 ZIP 文件处理...");
+                            const binaryString = atob(base64Data);
+                            const bytes = new Uint8Array(binaryString.length);
+                            for (let i = 0; i < binaryString.length; i++) {
+                              bytes[i] = binaryString.charCodeAt(i);
+                            }
+                            zipBlob = new Blob([bytes]);
+                            console.log("ZIP Blob 大小:", zipBlob.size);
+                          }
+                        } else {
+                          // 非流式响应，直接读取
+                          zipBlob = await response.blob();
+                          console.log(
+                            "收到数据，类型:",
+                            zipBlob.type,
+                            "大小:",
+                            zipBlob.size,
+                          );
+                        }
+
+                        // 如果还没有imageDataUrl（即需要解压ZIP）
+                        if (!imageDataUrl && zipBlob) {
+                          // NovelAI始终返回ZIP格式，需要解压
+                          try {
+                            // 检查JSZip是否已加载
+                            if (typeof JSZip === "undefined") {
+                              throw new Error("JSZip库未加载，请刷新页面重试");
+                            }
+
+                            // 解压ZIP文件
+                            const zip = await JSZip.loadAsync(zipBlob);
+                            console.log("ZIP文件内容:", Object.keys(zip.files));
+
+                            // 查找第一个图片文件（通常是image_0.png）
+                            let imageFile = null;
+                            for (let filename in zip.files) {
+                              if (filename.match(/\.(png|jpg|jpeg|webp)$/i)) {
+                                imageFile = zip.files[filename];
+                                console.log("找到图片文件:", filename);
+                                break;
+                              }
+                            }
+
+                            if (!imageFile) {
+                              throw new Error("ZIP文件中未找到图片");
+                            }
+
+                            // 提取图片数据
+                            const imageBlob = await imageFile.async("blob");
+                            console.log("提取的图片大小:", imageBlob.size);
+
+                            // 创建图片URL
+                            const reader = new FileReader();
+                            imageDataUrl = await new Promise(
+                              (resolve, reject) => {
+                                reader.onloadend = () => resolve(reader.result);
+                                reader.onerror = reject;
+                                reader.readAsDataURL(imageBlob);
+                              },
+                            );
+                            console.log("✅ 图片解压成功！");
+                          } catch (zipError) {
+                            console.error("ZIP解压失败:", zipError);
+                            throw new Error(
+                              "图片解压失败: " + zipError.message,
+                            );
+                          }
+                        }
+
+                        console.log(`✅ NAI图片${i + 1}生成成功！`);
+                        generatedImageUrls.push(imageDataUrl);
+                      }
+
+                      // 将生成的图片URL保存到动态中
+                      newPost.imageUrls = generatedImageUrls;
+
+                      // 保持向后兼容，单张图片时也设置 imageUrl
+                      if (generatedImageUrls.length === 1) {
+                        newPost.imageUrl = generatedImageUrls[0];
+                      }
+
+                      newPost.prompt = msgData.prompt;
+                      newPost.imageCount = generatedImageUrls.length;
+                      console.log(
+                        `✅ 动态NovelAI图片全部生成完成: ${generatedImageUrls.length}张`,
+                      );
+                    } catch (error) {
+                      console.error("❌ 动态NAI图片生成失败:", error);
+                      // 失败时仍然发布动态，但添加错误信息
+                      newPost.content =
+                        (newPost.content || newPost.publicText || "") +
+                        `\n[图片生成失败: ${error.message}]`;
+                    }
+                  }
+
+                  await db.qzonePosts.add(newPost);
+                  updateUnreadIndicator(unreadPostsCount + 1);
+                  if (
+                    isViewingThisChat &&
+                    document
+                      .getElementById("qzone-screen")
+                      .classList.contains("active")
+                  ) {
+                    await renderQzonePosts();
+                  }
+                  continue;
+
+                case "qzone_comment":
+                  const postToComment = await db.qzonePosts.get(
+                    parseInt(msgData.postId),
+                  );
+                  if (postToComment) {
+                    if (!postToComment.comments) postToComment.comments = [];
+
+                    const newAiComment = {
+                      commenterName: msgData.commenterName || chat.name,
+                      text: msgData.commentText,
+                      timestamp: Date.now(),
+                    };
+
+                    // 检查AI是否指定了回复对象
+                    if (msgData.replyTo) {
+                      newAiComment.replyTo = msgData.replyTo;
+                    }
+
+                    postToComment.comments.push(newAiComment);
+                    await db.qzonePosts.update(postToComment.id, {
+                      comments: postToComment.comments,
+                    });
+                    updateUnreadIndicator(unreadPostsCount + 1);
+                    if (
+                      isViewingThisChat &&
+                      document
+                        .getElementById("qzone-screen")
+                        .classList.contains("active")
+                    ) {
+                      await renderQzonePosts();
+                    }
+                  }
+                  continue;
+

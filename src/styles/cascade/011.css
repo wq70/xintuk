@@ -1,0 +1,1345 @@
+
+.order-item .product-image {
+  width: 70px;
+  height: 70px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+.order-item .order-info {
+  flex-grow: 1;
+}
+.order-item .product-name {
+  font-weight: 500;
+}
+.order-item .order-status {
+  font-size: 13px;
+  color: #28a745;
+  margin-top: 8px;
+  font-weight: 500;
+}
+.order-item .order-time {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+/* ▲▲▲ 新增CSS结束 ▲▲▲ */
+/* ▼▼▼ 把这一整块全新的CSS，粘贴到 <style> 标签的最末尾 ▼▼▼ */
+
+/* --- “桃宝”App 搜索栏样式 --- */
+.taobao-search-bar {
+  display: flex;
+  gap: 10px;
+  padding: 0 0 15px 0; /* 只在下方留出间距 */
+}
+
+#product-search-input {
+  flex-grow: 1;
+  border: 1px solid #ff5722;
+  padding: 10px 15px;
+  border-radius: 20px;
+  font-size: 14px;
+  outline: none;
+}
+
+#product-search-btn {
+  background-color: #ff5722;
+  color: white;
+  border: none;
+  border-radius: 20px;
+  padding: 0 20px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+/* --- AI生成结果弹窗内的样式 --- */
+#ai-product-results-grid .product-card {
+  position: relative; /* 为了定位“添加”按钮 */
+  padding-bottom: 40px; /* 为按钮留出空间 */
+  cursor: default; /* 在弹窗里，卡片本身不可点击 */
+}
+
+.add-to-my-page-btn {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  right: 8px;
+  width: calc(100% - 16px);
+  padding: 8px 0;
+  background-color: #4caf50; /* 绿色，代表添加 */
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.add-to-my-page-btn:hover {
+  background-color: #45a049;
+}
+
+.add-to-my-page-btn:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+/* ▲▲▲ 新增CSS结束 ▲▲▲ */
+/* ▼▼▼ 把这一整块全新的CSS，粘贴到 <style> 标签的最末尾 ▼▼▼ */
+
+/* --- 购物车页签上的小红点 --- */
+.taobao-tab {
+  position: relative;
+}
+#cart-item-count-badge {
+  position: absolute;
+  top: 5px;
+  right: 15px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  background-color: #ff5722;
+  color: white;
+  font-size: 11px;
+  border-radius: 9px;
+  line-height: 18px;
+}
+
+/* --- 商品卡片上的“加入购物车”按钮 --- */
+.product-card .add-cart-btn {
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+  width: 28px;
+  height: 28px;
+  background-color: #ff5722;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  font-size: 18px;
+  line-height: 28px;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s;
+}
+.product-card .add-cart-btn:active {
+  transform: scale(0.9);
+}
+
+/* --- 购物车列表 --- */
+#cart-item-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 70px; /* 为底部的结算栏留出空间 */
+}
+.cart-item {
+  background-color: var(--secondary-bg);
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.cart-item .product-image {
+  width: 80px;
+  height: 80px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  cursor: pointer; /* 让图片可点击 */
+}
+.cart-item .cart-item-info {
+  flex-grow: 1;
+  cursor: pointer; /* 让信息区也可点击 */
+}
+.cart-item .product-name {
+  font-weight: 500;
+}
+.cart-item .product-price {
+  color: #ff5722;
+  font-weight: bold;
+  margin-top: 8px;
+}
+.cart-item .quantity-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cart-item .quantity-controls button {
+  width: 24px;
+  height: 24px;
+  border: 1px solid #ccc;
+  background-color: #f0f0f0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.cart-item .delete-cart-item-btn {
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: none;
+  color: #999;
+  font-size: 24px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* --- 购物车结算栏 --- */
+#cart-checkout-bar {
+  position: fixed; /* ★★★ 核心修改：从 absolute 改为 fixed ★★★ */
+  bottom: 0;
+  left: 0;
+  right: 0; /* (推荐) 配合 left:0 自动撑满宽度，更稳妥 */
+  /* width: 100%; (可以保留或删除) */
+  z-index: 10; /* (推荐) 确保它始终在最上层 */
+  padding: 10px 15px;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom));
+  background-color: var(--secondary-bg);
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+#cart-checkout-bar .total-price {
+  font-weight: bold;
+}
+#cart-checkout-bar #cart-total-price {
+  color: #ff5722;
+  font-size: 18px;
+}
+#cart-checkout-bar #checkout-btn {
+  background-color: #ff5722;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 20px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+/* --- 商品详情弹窗 --- */
+#product-detail-body {
+  text-align: center;
+}
+#product-detail-body .product-image {
+  width: 80%;
+  max-width: 250px;
+  border-radius: 8px;
+  margin-bottom: 15px;
+}
+#product-detail-body .product-name {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+#product-detail-body .product-price {
+  font-size: 24px;
+  font-weight: bold;
+  color: #ff5722;
+  margin-bottom: 20px;
+}
+#product-detail-body .product-price::before {
+  content: "¥";
+  font-size: 16px;
+}
+
+/* ▲▲▲ 新增CSS结束 ▲▲▲ */
+/* ▼▼▼ 把这一整块全新的CSS，粘贴到 <style> 标签的最末尾 ▼▼▼ */
+
+/* --- 商品详情弹窗 - 评价区 --- */
+#product-reviews-section {
+  padding: 0 15px 15px 15px; /* 和主体内容保持一致的内边距 */
+  border-top: 1px solid var(--border-color);
+  margin-top: 15px;
+}
+#product-reviews-section h3 {
+  font-size: 16px;
+  margin: 15px 0;
+}
+#product-reviews-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  max-height: 150px; /* 给一个最大高度，内容多了可以滚动 */
+  overflow-y: auto;
+  margin-bottom: 15px;
+}
+.product-review-item {
+  font-size: 14px;
+  line-height: 1.6;
+  border-bottom: 1px solid #f0f0f0;
+  padding-bottom: 10px;
+}
+.product-review-item .review-author {
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 5px;
+}
+#generate-reviews-btn {
+  width: 100%;
+  margin-top: 10px;
+  background-color: #fff7e6;
+  color: #fa8c16;
+  border-color: #ffd591;
+}
+
+/* ▲▲▲ 新增CSS结束 ▲▲▲ */
+/* ▼▼▼ 把这一整块全新的CSS，粘贴到 <style> 标签的最末尾 ▼▼▼ */
+
+/* --- 余额明细列表样式 --- */
+.transaction-item {
+  background-color: var(--secondary-bg);
+  border-radius: 8px;
+  padding: 12px 15px;
+  margin-bottom: 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.transaction-info .description {
+  font-weight: 500;
+}
+.transaction-info .timestamp {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+.transaction-amount {
+  font-weight: bold;
+  font-size: 16px;
+}
+.transaction-amount.income {
+  color: #4caf50; /* 收入为绿色 */
+}
+.transaction-amount.expense {
+  color: #f44336; /* 支出为红色 */
+}
+
+/* ▲▲▲ 新增CSS结束 ▲▲▲ */
+/* ▼▼▼ 【全新】这是为物流详情页新增的样式，请粘贴到 <style> 的末尾 ▼▼▼ */
+
+#logistics-content-area {
+  padding: 20px;
+  background-color: #f5f5f5;
+}
+
+#phone-screen.dark-mode #logistics-content-area {
+  background-color: #121212;
+}
+
+/* 顶部商品信息卡片 */
+.logistics-product-summary {
+  display: flex;
+  gap: 15px;
+  padding: 15px;
+  margin-bottom: 20px;
+  background-color: var(--secondary-bg);
+  border-radius: 12px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+}
+
+.logistics-product-summary .product-image {
+  width: 60px;
+  height: 60px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.logistics-product-summary .info .name {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.logistics-product-summary .info .status {
+  font-size: 13px;
+  color: #ff5722; /* 淘宝橙 */
+  margin-top: 5px;
+  font-weight: 500;
+}
+
+/* 时间轴容器 */
+.logistics-timeline {
+  position: relative;
+  padding-left: 25px; /* 为时间轴的竖线和圆点留出空间 */
+  background-color: var(--secondary-bg);
+  padding: 20px 20px 20px 30px;
+  border-radius: 12px;
+}
+
+/* 时间轴的竖线 */
+.logistics-timeline::before {
+  content: "";
+  position: absolute;
+  left: 15px;
+  top: 20px;
+  bottom: 20px;
+  width: 2px;
+  background-color: #e0e0e0;
+}
+
+#phone-screen.dark-mode .logistics-timeline::before {
+  background-color: #38383a;
+}
+
+/* 每一个物流步骤 */
+.logistics-step {
+  position: relative;
+  margin-bottom: 25px;
+}
+
+.logistics-step:last-child {
+  margin-bottom: 0;
+}
+
+/* 时间轴上的圆点 */
+.logistics-step::before {
+  content: "";
+  position: absolute;
+  left: -22px;
+  top: 5px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #ccc;
+  border: 2px solid var(--secondary-bg);
+  z-index: 1;
+}
+
+/* 最新的一条物流状态，让它的圆点更突出 */
+.logistics-step:first-child::before {
+  background-color: #ff5722;
+  transform: scale(1.3);
+}
+
+.logistics-step-content .status-text {
+  font-weight: 500;
+  font-size: 14px;
+  margin-bottom: 5px;
+  line-height: 1.5;
+}
+
+.logistics-step-content .timestamp {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+/* ▲▲▲ 新增CSS结束 ▲▲▲ */
+/* ▼▼▼ 【全新】这是为“分享给Ta代付”按钮新增的样式 ▼▼▼ */
+#share-cart-to-char-btn {
+  background-color: #ff9800; /* 使用一个温暖的橙色，区别于结算按钮 */
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 20px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s; /* 添加悬停效果 */
+}
+#share-cart-to-char-btn:hover {
+  background-color: #f57c00;
+}
+/* ▲▲▲ 新增CSS结束 ▲▲▲ */
+/* ▼▼▼ 【全新】这是为“购物车代付请求”新增的卡片样式 ▼▼▼ */
+
+/* 1. 让包裹卡片的气泡本身变透明 */
+.message-bubble.is-cart-share-request .content {
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  border: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* 2. 卡片主体样式 */
+.cart-share-card {
+  width: 230px;
+  border-radius: 12px;
+  background-color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  border: 2px solid transparent; /* 为不同状态准备的边框 */
+  transition: all 0.3s ease;
+}
+
+/* 3. 卡片头部 */
+.cart-share-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 15px;
+  background-color: #fff8e1; /* 温暖的米黄色 */
+  color: #ffa000;
+}
+.cart-share-header .icon {
+  font-size: 24px;
+  font-weight: bold;
+}
+.cart-share-header .title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* 4. 卡片内容区域 */
+.cart-share-body {
+  padding: 15px;
+  text-align: center;
+}
+.cart-share-body .label {
+  font-size: 13px;
+  color: #888;
+}
+.cart-share-body .amount {
+  font-size: 32px;
+  font-weight: 700;
+  color: #ff5722; /* 淘宝橙 */
+  margin: 5px 0 15px 0;
+}
+.cart-share-body .status-text {
+  font-weight: 500;
+  color: var(--accent-color);
+}
+
+/* 5. 不同状态下的样式 */
+.cart-share-card.paid {
+  border-color: #4caf50; /* 绿色 */
+}
+.cart-share-card.paid .status-text {
+  color: #4caf50;
+}
+.cart-share-card.rejected {
+  border-color: #f44336; /* 红色 */
+  opacity: 0.8;
+}
+.cart-share-card.rejected .status-text {
+  color: #f44336;
+}
+/* ▲▲▲ 新增CSS结束 ▲▲▲ */
+/* ▼▼▼ 【全新】这是为“为Ta购买”和礼物通知卡片新增的样式 ▼▼▼ */
+
+/* 1. “为Ta购买”按钮的样式 */
+#buy-for-char-btn {
+  background-color: #4caf50; /* 使用一个代表“礼物”的绿色 */
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 20px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+#buy-for-char-btn:hover {
+  background-color: #45a049;
+}
+
+/* 2. 让包裹礼物卡片的气泡变透明 */
+.message-bubble.is-gift-notification .content {
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  border: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* 3. 礼物通知卡片主体样式 */
+.gift-card {
+  width: 230px;
+  border-radius: 12px;
+  background-color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+.gift-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 15px;
+  background-color: #e8f5e9; /*淡淡的绿色背景*/
+  color: #2e7d32;
+}
+.gift-card-header .icon {
+  font-size: 24px;
+  font-weight: bold;
+}
+.gift-card-header .title {
+  font-size: 16px;
+  font-weight: 600;
+}
+.gift-card-body {
+  padding: 15px;
+}
+.gift-card-body .greeting {
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+.gift-card-items {
+  font-size: 13px;
+  color: #555;
+  max-height: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 10px;
+}
+.gift-card-footer {
+  padding-top: 10px;
+  border-top: 1px solid #f0f0f0;
+  text-align: right;
+  font-weight: bold;
+}
+.gift-card-footer .total-price {
+  color: #ff5722;
+}
+/* ▲▲▲ 新增样式结束 ▲▲▲ */
+/* ▼▼▼ 把这一整块全新的CSS，粘贴到 <style> 的末尾 ▼▼▼ */
+
+/* 1. 让角色主页的内容区可以独立滚动 */
+#weibo-char-profile-page {
+  flex-grow: 1;
+  overflow-y: auto;
+  background-color: #f0f2f5;
+}
+
+/* 2. 修正夜间模式下主页和新页面的背景色 */
+#phone-screen.dark-mode #weibo-profile-page,
+#phone-screen.dark-mode #weibo-char-profile-page {
+  background-color: #000;
+}
+
+/* 3. 为角色主页上的职业显示添加样式 (已修改) */
+#weibo-char-profession-display {
+  position: absolute;
+  /* 定位：从右侧标签改为与“关注”数据左对齐 */
+  left: 35px;
+  /* 垂直位置：放在“关注”数据行的下方，-5px会让它更靠下一点 */
+  bottom: -5px;
+  right: auto; /* 清除掉旧的 right 定位，避免冲突 */
+  z-index: 2;
+
+  /* 外观：从半透明标签改为和你主页一致的灰色普通文字 */
+  font-size: 13px;
+  color: #8a8a8a;
+  text-shadow: none;
+  background-color: transparent;
+  padding: 0;
+  border-radius: 0;
+}
+
+/* 4. 给关注列表的“查看主页”按钮添加样式 */
+.weibo-following-item .view-profile-btn {
+  margin-left: auto; /* 让按钮自动靠右 */
+  padding: 5px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--accent-color);
+  background-color: #e7f3ff;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+}
+#phone-screen.dark-mode .weibo-following-item .view-profile-btn {
+  background-color: rgba(0, 123, 255, 0.2);
+}
+
+/* ▲▲▲ 新增CSS粘贴结束 ▲▲▲ */
+/* ▼▼▼ 【层级修复】请将这段新CSS粘贴到 <style> 的末尾 ▼▼▼ */
+
+/* 强制提升头像框选择弹窗的层级，确保它能覆盖在其他弹窗之上 */
+#avatar-frame-modal {
+  z-index: 1005;
+}
+
+/* ▲▲▲ 修复结束 ▲▲▲ */
+/* ▼▼▼ 这是新增的样式 ▼▼▼ */
+
+/* 这是我们新加的、包裹头像的可点击区域的样式 */
+.weibo-post-avatar-clickable {
+  cursor: pointer; /* 鼠标放上去时显示为小手形状 */
+  transition: opacity 0.2s ease-in-out; /* 添加一个平滑的过渡动画 */
+}
+
+/* 鼠标悬停时，让头像稍微变暗一点，给用户一个明确的反馈 */
+.weibo-post-avatar-clickable:hover {
+  opacity: 0.85;
+}
+
+/* ▲▲▲ 新增样式结束 ▲▲▲ */
+/* ▼▼▼ 【全新】语音播放动画样式 ▼▼▼ */
+.message-bubble.is-voice-message.playing .voice-waveform div {
+  animation: wave-play 1s ease-in-out infinite;
+}
+
+@keyframes wave-play {
+  0%,
+  100% {
+    height: 2px;
+  }
+  25% {
+    height: 12px;
+  }
+  50% {
+    height: 6px;
+  }
+  75% {
+    height: 18px;
+  }
+}
+/* ▲▲▲ 样式粘贴结束 ▲▲▲ */
+
+/* ============ “查手机”功能美化代码 v2.0 (支持自定义图片) 开始 ============ */
+
+/* --- 步骤1: 缩小图标尺寸 (保持不变) --- */
+#character-app-grid .app-icon .icon-bg {
+  width: 50px !important;
+  height: 50px !important;
+  border-radius: 13px !important;
+}
+#character-app-grid .app-icon .label {
+  font-size: 12px;
+}
+
+/* --- 步骤2: 将容器改为自由定位的“桌面”布局 (保持不变) --- */
+#character-app-grid {
+  display: block !important;
+  grid-template-columns: none !important;
+  gap: 0 !important;
+  position: relative !important;
+  height: 100% !important;
+}
+
+/* --- 步骤3: 让所有App图标“浮”起来 (保持不变) --- */
+#character-app-grid .app-icon {
+  position: absolute !important;
+}
+
+/* --- 步骤4: 【核心修改】为我们新的图片位设置样式 --- */
+.char-phone-widget {
+  position: absolute;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); /* 加个阴影更好看 */
+  border: 2px solid rgba(255, 255, 255, 0.5); /* 加个白边更有质感 */
+  overflow: hidden; /* 防止图片溢出圆角 */
+  cursor: pointer; /* 鼠标放上去是小手形状，提示可以点击 */
+  transition: transform 0.2s ease; /* 添加点击动效 */
+  background-color: #e0e0e0; /* 图片加载前的占位颜色 */
+}
+.char-phone-widget:active {
+  transform: scale(0.95); /* 点击时缩小一点点 */
+}
+.char-phone-widget img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* 保证图片填满且不变形 */
+}
+
+/* ============================================== */
+/* === ★★★ 手动精调区：在这里修改位置和大小 ★★★ === */
+/* ============================================== */
+
+/* --- 左上角的图片位 --- */
+#char-phone-widget-1 {
+  /* --- 在这里调整【上下位置】(数字越大越往下)--- */
+  top: 60px;
+  /* --- 在这里调整【左右位置】(数字越大越往右)--- */
+  left: 20px;
+  /* --- 在这里调整【大小】--- */
+  width: 110px;
+  height: 110px;
+  border-radius: 22px; /* 圆角 (建议是宽度的1/5左右) */
+}
+
+/* --- 右下角的图片位 --- */
+#char-phone-widget-2 {
+  /* --- 在这里调整【上下位置】(数字越大越往上)--- */
+  bottom: 60px;
+  /* --- 在这里调整【左右位置】(数字越大越往左)--- */
+  right: 20px;
+  /* --- 在这里调整【大小】--- */
+  width: 110px;
+  height: 110px;
+  border-radius: 22px; /* 圆角 */
+}
+
+/* --- APP 图标位置调整 (这部分保持不变) --- */
+#character-app-grid .app-icon:nth-child(1) {
+  top: 70px;
+  left: 150px;
+}
+#character-app-grid .app-icon:nth-child(2) {
+  top: 70px;
+  left: 215px;
+}
+#character-app-grid .app-icon:nth-child(3) {
+  top: 155px;
+  left: 30px;
+}
+#character-app-grid .app-icon:nth-child(4) {
+  top: 155px;
+  left: 95px;
+}
+#character-app-grid .app-icon:nth-child(5) {
+  top: 155px;
+  left: 160px;
+}
+#character-app-grid .app-icon:nth-child(6) {
+  top: 240px;
+  left: 225px;
+}
+#character-app-grid .app-icon:nth-child(7) {
+  top: 240px;
+  left: 30px;
+}
+#character-app-grid .app-icon:nth-child(8) {
+  top: 240px;
+  left: 95px;
+}
+#character-app-grid .app-icon:nth-child(9) {
+  top: 325px;
+  left: 30px;
+}
+#character-app-grid .app-icon:nth-child(10) {
+  top: 325px;
+  left: 95px;
+}
+
+/* ============ “查手机”功能美化代码 结束 ============ */
+
+/* ▼▼▼ 【最终修复版】只为“微博”和“粉丝”增加点击区域 ▼▼▼ */
+
+/*
+ * 核心原理不变，但这次我们使用了更精确的 ID 选择器，
+ * 只选中 #weibo-posts-item (微博) 和 #weibo-fans-item (粉丝) 这两个元素。
+ */
+#weibo-posts-item,
+#weibo-fans-item {
+  padding: 8px 10px;
+  margin: -8px -10px;
+  border-radius: 8px;
+  transition: background-color 0.2s;
+}
+
+/* 为这两个按钮添加点击时的背景色反馈 */
+#weibo-posts-item:active,
+#weibo-fans-item:active {
+  background-color: rgba(0, 0, 0, 0.08); /* 点击时给一个淡淡的灰色背景 */
+}
+
+/* 在夜间模式下的点击反馈颜色 */
+#phone-screen.dark-mode #weibo-posts-item:active,
+#phone-screen.dark-mode #weibo-fans-item:active {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+/* ▲▲▲ 最终修复版样式结束 ▲▲▲ */
+
+/* ======================================================================= /
+/ === ★★★ 角色手机桌面美化布局 v16.0 (垂直居中偏移版) ★★★ === /
+/ ======================================================================= */
+
+/* --- 1. 总控制台 & 布局变量 --- */
+#character-phone-screen {
+  position: relative !important;
+
+  /* --- ★★★ 唯一的【垂直位置】总控制器 ★★★ --- */
+  /* 调整这个值，就能让所有图标和小组件一起上下移动 */
+  /* 增加数值 = 整体下移；减小数值 = 整体上移 */
+  /* 我帮你设置了一个看起来比较居中的初始值 */
+  --global-vertical-offset: 10px;
+
+  /* (水平居中部分，保持不变) */
+  --grid-width: 345px;
+  --grid-left-edge: calc((100% - var(--grid-width)) / 2);
+}
+
+/* --- 2. 准备工作 (保持不变) --- */
+#character-app-grid {
+  position: absolute !important;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: block !important;
+  grid-template-columns: none !important;
+  gap: 0 !important;
+}
+#character-app-grid .app-icon,
+#char-phone-widget-1,
+#char-phone-widget-2 {
+  position: absolute !important;
+}
+
+/* --- 3. App图标样式 (保持不变) --- */
+#character-app-grid .app-icon .icon-bg {
+  width: 40px !important;
+  height: 40px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+#character-app-grid .app-icon .label {
+  font-size: 12px;
+  color: #fff;
+  padding-top: 8px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+/* --- 4. 小组件位置和尺寸 (★核心修改: 应用全局偏移) --- */
+#char-phone-widget-1 {
+  top: calc(var(--global-vertical-offset) + 90px); /* 90px 是你固定的值 */
+  left: calc(var(--grid-left-edge) + 30px);
+  width: 135px;
+  height: 135px;
+  border-radius: 22px;
+}
+#char-phone-widget-2 {
+  top: calc(var(--global-vertical-offset) + 480px); /* 480px 是你固定的值 */
+  left: calc(var(--grid-left-edge) + 180px);
+  width: 135px;
+  height: 135px;
+  border-radius: 22px;
+}
+
+/* --- 5. App图标位置 (★核心修改: 应用全局偏移) --- */
+/* 第1行 */
+#character-app-grid .app-icon:nth-child(1) {
+  top: calc(var(--global-vertical-offset) + 155px);
+  left: calc(var(--grid-left-edge) + 185px);
+}
+#character-app-grid .app-icon:nth-child(2) {
+  top: calc(var(--global-vertical-offset) + 155px);
+  left: calc(var(--grid-left-edge) + 250px);
+}
+/* 第2行 */
+#character-app-grid .app-icon:nth-child(3) {
+  top: calc(var(--global-vertical-offset) + 270px);
+  left: calc(var(--grid-left-edge) + 30px);
+}
+#character-app-grid .app-icon:nth-child(4) {
+  top: calc(var(--global-vertical-offset) + 270px);
+  left: calc(var(--grid-left-edge) + 105px);
+}
+#character-app-grid .app-icon:nth-child(5) {
+  top: calc(var(--global-vertical-offset) + 270px);
+  left: calc(var(--grid-left-edge) + 180px);
+}
+/* 第3行 */
+#character-app-grid .app-icon:nth-child(6) {
+  top: calc(var(--global-vertical-offset) + 375px);
+  left: calc(var(--grid-left-edge) + 105px);
+}
+#character-app-grid .app-icon:nth-child(7) {
+  top: calc(var(--global-vertical-offset) + 375px);
+  left: calc(var(--grid-left-edge) + 185px);
+}
+#character-app-grid .app-icon:nth-child(8) {
+  top: calc(var(--global-vertical-offset) + 375px);
+  left: calc(var(--grid-left-edge) + 250px);
+}
+/* 第4行 */
+#character-app-grid .app-icon:nth-child(9) {
+  top: calc(var(--global-vertical-offset) + 480px);
+  left: calc(var(--grid-left-edge) + 30px);
+}
+#character-app-grid .app-icon:nth-child(10) {
+  top: calc(var(--global-vertical-offset) + 480px);
+  left: calc(var(--grid-left-edge) + 105px);
+}
+
+/* ▼▼▼ 【查手机功能 | 图标对齐终极修复 V4】 ▼▼▼ */
+/*
+ * 解决方案：
+ * 1. (保留) 使用负外边距，将应用名(.label)向上拉，使其紧贴图标。
+ * 2. (新增) 对包含默认SVG图标的整个.app-icon元素，也使用一个负的margin-top，
+ *    使其整体向上移动，从而和其他自定义图标在垂直方向上完美对齐。
+ */
+
+/* 步骤1：让文字紧贴图标 (这是上次的成功修复，我们保留它) */
+#character-app-grid .app-icon:has(.icon-bg > svg) .label {
+  margin-top: -7px !important;
+  padding-top: 0px !important;
+}
+
+/* 步骤2：让图标和文字作为一个整体，向上移动 */
+#character-app-grid .app-icon:has(.icon-bg > svg) {
+  margin-top: -8px; /* 这个负值会把整个图标+文字的组合向上拉 */
+}
+/* ▲▲▲ 修复代码结束 ▲▲▲ */
+/* ▼▼▼ 这是步骤1需要粘贴的新样式 ▼▼▼ */
+
+/* 让每一条评论都变成可点击的，并增加悬停效果 */
+.weibo-comment-item {
+  cursor: pointer; /* 鼠标悬停时显示为小手形状 */
+  transition: background-color 0.2s; /* 添加一个平滑的背景色过渡动画 */
+  border-radius: 4px; /* 给一点点圆角，更好看 */
+  padding: 2px 5px; /* 增加一点内边距，让点击区域更大 */
+  margin: 0 -5px; /* 把上面的内边距抵消掉，保持对齐 */
+}
+.weibo-comment-item:hover {
+  background-color: #f0f2f5; /* 鼠标放上去时，给一个淡淡的背景色 */
+}
+#phone-screen.dark-mode .weibo-comment-item:hover {
+  background-color: #2c2c2e; /* 夜间模式下的悬停颜色 */
+}
+
+/* “回复”这两个字的样式，让它更柔和 */
+.weibo-comment-item .weibo-comment-reply-tag {
+  color: var(--text-secondary);
+  margin: 0 4px; /* 和两边的名字拉开一点距离 */
+}
+
+/* 被回复者的名字样式，让它和普通评论者名字一样可以点击 */
+.weibo-comment-item .reply-target-name {
+  font-weight: 600;
+  color: var(--accent-color);
+  cursor: pointer;
+  margin-right: 5px;
+}
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+/* ▼▼▼ 【全新】角色手机App内壁纸样式 ▼▼▼ */
+
+/* 当内部屏幕有壁纸时，设置背景图的显示方式 */
+.character-phone-inner-screen.has-app-wallpaper {
+  background-size: cover;
+  background-position: center;
+}
+
+/* 关键：让所有App页面的内容列表背景变透明 */
+.character-phone-inner-screen.has-app-wallpaper .list-container,
+.character-phone-inner-screen.has-app-wallpaper
+  #character-chat-history-messages {
+  background-color: transparent !important;
+}
+
+/* 为了保证文字的可读性，我们给列表项和卡片加上半透明的背景 */
+.character-phone-inner-screen.has-app-wallpaper .character-data-item,
+.character-phone-inner-screen.has-app-wallpaper .character-cart-item,
+.character-phone-inner-screen.has-app-wallpaper .character-browser-item,
+.character-phone-inner-screen.has-app-wallpaper .character-bank-transaction,
+.character-phone-inner-screen.has-app-wallpaper .chat-list-item {
+  background-color: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* 同样为聊天气泡增加半透明效果 */
+.character-phone-inner-screen.has-app-wallpaper
+  .character-chat-bubble-container.received
+  .character-chat-bubble {
+  background-color: rgba(255, 255, 255, 0.85);
+}
+.character-phone-inner-screen.has-app-wallpaper
+  .character-chat-bubble-container.sent
+  .character-chat-bubble {
+  background-color: rgba(149, 236, 105, 0.85); /* 微信绿，但带一点透明 */
+}
+
+/* 适配夜间模式的半透明颜色 */
+#phone-screen.dark-mode
+  .character-phone-inner-screen.has-app-wallpaper
+  .character-data-item,
+#phone-screen.dark-mode
+  .character-phone-inner-screen.has-app-wallpaper
+  .chat-list-item {
+  background-color: rgba(28, 28, 30, 0.7);
+}
+#phone-screen.dark-mode
+  .character-phone-inner-screen.has-app-wallpaper
+  .character-chat-bubble-container.received
+  .character-chat-bubble {
+  background-color: rgba(44, 44, 46, 0.85);
+}
+#phone-screen.dark-mode
+  .character-phone-inner-screen.has-app-wallpaper
+  .character-chat-bubble-container.sent
+  .character-chat-bubble {
+  background-color: rgba(48, 93, 32, 0.85); /* 夜间模式的绿色 */
+}
+/* ▲▲▲ 新CSS粘贴结束 ▲▲▲ */
+/* ▼▼▼ 【全新】这是为“游戏分享”新增的颜色样式 ▼▼▼ */
+.share-type.game {
+  background-color: #9c27b0; /* 一个代表游戏的神秘紫色 */
+}
+/* ▲▲▲ 新增样式结束 ▲▲▲ */
+/* ▼▼▼ 【全新】心动飞行棋样式 ▼▼▼ */
+
+/* --- 游戏主界面布局 --- */
+#ludo-game-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  padding: 15px;
+  box-sizing: border-box;
+  gap: 15px;
+  background-color: #fff0f5; /* 温柔的淡粉色背景 */
+}
+
+#phone-screen.dark-mode #ludo-game-content {
+  background-color: #2c1e22; /* 夜间模式下的深粉紫色 */
+}
+
+/* --- 棋盘容器与棋盘本身 --- */
+#ludo-board-container {
+  position: relative;
+  width: 100%;
+  height: 280px; /* 给棋盘一个固定的高度 */
+  flex-shrink: 0;
+  background-color: rgba(255, 255, 255, 0.5);
+  border-radius: 10px;
+  padding: 10px;
+  box-sizing: border-box;
+}
+
+#ludo-board {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr); /* 10x6的网格布局 */
+  grid-template-rows: repeat(6, 1fr);
+  width: 100%;
+  height: 100%;
+  gap: 3px;
+}
+
+/* --- 棋盘格子样式 --- */
+.ludo-cell {
+  border-radius: 4px;
+  background-color: rgba(255, 192, 203, 0.3); /* 淡淡的粉色格子 */
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 14px;
+  font-weight: bold;
+  color: #db7093;
+}
+
+/* 起点和终点格子 */
+.ludo-cell.start {
+  background-color: #90ee90;
+  color: #2e8b57;
+}
+.ludo-cell.end {
+  background-color: #ffd700;
+  color: #b8860b;
+}
+
+/* 特殊事件格子 */
+.ludo-cell.event-truth {
+  background-color: #ffb6c1;
+} /* 真心话 */
+.ludo-cell .cell-number {
+  font-size: 10px;
+  position: absolute;
+  top: 2px;
+  left: 3px;
+  color: rgba(0, 0, 0, 0.2);
+}
+
+/* --- 棋子样式 --- */
+.ludo-piece {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background-size: cover;
+  background-position: center;
+  border: 2px solid white;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 10;
+}
+.ludo-piece.user {
+  border-color: #87cefa;
+}
+.ludo-piece.char {
+  border-color: #ffc0cb;
+}
+
+/* --- 游戏日志 --- */
+#ludo-log-container {
+  flex-grow: 1;
+  background-color: rgba(255, 255, 255, 0.5);
+  border-radius: 10px;
+  padding: 10px;
+  overflow-y: auto;
+  min-height: 0;
+}
+#ludo-game-log .log-entry {
+  padding: 6px 8px;
+  font-size: 14px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  line-height: 1.5;
+}
+#ludo-game-log .log-entry.system {
+  color: #db7093;
+  font-style: italic;
+  text-align: center;
+}
+#ludo-game-log .log-entry.user {
+  color: #007bff;
+}
+#ludo-game-log .log-entry.char {
+  color: #e83e8c;
+}
+#ludo-game-log .log-entry strong {
+  font-weight: 900;
+}
+
+#ludo-dice-container {
+  perspective: 1000px;
+}
+.dice {
+  width: 50px;
+  height: 50px;
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 1s;
+  cursor: pointer;
+}
+.dice.rolling {
+  animation: roll-dice 1.5s ease-out;
+}
+@keyframes roll-dice {
+  0% {
+    transform: rotateX(0deg) rotateY(0deg);
+  }
+  100% {
+    transform: rotateX(1080deg) rotateY(720deg);
+  }
+}
+.dice .face {
+  position: absolute;
+  width: 50px;
+  height: 50px;
+  border: 1px solid #ccc;
+  background: white;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 24px;
+  font-weight: bold;
+}
+.face.front {
+  transform: rotateY(0deg) translateZ(25px);
+}
+.face.back {
+  transform: rotateY(180deg) translateZ(25px);
+}
+.face.right {
+  transform: rotateY(90deg) translateZ(25px);
+}
+.face.left {
+  transform: rotateY(-90deg) translateZ(25px);
+}
+.face.top {
+  transform: rotateX(90deg) translateZ(25px);
+}
+.face.bottom {
+  transform: rotateX(-90deg) translateZ(25px);
+}
+
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+/* ▼▼▼ 【全新】飞行棋问题类型标签样式 ▼▼▼ */
+.question-type-tag {
+  font-size: 10px;
+  font-weight: bold;
+  padding: 3px 8px;
+  border-radius: 10px;
+  color: white;
+  margin-left: 10px;
+  flex-shrink: 0;
+}
+.question-type-tag.both-answer {
+  background-color: #ff8fab; /* 粉色代表共同回答 */
+}
+.question-type-tag.single-answer {
+  background-color: #87ceeb; /* 蓝色代表一人回答 */
+}
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+/* ▼▼▼ 【全新】飞行棋结算卡片样式 ▼▼▼ */
+#ludo-summary-content h3 {
+  text-align: center;
+  color: var(--accent-color);
+  margin-bottom: 15px;
+  font-size: 20px;
+  font-weight: bold;
+}
+#ludo-summary-content .ludo-qa-log {
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 1px solid var(--border-color);
+  max-height: 300px; /* 给问答记录一个最大高度，内容多了可以滚动 */
+  overflow-y: auto;
+}
+#ludo-summary-content h4 {
+  margin-bottom: 10px;
+  color: var(--text-primary);
+}
+#ludo-summary-content .qa-item {
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed #eee;
+}
+#ludo-summary-content .qa-item:last-child {
+  border-bottom: none;
+}
+#ludo-summary-content .qa-question {
+  font-weight: 600;
+  color: #db7093; /* 一个可爱的粉紫色 */
+  margin-bottom: 8px;
+}
+#ludo-summary-content .qa-answer {
+  padding-left: 15px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+#ludo-summary-content .qa-answer strong {
+  color: var(--text-primary);
+}
+#phone-screen.dark-mode #ludo-summary-content .qa-answer {
+  color: #bbb;
+}
+
+/* ▼▼▼ 【独家定制】角色手机消息列表 - 可爱磨砂透明圆角版 v3.0 ▼▼▼ */
+
+/* 1. 给消息列表容器增加内边距和间距，并强制开启滚动 */
+#character-chat-list.list-container {
+  /* --- ★★★ 核心修复：强制开启滚动 ★★★ --- */
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1; /* 占据剩余空间 */
+  height: 0; /* 关键：强制让flex子元素的高度受限，从而触发滚动条 */
+  min-height: 0; /* 兼容性保障 */
+  overflow-y: auto; /* 内容超出时显示滚动条 */
+  /* ------------------------------------ */
+
+  padding: 15px 10px; /* 保持原来的内边距 */
+  gap: 15px; /* “我”的卡片和“其他人”卡片之间的间距 */
+}
+
+/* 2. 重置所有列表项的基础样式，移除旧的边框 */
+#character-chat-list .chat-list-item {
+  border-bottom: none !important;
+}
+
+/* 3. 【你的专属】单独设置“我的消息”(第一个)的可爱胶囊样式 */
+#character-chat-list > .chat-list-item {
+  background-color: rgba(255, 255, 255, 0.1); /* 超级透明的白色背景 */
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 25px; /* 可爱的胶囊圆角 */
+  border: 1px solid rgba(255, 255, 255, 0.15); /* 淡淡的亮边，增加质感 */
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); /* 柔和的阴影，营造悬浮感 */
+  padding: 15px; /* 增加内边距，让内容更舒服 */
+  color: white; /* 文字颜色也变成白色 */
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); /* 给文字加一点阴影保证清晰度 */
+  flex-shrink: 0; /* 防止被压缩 */
+}
+#character-chat-list > .chat-list-item .last-msg {
+  color: rgba(255, 255, 255, 0.7); /* 预览消息的文字颜色淡一点 */
+}
+
+/* 4. 【你的专属】设置“其他人消息”容器的样式 */

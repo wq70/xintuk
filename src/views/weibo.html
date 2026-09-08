@@ -1,0 +1,347 @@
+      <div id="weibo-screen" class="screen">
+        <!-- 这个容器将存放微博的所有页面 -->
+        <div id="weibo-page-container">
+          <!-- 页面1: 我的主页 (已改造) -->
+          <div id="weibo-my-profile-view" class="weibo-view active">
+            <!-- 头部  -->
+            <div class="header">
+              <span class="back-btn" onclick="showScreen('home-screen')">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </span>
+              <span>我的主页</span>
+              <div class="header-actions">
+                <!-- 新的私信按钮 -->
+                <span class="action-btn" id="weibo-my-dms-btn" title="我的私信">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="22"
+                    height="22"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path
+                      d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"
+                    ></path>
+                    <polyline points="22,6 12,13 2,6"></polyline>
+                  </svg>
+                </span>
+
+                <!-- 新增“编辑”按钮 -->
+                <span
+                  class="action-btn"
+                  id="edit-weibo-profile-btn"
+                  title="编辑资料"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M12 20h9"></path>
+                    <path
+                      d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"
+                    ></path>
+                  </svg>
+                </span>
+                <span
+                  class="action-btn"
+                  id="create-weibo-post-btn"
+                  style="font-size: 28px; font-weight: 300"
+                  >+</span
+                >
+              </div>
+            </div>
+            <!-- 主页内容区 -->
+            <div id="weibo-profile-page">
+              <div class="weibo-profile-header">
+                <img
+                  id="weibo-background-img"
+                  src="https://i.postimg.cc/mk93Y3j1/weibo-bg-default.jpg"
+                  class="weibo-background"
+                />
+
+                <div class="weibo-avatar-container">
+                  <img
+                    id="weibo-avatar-img"
+                    src="https://files.catbox.moe/q6z5fc.jpeg"
+                    class="weibo-avatar"
+                  />
+
+                  <img
+                    id="weibo-avatar-frame"
+                    class="weibo-avatar-frame"
+                    src=""
+                    style="display: none"
+                  />
+                </div>
+
+                <div class="weibo-nickname" id="weibo-nickname">你的昵称</div>
+
+                <div id="weibo-user-profession-display">点击设置职业</div>
+
+                <div class="weibo-stats">
+                  <div id="weibo-following-btn" class="weibo-stat-item">
+                    <span id="weibo-following-count" class="weibo-stat-number"
+                      >0</span
+                    >
+                    <span class="weibo-stat-label">关注</span>
+                  </div>
+                  <div id="weibo-posts-item" class="weibo-stat-item">
+                    <span id="weibo-posts-count" class="weibo-stat-number"
+                      >0</span
+                    >
+                    <span class="weibo-stat-label">微博</span>
+                  </div>
+                  <div id="weibo-fans-item" class="weibo-stat-item">
+                    <span id="weibo-fans-count" class="weibo-stat-number"
+                      >0</span
+                    >
+                    <span class="weibo-stat-label">粉丝</span>
+                  </div>
+                </div>
+              </div>
+              <div
+                id="my-weibo-feed-list"
+                style="
+                  padding: 15px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 15px;
+                "
+              ></div>
+            </div>
+          </div>
+
+          <!-- 页面2: 关注的人 (保持不变) -->
+          <div id="weibo-following-view" class="weibo-view">
+            <div class="header">
+              <span class="back-btn" onclick="showScreen('home-screen')">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </span>
+              <span>关注的人</span>
+              <span
+                class="action-btn"
+                id="clear-following-feed-btn"
+                style="font-size: 16px; font-weight: 500"
+                >清空</span
+              >
+            </div>
+            <div
+              id="weibo-following-feed-list"
+              style="
+                flex-grow: 1;
+                overflow-y: auto;
+                padding: 15px;
+                display: flex;
+                flex-direction: column;
+                gap: 15px;
+              "
+            >
+              <!-- 关注的人的微博列表将由JS动态生成在这里 -->
+            </div>
+          </div>
+
+          <!-- 页面3: 热搜 (保持不变) -->
+          <div id="weibo-hot-search-view" class="weibo-view">
+            <div class="header">
+              <span class="back-btn" onclick="showScreen('home-screen')">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </span>
+              <span>热搜</span>
+              <div class="header-actions">
+                <span
+                  class="action-btn"
+                  id="generate-hot-search-btn"
+                  title="生成热搜"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="22"
+                    height="22"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  </svg>
+                </span>
+              </div>
+            </div>
+            <div
+              id="weibo-hot-search-list"
+              style="flex-grow: 1; overflow-y: auto"
+            >
+              <p style="text-align: center; color: #8a8a8a; margin-top: 50px">
+                点击右上角放大镜生成热搜
+              </p>
+            </div>
+          </div>
+
+          <!-- 页面4: 广场 (保持不变) -->
+          <div id="weibo-plaza-view" class="weibo-view">
+            <div class="header">
+              <span class="back-btn" onclick="showScreen('home-screen')">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </span>
+              <span>广场</span>
+              <div class="header-actions">
+                <span
+                  class="action-btn"
+                  id="generate-plaza-feed-btn"
+                  title="生成广场动态"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="22"
+                    height="22"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  </svg>
+                </span>
+              </div>
+            </div>
+            <div
+              id="weibo-plaza-feed-list"
+              style="flex-grow: 1; overflow-y: auto; padding: 0"
+            >
+              <p style="text-align: center; color: #8a8a8a; margin-top: 50px">
+                点击右上角放大镜生成广场动态
+              </p>
+            </div>
+          </div>
+
+          <!-- 页面5: 热搜详情页 (保持不变) -->
+          <div id="weibo-hottopic-feed-view" class="weibo-view">
+            <div class="header">
+              <span class="back-btn" id="back-from-hottopic-btn">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </span>
+              <span id="weibo-hottopic-title">热搜话题</span>
+              <div class="header-actions">
+                <span
+                  class="action-btn"
+                  id="refresh-hottopic-feed-btn"
+                  title="换一批"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <polyline points="23 4 23 10 17 10"></polyline>
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                  </svg>
+                </span>
+              </div>
+            </div>
+            <div
+              id="weibo-hottopic-feed-list"
+              style="flex-grow: 1; overflow-y: auto; padding: 0"
+            >
+              <!-- 热搜微博列表将由JS动态生成 -->
+            </div>
+          </div>
+        </div>
+
+        <!-- 底部导航栏 -->
+        <div id="weibo-bottom-nav">
+          <div class="weibo-nav-item" data-view="weibo-hot-search-view">
+            热搜
+          </div>
+          <div class="weibo-nav-item" data-view="weibo-plaza-view">广场</div>
+          <div class="weibo-nav-item" data-view="weibo-following-view">
+            关注的人
+          </div>
+          <div class="weibo-nav-item active" data-view="weibo-my-profile-view">
+            我的微博
+          </div>
+        </div>
+      </div>
+

@@ -1,0 +1,1294 @@
+
+.npc-chat-group {
+  background-color: rgba(255, 255, 255, 0.1); /* 同样超级透明 */
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 25px; /* 容器本身也是圆角 */
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  overflow: hidden; /* 关键！让内部的列表项严格遵守容器的圆角 */
+  padding: 5px 0; /* 容器内部的上下留白 */
+  flex-shrink: 0; /* 防止被压缩 */
+}
+
+/* 5. 设置容器内部单个消息的样式 */
+.npc-chat-group .chat-list-item {
+  background-color: transparent !important; /* 内部的项完全透明 */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important; /* 用淡淡的亮线分隔 */
+  padding: 12px 15px;
+  color: white; /* 文字颜色也是白色 */
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+.npc-chat-group .chat-list-item .last-msg {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* 6. 移除容器内【最后一个】消息的下划线，让卡片底部更干净 */
+.npc-chat-group .chat-list-item:last-child {
+  border-bottom: none !important;
+}
+/* ▲▲▲ 定制结束 ▲▲▲ */
+
+/* ======================================================================= */
+/* ===         修复“查手机-外观设置”中预览图过大的问题 v1.0         === */
+/* ======================================================================= */
+
+/* 1. 修复手机壁纸和App内壁纸的预览 */
+/* 
+   问题原因：之前的样式是 background-size: cover，会强制图片填满预览框，导致裁剪。
+   解决方案：改为 background-size: contain，让图片在框内完整显示。
+*/
+#char-phone-wallpaper-preview,
+#char-phone-app-wallpaper-preview {
+  background-size: contain !important;
+  background-repeat: no-repeat !important; /* 防止图片在无法填满时重复平铺 */
+}
+
+/* 2. 修复两个桌面小组件的图片预览 */
+/* 
+   问题原因：和上面类似，但对于<img>标签，控制显示方式的属性是 object-fit。
+   解决方案：同样将 cover 改为 contain。
+*/
+#char-phone-widget-preview-1,
+#char-phone-widget-preview-2 {
+  object-fit: contain !important;
+  /* (可选美化) 为没有图片时的预览框加个底色，更好看 */
+  background-color: #f0f2f5;
+}
+/* ======================================================================= */
+/* ===         【V2 最终修复】修复查手机-小组件预览图过大问题         === */
+/* ======================================================================= */
+
+#char-phone-widget-preview-1,
+#char-phone-widget-preview-2 {
+  background-size: contain !important; /* 核心：让背景图完整显示 */
+  background-repeat: no-repeat !important; /* 防止图片重复平铺 */
+  background-position: center !important; /* 确保图片居中 */
+}
+
+/* ▼▼▼ 【独家定制】心动飞行棋输入框 - 粉色按钮版 v1.0 ▼▼▼ */
+
+/* 1. 输入区域的容器样式 (保持不变) */
+#ludo-action-area {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 10px 12px !important;
+}
+
+/* 2. 文本输入框的样式 (保持不变) */
+#ludo-action-area #ludo-user-speech-input {
+  flex-grow: 1;
+  border: none;
+  padding: 10px 15px;
+  border-radius: 20px;
+  background-color: var(--secondary-bg);
+  font-size: 16px;
+  resize: none;
+  max-height: 100px;
+  line-height: 1.5;
+  box-sizing: border-box;
+}
+
+/* 3. “确认回答”按钮的样式 (已修改为粉色) */
+#ludo-action-area .form-button {
+  width: auto !important;
+  height: 40px;
+  border-radius: 20px;
+  padding: 0 20px;
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 !important;
+  border: none;
+  cursor: pointer;
+
+  /* ★★★ 核心修改：使用可爱的粉色渐变和阴影 ★★★ */
+  background: linear-gradient(135deg, #ff8fab, #fb6f92);
+  color: white;
+  box-shadow: 0 4px 10px rgba(251, 111, 146, 0.3);
+  transition: all 0.2s ease-in-out;
+}
+
+/* ★★★ 新增：为按钮添加更生动的交互效果 ★★★ */
+#ludo-action-area .form-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(251, 111, 146, 0.4);
+}
+#ludo-action-area .form-button:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: 0 2px 5px rgba(251, 111, 146, 0.3);
+}
+
+/* 4. 夜间模式适配 (保持不变) */
+#phone-screen.dark-mode #ludo-action-area #ludo-user-speech-input {
+  background-color: #2c2c2e;
+  color: var(--text-primary);
+}
+/* ▲▲▲ 美化代码结束 ▲▲▲ */
+/* ▼▼▼ 【全新】心声面板背景图样式 ▼▼▼ */
+#inner-voice-main-panel.modal-content {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  /* 我们给它加一个过渡效果，让背景切换更平滑 */
+  transition: background-image 0.3s ease-in-out;
+}
+/* ▲▲▲ 新增CSS结束 ▲▲▲ */
+/* ▼▼▼ 【全新】“谁是卧底”游戏样式 ▼▼▼ */
+
+/* “你说我猜”发言输入区的美化 */
+#undercover-action-area.speaking-mode {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 0;
+}
+#undercover-action-area.speaking-mode #undercover-user-speech-input {
+  flex-grow: 1;
+  border: none;
+  padding: 10px 15px;
+  border-radius: 20px;
+  background-color: var(--secondary-bg);
+  font-size: 16px;
+  resize: none;
+  max-height: 100px;
+  line-height: 1.5;
+  width: auto !important;
+  height: auto !important;
+}
+#undercover-action-area.speaking-mode #undercover-end-speech-btn {
+  height: 40px;
+  border-radius: 20px;
+  padding: 0 15px;
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 !important;
+  width: auto !important;
+  background-color: var(--accent-color);
+  color: white;
+  border: none;
+}
+#phone-screen.dark-mode
+  #undercover-action-area.speaking-mode
+  #undercover-user-speech-input {
+  background-color: #2c2c2e;
+  color: var(--text-primary);
+}
+
+/* ▼▼▼ 第2步：将这段新样式粘贴到 <style> 的末尾 ▼▼▼ */
+
+/* --- 【全新】用户发出的“解除关系”卡片样式 --- */
+
+/* 1. 让卡片的容器气泡变透明，消除默认背景 */
+.message-bubble.is-ls-disconnect .content {
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  border: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* 2. 卡片主体样式 */
+.lovers-space-disconnect-card {
+  width: 220px; /* 宽度可以自己调整 */
+  background: linear-gradient(
+    135deg,
+    #f5f7fa,
+    #e9ecef
+  ); /* 浅灰色渐变，更有质感 */
+  border-radius: 12px;
+  border: 1px solid #ced4da;
+  display: flex;
+  align-items: center;
+  gap: 15px; /* 图标和文字的间距 */
+  padding: 15px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* 3. 夜间模式下的卡片颜色 */
+#phone-screen.dark-mode .lovers-space-disconnect-card {
+  background: linear-gradient(135deg, #495057, #343a40);
+  border-color: #6c757d;
+}
+
+/* 4. 心碎 Emoji 图标的样式 */
+.lovers-space-disconnect-card .icon {
+  font-size: 32px; /* Emoji 大小 */
+  line-height: 1;
+}
+
+/* 5. 文字区域的样式 */
+.lovers-space-disconnect-card .text-content .title {
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--text-primary);
+}
+
+/* ▲▲▲ 新增CSS结束 ▲▲▲ */
+/* ▼▼▼ 【全新】这是User自己的私信功能的所有新样式 ▼▼▼ */
+
+/* --- 1. 私信列表页面 --- */
+#user-dm-list-container .dm-list-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 15px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-color);
+}
+#user-dm-list-container .dm-list-item:hover {
+  background-color: #f5f5f5;
+}
+#phone-screen.dark-mode #user-dm-list-container .dm-list-item:hover {
+  background-color: #2c2c2e;
+}
+#user-dm-list-container .dm-avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  margin-right: 12px;
+  object-fit: cover;
+}
+#user-dm-list-container .dm-info {
+  flex-grow: 1;
+  overflow: hidden;
+}
+#user-dm-list-container .dm-name-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+#user-dm-list-container .dm-name {
+  font-weight: 600;
+  font-size: 16px;
+}
+#user-dm-list-container .dm-persona-tag {
+  font-size: 10px;
+  color: var(--text-secondary);
+  background-color: #f0f0f0;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+#phone-screen.dark-mode #user-dm-list-container .dm-persona-tag {
+  background-color: #3a3a3c;
+}
+#user-dm-list-container .dm-last-msg {
+  font-size: 14px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* --- 2. 私信详情页面 (聊天界面) --- */
+#user-dm-messages-container {
+  background-color: #f0f2f5 !important;
+}
+#phone-screen.dark-mode #user-dm-messages-container {
+  background-color: #000000 !important;
+}
+
+/* 复用主聊天界面的气泡样式，但为粉丝和User定义特定对齐方式 */
+#user-dm-messages-container .message-wrapper.fan {
+  align-self: flex-start;
+}
+#user-dm-messages-container .message-wrapper.fan .message-bubble {
+  flex-direction: row;
+}
+#user-dm-messages-container .message-wrapper.fan .content {
+  background-color: #ffffff; /* 粉丝用白色气泡 */
+  color: var(--text-primary);
+  border-radius: 2px 18px 18px 18px;
+}
+
+#user-dm-messages-container .message-wrapper.user-self {
+  /* 使用新class，避免冲突 */
+  align-self: flex-end;
+}
+#user-dm-messages-container .message-wrapper.user-self .message-bubble {
+  flex-direction: row-reverse;
+}
+/* 你自己的消息，使用微博的橙色 */
+#user-dm-messages-container .message-wrapper.user-self .content {
+  background-color: #ff8200;
+  color: white;
+  border-radius: 18px 2px 18px 18px;
+}
+
+/* 夜间模式适配 */
+#phone-screen.dark-mode
+  #user-dm-messages-container
+  .message-wrapper.fan
+  .content {
+  background-color: #2c2c2e;
+}
+#phone-screen.dark-mode
+  #user-dm-messages-container
+  .message-wrapper.user-self
+  .content {
+  background-color: #e67300;
+}
+
+/* ▼▼▼ 用这【一整块】代码，替换掉你旧的 user-dm-input-area 相关样式 ▼▼▼ */
+
+/* --- 1. 私信输入区域的整体背景和边距 (这部分保持不变) --- */
+#user-dm-input-area {
+  border-top: 1px solid var(--border-color);
+  background-color: #f7f7f7;
+  padding: 10px 12px;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom));
+}
+
+/* --- 2. 核心布局：强制输入框和按钮在同一行 --- */
+/* 我们用一个更精确的选择器，来确保样式能生效 */
+#user-dm-detail-screen .chat-input-main-row {
+  display: flex; /* 关键：设为flex布局 */
+  flex-direction: row; /* 关键：强制横向排列 */
+  align-items: flex-end; /* 让多行输入时，按钮和输入框底部对齐，更好看 */
+  gap: 8px; /* 输入框和按钮组之间的间距 */
+}
+
+/* --- 3. 输入框：让它自动伸展，占满左侧所有空间 --- */
+#user-dm-input-area #user-dm-input {
+  flex-grow: 1; /* 关键！ */
+
+  /* 下面是输入框的外观，保持不变 */
+  border: 1px solid #ddd;
+  border-radius: 18px;
+  padding: 8px 15px;
+  line-height: 1.5;
+  min-height: 38px;
+  max-height: 100px;
+  resize: none;
+  background-color: #fff;
+}
+
+/* --- 4. 按钮容器：让所有按钮在里面横向排列 --- */
+#user-dm-input-area #input-actions-wrapper {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex-shrink: 0; /* 防止按钮们被挤压变形 */
+}
+
+/* --- 5. 【你的要求】修改“发送”按钮为圆角矩形 --- */
+#user-dm-input-area #user-dm-send-btn {
+  height: 38px;
+  border-radius: 8px; /* ★★★ 修改点在这里！从 18px 改为 8px ★★★ */
+  background-color: #ff8200;
+  /* --- 以下为补充样式，让按钮更好看 --- */
+  border: none;
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 0 15px; /* 让文字不那么拥挤 */
+}
+
+/* --- 6. 其他两个图标按钮的样式 (保持不变) --- */
+#user-dm-input-area .chat-action-icon-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  padding: 0;
+  font-size: 24px;
+  background-color: rgba(0, 0, 0, 0.05);
+  color: var(--text-primary);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+/* --- 7. 夜间模式适配 (保持不变) --- */
+#phone-screen.dark-mode #user-dm-input-area {
+  background-color: #1c1c1e;
+  border-top-color: #38383a;
+}
+#phone-screen.dark-mode #user-dm-input-area #user-dm-input {
+  background-color: #2c2c2e;
+  border-color: #38383a;
+  color: white;
+}
+#phone-screen.dark-mode #user-dm-input-area .chat-action-icon-btn {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* ▲▲▲ 替换结束 ▲▲▲ */
+/* ▼▼▼ 【全新】这是为User私信输入框新增的按钮样式 ▼▼▼ */
+
+#user-dm-input-area #input-actions-wrapper {
+  display: flex;
+  align-items: flex-end; /* 确保按钮底部对齐 */
+  gap: 8px; /* 按钮之间的间距 */
+}
+
+/* 复用主聊天界面的小图标按钮样式 */
+#user-dm-input-area .chat-action-icon-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  padding: 0;
+  font-size: 24px;
+  background-color: rgba(0, 0, 0, 0.05);
+  color: var(--text-primary);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+#phone-screen.dark-mode #user-dm-input-area .chat-action-icon-btn {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+/* ▲▲▲ 新增样式结束 ▲▲▲ */
+/* ▼▼▼ 【全新】这是User私信删除功能的所有新样式 ▼▼▼ */
+
+/* --- 单条消息删除按钮 --- */
+/* 1. 让每条消息的容器可以作为删除按钮的定位参考点 */
+#user-dm-messages-container .message-wrapper {
+  position: relative;
+}
+
+/* 2. 删除按钮本身的样式 */
+.user-dm-message-delete-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  background-color: rgba(0, 0, 0, 0.1);
+  color: #555;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 22px;
+  text-align: center;
+  opacity: 0; /* 默认隐藏 */
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+/* 3. 鼠标悬停在整条消息上时，才显示删除按钮 */
+#user-dm-messages-container .message-wrapper:hover .user-dm-message-delete-btn {
+  opacity: 1;
+}
+.user-dm-message-delete-btn:hover {
+  background-color: #ff3b30;
+  color: white;
+}
+
+/* 4. 根据消息是粉丝的还是你的，决定按钮的位置 */
+#user-dm-messages-container .message-wrapper.fan .user-dm-message-delete-btn {
+  right: -28px; /* 放在气泡右边 */
+}
+#user-dm-messages-container
+  .message-wrapper.user-self
+  .user-dm-message-delete-btn {
+  left: -28px; /* 放在气泡左边 */
+}
+
+/* --- 左滑删除整个对话 --- */
+/* 1. 滑动容器 */
+.user-dm-list-item-swipe-container {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--secondary-bg);
+}
+
+/* 2. 可滑动的内容区 */
+.user-dm-list-item-content {
+  position: relative;
+  z-index: 2;
+  background-color: inherit;
+  transition: transform 0.3s ease;
+}
+.user-dm-list-item-content.swiped {
+  transform: translateX(-80px); /* 向左滑动80px，露出删除按钮 */
+}
+
+/* 3. 隐藏在后面的操作按钮区域 */
+.user-dm-swipe-actions {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+}
+
+/* 4. “删除”按钮的样式 */
+.user-dm-swipe-actions .swipe-action-btn {
+  height: 100%;
+  padding: 0 20px;
+  border: none;
+  color: white;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  background-color: #ff3b30; /* 红色背景 */
+}
+
+/* 5. 修复分割线，让滑动效果更完美 */
+#user-dm-list-container .dm-list-item {
+  border-bottom: none; /* 移除原始的分割线 */
+}
+#user-dm-list-container .user-dm-list-item-swipe-container:not(:last-child) {
+  border-bottom: 1px solid var(--border-color); /* 在滑动容器上添加新分割线 */
+}
+
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+/* ▼▼▼ 【全新】续火花图标样式 ▼▼▼ */
+.streak-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 13px; /* 调整了字体大小，让它更精致 */
+  color: #ff6f00; /* 温暖的橙色 */
+  font-weight: bold;
+  margin-left: 8px; /* 和角色名字拉开一点距离 */
+  text-shadow: 0 0 5px rgba(255, 152, 0, 0.5); /* 加一点发光效果 */
+}
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+/* ▼▼▼ 把这一整块全新的CSS，粘贴到 <style> 的最末尾 ▼▼▼ */
+
+/* --- 【全新】群成员管理列表样式 --- */
+#member-management-list .member-management-item {
+  background-color: var(--secondary-bg);
+}
+
+/* 单个成员项 */
+.member-management-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 15px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.member-management-item .avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px; /* 方形圆角头像 */
+  margin-right: 12px;
+}
+
+/* 成员信息（昵称、头衔、身份） */
+.member-management-item .info {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.member-management-item .info .name {
+  font-weight: 500;
+}
+.member-management-item .info .tags {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 身份标签（群主/管理员） */
+.member-management-item .role-tag {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: bold;
+  color: white;
+}
+.role-tag.owner {
+  background-color: #ffc107;
+} /* 黄色 */
+.role-tag.admin {
+  background-color: #28a745;
+} /* 绿色 */
+
+/* 头衔标签 */
+.member-management-item .title-tag {
+  font-size: 11px;
+  color: var(--text-secondary);
+  background-color: #f0f2f5;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+#phone-screen.dark-mode .member-management-item .title-tag {
+  background-color: #3a3a3c;
+}
+
+/* 操作按钮 */
+.member-management-item .actions {
+  display: flex;
+  gap: 8px;
+}
+.member-management-item .actions button {
+  padding: 5px 10px;
+  font-size: 12px;
+  border-radius: 5px;
+  cursor: pointer;
+  border: 1px solid var(--border-color);
+  background-color: #f8f9fa;
+}
+#phone-screen.dark-mode .member-management-item .actions button {
+  background-color: #3e3e42;
+  border-color: #545458;
+}
+.member-management-item .actions button.danger {
+  border-color: #ff4d4f;
+  color: #ff4d4f;
+}
+
+/* --- 【全新】聊天界面内的身份/头衔标签 --- */
+.group-sender-tags {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.group-role-tag,
+.group-title-tag {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 8px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+.group-role-tag.owner {
+  background-color: #fff2c2;
+  color: #d98c00;
+  border: 1px solid #ffe89d;
+}
+.group-role-tag.admin {
+  background-color: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+.group-title-tag {
+  background-color: #f0f2f5;
+  color: var(--text-secondary);
+}
+
+#phone-screen.dark-mode .group-role-tag.owner {
+  background-color: #594200;
+  color: #ffd466;
+  border-color: #795b00;
+}
+#phone-screen.dark-mode .group-role-tag.admin {
+  background-color: #104a3c;
+  color: #76ddc4;
+  border-color: #176854;
+}
+#phone-screen.dark-mode .group-title-tag {
+  background-color: #3a3a3c;
+}
+
+/* ▲▲▲ 新CSS粘贴结束 ▲▲▲ */
+/* ▼▼▼ 【独家定制】请将这段【全新】的CSS代码，粘贴到<style>标签的末尾 ▼▼▼ */
+
+/* 核心：专门为用户（user）在群聊中的消息行定义样式 */
+.message-wrapper.user .group-sender-line {
+  /* 1. 定位：从左侧定位改为右侧定位，与你的头像对齐 */
+  left: auto;
+  right: 50px; /* 原来是 left: 50px */
+
+  /* 2. 布局翻转：这是实现“标签在左，昵称在右”的关键！*/
+  flex-direction: row-reverse;
+}
+
+/* ▲▲▲ 粘贴结束 ▲▲▲ */
+/* ▼▼▼ 【全新】群公告功能样式 ▼▼▼ */
+
+/* 这是我们新加的群公告小黑板图标的样式 */
+/* ▼▼▼ 请用这块代码替换你旧的 #group-announcement-btn 样式 ▼▼▼ */
+#group-announcement-btn {
+  display: none; /* JS控制显示，保持不变 */
+  position: absolute; /* 核心修改：绝对定位 */
+  left: 100%; /* 定位在标题的右边 */
+  top: 50%; /* 垂直居中的第一步 */
+  transform: translateY(-50%); /* 垂直居中的第二步 */
+  margin-left: 5px; /* 与标题的间距 */
+
+  /* 保持视觉样式 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  cursor: pointer;
+  color: var(--accent-color);
+  transition: background-color 0.2s;
+  border-radius: 50%;
+}
+/* ▲▲▲ 替换结束 ▲▲▲ */
+#group-announcement-btn:hover {
+  background-color: rgba(0, 0, 0, 0.05); /* 鼠标悬停时给一点反馈 */
+}
+#phone-screen.dark-mode #group-announcement-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* 公告弹窗的样式 */
+#group-announcement-modal .modal-content {
+  height: 70%; /* 让弹窗高一些，方便看公告 */
+}
+
+/* 公告内容的显示区域 */
+#group-announcement-modal .modal-body {
+  white-space: pre-wrap; /* 让换行符生效 */
+  word-break: break-word; /* 防止长单词溢出 */
+  line-height: 1.7; /* 增加行高，更易读 */
+  font-size: 15px;
+}
+
+/* 编辑公告时，文本域的样式 */
+#group-announcement-modal textarea {
+  width: 100%;
+  height: 100%; /* 占满整个内容区 */
+  min-height: 300px;
+  box-sizing: border-box;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 10px;
+  font-size: 15px;
+  line-height: 1.7;
+  resize: vertical; /* 允许用户垂直拖动调整大小 */
+}
+
+/* ▲▲▲ 新增CSS结束 ▲▲▲ */
+
+/* ▼▼▼ 【独家定制】群聊昵称与标签顺序修复 ▼▼▼ */
+
+/* 1. 全局定义显示顺序：让标签永远在名字前面 */
+.group-sender-line > .group-sender-tags {
+  order: 1;
+}
+.group-sender-line > .sender-name {
+  order: 2;
+}
+
+/* 2. 为【AI/他人消息】设置对齐方式 (靠左) */
+.message-wrapper.ai .group-sender-line {
+  justify-content: flex-start; /* 确保内容从左边开始 */
+}
+
+/* 3. 【核心修复】修正【你的消息】的对齐方式 (靠右) */
+/* 这块代码会覆盖掉旧的、导致顺序错乱的规则 */
+.message-wrapper.user .group-sender-line {
+  left: auto;
+  right: 50px; /* 保持原有的右侧定位 */
+  flex-direction: row; /* 移除旧的“反转”效果 */
+  justify-content: flex-end; /* 让内容块整体靠右，这样名字就能贴近你的头像了 */
+}
+
+/* ▲▲▲ 修复结束 ▲▲▲ */
+/* ▼▼▼ 【全新】用户表情面板批量删除功能样式 ▼▼▼ */
+
+/* 1. 当表情面板进入选择模式时，隐藏“添加/上传”按钮 */
+#sticker-panel.selection-mode #add-sticker-btn,
+#sticker-panel.selection-mode #upload-sticker-btn {
+  display: none;
+}
+
+/* 2. 为表情格子添加选择框的视觉效果 */
+.sticker-item.in-selection-mode::before {
+  content: "";
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid rgba(0, 0, 0, 0.2);
+  background-color: rgba(255, 255, 255, 0.7);
+  transition: all 0.2s ease-in-out;
+}
+
+/* 3. 当表情被选中时，让选择框变成带对勾的√ */
+.sticker-item.selected::before {
+  background-color: var(--accent-color); /* 使用你的主题色 */
+  border-color: var(--accent-color);
+  content: "✔";
+  color: white;
+  font-size: 14px;
+  text-align: center;
+  line-height: 20px;
+}
+
+/* 4. 底部批量删除操作栏的样式 */
+#sticker-panel-footer {
+  padding: 10px 15px;
+  /* 适配iPhone底部安全区 */
+  padding-bottom: calc(10px + env(safe-area-inset-bottom));
+  background-color: rgba(247, 247, 247, 0.9);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-top: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+#sticker-panel-footer button {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  background-color: #ff3b30; /* 醒目的红色 */
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#sticker-panel-footer button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+/* ▼▼▼ 【全新】角色表情包批量删除功能样式 ▼▼▼ */
+
+/* 1. 当进入选择模式时，隐藏顶部的“批量添加/本地上传”按钮 */
+#char-sticker-manager-screen.selection-mode .panel-btn {
+  display: none;
+}
+
+/* 2. 角色表情包的底部操作栏样式，和用户表情包的类似 */
+#char-sticker-footer {
+  padding: 10px 15px;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom));
+  background-color: rgba(247, 247, 247, 0.9);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-top: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+#char-sticker-footer button {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  background-color: #ff3b30;
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#char-sticker-footer button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+/* 3. 为页签内容区添加 active 类，用于JS控制显示/隐藏 */
+.frame-content {
+  display: none;
+}
+.frame-content.active {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+/* ▼▼▼ 【全新】这是为心声面板编辑功能新增的CSS ▼▼▼ */
+
+/* 当头部有这个class时，强制隐藏底部边框 */
+#inner-voice-main-panel .modal-header.no-border {
+  border-bottom: none !important;
+}
+
+/* ▲▲▲ 新增CSS结束 ▲▲▲ */
+/* 强制提升“心声样式编辑器”的层级，确保它能覆盖在心声面板之上 */
+#inner-voice-editor-modal {
+  z-index: 1001; /* 这个值比心声面板的默认层级(1000)要高 */
+}
+
+/* ▲▲▲ 修复结束 ▲▲▲ */
+/* ▼▼▼ 【全新】这是为心声面板图标新增的颜色控制样式 ▼▼▼ */
+
+/* 1. 为心声面板定义一个CSS变量，并设置默认颜色 */
+#inner-voice-main-panel {
+  --iv-icon-color: #ff8a80; /* 你可以修改这个默认的粉红色 */
+}
+
+/* 2. 让所有目标图标的颜色都使用这个变量 */
+#close-inner-voice-modal {
+  color: var(--iv-icon-color);
+}
+
+#inner-voice-edit-btn svg,
+#change-inner-voice-bg-btn svg,
+#inner-voice-history-btn svg {
+  /* 核心：将图标的线条颜色设置为我们定义的变量 */
+  stroke: var(--iv-icon-color);
+}
+/* ▲▲▲ 新增样式结束 ▲▲▲ */
+/* ▼▼▼ 【全新】AI生成群成员按钮样式 ▼▼▼ */
+#member-management-actions #ai-generate-members-btn {
+  background-color: #007bff; /* 一个醒目的蓝色 */
+  color: white;
+}
+/* ▲▲▲ 新增CSS结束 ▲▲▲ */
+/* ▼▼▼ 【全新】约会大作战App样式 (V5 - 终极修复版) ▼▼▼ */
+
+#date-a-live-screen {
+  background-color: #f0f2f5;
+}
+#phone-screen.dark-mode #date-a-live-screen {
+  background-color: #000;
+}
+
+/* ★★★ 这是本次唯一的、但最关键的修改区域 ★★★ */
+#dating-scene-content {
+  flex: 1; /* ★★★ 核心1: 让内容区占据父容器（屏幕）的所有剩余空间 */
+  min-height: 0; /* ★★★ 核心2: flex布局的一个重要技巧，防止内容溢出时产生意外的布局问题 */
+  overflow-y: auto; /* ★★★ 核心3: 当内容超出容器高度时，自动显示垂直滚动条！*/
+
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+/* ★★★ 修改结束 ★★★ */
+
+.dating-scene-card {
+  width: 100%;
+  background-color: var(--secondary-bg);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  position: relative;
+  transition:
+    transform 0.3s ease,
+    opacity 0.3s ease;
+
+  /* 保持卡片内部为垂直flex布局，确保图片在上，文字在下 */
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0; /* 防止卡片自身被意外压缩 */
+}
+
+.dating-scene-delete-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background-color: rgba(0, 0, 0, 0.5);
+  color: white;
+  border: none;
+  font-size: 20px;
+  line-height: 28px;
+  text-align: center;
+  cursor: pointer;
+  z-index: 5;
+  opacity: 0;
+  transition: background-color 0.2s;
+}
+.dating-scene-card:hover .dating-scene-delete-btn {
+  opacity: 1;
+}
+.dating-scene-delete-btn:hover {
+  background-color: #ff3b30;
+}
+
+.dating-scene-image-container {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  background-color: #e9ecef;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: var(--text-secondary);
+  font-size: 14px;
+  flex-shrink: 0;
+}
+#phone-screen.dark-mode .dating-scene-image-container {
+  background-color: #2c2c2e;
+}
+
+.dating-scene-image-container .loading-spinner {
+  width: 30px;
+  height: 30px;
+  border: 3px solid rgba(0, 0, 0, 0.1);
+  border-top-color: var(--accent-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.dating-scene-image-container img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.dating-scene-info {
+  padding: 15px;
+  text-align: center;
+  flex-shrink: 0; /* 防止文字区域被压缩 */
+}
+
+.dating-scene-info .name {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.dating-scene-info .cost {
+  font-size: 16px;
+  color: #ff5722;
+  font-weight: bold;
+  margin-top: 8px;
+}
+/* ▲▲▲ 样式结束 ▲▲▲ */
+/* ▼▼▼ 【全新】借钱列表项美化样式 ▼▼▼ */
+#borrow-money-char-list .character-select-item {
+  gap: 12px; /* 在头像和名字之间增加一些间距 */
+}
+/* ▲▲▲ 新增CSS结束 ▲▲▲ */
+/* ▼▼▼ 【全新】借条卡片样式 ▼▼▼ */
+.message-bubble.is-borrow-request .content {
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  border: none;
+}
+
+.borrow-card {
+  width: 220px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #e0c3fc, #8ec5fc); /* 温柔的紫蓝色渐变 */
+  color: white;
+  padding: 15px;
+  box-shadow: 0 4px 12px rgba(142, 197, 252, 0.4);
+  position: relative;
+  overflow: hidden;
+}
+.borrow-card::before {
+  content: "💸"; /* 飞钱的Emoji作为装饰 */
+  position: absolute;
+  top: -5px;
+  right: 10px;
+  font-size: 32px;
+  opacity: 0.15;
+  transform: rotate(15deg);
+}
+
+.borrow-card .borrow-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+}
+.borrow-card .borrow-header span {
+  color: #4a00e0; /* 深紫色突出借钱对象 */
+  text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+}
+
+.borrow-card .borrow-body .label {
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+.borrow-card .borrow-body .amount {
+  font-size: 32px;
+  font-weight: 700;
+  margin: 4px 0 10px 0;
+}
+
+.borrow-card .borrow-body .reason {
+  font-size: 12px;
+  line-height: 1.5;
+  opacity: 0.9;
+  padding-top: 8px;
+  margin-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  word-break: break-all;
+}
+/* ▲▲▲ 新增CSS结束 ▲▲▲ */
+/* 1. 主容器 (保持不变) */
+#dating-game-screen {
+  background-color: #000;
+  color: white;
+}
+
+/* 2. 背景图层 (最底层) */
+#dating-game-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  transition:
+    background-image 0.5s ease-in-out,
+    filter 0.5s ease-in-out;
+  filter: blur(3px) brightness(0.8);
+  transform: scale(1.05);
+  z-index: 1; /* ★★★ 核心修改：明确指定层级为 1 ★★★ */
+}
+
+/* 4. UI层 (最顶层) */
+.dating-game-ui-overlay {
+  position: relative; /* 相对定位，因为它需要自然地排在最上层 */
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end; /* 将内容推到底部 */
+  padding-bottom: calc(env(safe-area-inset-bottom) + 15px);
+  box-sizing: border-box;
+  z-index: 3; /* ★★★ 核心修改：明确指定层级为 3，比立绘高，确保它永远在最上面！ ★★★ */
+}
+#dating-game-screen .header {
+  position: absolute;
+  top: 0;
+  width: 100%;
+  box-sizing: border-box;
+  background-color: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+}
+#dating-game-screen .header .back-btn {
+  color: white;
+}
+
+/* --- ▼▼▼ 这里是本次修改的核心区域 ▼▼▼ --- */
+
+.dating-game-textbox {
+  display: flex; /* 1. 改为Flex布局 */
+  flex-direction: column;
+  justify-content: space-between; /* 2. 让内容和提示分开 */
+  background-color: rgba(0, 0, 0, 0.75);
+  padding: 15px 20px;
+  margin: 0 15px 15px 15px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  min-height: 120px; /* 3. 设置一个固定的最小高度 */
+  transition:
+    opacity 0.5s,
+    transform 0.5s;
+  cursor: pointer;
+  /* 4. 移除 overflow: auto，禁止其自身滚动 */
+}
+
+/* --- ▼▼▼ 在 .dating-game-textbox 规则之后，粘贴下面这段新代码 ▼▼▼ --- */
+
+/* 文本内容的容器，我们给它一个淡入淡出的动画 */
+.dating-game-textbox #dating-game-text-content {
+  transition: opacity 0.2s ease-in-out;
+}
+/* 当句子切换时，先让旧句子淡出 */
+.dating-game-textbox #dating-game-text-content.fade-out {
+  opacity: 0;
+}
+
+/* “点击继续”的提示 */
+.dating-game-textbox .continue-indicator {
+  display: block;
+  text-align: right;
+  margin-top: 10px;
+  font-size: 14px;
+  color: #888;
+  animation: pulse-indicator 1.5s infinite;
+}
+@keyframes pulse-indicator {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* --- ▲▲▲ 新增代码结束 ▲▲▲ --- */
+
+.dating-game-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 15px;
+  margin-bottom: 15px;
+}
+
+.dating-game-choice-btn {
+  width: 100%;
+  padding: 15px;
+  background-color: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  border-radius: 25px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  transition:
+    background-color 0.2s,
+    transform 0.1s;
+}
+
+.dating-game-choice-btn.input-action {
+  background-color: rgba(0, 123, 255, 0.4);
+  border-color: rgba(0, 123, 255, 0.6);
+}
+
+.dating-game-choice-btn:hover {
+  background-color: rgba(255, 255, 255, 0.4);
+}
+.dating-game-choice-btn:active {
+  transform: scale(0.98);
+}
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+/* ▼▼▼ 【全新】约会大作战-文游界面UI增强样式 ▼▼▼ */
+
+/* 1. 为文游界面顶部栏添加按钮容器 (这段代码已包含在步骤1中，如果已添加可忽略) */
+#dating-game-screen .header {
+  justify-content: space-between;
+}
+
+/* 3. 立绘层 (中间层) */
+#dating-game-sprite-container {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80%;
+  height: auto;
+  max-height: 80%;
+  pointer-events: none;
+  transition: all 0.5s ease-in-out;
+  z-index: 2; /* ★★★ 核心修改：明确指定层级为 2，比背景高 ★★★ */
+}
+#dating-game-sprite-container img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.5));
+}
+
+/* 3. 设置弹窗样式 */
+#dating-game-settings-modal .modal-content {
+  height: 85%;
+}
+#dating-game-settings-modal .form-group {
+  margin-bottom: 15px;
+}

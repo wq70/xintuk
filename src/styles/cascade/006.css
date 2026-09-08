@@ -1,0 +1,1270 @@
+
+.wb-book-container {
+  padding-left: 20px;
+  max-height: 1000px;
+  overflow: hidden;
+  transition: max-height 0.3s ease-in-out;
+}
+.wb-book-container.collapsed {
+  max-height: 0;
+}
+
+/* ▲▲▲ 粘贴结束 ▲▲▲ */
+/* ▼▼▼ 【全新】字体预设功能样式 ▼▼▼ */
+
+#font-preset-container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 15px; /* 卡槽之间的间距 */
+}
+
+.font-preset-slot {
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+#phone-screen.dark-mode .font-preset-slot {
+  border-color: #38383a;
+}
+
+.font-preset-slot.empty {
+  justify-content: center;
+  align-items: center;
+  min-height: 80px;
+  border-style: dashed;
+}
+
+.font-preview-text {
+  font-size: 22px;
+  padding: 10px;
+  border-radius: 8px;
+  text-align: center;
+  min-height: 30px;
+  transition: font-family 0.3s ease;
+}
+
+#phone-screen.dark-mode .font-preview-text {
+  background-color: #2c2c2e;
+  color: #fff;
+}
+
+.font-preset-info {
+  font-size: 14px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.font-preset-actions {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+.preset-btn {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  background-color: var(--accent-color);
+  color: white;
+}
+
+.preset-btn.secondary {
+  background-color: #e9ecef;
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+#phone-screen.dark-mode .preset-btn.secondary {
+  background-color: #3e3e42;
+  border-color: #545458;
+}
+
+.preset-btn.delete {
+  background-color: #ffdde5;
+  color: #ff3b30;
+  border: 1px solid #ffc2d1;
+  max-width: 80px; /* 让删除按钮窄一点 */
+  flex: 0 0 auto;
+}
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+/* 【美化 V2】让后台活动设置的按钮更圆润、更立体 */
+#background-activity-details .form-button-secondary {
+  border-radius: 20px; /* 大幅增加圆角，形成胶囊形状 */
+  padding-top: 10px; /* 增加顶部内边距，让按钮更高 */
+  padding-bottom: 10px; /* 增加底部内边距，让按钮更高 */
+  font-weight: 500; /* 字体稍微加粗一点 */
+  transition: all 0.2s ease; /* 添加平滑的过渡效果 */
+}
+
+/* 为按钮添加一个微妙的点击效果 */
+#background-activity-details .form-button-secondary:active {
+  transform: scale(0.96); /* 点击时轻微缩小 */
+  opacity: 0.8; /* 点击时稍微变淡 */
+}
+/* ▼▼▼ 【全新】BGM搜索结果弹窗样式 ▼▼▼ */
+
+/* ▼▼▼ 在这里添加下面这段新样式 ▼▼▼ */
+#music-search-results-modal .modal-content {
+  z-index: 220; /* 这个值比播放列表的 210 要高 */
+}
+/* ▲▲▲ 添加结束 ▲▲▲ */
+
+.search-result-item {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+/* ▼▼▼ 【全新】BGM搜索结果弹窗样式 ▼▼▼ */
+
+.search-result-item {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.search-result-item:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+#phone-screen.dark-mode .search-result-item:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.search-result-item .title {
+  font-weight: 500;
+  font-size: 15px;
+  color: var(--text-primary);
+}
+
+.search-result-item .artist {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.search-result-item .source {
+  font-size: 10px;
+  color: var(--accent-color);
+  background-color: rgba(0, 123, 255, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: bold;
+  margin-left: 8px;
+}
+/* ▲▲▲ 新增CSS结束 ▲▲▲ */
+/* ▼▼▼ 【全新】BGM搜索源选择弹窗样式 ▼▼▼ */
+#music-source-selector-modal .modal-body label {
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+#music-source-selector-modal .modal-body input[type="radio"] {
+  width: 18px;
+  height: 18px;
+}
+/* ▲▲▲ 新增CSS结束 ▲▲▲ */
+/* ▼▼▼ 用这整块【布局微调版】样式，替换掉上一次的旧样式 ▼▼▼ */
+
+/* 1. 闪烁动画 (保持不变) */
+@keyframes flash-char {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 3px rgba(255, 192, 203, 0);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.08);
+    box-shadow: 0 0 12px rgba(255, 192, 203, 0.9);
+  }
+}
+@keyframes flash-user {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 3px rgba(173, 216, 230, 0);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.08);
+    box-shadow: 0 0 12px rgba(173, 216, 230, 0.9);
+  }
+}
+
+/* 2. 【核心修改】调整头像容器的下边距 */
+#music-avatars-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 8px; /* <<<< 从 25px 减小到 8px，让它和下面的文字更近 */
+  position: relative;
+  z-index: 5;
+}
+
+/* 3. 单个头像样式 (保持不变) */
+#music-avatars-container img {
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+/* 4. 分开闪烁动画 (保持不变) */
+#music-avatars-container.flashing #music-char-avatar {
+  animation: flash-char 2.2s infinite ease-in-out;
+}
+#music-avatars-container.flashing #music-user-avatar {
+  animation: flash-user 2.2s infinite ease-in-out 0.3s;
+}
+
+/* 5. 心电图样式 (保持不变) */
+#heartbeat-line {
+  width: 80px;
+  height: 30px;
+  overflow: visible;
+  margin: 0 -15px;
+  opacity: 0;
+  transition: opacity 0.5s;
+}
+#music-avatars-container.flashing #heartbeat-line {
+  opacity: 1;
+}
+.heartbeat-path {
+  stroke: #ffc0cb;
+  stroke-width: 1.5;
+  fill: none;
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  animation: draw-line 2.2s infinite linear;
+  filter: drop-shadow(0 0 3px #ffc0cb);
+}
+.heartbeat-heart {
+  display: none;
+}
+@keyframes draw-line {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* 6. 【核心修改】调整“一起听了”文字的样式和边距 */
+#music-time-counter {
+  margin-bottom: 20px; /* <<<< 现在由它来负责和下面的封面拉开距离 */
+  font-size: 11px;
+  color: #666; /* 颜色稍微加深一点 */
+  text-align: center;
+}
+
+/* 7. 唱片旋转动画 (保持不变) */
+@keyframes spin-record {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 8. 封面和歌词的切换容器 (保持不变) */
+#music-display-area {
+  width: 192px;
+  height: 192px;
+  margin-bottom: 15px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.3s ease;
+}
+#music-display-area:active {
+  transform: scale(0.98);
+}
+
+/* 9. 歌曲封面 (保持不变) */
+#music-album-cover {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  display: block;
+}
+#music-album-cover.rotating {
+  animation: spin-record 10s linear infinite;
+}
+#music-album-cover.paused {
+  animation-play-state: paused;
+}
+
+/* 10. 其他样式 (保持不变) */
+#music-lyrics-container {
+  display: none;
+}
+#music-display-area.show-lyrics #music-album-cover {
+  display: none;
+}
+#music-display-area.show-lyrics #music-lyrics-container {
+  display: block;
+}
+#music-player-song-title {
+  margin-bottom: 2px;
+}
+#music-player-artist {
+  margin-bottom: 10px;
+}
+.music-player-window {
+  min-height: 480px;
+}
+
+/* ▲▲▲ 布局微调版样式粘贴结束 ▲▲▲ */
+/* ▼▼▼ 【最终修复版】提升搜索相关弹窗的层级 ▼▼▼ */
+#music-source-selector-modal,
+#custom-modal-overlay {
+  z-index: 250 !important; /* 这个值必须高于播放列表(210)，!important确保它拥有最高优先级 */
+}
+/* ▲▲▲ 粘贴结束 ▲▲▲ */
+/* ▼▼▼ 步骤 1：把这一整块全新的CSS，粘贴到 <style> 的末尾 ▼▼▼ */
+
+/* --- 1. 隐藏旧的主屏幕元素 --- */
+/* 我们不再需要旧的锁屏时钟和图标网格了，新的布局会完全取代它们 */
+#home-screen #clock-container {
+  display: none !important;
+}
+
+/* --- 2. 【核心】重新定义主屏幕布局 --- */
+/* 
+   这将把你的主屏幕从一个简单的垂直列表，变成一个撑满全屏、
+   使用Flexbox布局的强大容器，为新的“桌面式”布局打下基础。
+*/
+/* --- 2. 【核心】重新定义主屏幕布局 --- */
+#home-screen {
+  /* 使用一个漂亮的线性渐变作为默认背景，当然你可以在“外观设置”里随时换掉它 */
+  background: linear-gradient(135deg, #6dd5fa, #2980b9);
+  background-size: cover;
+  background-position: center;
+
+  /* 适配iPhone刘海和底部安全区 */
+  padding-top: calc(20px + env(safe-area-inset-top));
+  padding-bottom: calc(20px + env(safe-area-inset-bottom));
+
+  /* ▼▼▼ 在这里添加下面这两行 ▼▼▼ */
+  padding-left: 0;
+  padding-right: 0;
+  /* ▲▲▲ 添加结束 ▲▲▲ */
+
+  /* 使用Flexbox让内容区和Dock栏上下分离 */
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  height: 100%; /* 确保它撑满屏幕 */
+}
+
+/* --- 3. 中间主要内容区 (个人资料卡 + 小组件 + App图标) --- */
+#main-content-area {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 30px; /* 卡片和下方图标的间距 */
+  align-items: center;
+  margin-top: 20px; /* 距离屏幕顶部一点距离 */
+}
+
+/* --- 4. 个人资料卡片 (这是视觉核心) --- */
+
+/* 4a. 卡片外层容器：这是所有内部元素定位的“锚点” */
+#profile-widget {
+  position: relative; /* 关键：让内部的头像和伪元素可以相对于它进行绝对定位 */
+  width: 100%;
+  max-width: 380px;
+  flex-shrink: 0;
+}
+
+/* 4b. 背景头图：只给顶部设置圆角 */
+#profile-banner-img {
+  display: block;
+  width: 100%;
+  height: 150px;
+  object-fit: cover;
+  border-radius: 24px 24px 0 0; /* 只给顶部设置圆角 */
+  position: relative;
+  z-index: 1; /* 层级1：在最下方 */
+}
+
+/* 4c. 头像容器：精确定位，使其中心线与头图底部对齐 */
+#profile-widget .profile-avatar-container {
+  position: absolute;
+  top: 80px; /* 从顶部向下偏移，让它一半在头图上，一半在下面 */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background-color: white; /* 白色背景板，让头像更突出 */
+  padding: 4px; /* 白色边框的效果 */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 3; /* 层级3：最高层，压住一切 */
+}
+
+#profile-avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+/* 4d. 白色信息卡片：使用负外边距实现无缝拼接 */
+#profile-widget .profile-info {
+  /* 【修改后】白色到透明的渐变背景，并加上一层柔和的阴影 */
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.85) 20%,
+    rgba(255, 255, 255, 0)
+  );
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border-radius: 24px;
+
+  /* 核心魔法：使用负外边距，将卡片向上移动，与头图和头像重叠 */
+  margin-top: -24px;
+
+  /* 同时，为上移的头像留出精确的空间，避免文字压住头像 */
+  padding-top: 54px; /* 头像半径(40px) + 额外间距(14px) */
+
+  min-height: 120px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-left: 15px;
+  padding-right: 15px;
+  padding-bottom: 15px;
+  text-align: center;
+  color: #1c1c1e;
+  position: relative;
+  z-index: 2; /* 层级2：在头图之上，但在头像之下 */
+}
+
+/* 4e. 个人资料内部的文字样式 */
+#profile-username {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 2px 0;
+}
+#profile-sub-username {
+  font-size: 13px;
+  color: #8a8a8a;
+  margin: 0 0 10px 0;
+}
+#profile-bio {
+  font-size: 14px;
+  margin: 0 0 12px 0;
+  color: #333;
+}
+#profile-location {
+  font-size: 12px;
+  color: #8a8a8a;
+  margin: 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background-color: rgba(0, 0, 0, 0.05);
+  padding: 3px 9px;
+  border-radius: 10px;
+}
+
+/* --- 5. 桌面式布局 (小组件 + App图标) --- */
+#desktop-layout {
+  display: grid; /* 使用Grid布局，轻松实现两列 */
+  grid-template-columns: 1fr 1.1fr; /* 左窄右宽的两列 */
+  gap: 20px;
+  width: 100%;
+  align-items: start;
+}
+#desktop-widget-column {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between; /* 【核心修改】将 space-around 改为 space-between */
+  align-items: start;
+  width: 100%;
+}
+
+/* 右侧App图标容器 */
+#desktop-app-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr; /* 两列图标 */
+  gap: 25px;
+  align-content: start;
+}
+.desktop-app-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  text-align: center;
+}
+.icon-bg-desktop {
+  width: 55px;
+  height: 55px;
+  border-radius: 14px;
+  background-color: #f0f2f5;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease;
+  overflow: hidden;
+}
+.icon-bg-desktop img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 0;
+}
+.desktop-app-icon .label {
+  color: #333;
+  font-size: 13px;
+  font-weight: 500;
+}
+.desktop-app-icon:active .icon-bg-desktop {
+  transform: scale(0.9);
+}
+
+/* --- 6. 底部 Dock 栏 --- */
+#desktop-dock {
+  background-color: rgba(255, 255, 255, 0.15); /* 玻璃拟态背景 */
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 20px;
+  padding: 15px 25px;
+  display: flex;
+  justify-content: center;
+  gap: 30px;
+  width: fit-content; /* 宽度自适应内容 */
+  flex-shrink: 0;
+}
+
+/* --- 7. 【核心功能】为可编辑元素添加视觉反馈 --- */
+.editable-text,
+.editable-image {
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+/* 鼠标悬停时，显示一个半透明的虚线外框，并轻微变暗，提示用户这里可以点 */
+.editable-text:hover,
+.editable-image:hover {
+  outline: 2px dashed rgba(0, 0, 0, 0.4);
+  opacity: 0.85;
+  border-radius: 4px; /* 让外框也有一点圆角 */
+}
+
+/* --- 8. 【锁屏兼容】让锁屏和主屏幕可以堆叠 --- */
+#lock-screen,
+#home-screen {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+#lock-screen {
+  z-index: 999; /* 确保锁屏在最上层 */
+}
+/* ▼▼▼ 这是新增的桌面小组件样式 ▼▼▼ */
+
+/* 单个小组件的总容器 */
+.custom-widget-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px; /* 各个元素之间的垂直间距 */
+}
+
+.widget-bubble {
+  position: relative;
+  background-color: rgba(255, 255, 255, 0.9);
+  color: #333;
+  padding: 8px 12px;
+  border-radius: 20px; /* 【核心修改】增加圆角，实现胶囊感 */
+  font-size: 13px;
+  font-weight: 500;
+  /* 【核心修改】移除 min-width，让宽度自适应内容 */
+  text-align: center;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+/* 用伪元素给气泡加一个小尾巴，指向下面的圆形图片 */
+.widget-bubble::after {
+  content: "";
+  position: absolute;
+  bottom: -6px; /* 尾巴在气泡下方 */
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 6px 6px 0;
+  border-style: solid;
+  border-color: rgba(255, 255, 255, 0.9) transparent transparent transparent;
+}
+
+.widget-circle-uploader {
+  width: 65px; /* 从 80px 缩小 */
+  height: 65px; /* 从 80px 缩小 */
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+  padding: 3px;
+  background-color: transparent; /* 【核心修改】将背景色改为透明 */
+  box-sizing: border-box;
+}
+
+/* 这是替换后的第二块 */
+.widget-circle-uploader img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%; /* 【核心】让图片也变成圆形，完美适应内边距 */
+}
+
+/* 下方的透明文字区域 */
+.widget-subtext {
+  background: transparent;
+  border: none;
+  color: #333;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5); /* 加一点文字阴影更清晰 */
+  font-size: 13px;
+  font-weight: 500;
+  text-align: center;
+}
+
+/* ▲▲▲ 新增样式结束 ▲▲▲ */
+/* ▼▼▼ 【V3最终美化版】主屏幕美化预设功能样式 ▼▼▼ */
+.preset-manager-container {
+  width: 100%;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-color);
+}
+#phone-screen.dark-mode .preset-manager-container {
+  border-top-color: #3a3a3c;
+}
+.preset-manager-container .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.preset-manager-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr; /* 【核心】2x2 网格布局 */
+  gap: 12px; /* 按钮间距 */
+  width: 100%;
+}
+.preset-btn-capsule {
+  padding: 12px 15px; /* 增加垂直内边距，让按钮更高更可爱 */
+  border: none;
+  border-radius: 25px; /* 更大的圆角，胶囊感更强 */
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08); /* 增加一点立体阴影 */
+}
+.preset-btn-capsule:active {
+  transform: scale(0.96);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+.preset-btn-capsule:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+  background-color: #e9ecef !important; /* 禁用时统一用灰色 */
+  color: #adb5bd !important;
+  border-color: #dee2e6 !important;
+}
+#phone-screen.dark-mode .preset-btn-capsule:disabled {
+  background-color: #3a3a3c !important;
+  color: #545458 !important;
+}
+.preset-btn-apply {
+  background-color: var(--accent-color); /* 应用按钮使用主题色 */
+  color: white;
+  grid-column: 1 / -1; /* 【核心】让应用按钮独占一行，更突出 */
+}
+.preset-btn-save {
+  background-color: #4cd964; /* 保存用绿色，代表创建 */
+  color: white;
+}
+.preset-btn-secondary {
+  background-color: #f8f9fa;
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+#phone-screen.dark-mode .preset-btn-secondary {
+  background-color: #3a3a3c;
+  border-color: #545458;
+}
+.preset-btn-delete {
+  background-color: #ffdde5;
+  color: #ff3b30;
+}
+#phone-screen.dark-mode .preset-btn-delete {
+  background-color: #5c2b2b;
+  color: #ff8a80;
+}
+/* ▲▲▲ 样式粘贴结束 ▲▲▲ */
+
+/* ▼▼▼ 【V6最终修复版】夜间模式终极适配 (已修复所有页面适配问题) ▼▼▼ */
+
+/* 核心：当 #phone-screen 拥有 .dark-mode 类时，激活以下所有样式 */
+
+/* 1. 全局重新定义颜色变量 */
+#phone-screen.dark-mode {
+  --secondary-bg: #1c1c1e;
+  --border-color: #38383a;
+  --text-primary: #ffffff;
+  --text-secondary: #8e8e93;
+  --status-bar-text-color: #ffffff;
+}
+
+/* 2. 【基础】为所有屏幕和主要容器设置基础深色背景 */
+#phone-screen.dark-mode,
+#phone-screen.dark-mode .screen,
+#phone-screen.dark-mode #chat-list,
+#phone-screen.dark-mode #world-book-list,
+#phone-screen.dark-mode .list-container,
+#phone-screen.dark-mode .form-container,
+#phone-screen.dark-mode #chat-messages {
+  background-color: #000000 !important;
+}
+
+/* 3. 【主屏幕】专属样式 (从被删除的代码中恢复并整合) */
+#phone-screen.dark-mode #home-screen {
+  background: #111827; /* 深蓝色背景 */
+}
+#phone-screen.dark-mode #desktop-dock {
+  background-color: rgba(55, 65, 81, 0.5); /* Dock栏深灰色玻璃效果 */
+}
+#phone-screen.dark-mode .desktop-app-icon .label,
+#phone-screen.dark-mode .widget-subtext {
+  color: #e5e7eb; /* 桌面文字变为浅灰色 */
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7); /* 加强阴影 */
+}
+#phone-screen.dark-mode #profile-widget .profile-info {
+  background: linear-gradient(
+    to bottom,
+    rgba(28, 28, 30, 0.85) 20%,
+    rgba(28, 28, 30, 0)
+  ); /* 信息卡片深灰色渐变 */
+  color: #f9fafb;
+}
+#phone-screen.dark-mode #profile-username,
+#phone-screen.dark-mode #profile-bio,
+#phone-screen.dark-mode #profile-location span {
+  color: #f9fafb; /* 信息卡片主文字白色 */
+}
+#phone-screen.dark-mode #profile-sub-username,
+#phone-screen.dark-mode #profile-location {
+  color: #9ca3af; /* 信息卡片次要文字灰色 */
+}
+#phone-screen.dark-mode #profile-location {
+  background-color: rgba(255, 255, 255, 0.1); /* 地点背景变亮 */
+}
+#phone-screen.dark-mode .widget-bubble {
+  background-color: rgba(55, 65, 81, 0.9); /* 小组件气泡深灰色 */
+  color: #e5e7eb; /* 小组件文字浅灰色 */
+}
+#phone-screen.dark-mode .widget-bubble::after {
+  border-top-color: rgba(55, 65, 81, 0.9); /* 小尾巴颜色同步 */
+}
+
+/* 4. 【修复】适配所有页面的头部Header */
+#phone-screen.dark-mode .header,
+#phone-screen.dark-mode .qzone-header {
+  background-color: rgba(28, 28, 30, 0.85) !important;
+  border-bottom-color: var(--border-color) !important;
+  color: var(--text-primary) !important;
+}
+
+/* 5. 【修复】适配所有通用组件 (弹窗、输入框等) */
+#phone-screen.dark-mode #chat-input-area,
+#phone-screen.dark-mode #chat-list-bottom-nav {
+  background-color: rgba(28, 28, 30, 0.85);
+  border-top-color: var(--border-color);
+}
+#phone-screen.dark-mode #chat-input {
+  background-color: var(--secondary-bg);
+  color: var(--text-primary);
+}
+#phone-screen.dark-mode .modal-content,
+#phone-screen.dark-mode #custom-modal {
+  background-color: #2c2c2e;
+}
+#phone-screen.dark-mode .modal-header,
+#phone-screen.dark-mode .modal-footer,
+#phone-screen.dark-mode .custom-modal-footer {
+  border-color: var(--border-color);
+}
+#phone-screen.dark-mode .form-group input,
+#phone-screen.dark-mode .form-group select,
+#phone-screen.dark-mode .form-group textarea {
+  background-color: var(--secondary-bg);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+#phone-screen.dark-mode .list-item,
+#phone-screen.dark-mode .chat-list-item-swipe-container:not(:last-child) {
+  border-bottom-color: var(--border-color);
+}
+#phone-screen.dark-mode .list-item:hover,
+#phone-screen.dark-mode .chat-list-item:hover {
+  background-color: #2c2c2e;
+}
+
+/* 6. 【解决】字体预设 & 外观设置页面深度适配 */
+#phone-screen.dark-mode #font-settings-screen,
+#phone-screen.dark-mode #wallpaper-screen {
+  background-color: #000000;
+}
+#phone-screen.dark-mode .font-preset-slot,
+#phone-screen.dark-mode #font-preview,
+#phone-screen.dark-mode #wallpaper-preview {
+  background-color: var(--secondary-bg);
+  border-color: var(--border-color);
+}
+#phone-screen.dark-mode .preset-btn.secondary {
+  background-color: #3e3e42;
+  border-color: #545458;
+}
+
+/* 7. 【解决】“查手机”功能所有内部页面深度适配 */
+#phone-screen.dark-mode #character-phone-container {
+  background-color: #000000;
+}
+#phone-screen.dark-mode .character-phone-frame {
+  background-color: #111;
+}
+#phone-screen.dark-mode .character-phone-inner-screen,
+#phone-screen.dark-mode .character-phone-page {
+  background-color: #000000;
+}
+#phone-screen.dark-mode .character-phone-header {
+  background-color: rgba(28, 28, 30, 0.85) !important;
+  border-bottom: 1px solid #38383a !important;
+}
+#phone-screen.dark-mode #character-app-grid .label {
+  color: #e5e7eb;
+}
+#phone-screen.dark-mode .character-chat-list .chat-list-item:hover {
+  background-color: #1c1c1e;
+}
+#phone-screen.dark-mode #character-chat-history-messages {
+  background-color: #0e0e0e !important;
+}
+#phone-screen.dark-mode .character-chat-bubble.received {
+  background-color: #2c2c2e;
+}
+#phone-screen.dark-mode .character-data-item,
+#phone-screen.dark-mode .character-bank-transaction,
+#phone-screen.dark-mode .character-cart-item,
+#phone-screen.dark-mode .character-browser-item {
+  background-color: #1c1c1e;
+  border-color: #38383a;
+}
+#phone-screen.dark-mode .character-data-item .title,
+#phone-screen.dark-mode .character-data-item .content,
+#phone-screen.dark-mode .cart-item-price {
+  color: var(--text-primary);
+}
+#phone-screen.dark-mode .character-bank-balance-card {
+  background: linear-gradient(135deg, #3a3a3c, #1c1c1e);
+}
+#phone-screen.dark-mode #character-diary-list .character-data-item {
+  background-color: #1a1510;
+  border-color: #4a443b;
+  border-left-color: #8c7d6b;
+}
+#phone-screen.dark-mode #character-select-item .name {
+  color: #80cbc4 !important; /* 柔和的青色 */
+}
+
+/* 8. 【新增】修复聊天列表分组标题的背景色 */
+#phone-screen.dark-mode .chat-group-header {
+  background-color: #1c1c1e;
+}
+#phone-screen.dark-mode .chat-list-item-content.pinned {
+  background-color: #3a3a3c;
+}
+
+/* ▲▲▲ CSS 代码粘贴结束 ▲▲▲ */
+/* ▼▼▼ 步骤 1.1：将这整块【终极修复版】CSS粘贴到 <style> 的末尾 ▼▼▼ */
+
+/* 核心修复：使用 !important 强制提升优先级，覆盖掉所有捣乱的内联样式 */
+
+/* 1. 为所有需要适配的屏幕强制设置纯黑背景 */
+#phone-screen.dark-mode #wallpaper-screen,
+#phone-screen.dark-mode #font-settings-screen,
+#phone-screen.dark-mode #api-settings-screen,
+#phone-screen.dark-mode #character-selection-screen,
+#phone-screen.dark-mode #world-book-screen,
+#phone-screen.dark-mode #world-book-editor-screen,
+#phone-screen.dark-mode .form-container, /* 确保所有表单容器也适配 */
+#phone-screen.dark-mode .list-container {
+  /* 确保所有列表容器也适配 */
+  background-color: #000000 !important;
+}
+
+/* 2. 为“查手机”内部的所有页面强制设置纯黑背景 */
+#phone-screen.dark-mode .character-phone-inner-screen,
+#phone-screen.dark-mode .character-phone-page {
+  background-color: #000000 !important;
+}
+#phone-screen.dark-mode #character-chat-history-messages {
+  background-color: #0e0e0e !important; /* 聊天记录用深灰色 */
+}
+
+/* 3. 修复页面内部组件的背景色 */
+#phone-screen.dark-mode #font-preview,
+#phone-screen.dark-mode #wallpaper-preview {
+  background-color: #1c1c1e !important;
+  border-color: #38383a !important;
+}
+
+/* 4. 修复“查手机”里对方的聊天气泡颜色 */
+#phone-screen.dark-mode .character-chat-bubble.received {
+  background-color: #2c2c2e !important;
+}
+/* ▼▼▼ 【最终修复版】提升所有弹窗的层级 ▼▼▼ */
+#music-source-selector-modal,
+#music-search-results-modal {
+  z-index: 250 !important; /* 这个值高于播放列表(210)，!important确保它拥有最高优先级 */
+}
+/* ▲▲▲ 粘贴结束 ▲▲▲ */
+/* ▼▼▼ 把这一整块全新的CSS，粘贴到 <style> 的末尾 ▼▼▼ */
+
+/* 【全新美化版】通用操作菜单按钮 */
+#preset-actions-modal .custom-modal-footer button {
+  width: 100%;
+  border: none; /* 移除边框 */
+  border-radius: 20px; /* ★★★ 修改这里！把 12px 改成了 20px ★★★ */
+  padding: 14px;
+  font-size: 16px; /* 字体稍微缩小一点，更精致 */
+  font-weight: 500;
+  margin-bottom: 8px; /* 按钮之间的垂直间距 */
+  background-color: #f0f0f0; /* 统一的浅灰色背景 */
+  color: var(--text-primary);
+  transition:
+    background-color 0.2s,
+    transform 0.1s; /* 添加动画 */
+}
+
+/* 鼠标悬停和点击效果 */
+#preset-actions-modal .custom-modal-footer button:hover {
+  background-color: #e0e0e0;
+}
+#preset-actions-modal .custom-modal-footer button:active {
+  transform: scale(0.98); /* 点击时轻微缩小 */
+}
+
+/* 单独美化“删除”按钮 */
+#preset-actions-modal .custom-modal-footer button.btn-danger {
+  background-color: #ffe5e5;
+  color: #ff3b30;
+}
+#preset-actions-modal .custom-modal-footer button.btn-danger:hover {
+  background-color: #ffcccc;
+}
+
+/* 美化“取消”按钮 */
+#preset-actions-modal .custom-modal-footer button:last-child {
+  background-color: #e9ecef;
+  margin-top: 4px; /* 和上面的按钮稍微拉开一点距离 */
+}
+#preset-actions-modal .custom-modal-footer button:last-child:hover {
+  background-color: #dcdfe3;
+}
+
+/* 移除按钮之间的分割线 */
+#preset-actions-modal .custom-modal-footer button {
+  border-bottom: none !important;
+}
+
+/* ▲▲▲ 粘贴结束 ▲▲▲ */
+/* ▼▼▼ 把这一整块全新的CSS，粘贴到 <style> 的末尾 ▼▼▼ */
+
+/* 【核心修正】提升通用操作菜单的层级，确保它能覆盖播放列表 */
+#preset-actions-modal {
+  z-index: 220; /* 这个值比播放列表(210)更高，就不会被挡住了 */
+}
+
+/* ▲▲▲ 粘贴结束 ▲▲▲ */
+/* --- “查手机”悬停删除按钮样式 开始 --- */
+
+/* 1. 让“查手机”功能里的所有列表项都成为可以定位删除按钮的容器 */
+.character-data-item,
+.character-cart-item,
+.character-browser-item,
+.character-bank-transaction,
+.character-trajectory-item,
+.character-app-usage-item,
+.character-chat-bubble-container,
+.character-album-item {
+  position: relative; /* 这是让按钮可以基于它来定位的关键 */
+}
+
+/* 2. 美化删除按钮，并将它定位到右上角，默认隐藏 */
+.item-delete-btn,
+.message-delete-btn {
+  position: absolute;
+  top: 8px; /* 距离顶部8像素 */
+  right: 8px; /* 距离右侧8像素 */
+  width: 24px;
+  height: 24px;
+  border-radius: 50%; /* 圆形按钮 */
+  background-color: rgba(0, 0, 0, 0.4); /* 半透明黑色背景，更美观 */
+  color: white;
+  border: none;
+  display: flex; /* 使用flex布局让叉号"×"完美居中 */
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer; /* 鼠标放上去时显示小手图标 */
+  z-index: 10; /* 确保按钮在最上层 */
+
+  /* 核心：默认状态下隐藏按钮 */
+  opacity: 0;
+  visibility: hidden;
+  transform: scale(0.8); /* 配合动画，让出现效果更自然 */
+  transition:
+    opacity 0.2s ease-in-out,
+    transform 0.2s ease-in-out;
+}
+
+/* 3. 当鼠标悬停在任何一个列表项上时，显示它内部的删除按钮 */
+.character-data-item:hover .item-delete-btn,
+.character-cart-item:hover .item-delete-btn,
+.character-browser-item:hover .item-delete-btn,
+.character-bank-transaction:hover .item-delete-btn,
+.character-trajectory-item:hover .item-delete-btn,
+.character-app-usage-item:hover .item-delete-btn,
+.character-chat-bubble-container:hover .message-delete-btn,
+.character-album-item:hover .item-delete-btn {
+  opacity: 1; /* 变得完全可见 */
+  visibility: visible;
+  transform: scale(1); /* 恢复正常大小 */
+}
+
+/* --- “查手机”悬停删除按钮样式 结束 --- */
+
+/* ▼▼▼ 【全新】角色手机微信消息删除按钮样式 ▼▼▼ */
+.character-chat-bubble-container {
+  position: relative; /* 让删除按钮可以相对于它定位 */
+}
+
+.message-delete-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  background-color: rgba(0, 0, 0, 0.1);
+  color: #555;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 22px;
+  text-align: center;
+  opacity: 0; /* 默认隐藏 */
+  transition: all 0.2s ease;
+}
+
+.character-chat-bubble-container:hover .message-delete-btn {
+  opacity: 1; /* 鼠标悬停时显示 */
+}
+
+.message-delete-btn:hover {
+  background-color: #ff3b30;
+  color: white;
+}
+
+/* 根据消息是左是右，调整删除按钮的位置 */
+.character-chat-bubble-container.sent .message-delete-btn {
+  left: -28px;
+}
+.character-chat-bubble-container.received .message-delete-btn {
+  right: -28px;
+}
+/* ▲▲▲ 新增样式结束 ▲▲▲ */
+
+/* ▲▲▲ CSS 粘贴结束 ▲▲▲ */
+
+/* ▼▼▼ 【全新添加】强制修正所有设置页面的底部安全区 ▼▼▼ */
+#font-settings-screen .form-container,
+#wallpaper-screen .form-container,
+#api-settings-screen .form-container {
+  padding-bottom: calc(20px + env(safe-area-inset-bottom));
+}
+/* ▲▲▲ 添加结束 ▲▲▲ */
+
+/* ▼▼▼ 【全新】iOS风格的滑动开关样式 ▼▼▼ */
+
+.toggle-switch-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* 让文字和开关两端对齐 */
+  cursor: pointer;
+  user-select: none;
+  width: 100%;
+  padding: 10px 0; /* 增加一点上下间距 */
+}
+
+.toggle-switch-text {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+/* 隐藏原始的 checkbox */
+.toggle-switch-label input[type="checkbox"] {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+/* 开关的轨道 */
+.toggle-switch-slider {
+  position: relative;
+  display: inline-block;
+  width: 51px;
+  height: 31px;
+  background-color: #e9e9eb;
+  border-radius: 34px;
+  transition: background-color 0.2s;
+  flex-shrink: 0; /* 防止被压缩 */
+}
+
+/* 开关的滑块 (那个白色圆点) */
+.toggle-switch-slider::before {
+  content: "";
+  position: absolute;
+  height: 27px;
+  width: 27px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  border-radius: 50%;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+/* 当 checkbox 被选中时，改变轨道的颜色 */
+.toggle-switch-label input:checked + .toggle-switch-slider {
+  background-color: #34c759; /* iOS 风格的绿色 */
+}
+
+/* 当 checkbox 被选中时，移动滑块 */
+.toggle-switch-label input:checked + .toggle-switch-slider::before {
+  transform: translateX(20px);
+}
+
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+/* ▼▼▼ 这是为你新增的颜色样式 ▼▼▼ */
+
+/* 1. 把时间的颜色强制设置为黑色 */
+#status-bar-time {
+  color: #000000 !important; /* !important 确保它优先级最高 */
+}
+
+/* 2. 把电池容器内的所有东西（图标边框、电量条、百分比文字）都设置为绿色 */
+#status-bar-battery {
+  color: #4caf50 !important; /* 这是一个很好看的绿色 */
+}
+
+/* ▲▲▲ 新增样式结束 ▲▲▲ */
+/* ▼▼▼ 这是步骤1需要粘贴的新样式 ▼▼▼ */
+
+/* 让每一条评论都变成可点击的 */
+.comment-item {
+  cursor: pointer; /* 鼠标悬停时显示为小手形状 */
+  transition: background-color 0.2s; /* 添加一个平滑的背景色过渡动画 */
+  border-radius: 4px; /* 给一点点圆角，更好看 */
+  padding: 2px 5px; /* 增加一点内边距，让点击区域更大 */
+  margin: 0 -5px; /* 把上面的内边距抵消掉，保持对齐 */
+}
+.comment-item:hover {
+  background-color: #f0f2f5; /* 鼠标放上去时，给一个淡淡的背景色 */
+}
+#phone-screen.dark-mode .comment-item:hover {
+  background-color: #2c2c2e; /* 夜间模式下的悬停颜色 */
+}
+
+/* “回复”这两个字的样式 */
+.comment-item .reply-text {
+  color: var(--text-secondary);
+  margin: 0 4px; /* 和两边的名字拉开一点距离 */
+}
+
+/* 被回复者的名字样式 */
+.comment-item .reply-target-name {
+  font-weight: 600;
+  color: var(--accent-color);
+  cursor: pointer;
+  margin-right: 5px;
+}
+/* ▼▼▼ 【全新】聊天记录搜索功能样式 ▼▼▼ */
+
+/* 搜索结果列表 */
+#chat-search-results-list {
+  flex-grow: 1; /* 占据剩余所有空间 */
+  overflow-y: auto; /* 内容多了可以滚动 */
+}
+
+/* 单条搜索结果的样式 */
+.search-result-item {
+  padding: 12px 15px;
+  border-bottom: 1px solid var(--border-color);
+  cursor: pointer;
+  display: flex;
+  gap: 12px; /* 头像和内容的间距 */
+  align-items: flex-start;
+}
+.search-result-item:hover {
+  background-color: #f5f5f5;
+}
+#phone-screen.dark-mode .search-result-item:hover {
+  background-color: #2c2c2e;
+}
+
+/* 结果中的头像 */
+.search-result-item .avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* 结果右侧信息（名字、时间、内容） */
+.search-result-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px; /* 信息内部的垂直间距 */
+  overflow: hidden; /* 防止内容过长溢出 */
+}
+
+/* 名字和时间的容器 */

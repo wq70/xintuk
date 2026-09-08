@@ -1,0 +1,75 @@
+    <div id="weibo-dm-list-screen" class="screen">
+      <div class="header">
+        <span class="back-btn" id="back-from-dm-list">‹</span>
+        <span id="weibo-dm-list-title">粉丝私信</span>
+        <!-- 这是你要求的“继续生成”按钮 -->
+        <div class="header-actions">
+          <span
+            class="action-btn"
+            id="generate-more-dms-btn"
+            title="继续生成私信"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>
+            </svg>
+          </span>
+
+          <!-- “清空全部”按钮 -->
+          <span class="action-btn" id="clear-all-dms-btn" title="清空全部私信">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"
+              />
+            </svg>
+          </span>
+        </div>
+      </div>
+      <div id="weibo-dm-list" class="list-container" style="padding: 0">
+        <!-- 私信列表将由JS动态生成 -->
+      </div>
+    </div>
+
+    <div id="weibo-dm-detail-screen" class="screen">
+      <div class="header">
+        <span class="back-btn" id="back-from-dm-detail">‹</span>
+        <span id="weibo-dm-detail-title"></span>
+        <span style="width: 30px"></span>
+        <!-- 占位符 -->
+      </div>
+      <div
+        id="weibo-dm-messages"
+        class="list-container"
+        style="
+          display: flex;
+          flex-direction: column;
+          gap: 15px;
+          padding: 15px;
+          background-color: #f0f2f5;
+        "
+      >
+        <!-- 聊天气泡将由JS动态生成 -->
+      </div>
+    </div>
+
+    <!-- index.html -->
+

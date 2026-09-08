@@ -1,0 +1,442 @@
+    <div id="wallpaper-screen" class="screen">
+      <div class="header">
+        <span class="back-btn" onclick="showScreen('home-screen')">‹</span>
+        <span>外观设置</span>
+        <span style="width: 30px"></span>
+      </div>
+
+      <!-- 内容滚动区域 -->
+      <div class="form-container settings-scroll-container">
+        <!-- 1. 锁屏与安全卡片 -->
+        <div class="settings-group-card">
+          <div class="settings-section-title">🔒 锁屏与安全</div>
+
+          <div class="setting-row">
+            <label class="setting-label">启用锁屏界面</label>
+            <label class="toggle-switch-label">
+              <input type="checkbox" id="enable-lock-screen-toggle" />
+              <span class="toggle-switch-slider"></span>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label>锁屏密码 (留空则无)</label>
+            <input
+              type="text"
+              id="password-set-input"
+              class="moe-input"
+              placeholder="设置解锁密码"
+            />
+          </div>
+
+          <div class="setting-item">
+            <label>锁屏壁纸</label>
+            <div class="preview-upload-box">
+              <div id="lockscreen-wallpaper-preview" class="mini-preview">
+                预览
+              </div>
+              <button
+                class="upload-btn-pill"
+                onclick="
+                  document
+                    .getElementById('lockscreen-wallpaper-upload-input')
+                    .click()
+                "
+              >
+                更换壁纸
+              </button>
+            </div>
+            <input
+              type="file"
+              id="lockscreen-wallpaper-upload-input"
+              accept="image/*"
+              hidden
+            />
+          </div>
+        </div>
+        <!-- 5. 高级美化 (CSS) 卡片 -->
+        <div class="settings-group-card">
+          <div class="settings-section-title">自定义css美化 (CSS)</div>
+
+          <div class="setting-item">
+            <div style="display: flex; gap: 5px; margin-bottom: 5px">
+              <select
+                id="theme-selector"
+                class="moe-input select"
+                style="flex: 1"
+              ></select>
+              <button id="rename-theme-btn" class="btn-icon">✏️</button>
+              <button id="delete-theme-btn" class="btn-icon danger">🗑️</button>
+            </div>
+            <textarea
+              id="theme-css-editor"
+              class="moe-input code-area"
+              rows="6"
+              placeholder="在此输入CSS代码..."
+            ></textarea>
+            <div class="css-actions">
+              <button id="apply-theme-btn" class="upload-btn-pill primary">
+                应用
+              </button>
+              <button id="save-theme-btn" class="upload-btn-pill">保存</button>
+              <button id="save-as-new-theme-btn" class="upload-btn-pill">
+                另存为
+              </button>
+              <button id="export-theme-btn" class="upload-btn-pill secondary">
+                导出
+              </button>
+              <button id="import-theme-btn" class="upload-btn-pill secondary">
+                导入
+              </button>
+              <button
+                id="reset-theme-css-btn"
+                class="upload-btn-pill danger"
+                style="background-color: #ff3b30; color: white"
+              >
+                重置
+              </button>
+              <button
+                id="manage-char-css-btn"
+                class="upload-btn-pill"
+                style="background-color: #ff9800; color: white"
+              >
+                清理角色CSS
+              </button>
+              <input
+                type="file"
+                id="import-theme-input"
+                accept=".json, .txt, .css, .docx"
+                hidden
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. 主屏幕视觉卡片 -->
+        <div class="settings-group-card">
+          <div class="settings-section-title">📱 主屏幕视觉</div>
+
+          <div class="setting-row">
+            <label class="setting-label">显示状态栏</label>
+            <label class="toggle-switch-label">
+              <input type="checkbox" id="show-status-bar-toggle" />
+              <span class="toggle-switch-slider"></span>
+            </label>
+          </div>
+
+          <div class="setting-row">
+            <label class="setting-label">夜间模式</label>
+            <label class="toggle-switch-label">
+              <!-- ★★★ 核心修复：ID 改回 theme-toggle-switch，解决报错 ★★★ -->
+              <input type="checkbox" id="theme-toggle-switch" />
+              <span class="toggle-switch-slider"></span>
+            </label>
+          </div>
+
+          <div class="setting-row">
+            <label class="setting-label">去除文字阴影</label>
+            <label class="toggle-switch-label">
+              <input type="checkbox" id="remove-home-font-shadow-toggle" />
+              <span class="toggle-switch-slider"></span>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label>主屏幕壁纸</label>
+            <div class="preview-upload-box">
+              <div id="wallpaper-preview" class="mini-preview">预览</div>
+              <button
+                class="upload-btn-pill"
+                onclick="
+                  document.getElementById('wallpaper-upload-input').click()
+                "
+              >
+                更换壁纸
+              </button>
+            </div>
+            <input
+              type="file"
+              id="wallpaper-upload-input"
+              accept="image/*"
+              hidden
+            />
+          </div>
+
+          <div class="setting-item">
+            <label>图标/组件字体颜色</label>
+            <div class="color-picker-wrapper">
+              <!-- 1. 颜色选择器 (保持原ID) -->
+              <input
+                type="color"
+                id="home-icon-widget-text-color-picker"
+                value="#FFFFFF"
+              />
+
+              <!-- 2. 文本输入框，允许手动输入颜色代码 -->
+              <input
+                type="text"
+                id="home-icon-widget-text-color-input"
+                placeholder="#FFFFFF"
+                maxlength="7"
+                spellcheck="false"
+              />
+            </div>
+          </div>
+
+          <!-- 主屏幕预设部分 -->
+          <div class="setting-item">
+            <label>主屏幕预设管理</label>
+            <div
+              class="preset-manager-container"
+              style="margin-top: 5px; border: none; padding: 0"
+            >
+              <div class="form-group">
+                <select
+                  id="home-preset-selector"
+                  class="moe-input select"
+                ></select>
+                <div class="preset-manager-controls compact">
+                  <button
+                    id="apply-home-preset-btn"
+                    class="preset-btn-capsule preset-btn-apply"
+                    disabled
+                  >
+                    应用
+                  </button>
+                  <button
+                    id="save-home-preset-btn"
+                    class="preset-btn-capsule preset-btn-save"
+                  >
+                    保存当前
+                  </button>
+                  <button
+                    id="update-home-preset-btn"
+                    class="preset-btn-capsule preset-btn-secondary"
+                    disabled
+                  >
+                    更新
+                  </button>
+                  <button
+                    id="rename-home-preset-btn"
+                    class="preset-btn-capsule preset-btn-secondary"
+                    disabled
+                  >
+                    重命名
+                  </button>
+                  <button
+                    id="delete-home-preset-btn"
+                    class="preset-btn-capsule preset-btn-delete"
+                    disabled
+                  >
+                    删除
+                  </button>
+                  <button
+                    id="import-home-preset-btn"
+                    class="preset-btn-capsule preset-btn-secondary"
+                  >
+                    导入
+                  </button>
+                  <button
+                    id="export-home-preset-btn"
+                    class="preset-btn-capsule preset-btn-secondary"
+                    disabled
+                  >
+                    导出
+                  </button>
+                  <input
+                    type="file"
+                    id="import-home-preset-input"
+                    accept=".json"
+                    hidden
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ★★★ 新增：路人头像库卡片 ★★★ -->
+        <div class="settings-group-card">
+          <div class="settings-section-title">👥 全局路人头像库</div>
+          <div class="setting-item">
+            <label>用于生成随机NPC、评论区的头像</label>
+            <div class="moe-btn-group">
+              <button
+                id="manage-passerby-avatars-btn"
+                class="moe-btn-secondary"
+              >
+                📂 管理图库
+              </button>
+              <button id="add-passerby-avatar-btn" class="moe-btn-secondary">
+                ➕ 添加头像
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. App 图标与名称卡片 -->
+        <div class="settings-group-card">
+          <div class="settings-section-title">🎨 图标与名称</div>
+          <div class="setting-item">
+            <label>App 图标定制</label>
+            <div id="icon-settings-grid" class="icon-grid-compact">
+              <!-- JS生成 -->
+            </div>
+          </div>
+
+          <div class="setting-item">
+            <label>App 名称定制</label>
+            <div id="icon-rename-grid" class="name-grid-compact">
+              <!-- JS生成 -->
+            </div>
+            <button
+              class="form-button-secondary small-btn"
+              id="reset-app-names-btn"
+            >
+              恢复默认名字
+            </button>
+          </div>
+        </div>
+
+        <!-- 4. 声音与背景卡片 -->
+        <div class="settings-group-card">
+          <div class="settings-section-title">🎵 声音与背景</div>
+
+          <div class="setting-item">
+            <label>来电铃声 URL</label>
+            <input
+              type="text"
+              id="ringtone-url-input"
+              class="moe-input"
+              placeholder="音频链接..."
+            />
+          </div>
+
+          <div class="setting-item">
+            <label>提示音 URL</label>
+            <input
+              type="text"
+              id="notification-sound-url-input"
+              class="moe-input"
+              placeholder="音频链接..."
+            />
+          </div>
+
+          <div class="setting-item">
+            <label>全局聊天背景</label>
+            <div class="preview-upload-box">
+              <!-- ★★★ 修改点：删除了 landscape 类名，现在它是竖屏的了 ★★★ -->
+              <div id="global-bg-preview" class="mini-preview">预览</div>
+              <div class="btn-col">
+                <button
+                  class="upload-btn-pill"
+                  onclick="
+                    document.getElementById('global-bg-upload-input').click()
+                  "
+                >
+                  上传背景
+                </button>
+                <button
+                  class="upload-btn-pill danger"
+                  id="remove-global-bg-btn"
+                >
+                  移除背景
+                </button>
+              </div>
+            </div>
+            <input
+              type="file"
+              id="global-bg-upload-input"
+              accept="image/*"
+              hidden
+            />
+            <button
+              class="form-button-secondary small-btn danger-text"
+              id="clear-all-single-bgs-btn"
+              style="margin-top: 10px"
+            >
+              一键清空所有单人聊天背景
+            </button>
+          </div>
+        </div>
+
+        <!-- 底部留白，防止被保存按钮遮挡 -->
+        <div style="height: 80px"></div>
+      </div>
+
+      <!-- ★★★ 悬浮保存按钮 ★★★ -->
+      <button id="save-wallpaper-btn" class="moe-fab-save">
+        💾<span style="font-size: 12px; display: block; margin-top: -2px"
+          >保存</span
+        >
+      </button>
+    </div>
+
+    <!-- 分享链接功能 HTML -->
+    <div id="browser-screen" class="screen">
+      <div class="header">
+        <span class="back-btn" id="browser-back-btn">‹</span>
+        <span id="browser-title"></span>
+        <span style="width: 30px"></span>
+      </div>
+      <div id="browser-content" class="list-container">
+        <!-- 文章内容将由JS动态生成在这里 -->
+      </div>
+    </div>
+
+    <div id="font-settings-screen" class="screen">
+      <div class="header">
+        <span class="back-btn" onclick="showScreen('home-screen')">‹</span>
+        <span>字体预设</span>
+        <span style="width: 30px"></span>
+        <!-- 保留这个占位符，让标题能完美居中 -->
+      </div>
+      <div class="form-container" style="gap: 20px">
+        <p
+          style="
+            font-size: 13px;
+            color: #ff6b6b;
+            background-color: rgba(255, 107, 107, 0.1);
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 107, 107, 0.2);
+            text-align: center;
+            width: 100%;
+            box-sizing: border-box;
+          "
+        >
+          字体太大了导入本地字体会闪退！最好用url。
+        </p>
+        <!-- 字体预设卡槽的容器 -->
+        <div id="font-preset-container">
+          <!-- 5个卡槽将由JavaScript动态生成在这里 -->
+        </div>
+
+        <!-- 全局字体预览区 -->
+        <div class="form-group" style="width: 100%">
+          <label>当前全局字体预览</label>
+          <div id="font-preview">
+            <p style="font-size: 20px; margin: 0 0 10px 0">
+              你好世界 Hello World
+            </p>
+            <p style="margin: 0">这是全局字体预览效果，12345。</p>
+          </div>
+        </div>
+
+        <button class="form-button form-button-secondary" id="reset-font-btn">
+          恢复默认字体
+        </button>
+      </div>
+    </div>
+
+    <!-- 这个是隐藏的文件选择器，用来处理本地上传 -->
+    <input
+      type="file"
+      id="font-preset-local-upload"
+      accept=".ttf,.otf,.woff,.woff2"
+      style="display: none"
+    />
+
+    <!-- “查角色手机”功能的所有HTML界面 -->
+
+    <!-- 1. 角色选择屏幕 (保持不变) -->

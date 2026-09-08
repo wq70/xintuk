@@ -1,0 +1,787 @@
+        </div>
+      </div>
+    </div>
+    <!-- 情侣头像库管理模态框 -->
+    <div id="couple-avatar-library-modal" class="modal">
+      <div class="modal-content" style="height: 70%">
+        <div class="modal-header">
+          <span>情侣头像库</span>
+          <button id="add-couple-avatar-btn" class="action-button">添加</button>
+        </div>
+        <div class="modal-body" style="padding: 15px; background: #f5f5f5">
+          <div
+            id="couple-avatar-library-list"
+            style="display: flex; flex-direction: column; gap: 15px"
+          >
+            <!-- 情头列表将由JS动态生成 -->
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button
+            class="save"
+            id="close-couple-avatar-library-btn"
+            style="width: 100%"
+          >
+            关闭
+          </button>
+        </div>
+      </div>
+    </div>
+    <!-- 替换原来的 id="add-couple-avatar-modal" -->
+    <div id="add-couple-avatar-modal" class="modal" style="z-index: 1002">
+      <div class="modal-content" style="height: auto">
+        <div class="modal-header">
+          <span>添加情侣头像</span>
+        </div>
+        <div class="modal-body">
+          <div
+            class="moe-grid-row"
+            style="
+              margin-bottom: 15px;
+              display: flex;
+              justify-content: space-around;
+            "
+          >
+            <!-- 你的头像 -->
+            <div class="form-group" style="text-align: center; width: 45%">
+              <label style="font-size: 12px; color: #666">我的头像</label>
+              <div
+                class="avatar-upload"
+                style="width: 80px; height: 80px; margin: 5px auto"
+              >
+                <img
+                  id="new-couple-my-avatar-preview"
+                  src="https://i.postimg.cc/pT2xKzPz/album-cover-placeholder.png"
+                  style="
+                    width: 100%;
+                    height: 100%;
+                    object-fit: cover;
+                    border-radius: 12px;
+                    border: 1px dashed #ccc;
+                  "
+                />
+                <!-- 隐藏的文件输入框 -->
+                <input
+                  type="file"
+                  id="new-couple-my-avatar-input"
+                  accept="image/*"
+                  hidden
+                />
+              </div>
+              <!-- 这里的按钮现在有 ID 了 -->
+              <button
+                id="upload-couple-my-btn"
+                class="moe-btn-mini"
+                style="width: 100%"
+              >
+                上传/URL
+              </button>
+            </div>
+
+            <!-- 对方头像 -->
+            <div class="form-group" style="text-align: center; width: 45%">
+              <label style="font-size: 12px; color: #666">对方头像</label>
+              <div
+                class="avatar-upload"
+                style="width: 80px; height: 80px; margin: 5px auto"
+              >
+                <img
+                  id="new-couple-char-avatar-preview"
+                  src="https://i.postimg.cc/pT2xKzPz/album-cover-placeholder.png"
+                  style="
+                    width: 100%;
+                    height: 100%;
+                    object-fit: cover;
+                    border-radius: 12px;
+                    border: 1px dashed #ccc;
+                  "
+                />
+                <!-- 隐藏的文件输入框 -->
+                <input
+                  type="file"
+                  id="new-couple-char-avatar-input"
+                  accept="image/*"
+                  hidden
+                />
+              </div>
+              <!-- 这里的按钮现在有 ID 了 -->
+              <button
+                id="upload-couple-char-btn"
+                class="moe-btn-mini"
+                style="width: 100%"
+              >
+                上传/URL
+              </button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>情头描述 (重要：AI将根据此描述选择头像)</label>
+            <textarea
+              id="new-couple-desc-input"
+              rows="3"
+              class="moe-input"
+              placeholder="例如：甜蜜的拥抱，我在左边抱着你..."
+            ></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="cancel-add-couple-avatar-btn">取消</button>
+          <button class="save" id="save-couple-avatar-btn">保存</button>
+        </div>
+      </div>
+    </div>
+    <!-- ★★★ 新增：路人头像库管理弹窗 ★★★ -->
+    <div id="passerby-avatar-manager-modal" class="modal">
+      <div class="modal-content" style="height: 70%">
+        <div class="modal-header">
+          <span>路人头像库 (<span id="passerby-count">0</span>)</span>
+          <div class="header-actions">
+            <button
+              id="bulk-add-passerby-btn"
+              class="action-button"
+              style="font-size: 14px"
+            >
+              批量添加
+            </button>
+          </div>
+        </div>
+        <div
+          class="modal-body"
+          style="padding: 15px; background-color: #f5f5f5"
+        >
+          <div
+            id="passerby-avatar-grid"
+            style="
+              display: grid;
+              grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+              gap: 10px;
+            "
+          >
+            <!-- JS动态生成 -->
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button
+            class="save"
+            id="close-passerby-manager-btn"
+            style="width: 100%"
+          >
+            关闭
+          </button>
+        </div>
+      </div>
+    </div>
+    <!-- 隐藏的文件上传控件 -->
+    <input
+      type="file"
+      id="passerby-upload-input"
+      accept="image/*"
+      multiple
+      hidden
+    />
+
+    <div id="bug-report-modal" class="modal">
+      <div class="modal-content" style="height: 70%; max-height: 600px">
+        <!-- 头部 -->
+        <div class="modal-header">
+          <span>🏩 报错急救站</span>
+          <button
+            class="nurse-btn nurse-btn-clear"
+            onclick="window.clearBugReport()"
+          >
+            🧹 清扫
+          </button>
+        </div>
+
+        <!-- 内容区 -->
+        <div
+          class="modal-body"
+          style="
+            padding: 15px;
+            background: #fff0f6;
+            display: flex;
+            flex-direction: column;
+          "
+        >
+          <p style="font-size: 12px; color: #eb2f96; margin-bottom: 5px">
+            👇 如果遇到问题，请复制下方的红字发给开发者：
+          </p>
+          <textarea id="error-log-viewer" readonly></textarea>
+        </div>
+
+        <!-- 底部按钮 -->
+        <div
+          class="modal-footer"
+          style="background: #fff0f6; justify-content: space-between"
+        >
+          <button
+            class="nurse-btn nurse-btn-close"
+            onclick="window.closeBugStation()"
+          >
+            关 闭
+          </button>
+          <button
+            class="nurse-btn nurse-btn-copy"
+            onclick="window.copyBugReport()"
+          >
+            📋 一键复制报错
+          </button>
+        </div>
+      </div>
+    </div>
+    <!-- [新] 萌系番茄钟音乐控制面板 -->
+    <div id="pomodoro-music-modal" class="modal">
+      <div
+        class="modal-content moe-music-modal-content"
+        style="height: 65%; width: 320px; padding: 0"
+      >
+        <!-- 头部 -->
+        <div class="moe-music-header">
+          <span>✨ 专注旋律 ✨</span>
+        </div>
+
+        <div
+          class="modal-body"
+          style="
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+          "
+        >
+          <!-- 上半部分：唱片机播放器 -->
+          <div class="pomo-player-container">
+            <div class="pomo-disc-wrapper">
+              <div id="pomo-disc-anim" class="pomo-disc">
+                <!-- 封面图 -->
+                <img
+                  id="pomo-music-cover"
+                  src="https://i.postimg.cc/pT2xKzPz/album-cover-placeholder.png"
+                />
+              </div>
+            </div>
+
+            <div class="pomo-track-info">
+              <h3 id="pomo-music-title">未播放</h3>
+              <p id="pomo-music-artist">点击播放开始专注</p>
+            </div>
+
+            <div class="pomo-controls-row">
+              <button class="pomo-ctrl-btn" id="pomo-music-prev" title="上一首">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <polygon points="19 20 9 12 19 4 19 20"></polygon>
+                  <line x1="5" y1="19" x2="5" y2="5"></line>
+                </svg>
+              </button>
+
+              <button class="pomo-play-btn" id="pomo-music-play">
+                <!-- 播放图标 -->
+                <svg
+                  id="pomo-icon-play"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  stroke="none"
+                >
+                  <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+                <!-- 暂停图标 (默认隐藏) -->
+                <svg
+                  id="pomo-icon-pause"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  stroke="none"
+                  style="display: none"
+                >
+                  <rect x="6" y="4" width="4" height="16"></rect>
+                  <rect x="14" y="4" width="4" height="16"></rect>
+                </svg>
+              </button>
+
+              <button class="pomo-ctrl-btn" id="pomo-music-next" title="下一首">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <polygon points="5 4 15 12 5 20 5 4"></polygon>
+                  <line x1="19" y1="5" x2="19" y2="19"></line>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- 下半部分：播放列表 -->
+          <div id="pomo-music-list" class="pomo-playlist">
+            <!-- JS生成列表项 -->
+          </div>
+        </div>
+
+        <div class="modal-footer" style="border: none; padding: 10px 20px 20px">
+          <button
+            class="save"
+            id="close-pomo-music-modal"
+            style="
+              width: 100%;
+              border-radius: 20px;
+              background: #e0e0e0;
+              color: #666;
+              border: none;
+            "
+          >
+            收起面板
+          </button>
+        </div>
+      </div>
+    </div>
+    <!-- 在 body 结束标签前，其他 modal 的旁边添加 -->
+
+    <!-- 情侣空间-照片详情与评论弹窗 (萌系升级版) -->
+    <div id="ls-photo-detail-modal" class="modal">
+      <div class="modal-content ls-photo-modal-content">
+        <!-- 1. 顶部标题栏 -->
+        <div class="ls-photo-modal-header">
+          <span>✨ 甜蜜瞬间 ✨</span>
+          <span id="ls-photo-detail-close-btn" class="close-btn">×</span>
+        </div>
+
+        <!-- 2. 中间滚动区域 -->
+        <div class="ls-photo-modal-body">
+          <!-- 图片展示区 (类似拍立得风格) -->
+          <div class="ls-polaroid-container">
+            <div class="ls-photo-wrapper">
+              <img id="ls-photo-detail-img" src="" alt="照片" />
+            </div>
+            <div id="ls-photo-detail-desc" class="ls-photo-desc"></div>
+            <div id="ls-photo-detail-meta" class="ls-photo-date"></div>
+          </div>
+
+          <!-- 评论区标题 -->
+          <div class="ls-comments-section-title">
+            <span class="icon">💬</span> 悄悄话
+          </div>
+
+          <!-- 评论列表 -->
+          <div id="ls-photo-comments-list" class="ls-comments-list">
+            <!-- JS生成评论 -->
+          </div>
+        </div>
+
+        <!-- 3. 底部输入栏 -->
+        <div class="ls-photo-modal-footer">
+          <input
+            type="text"
+            id="ls-photo-comment-input"
+            placeholder="写下你的想法( •̀ ω •́ )✧..."
+          />
+          <button id="ls-photo-comment-send-btn">发送</button>
+        </div>
+      </div>
+    </div>
+    <!-- 情侣空间 - 分享详情专用弹窗 (Ver 2.0 萌系版) -->
+    <div id="ls-share-detail-modal" class="modal">
+      <div class="modal-content ls-share-card-container">
+        <!-- 1. 顶部装饰区 -->
+        <div class="ls-share-header-bg"></div>
+
+        <!-- 2. 头像与徽章 (核心视觉) -->
+        <div class="ls-share-avatar-wrapper">
+          <img id="ls-share-char-avatar" src="" class="ls-share-avatar-img" />
+          <!-- 类型徽章 -->
+          <div class="ls-share-badge" id="ls-share-badge-icon">🎬</div>
+        </div>
+
+        <!-- 3. 内容区域 -->
+        <div class="ls-share-content-body">
+          <!-- 推荐语气泡 (像是在说话) -->
+          <div class="ls-share-speech-bubble">
+            <div class="bubble-arrow"></div>
+            <p id="ls-share-thoughts">在这里显示 TA 的感想...</p>
+          </div>
+
+          <!-- 作品信息卡片 -->
+          <div class="ls-share-info-box">
+            <h3 id="ls-share-detail-title">作品标题</h3>
+            <span class="ls-share-pill" id="ls-share-type-text">电影</span>
+            <div class="ls-share-divider"></div>
+            <div class="ls-share-summary-text" id="ls-share-summary">
+              这里是作品的简介内容...
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. 底部按钮 -->
+        <div class="ls-share-footer-action">
+          <button id="ls-share-detail-close-btn">收到安利 (o´ω`o)ﾉ</button>
+        </div>
+      </div>
+    </div>
+    <!-- 莫兰迪风娃娃机充值弹窗 -->
+    <div id="claw-machine-modal" class="modal">
+      <!-- 容器背景改为透明，去除默认阴影 -->
+      <div
+        class="modal-content"
+        style="
+          background: transparent;
+          box-shadow: none;
+          border: none;
+          padding: 0;
+          width: 380px;
+          height: 720px;
+          overflow: visible;
+          display: flex;
+          justify-content: center;
+        "
+      >
+        <div id="claw-machine-body" class="morandi-style">
+          <!-- ★★★ 顶部功能栏：左关闭、中标题、右刷新 ★★★ -->
+          <div class="machine-header-bar">
+            <!-- 左侧：关闭按钮 (移到这里，远离刷新) -->
+            <div class="action-group left">
+              <button
+                id="close-claw-machine"
+                class="icon-btn close-header-btn"
+                title="退出娃娃机"
+              >
+                ✕
+              </button>
+            </div>
+
+            <!-- 中间：标题 + 设置按钮 -->
+            <div class="title-group">
+              <div class="header-title">✨ LUCK BOX ✨</div>
+              <button
+                id="claw-manage-btn"
+                class="icon-btn settings-btn"
+                title="管理娃娃库"
+              >
+                ⚙️
+              </button>
+            </div>
+
+            <!-- 右侧：刷新按钮 -->
+            <div class="action-group right">
+              <button
+                id="claw-restart-btn"
+                class="icon-btn refresh-btn"
+                title="刷新/换一批"
+              >
+                ↻
+              </button>
+            </div>
+          </div>
+
+          <!-- 概率仪表盘 -->
+          <div class="prob-dashboard">
+            <div class="pie-chart-wrapper">
+              <div id="prob-pie-chart" class="pie-chart"></div>
+              <div class="pie-hole"></div>
+            </div>
+            <div id="prob-legend" class="chart-legend"></div>
+          </div>
+
+          <!-- 玻璃仓 -->
+          <div class="machine-window glass-effect">
+            <div class="reflection-light"></div>
+            <div id="machine-claw">
+              <div class="claw-line"></div>
+              <div class="claw-hand">
+                <div class="claw-finger left"></div>
+                <div class="claw-finger right"></div>
+              </div>
+            </div>
+            <div id="doll-pool"></div>
+            <div class="machine-chute">PUT</div>
+          </div>
+
+          <!-- 控制台 -->
+          <div class="machine-controls glass-effect">
+            <div class="control-group">
+              <div class="joystick-base">
+                <div id="machine-joystick" class="joystick-stick">
+                  <div class="joystick-ball"></div>
+                </div>
+              </div>
+            </div>
+            <div class="display-screen">
+              <span class="label">COINS</span>
+              <span id="claw-machine-balance" class="value">0.00</span>
+            </div>
+            <div class="btn-group">
+              <button id="claw-grab-btn" class="pearl-btn">GO</button>
+            </div>
+          </div>
+
+          <div class="machine-base"></div>
+
+          <!-- 注意：原来的底部悬浮关闭按钮代码已经删除了 -->
+        </div>
+      </div>
+    </div>
+    <div id="doll-manager-modal" class="modal">
+      <div class="modal-content" style="height: 70%">
+        <div class="modal-header">
+          <span>管理娃娃图鉴</span>
+          <div class="header-actions">
+            <button id="add-doll-btn" class="action-button">添加</button>
+            <button
+              id="reset-dolls-btn"
+              class="action-button"
+              style="margin-right: 5px"
+            >
+              重置默认
+            </button>
+          </div>
+        </div>
+        <div class="modal-body" style="background: #f5f5f5; padding: 15px">
+          <div
+            id="doll-manager-grid"
+            style="
+              display: grid;
+              grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+              gap: 10px;
+            "
+          >
+            <!-- JS动态生成 -->
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="save" id="close-doll-manager-btn" style="width: 100%">
+            完成
+          </button>
+        </div>
+      </div>
+    </div>
+    <!-- 隐藏的文件上传控件 -->
+    <input
+      type="file"
+      id="doll-upload-input"
+      accept="image/*"
+      multiple
+      hidden
+    />
+
+    <div id="inner-voice-modal" class="modal">
+      <!-- 心声主面板 -->
+      <div
+        id="inner-voice-main-panel"
+        class="modal-content"
+        style="
+          width: 90%;
+          max-width: 340px;
+          height: auto;
+          max-height: 80%;
+          background-color: #fffafb;
+          border: 1px solid #ffe4e1;
+        "
+      >
+        <div
+          class="modal-header"
+          style="
+            border-bottom: 1px solid #ffe4e1;
+            padding: 12px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+          "
+        >
+          <span
+            id="close-inner-voice-modal"
+            style="cursor: pointer; font-size: 24px"
+            >×</span
+          >
+
+          <div style="display: flex; align-items: center; gap: 15px">
+            <span
+              id="inner-voice-edit-btn"
+              style="cursor: pointer"
+              title="编辑心声面板"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M12 20h9"></path>
+                <path
+                  d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"
+                ></path>
+              </svg>
+            </span>
+            <span
+              id="change-inner-voice-bg-btn"
+              style="cursor: pointer"
+              title="更换背景"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                <polyline points="21 15 16 10 5 21"></polyline>
+              </svg>
+            </span>
+            <span id="inner-voice-history-btn" style="cursor: pointer">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+              </svg>
+            </span>
+          </div>
+        </div>
+
+        <div class="modal-body" style="padding: 15px">
+          <!-- 头像和名字信息现在是独立的、可定位的元素 -->
+          <!-- 角色头像 -->
+          <div id="inner-voice-avatar-wrapper">
+            <img id="inner-voice-avatar" src="" />
+            <!-- 为头像框预留的位置 -->
+            <img id="inner-voice-avatar-frame" src="" style="display: none" />
+          </div>
+
+          <!-- 角色名字 -->
+          <div id="inner-voice-char-info">
+            <div id="inner-voice-char-name"></div>
+          </div>
+
+          <!-- 领养人信息（头像+名字）-->
+          <div id="inner-voice-adopter-info">
+            <img id="inner-voice-adopter-avatar" src="" />
+            <span id="inner-voice-adopter-name"></span>
+          </div>
+
+          <!-- 心声内容 -->
+          <div
+            id="inner-voice-content-area"
+            style="display: flex; flex-direction: column; gap: 15px"
+          >
+            <div>
+              <strong style="color: #e57373">服装:</strong>
+              <p
+                id="inner-voice-clothing"
+                style="margin: 5px 0 0 0; line-height: 1.6; color: #555"
+              ></p>
+            </div>
+            <div>
+              <strong style="color: #81c784">行为:</strong>
+              <p
+                id="inner-voice-behavior"
+                style="margin: 5px 0 0 0; line-height: 1.6; color: #555"
+              ></p>
+            </div>
+            <div>
+              <strong style="color: #64b5f6">心声:</strong>
+              <p
+                id="inner-voice-thoughts"
+                style="margin: 5px 0 0 0; line-height: 1.6; color: #555"
+              ></p>
+            </div>
+            <div>
+              <strong style="color: #ba68c8">坏心思:</strong>
+              <p
+                id="inner-voice-naughty-thoughts"
+                style="margin: 5px 0 0 0; line-height: 1.6; color: #555"
+              ></p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 历史记录面板 (保持不变) -->
+      <div
+        id="inner-voice-history-panel"
+        class="modal-content"
+        style="
+          width: 90%;
+          max-width: 340px;
+          height: 80%;
+          background-color: #f5f5f5;
+          display: none;
+          flex-direction: column;
+        "
+      >
+        <div
+          class="modal-header"
+          style="border-bottom: 1px solid #ddd; justify-content: space-between"
+        >
+          <span
+            id="back-from-history-btn"
+            style="
+              cursor: pointer;
+              font-size: 16px;
+              font-weight: 600;
+              color: var(--accent-color);
+            "
+            >返回</span
+          >
+          <span>历史心声</span>
+          <span
+            id="clear-all-history-btn"
+            style="cursor: pointer; font-size: 14px; color: #ff3b30"
+            >全部清空</span
+          >
+        </div>
+        <div
+          class="modal-body"
+          id="inner-voice-history-list"
+          style="padding: 0"
+        >
+          <!-- 历史记录会由JS动态生成在这里 -->
+        </div>
+      </div>
+    </div>
+
+
+    <input
+      type="file"
+      id="character-card-input"
+      accept=".png, .json"
+      style="display: none"
+    />
+
+    <input
+      type="file"
+      id="world-book-import-input"
+      accept=".json, .jsonl"
+      style="display: none"
+    />
+    <input type="file" id="ludo-qbank-import-input" accept=".json" hidden />
+    <input type="file" id="inner-voice-bg-input" accept="image/*" hidden />
+    <input type="file" id="script-kill-import-input" accept=".json" hidden />
+  </body>
+</html>

@@ -1,0 +1,997 @@
+    // 找到它前面的 label 元素并修改文字
+    const iconLabel = document.querySelector(
+      'label[for="group-editor-icon-input"]',
+    );
+    if (iconLabel) iconLabel.textContent = "小组封面 (图片URL / Emoji)";
+
+    document.getElementById("group-editor-worldview-input").value =
+      group.worldview || "";
+
+    const categoriesString = (group.categories || [])
+      .map((c) => `#${c}`)
+      .join(" ");
+    document.getElementById("group-editor-categories-input").value =
+      categoriesString;
+
+    document
+      .getElementById("forum-group-editor-modal")
+      .classList.add("visible");
+  }
+
+  /**
+   * 保存对小组信息的修改
+   */
+  async function saveGroupSettings() {
+    if (!editingGroupId) return;
+
+    const name = document
+      .getElementById("group-editor-name-input")
+      .value.trim();
+    if (!name) {
+      alert("小组名称不能为空！");
+      return;
+    }
+
+    const description = document
+      .getElementById("group-editor-desc-input")
+      .value.trim();
+    const icon = document
+      .getElementById("group-editor-icon-input")
+      .value.trim();
+    const worldview = document
+      .getElementById("group-editor-worldview-input")
+      .value.trim();
+    const categoriesInput = document
+      .getElementById("group-editor-categories-input")
+      .value.trim();
+    // 解析分类字符串
+    const categories = categoriesInput
+      ? categoriesInput.match(/#(\S+)/g)?.map((tag) => tag.substring(1)) || []
+      : [];
+
+    await db.forumGroups.update(editingGroupId, {
+      name,
+      description,
+      icon,
+      worldview,
+      categories,
+    });
+
+    document
+      .getElementById("forum-group-editor-modal")
+      .classList.remove("visible");
+    await renderForumScreen();
+    alert("小组信息已更新！");
+  }
+
+  /**
+   * 打开分类管理弹窗
+   */
+  async function openForumCategoryManager() {
+    await renderForumCategoryList();
+    document
+      .getElementById("forum-category-manager-modal")
+      .classList.add("visible");
+  }
+
+  /**
+   * 在弹窗中渲染分类列表
+   */
+  async function renderForumCategoryList() {
+    const listEl = document.getElementById("existing-forum-categories-list");
+    const categories = await db.forumCategories.toArray();
+    listEl.innerHTML = "";
+    if (categories.length === 0) {
+      listEl.innerHTML =
+        '<p style="text-align: center; color: var(--text-secondary);">还没有任何分类</p>';
+    }
+    categories.forEach((cat) => {
+      const item = document.createElement("div");
+      item.className = "existing-group-item";
+      item.innerHTML = `
+            <span class="group-name">${cat.name}</span>
+            <span class="delete-group-btn" data-id="${cat.id}">×</span>
+        `;
+      listEl.appendChild(item);
+    });
+  }
+
+  /**
+   * 添加一个新的圈子分类
+   */
+  async function addNewForumCategory() {
+    const input = document.getElementById("new-forum-category-name-input");
+    const name = input.value.trim();
+    if (!name) {
+      alert("分类名不能为空！");
+      return;
+    }
+    const existing = await db.forumCategories
+      .where("name")
+      .equals(name)
+      .first();
+    if (existing) {
+      alert(`分类 "${name}" 已经存在了！`);
+      return;
+    }
+    await db.forumCategories.add({ name });
+    input.value = "";
+    await renderForumCategoryList();
+  }
+
+  /**
+   * 删除一个圈子分类
+   */
+  async function deleteForumCategory(categoryId) {
+    const confirmed = await showCustomConfirm(
+      "确认删除",
+      "确定要删除这个分类吗？",
+      {
+        confirmButtonClass: "btn-danger",
+      },
+    );
+    if (confirmed) {
+      await db.forumCategories.delete(categoryId);
+      await renderForumCategoryList();
+    }
+  }
+  async function openGroupCreator() {
+    const name = await showCustomPrompt("创建新小组", "请输入小组名称：");
+    if (!name || !name.trim()) {
+      if (name !== null) alert("小组名称不能为空！");
+      return;
+    }
+
+    const desc = await showCustomPrompt("小组描述", "为你的小组写一句简介吧：");
+    if (desc === null) return;
+
+    // ★★★ 修改：提示输入 URL ★★★
+    const icon = await showCustomPrompt(
+      "小组封面",
+      "请输入图片链接 (URL)：\n(留空则使用默认图标)",
+      "",
+      "url",
+    );
+    if (icon === null) return;
+
+    try {
+      const newGroup = {
+        name: name.trim(),
+        description: desc.trim(),
+        icon: icon.trim(), // 存入URL
+      };
+      await db.forumGroups.add(newGroup);
+      await renderForumScreen();
+      alert(`小组“${name.trim()}”创建成功！`);
+    } catch (error) {
+      console.error("创建小组失败:", error);
+      alert(`创建失败: ${error.message}`);
+    }
+  }
+
+  /**
+   * 【全新】删除一个小组
+   * @param {number} groupId - 要删除的小组的ID
+   */
+  async function deleteGroupAndPosts(groupId) {
+    const group = await db.forumGroups.get(groupId);
+    if (!group) return;
+
+    const confirmed = await showCustomConfirm(
+      "确认删除",
+      `确定要删除小组“${group.name}”吗？此操作将同时删除该小组内的【所有帖子和评论】，且无法恢复！`,
+      { confirmButtonClass: "btn-danger" },
+    );
+
+    if (confirmed) {
+      try {
+        // 1. 找到该小组下的所有帖子
+        const postsToDelete = await db.forumPosts
+          .where("groupId")
+          .equals(groupId)
+          .toArray();
+        const postIds = postsToDelete.map((p) => p.id);
+
+        // 2. 如果有帖子，就找到这些帖子下的所有评论并删除
+        if (postIds.length > 0) {
+          await db.forumComments.where("postId").anyOf(postIds).delete();
+        }
+
+        // 3. 删除所有帖子
+        await db.forumPosts.where("groupId").equals(groupId).delete();
+
+        // 4. 最后删除小组本身
+        await db.forumGroups.delete(groupId);
+
+        await renderForumScreen(); // 刷新列表
+        alert(`小组“${group.name}”及其所有内容已删除。`);
+      } catch (error) {
+        console.error("删除小组时出错:", error);
+        alert(`删除失败: ${error.message}`);
+      }
+    }
+  }
+  // ▼▼▼ 用这块【V4 | 最终分类版】代码，完整替换旧的 generateEntertainmentGroupContent 函数 ▼▼▼
+
+  // ▼▼▼ 用这块【V5 | 最终原创分类版】代码，完整替换旧的 generateEntertainmentGroupContent 函数 ▼▼▼
+
+  /**
+   * 【AI核心 - 娱乐小组 V5 | 最终原创分类版】
+   */
+  async function generateEntertainmentGroupContent(groupId) {
+    if (!groupId) return;
+
+    await showCustomAlert("请稍候...", "娱乐小组正在紧急开会讨论最新热点...");
+
+    const { proxyUrl, apiKey, model } = state.apiConfig;
+    if (!proxyUrl || !apiKey || !model) {
+      alert("请先在API设置中配置好才能生成内容哦！");
+      return;
+    }
+
+    const publicFigures = Object.values(state.chats)
+      .filter((c) => !c.isGroup)
+      .map((c) => ({
+        name: c.name,
+        profession: c.settings.weiboProfession || "艺人",
+        persona: (
+          c.settings.weiboInstruction || c.settings.aiPersona
+        ).substring(0, 150),
+      }));
+
+    let topicsContext = "";
+    if (weiboHotSearchCache && weiboHotSearchCache.length > 0) {
+      topicsContext = `请围绕以下【当前最新的微博热搜话题】展开讨论：\n${weiboHotSearchCache
+        .map((t) => `- ${t.topic}`)
+        .join("\n")}`;
+    } else {
+      topicsContext = `请你根据下方“公众人物列表”中各个角色的【职业和人设】，为他们创造一些符合身份的、可能引发讨论的娱乐新闻或八卦事件作为讨论主题。`;
+    }
+
+    // --- ▼▼▼ 【核心修改】彻底重写Prompt指令 ---
+    const prompt = `
+# 任务
+你是一个专业的“豆瓣娱乐小组资深用户模拟器”。你的任务是根据一个热门娱乐主题，生成5个帖子和对应的评论，模拟小组内的真实讨论氛围。
+
+# 当前讨论主题
+${topicsContext}
+
+# 核心规则
+1.  **豆瓣风格铁律**: 所有帖子的标题、内容和评论都【必须】是地道的“豆瓣小组”风格。
+2.  **【【【分类铁律】】】**: 你【必须】为每一个帖子，根据其八卦内容，【原创】1-2个高度相关的分类标签。绝对不要使用任何预设列表。例如，如果帖子是关于恋情的，分类可以是 ["恋情瓜"]。
+3.  **角色扮演铁律**: 你生成的帖子内容可以【讨论或提及】下方的公众人物，但【不能扮演他们】亲自发帖。所有帖子都必须是路人视角。
+4.  **格式铁律**: 你的回复【必须且只能】是一个严格的JSON数组，包含5个帖子对象。每个对象【必须】包含 "author", "title", "content", "categories", 和 "comments" 字段。
+    - "categories" 字段【必须】是你为这篇帖子原创的分类数组。
+
+# 公众人物列表 (他们是讨论的对象，但不是发帖人)
+${JSON.stringify(publicFigures, null, 2)}
+
+# JSON输出格式示例:
+[
+  {
+    "author": "momo",
+    "title": "不懂就问，最近那个热搜上的剧真的好看吗？",
+    "content": "首页天天刷到，有点好奇但又怕踩雷...",
+    "categories": ["新剧讨论"],
+    "comments": [
+      {"author": "已注销", "content": "不好看，别去。"}
+    ]
+  }
+]
+`;
+    // --- ▲▲▲ 更新结束 ▲▲▲ ---
+
+    const messagesForApi = [{ role: "user", content: prompt }];
+
+    try {
+      let isGemini = proxyUrl === GEMINI_API_URL;
+      let geminiConfig = toGeminiRequestData(
+        model,
+        apiKey,
+        prompt,
+        messagesForApi,
+        isGemini,
+      );
+
+      const response = isGemini
+        ? await fetch(geminiConfig.url, geminiConfig.data)
+        : await fetch(`${proxyUrl}/v1/chat/completions`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+              model: model,
+              messages: messagesForApi,
+              temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+              response_format: { type: "json_object" },
+            }),
+          });
+
+      if (!response.ok) throw new Error(`API请求失败: ${response.status}`);
+
+      const data = await response.json();
+      const rawContent = isGemini
+        ? data.candidates[0].content.parts[0].text
+        : data.choices[0].message.content;
+      const cleanedContent = rawContent.replace(/^```json\s*|```$/g, "").trim();
+      const newPostsData = JSON.parse(cleanedContent);
+
+      if (Array.isArray(newPostsData) && newPostsData.length > 0) {
+        let totalPosts = 0;
+        let totalComments = 0;
+        for (const postData of newPostsData) {
+          // --- ▼▼▼ 【核心新增】保存分类数据 ---
+          const newPost = {
+            groupId: groupId,
+            title: postData.title,
+            content: postData.content,
+            author: postData.author,
+            timestamp: Date.now() + totalPosts,
+            categories: postData.categories || [], // 保存分类
+          };
+          // --- ▲▲▲ 新增结束 ▲▲▲ ---
+
+          const postId = await db.forumPosts.add(newPost);
+          totalPosts++;
+
+          if (postData.comments && Array.isArray(postData.comments)) {
+            const commentsToAdd = postData.comments.map((comment) => ({
+              postId: postId,
+              author: comment.author,
+              content: comment.content,
+              timestamp: Date.now() + totalPosts + totalComments++,
+            }));
+            if (commentsToAdd.length > 0) {
+              await db.forumComments.bulkAdd(commentsToAdd);
+            }
+          }
+        }
+        await renderGroupPosts(groupId);
+        await showCustomAlert(
+          "生成成功！",
+          `已为娱乐小组生成了 ${totalPosts} 条新帖子和 ${totalComments} 条评论。`,
+        );
+      } else {
+        throw new Error("AI返回的数据格式不正确。");
+      }
+    } catch (error) {
+      console.error("生成娱乐小组内容失败:", error);
+      await showCustomAlert("生成失败", `发生了一个错误：\n${error.message}`);
+    }
+  }
+  // ▲▲▲ 替换结束 ▲▲▲
+
+  // ▼▼▼ 用这块【V4 | 最终原创分类版】代码，完整替换旧的 generateDreamPost 函数 ▼▼▼
+
+  /**
+   * 【全新修正版 | V4】为“梦角小组”生成专属帖子的核心函数
+   */
+  async function generateDreamPost(groupId) {
+    await showCustomAlert("请稍候...", "正在为user编织一个甜蜜的梦境...");
+
+    const { proxyUrl, apiKey, model } = state.apiConfig;
+    if (!proxyUrl || !apiKey || !model) {
+      alert("请先在API设置中配置好才能生成内容哦！");
+      return;
+    }
+
+    const allChars = Object.values(state.chats).filter((c) => !c.isGroup);
+    if (allChars.length === 0) {
+      alert("还没有任何角色，无法发布梦境哦。");
+      return;
+    }
+
+    const postingChar = allChars[Math.floor(Math.random() * allChars.length)];
+    const userPersona = state.qzoneSettings.persona || "一个普通的、温柔的人。";
+    const userNickname = state.qzoneSettings.nickname || "{{user}}";
+
+    // --- ▼▼▼ 【核心修改】彻底重写Prompt指令 ---
+    const prompt = `
+# 任务：角色扮演与帖子创作（带评论和分类）
+你现在【就是】角色“${postingChar.name}”。你正在一个名为“梦角小组”的秘密论坛里。
+这个小组是你们这些角色，偷偷向彼此炫耀、倾诉对你们的共同爱人——用户“${userNickname}”——的爱意和幻想的地方。
+
+# 核心规则
+1.  **第一人称视角**: 你【必须】使用角色“${postingChar.name}”的第一人称视角来写作帖子正文。
+2.  **帖子主题**: 你的帖子内容是你对你的爱人“${userNickname}”的爱意表达或幻想。
+3.  **【【【分类铁律】】】**: 你【必须】根据梦境的具体内容，为这篇帖子【原创】1-2个高度相关的分类标签。绝对不要使用任何预设列表。例如，如果内容是甜蜜的日常，分类可以是 ["甜蜜日常"]。
+4.  **评论生成**: 在创作完帖子后，你还需要立刻切换到“其他小组成员”的视角，为这篇帖子生成【2-3条】符合情景的评论。
+5.  **格式铁律**: 你的回复【必须且只能】是一个严格的JSON对象，包含 "title", "content", "categories", 和 "comments" 字段。
+    - "categories" 字段【必须】是你为这篇帖子原创的分类数组。
+
+# 你的信息
+-   你的名字: ${postingChar.name}
+-   你的人设: ${postingChar.settings.aiPersona}
+
+# 你的爱人信息
+-   爱人的名字: ${userNickname}
+-   爱人的人设: ${userPersona}
+
+# JSON输出格式示例:
+{
+  "title": "关于他睡觉时的小习惯",
+  "content": "偷偷告诉你们，${userNickname}睡觉的时候喜欢抱着枕头的一角...",
+  "categories": ["甜蜜日常", "小习惯"],
+  "comments": [
+    {"author": "路人A", "content": "哇，好甜！"}
+  ]
+}
+`;
+    // --- ▲▲▲ 更新结束 ▲▲▲ ---
+
+    const messagesForApi = [{ role: "user", content: prompt }];
+
+    try {
+      let isGemini = proxyUrl === GEMINI_API_URL;
+      let geminiConfig = toGeminiRequestData(
+        model,
+        apiKey,
+        prompt,
+        messagesForApi,
+        isGemini,
+      );
+
+      const response = isGemini
+        ? await fetch(geminiConfig.url, geminiConfig.data)
+        : await fetch(`${proxyUrl}/v1/chat/completions`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+              model: model,
+              messages: messagesForApi,
+              temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+              response_format: { type: "json_object" },
+            }),
+          });
+
+      if (!response.ok) throw new Error(`API请求失败: ${response.status}`);
+
+      const data = await response.json();
+      const rawContent = isGemini
+        ? data.candidates[0].content.parts[0].text
+        : data.choices[0].message.content;
+      const cleanedContent = rawContent.replace(/^```json\s*|```$/g, "").trim();
+      const postData = JSON.parse(cleanedContent);
+
+      if (postData.title && postData.content) {
+        // --- ▼▼▼ 【核心新增】保存分类数据 ---
+        const newPost = {
+          groupId: groupId,
+          title: postData.title,
+          content: postData.content,
+          author: postingChar.name,
+          timestamp: Date.now(),
+          categories: postData.categories || [], // 保存分类
+        };
+        // --- ▲▲▲ 新增结束 ▲▲▲ ---
+
+        const postId = await db.forumPosts.add(newPost);
+
+        if (postData.comments && Array.isArray(postData.comments)) {
+          const commentsToAdd = postData.comments.map((c, i) => ({
+            postId,
+            author: c.author,
+            content: c.content,
+            timestamp: Date.now() + i + 1,
+          }));
+          await db.forumComments.bulkAdd(commentsToAdd);
+        }
+
+        await renderGroupPosts(groupId);
+        await showCustomAlert(
+          "发布成功！",
+          `“${postingChar.name}”发布了一条新的梦境。`,
+        );
+      } else {
+        throw new Error("AI返回的数据格式不正确。");
+      }
+    } catch (error) {
+      console.error("生成梦角帖子失败:", error);
+      await showCustomAlert("生成失败", `发生了一个错误：\n${error.message}`);
+    }
+  }
+  // ▲▲▲ 替换结束 ▲▲▲
+  // ▼▼▼ 用这块【已修复】的代码，完整替换你旧的 openForumFilterModal 函数 ▼▼▼
+  /**
+   * 【总入口】打开分类筛选模态框 (V3 - 已分离小组和帖子的分类)
+   * @param {'global' | 'group'} type - 筛选类型：'global'为主页筛选小组，'group'为小组内筛选帖子
+   * @param {number|null} id - 如果是小组内筛选，则为小组的ID
+   */
+  async function openForumFilterModal(type, id = null) {
+    currentFilterContext = { type, id };
+    const modal = document.getElementById("forum-filter-modal");
+    const listEl = document.getElementById("forum-filter-category-list");
+    listEl.innerHTML = "";
+
+    // --- ▼▼▼ 核心修正：根据上下文，从不同的地方收集分类 ▼▼▼ ---
+    let availableCategories = new Set(); // 使用Set来自动去重
+
+    try {
+      if (type === "global") {
+        // 如果是在“圈子”主页，我们只关心【小组】的分类
+        console.log("正在为小组列表收集分类...");
+        const allGroups = await db.forumGroups.toArray();
+        allGroups.forEach((group) => {
+          if (group.categories) {
+            group.categories.forEach((cat) => availableCategories.add(cat));
+          }
+        });
+      } else if (type === "group" && id) {
+        // 如果是在具体的“小组”页面，我们只关心该小组下【帖子】的分类
+        console.log(`正在为小组 ID: ${id} 的帖子列表收集分类...`);
+        const postsInGroup = await db.forumPosts
+          .where("groupId")
+          .equals(id)
+          .toArray();
+        postsInGroup.forEach((post) => {
+          if (post.categories) {
+            post.categories.forEach((cat) => availableCategories.add(cat));
+          }
+        });
+      }
+    } catch (error) {
+      console.error("收集分类标签时出错:", error);
+    }
+    // --- ▲▲▲ 修复结束 ▲▲▲ ---
+
+    const categoryArray = Array.from(availableCategories).sort(); // 转换为数组并排序
+
+    if (categoryArray.length === 0) {
+      listEl.innerHTML =
+        '<p style="color: var(--text-secondary); padding: 20px;">当前没有任何可用的分类标签。</p>';
+    } else {
+      const activeFilters =
+        type === "global"
+          ? activeForumFilters.global
+          : activeForumFilters.group[id] || [];
+
+      categoryArray.forEach((catName, index) => {
+        const isChecked = activeFilters.includes(catName);
+        const label = document.createElement("label");
+        const inputId = `filter-cat-${type}-${index}`; // 创建唯一的ID
+        label.setAttribute("for", inputId);
+        label.innerHTML = `
+                <input type="checkbox" id="${inputId}" value="${catName}" ${isChecked ? "checked" : ""}>
+                <span>${catName}</span>
+            `;
+        listEl.appendChild(label);
+      });
+    }
+
+    modal.classList.add("visible");
+  }
+  // ▲▲▲ 替换结束 ▲▲▲
+
+  /**
+   * 应用筛选条件并刷新列表
+   */
+  async function applyForumFilter() {
+    const { type, id } = currentFilterContext;
+    const selectedCategories = Array.from(
+      document.querySelectorAll("#forum-filter-category-list input:checked"),
+    ).map((cb) => cb.value);
+
+    const filterBtnId =
+      type === "global" ? "forum-filter-btn" : "group-filter-btn";
+    const filterBtn = document.getElementById(filterBtnId);
+
+    if (type === "global") {
+      activeForumFilters.global = selectedCategories;
+      await renderForumScreen();
+    } else if (type === "group" && id) {
+      if (!activeForumFilters.group[id]) activeForumFilters.group[id] = [];
+      activeForumFilters.group[id] = selectedCategories;
+      await renderGroupPosts(id);
+    }
+
+    // 根据是否应用了筛选，更新图标状态
+    if (selectedCategories.length > 0) {
+      filterBtn.classList.add("active");
+    } else {
+      filterBtn.classList.remove("active");
+    }
+
+    document.getElementById("forum-filter-modal").classList.remove("visible");
+  }
+
+  async function followSeries(seriesId) {
+    if (!seriesId) return;
+    const series = await db.forumSeries.get(seriesId);
+    if (!series) {
+      alert("未找到对应的连载");
+      return;
+    }
+    if (series.isFollowed) {
+      await showCustomAlert(
+        "已追更",
+        `《${series.title || "这部连载"}》已经在书架里啦。`,
+      );
+      return;
+    }
+    const now = Date.now();
+    await db.forumSeries.update(seriesId, {
+      isFollowed: true,
+      bookshelfAddedAt: now,
+    });
+    await showCustomAlert(
+      "追更成功",
+      `《${series.title || "这部连载"}》已加入圈子书架，并会自动为你追更。`,
+    );
+    await renderForumBookshelf();
+    await generateNextSeriesChapter(seriesId);
+  }
+
+  async function generateNextSeriesChapter(seriesId) {
+    if (!seriesId) return;
+    if (ongoingSeriesTasks.has(seriesId)) {
+      await showCustomAlert("正在追更", "上一章还在生成中，请稍等~");
+      return;
+    }
+    const series = await db.forumSeries.get(seriesId);
+    if (!series) {
+      alert("未找到对应的连载");
+      return;
+    }
+    const chapters = await db.forumChapters
+      .where("seriesId")
+      .equals(seriesId)
+      .sortBy("chapterIndex");
+    if (chapters.length === 0) {
+      alert("还没有章节可以续写");
+      return;
+    }
+
+    const targetGroupId = series.groupId || window.activeGroupId;
+    if (!targetGroupId) {
+      ongoingSeriesTasks.delete(seriesId);
+      alert("未找到所属小组，无法追更");
+      return;
+    }
+    if (series.isFinished) {
+      ongoingSeriesTasks.delete(seriesId);
+      await showCustomAlert(
+        "已完结",
+        `《${series.title || "这部连载"}》已标记完结，不能继续追更。`,
+      );
+      return;
+    }
+    const seriesAuthor =
+      series.seriesAuthor ||
+      getRandomItem([
+        "隔壁文手",
+        "星河写手",
+        "匿名太太",
+        "笔名未定",
+        "拾字人",
+      ]) ||
+      "匿名太太";
+
+    const seriesTitle = series.title || series.pairing || "这部连载";
+    const lastChapter = chapters[chapters.length - 1];
+    const summaryContext = chapters
+      .map(
+        (ch) =>
+          `第${ch.chapterIndex}章《${ch.title || ""}》：${
+            ch.summary || (ch.content || "").slice(0, 120) || "（暂无摘要）"
+          }`,
+      )
+      .join("\n");
+    const nextIndex =
+      (series.lastChapterIndex || lastChapter.chapterIndex || chapters.length) +
+      1;
+
+    ongoingSeriesTasks.add(seriesId);
+    await showCustomAlert("追更中...", `正在写第${nextIndex}章，稍等片刻...`);
+
+    const { proxyUrl, apiKey, model } = state.apiConfig;
+    if (!proxyUrl || !apiKey || !model) {
+      ongoingSeriesTasks.delete(seriesId);
+      alert("请先配置API！");
+      return;
+    }
+
+    const char1Persona =
+      series.char1Persona || getPersonaByName(series.char1Name);
+    const char2Persona =
+      series.char2Persona || getPersonaByName(series.char2Name);
+    const userPersona =
+      series.userPersona ||
+      state.qzoneSettings.weiboUserPersona ||
+      "一个普通人";
+    const lengthInstruction = series.wordCount
+      ? `本章的篇幅尽量接近【${series.wordCount}】。`
+      : "本章不少于1000字。";
+
+    const prompt = `
+你是连载小说作者，请继续创作《${seriesTitle}》的第${nextIndex}章。
+
+# 角色与人设
+- 角色A (${series.char1Name || "角色A"}): ${char1Persona}
+- 角色B (${series.char2Name || "角色B"}): ${char2Persona}
+- 用户: ${userPersona}
+
+# 写作要求
+- 题材/类型: ${series.type || "沿用前文"}
+- 文风: ${series.style || "保持前文一致"}
+- 世界观/剧情设定: ${series.worldview || "沿用既定设定"}
+- ${lengthInstruction}
+- 评论：为本章生成 5-8 条读者评论/弹幕，语言自然有代入感。
+- 完结判断：如果本章已经收束主要矛盾、故事完结，请将 isFinished 设为 true；否则为 false，并继续保留可追更的悬念。
+
+# 已发布章节摘要 (供你掌握主线)
+${summaryContext || "暂无摘要"}
+
+# 上一章全文 (供衔接)
+${lastChapter.content || ""}
+
+# 输出格式 (严格JSON对象，包含 5-8 条评论，并用 isFinished 标记是否完结)
+{
+  "chapterTitle": "第${nextIndex}章 标题",
+  "chapterSummary": "本章摘要，3-5句",
+  "chapterContent": "完整正文",
+  "categories": ["标签1","标签2"],
+  "comments": [
+    {"author": "读者A", "content": "弹幕或短评"},
+    {"author": "读者B", "content": "弹幕或短评"}
+  ],
+  "isFinished": false
+}
+仅输出JSON。`;
+
+    const messagesForApi = [{ role: "user", content: prompt }];
+    try {
+      let isGemini = proxyUrl === GEMINI_API_URL;
+      let geminiConfig = toGeminiRequestData(
+        model,
+        apiKey,
+        prompt,
+        messagesForApi,
+        isGemini,
+      );
+      const response = isGemini
+        ? await fetch(geminiConfig.url, geminiConfig.data)
+        : await fetch(`${proxyUrl}/v1/chat/completions`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+              model: model,
+              messages: messagesForApi,
+              temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+              response_format: { type: "json_object" },
+            }),
+          });
+      if (!response.ok) throw new Error(`API请求失败: ${response.status}`);
+
+      const data = await response.json();
+      const rawContent = isGemini
+        ? data.candidates[0].content.parts[0].text
+        : data.choices[0].message.content;
+      let parsed;
+      try {
+        const cleanedContent = rawContent
+          .replace(/^```json\s*|```$/g, "")
+          .trim();
+        parsed = JSON.parse(cleanedContent);
+      } catch (e) {
+        console.error("解析追更返回数据失败", e);
+        throw new Error("AI返回了无效的JSON格式。");
+      }
+
+      const chapterTitle = parsed.chapterTitle || `第${nextIndex}章`;
+      const chapterContent =
+        parsed.chapterContent ||
+        parsed.story ||
+        parsed.content ||
+        "本章生成失败，请重试。";
+      const chapterSummary = parsed.chapterSummary || "";
+      const baseCategories = Array.isArray(parsed.categories)
+        ? parsed.categories
+        : [];
+      const postCategories = Array.from(
+        new Set(["长篇", "连载", "追更", ...baseCategories]),
+      );
+      const timestamp = Date.now();
+      const isFinished = !!parsed.isFinished;
+
+      const postId = await db.forumPosts.add({
+        groupId: targetGroupId,
+        title: `【连载】${seriesTitle} - 第${nextIndex}章 ${chapterTitle.replace(/^第\d+章\s*/i, "")}`,
+        content: chapterContent,
+        author: seriesAuthor,
+        timestamp,
+        categories: postCategories,
+        lengthType: "long",
+        seriesId,
+        chapterIndex: nextIndex,
+      });
+
+      if (parsed.comments && Array.isArray(parsed.comments)) {
+        const commentsToAdd = parsed.comments
+          .filter((c) => c && c.content)
+          .map((c, idx) => ({
+            postId,
+            author: c.author || "路人",
+            content: c.content,
+            timestamp: timestamp + idx + 1,
+          }));
+        if (commentsToAdd.length > 0) {
+          await db.forumComments.bulkAdd(commentsToAdd);
+        }
+      }
+
+      const chapterId = await db.forumChapters.add({
+        seriesId,
+        chapterIndex: nextIndex,
+        title: chapterTitle,
+        summary: chapterSummary,
+        content: chapterContent,
+        createdAt: timestamp,
+        postId,
+      });
+
+      await db.forumSeries.update(seriesId, {
+        lastChapterId: chapterId,
+        lastChapterIndex: nextIndex,
+        updatedAt: timestamp,
+        isFinished,
+      });
+
+      if (targetGroupId) {
+        await renderGroupPosts(targetGroupId);
+      }
+      await renderForumBookshelf();
+      if (activeSeriesId === seriesId) {
+        await renderSeriesDetail(seriesId);
+      }
+      await showCustomAlert("追更完成", `第${nextIndex}章已经写好，去看看吧！`);
+    } catch (error) {
+      console.error("追更失败:", error);
+      await showCustomAlert("追更失败", `发生了一个错误：\n${error.message}`);
+    } finally {
+      ongoingSeriesTasks.delete(seriesId);
+    }
+  }
+
+  async function openForumBookshelf() {
+    await renderForumBookshelf();
+    showScreen("forum-bookshelf-screen");
+  }
+
+  async function renderForumBookshelf() {
+    const listEl = document.getElementById("forum-bookshelf-list");
+    if (!listEl) return;
+    const allSeries = await db.forumSeries.toArray();
+    const followed = allSeries.filter((s) => s.isFollowed);
+
+    if (followed.length === 0) {
+      listEl.innerHTML =
+        '<p style="text-align:center; color: #8a8a8a; padding: 40px 0;">书架空空如也，去追更一部长篇吧！</p>';
+      return;
+    }
+
+    followed.sort(
+      (a, b) =>
+        (b.updatedAt || b.bookshelfAddedAt || 0) -
+        (a.updatedAt || a.bookshelfAddedAt || 0),
+    );
+
+    const cards = [];
+    for (const series of followed) {
+      const chapters = await db.forumChapters
+        .where("seriesId")
+        .equals(series.id)
+        .sortBy("chapterIndex");
+      const lastChapter = chapters[chapters.length - 1];
+      const lastTitle = lastChapter
+        ? `第${lastChapter.chapterIndex}章 ${lastChapter.title || ""}`
+        : "尚无章节";
+      const lastPostId = lastChapter?.postId || "";
+      const isFinished = !!series.isFinished;
+      const continueText = isFinished ? "已完结" : "追更";
+
+      cards.push(`
+        <div class="forum-bookshelf-card" data-series-id="${series.id}">
+          <div class="series-card-header">
+            <div class="series-card-title">${series.title || series.pairing || "未命名连载"}</div>
+            <div class="series-card-meta">${series.pairing || ""}</div>
+            <div class="series-card-meta">最新：${lastTitle} · ${isFinished ? "已完结" : "连载中"}</div>
+          </div>
+          <div class="series-card-actions">
+            <button class="mini-btn primary" data-series-action="read-latest" data-series-id="${series.id}" data-post-id="${lastPostId}">阅读</button>
+            <button class="mini-btn" data-series-action="open-detail" data-series-id="${series.id}">目录</button>
+            <button class="mini-btn ${isFinished ? "disabled" : ""}" data-series-action="continue" data-series-id="${series.id}" ${isFinished ? "disabled" : ""}>${continueText}</button>
+            <button class="mini-btn" data-series-action="share" data-series-id="${series.id}">分享</button>
+          </div>
+        </div>
+      `);
+    }
+
+    listEl.innerHTML = cards.join("");
+  }
+
+  async function openSeriesDetail(seriesId) {
+    activeSeriesId = seriesId;
+    await renderSeriesDetail(seriesId);
+    showScreen("forum-series-detail-screen");
+  }
+
+  async function renderSeriesDetail(seriesId) {
+    const metaEl = document.getElementById("forum-series-meta");
+    const listEl = document.getElementById("forum-series-chapter-list");
+    if (!metaEl || !listEl) return;
+
+    const series = await db.forumSeries.get(seriesId);
+    if (!series) {
+      metaEl.innerHTML = '<p style="padding: 15px;">未找到连载。</p>';
+      listEl.innerHTML = "";
+      return;
+    }
+    const isFinished = !!series.isFinished;
+
+    document.getElementById("forum-series-detail-title").textContent =
+      series.title || "连载详情";
+
+    const chapters = await db.forumChapters
+      .where("seriesId")
+      .equals(seriesId)
+      .sortBy("chapterIndex");
+    const nextIndex = (series.lastChapterIndex || chapters.length) + 1;
+    const metaLines = [
+      `<div class="series-meta-line">CP：${series.pairing || `${series.char1Name || ""}x${series.char2Name || ""}`}</div>`,
+      `<div class="series-meta-line">状态：${isFinished ? "已完结" : `已更新至第${series.lastChapterIndex || chapters.length || 1}章`}</div>`,
+      `<div class="series-meta-line">题材：${series.type || "未设置"} · 文风：${series.style || "未设置"}</div>`,
+    ];
+    metaEl.innerHTML = `<div class="forum-series-card">${metaLines.join("")}</div>`;
+
+    const nextBtn = document.getElementById("series-next-chapter-btn");
+    if (nextBtn) {
+      nextBtn.dataset.seriesId = seriesId;
+      nextBtn.textContent = isFinished ? "已完结" : `追更第${nextIndex}章`;
+      nextBtn.disabled = isFinished;
+      nextBtn.classList.toggle("disabled", isFinished);
+    }
+
+    if (chapters.length === 0) {
+      listEl.innerHTML =
+        '<p style="padding: 15px; color: var(--text-secondary);">还没有章节。</p>';
+      return;
+    }
+
+    listEl.innerHTML = chapters
+      .map(
+        (ch) => `
+        <div class="forum-chapter-item" data-post-id="${ch.postId || ""}" data-series-id="${seriesId}">
+          <div class="chapter-title">第${ch.chapterIndex}章 ${ch.title || ""}</div>
+          <div class="chapter-summary">${(ch.summary || "").replace(/\n/g, "<br>") || "暂无摘要"}</div>
+          <div class="chapter-actions">
+            <button class="mini-btn" data-series-action="open-post" data-series-id="${seriesId}" data-post-id="${ch.postId || ""}">阅读</button>
+          </div>
+        </div>`,
+      )
+      .join("");
+  }
+
+  // ▲▲▲ 新增函数结束 ▲▲▲
+
+  // ▲▲▲ 替换结束 ▲▲▲
+  // ▼▼▼ 【全新】论坛功能事件监听器 ▼▼▼
+
+  // 2. 当用户点击“圈子”App图标时，渲染小组列表
+  document
+    .querySelector(".desktop-app-icon[onclick=\"showScreen('forum-screen')\"]")
+    .addEventListener("click", renderForumScreen);
+
+  // 3. 绑定小组页和帖子页的返回按钮
+  document
+    .getElementById("back-to-forum-list")
+    .addEventListener("click", () => showScreen("forum-screen"));
+  document
+    .getElementById("back-to-group-screen")

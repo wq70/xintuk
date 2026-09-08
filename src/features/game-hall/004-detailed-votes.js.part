@@ -1,0 +1,861 @@
+            logToScriptKillGame(`轮到 ${player.role.name} (${player.name}) 进行补充搜证...`);
+            await sleep(2000);
+            await handleAiSearch(player);
+          }
+        }
+        logToScriptKillGame('所有AI补充搜证完毕，玩家可以继续搜证或结束本环节进入最终讨论。', 'system');
+        break;
+
+      // 【全新阶段】第二轮讨论
+      case 'discussion_round_2':
+        logToScriptKillGame('第二轮搜证结束，现在进入【第二轮讨论环节】。', 'system');
+        updateActionAreaSK(); // 显示发言按钮
+        break;
+
+      // 【全新阶段】第三轮（最终）讨论
+      case 'discussion_round_3':
+        logToScriptKillGame('第二轮讨论结束，现在进入【最终讨论环节】。', 'system');
+        updateActionAreaSK(); // 再次显示发言按钮
+        break;
+
+      case 'voting':
+        // 投票和结束逻辑保持不变
+        logToScriptKillGame('最终讨论结束，现在进入投票环节。请投票指认凶手！', 'system');
+        const detailedVotes = {};
+        const alivePlayers = scriptKillGameState.players;
+        for (const voter of alivePlayers) {
+          let targetId = voter.isUser
+            ? await waitForUserActionSK('请投票指认凶手', 'vote')
+            : await triggerScriptKillAiAction(voter.id, 'vote');
+          detailedVotes[voter.id] = targetId;
+          if (targetId) {
+            const targetPlayer = scriptKillGameState.players.find(p => p.id === targetId);
+            logToScriptKillGame(`${voter.name} 投票给了 ${targetPlayer.name}。`);
+          } else {
+            logToScriptKillGame(`${voter.name} 弃票了。`);
+          }
+        }
+        scriptKillGameState.votes = detailedVotes;
+        scriptKillGameState.gamePhase = 'end';
+        await sleep(2000);
+        await processScriptKillTurn();
+        break;
+
+      case 'end':
+        // 结束逻辑保持不变
+        logToScriptKillGame('投票结束，正在公布真相...', 'system');
+        await sleep(2000);
+        const voteCounts = {};
+        for (const voterId in scriptKillGameState.votes) {
+          const targetId = scriptKillGameState.votes[voterId];
+          if (targetId) {
+            voteCounts[targetId] = (voteCounts[targetId] || 0) + 1;
+          }
+        }
+        let maxVotes = 0,
+          votedPlayerIds = [];
+        for (const playerId in voteCounts) {
+          if (voteCounts[playerId] > maxVotes) {
+            maxVotes = voteCounts[playerId];
+            votedPlayerIds = [playerId];
+          } else if (voteCounts[playerId] === maxVotes) {
+            votedPlayerIds.push(playerId);
+          }
+        }
+        const killer = scriptKillGameState.players.find(p => p.role.isKiller);
+        let winner = '',
+          resultText = '';
+        if (votedPlayerIds.length === 1 && votedPlayerIds[0] === killer.id) {
+          winner = '好人阵营';
+          resultText = `恭喜！你们成功指认出凶手【${killer.role.name} (${killer.name})】！好人阵营胜利！`;
+        } else {
+          winner = '凶手阵营';
+          resultText = `很遗憾，真正的凶手是【${killer.role.name} (${killer.name})】！凶手阵营胜利！`;
+        }
+        logToScriptKillGame(resultText, 'system');
+        await sleep(3000);
+        logToScriptKillGame(`【真相】\n${scriptKillGameState.script.truth}`, 'system');
+        await showCustomAlert('请稍候...', 'AI正在生成本局复盘摘要...');
+        const aiSummary = await generateAiSkSummary();
+        const summary = generateSkSummary(winner, aiSummary);
+        showScriptKillSummaryModal(summary);
+        scriptKillGameState.isActive = false;
+        updateActionAreaSK();
+        break;
+    }
+  }
+  // ▲▲▲ 替换结束 ▲▲▲
+  // ▼▼▼ 【全新】这是剧本杀的重roll功能核心函数 ▼▼▼
+  /**
+   * 【剧本杀】处理AI发言的重roll请求
+   * @param {number} logIndex - 要重roll的发言在gameLog中的索引
+   */
+  async function handleScriptKillReroll(logIndex) {
+    const logEntry = scriptKillGameState.gameLog[logIndex];
+    if (!logEntry || logEntry.type !== 'speech' || !logEntry.message.player || logEntry.message.player.isUser) {
+      return; // 安全检查，确保操作的是AI的发言
+    }
+
+    const playerToReroll = logEntry.message.player;
+
+    // 给用户一个即时反馈
+    const speechTextElement = document
+      .querySelector(`button.sk-reroll-btn[data-log-index="${logIndex}"]`)
+      .closest('.speech-content')
+      .querySelector('.speech-text');
+    if (speechTextElement) {
+      speechTextElement.innerHTML = '<i>正在重新思考...</i>';
+    }
+
+    try {
+      // 根据游戏阶段智能判断AI应该执行哪个动作
+      let actionType;
+      const currentPhase = scriptKillGameState.gamePhase;
+      if (currentPhase === 'introduction') {
+        actionType = 'introduce';
+      } else if (currentPhase === 'timeline_discussion') {
+        actionType = 'discuss_timeline';
+      } else {
+        actionType = 'discuss'; // 默认为自由讨论
+      }
+
+      // 重新调用AI生成新的发言
+      const newSpeech = await triggerScriptKillAiAction(playerToReroll.id, actionType);
+
+      // 用新的发言内容替换掉旧的
+      scriptKillGameState.gameLog[logIndex].message.speech = newSpeech;
+
+      // 重新渲染整个游戏界面以显示更新
+      renderScriptKillGameScreen();
+    } catch (error) {
+      console.error('剧本杀发言重roll失败:', error);
+      if (speechTextElement) {
+        speechTextElement.innerHTML = `<i style="color:red;">重新生成失败，请检查网络或API设置。</i>`;
+      }
+    }
+  }
+  // ▲▲▲ 新增函数结束 ▲▲▲
+
+  // ▼▼▼ 【剧本杀】用这块【已添加重roll按钮】的代码，完整替换旧的 renderScriptKillGameScreen 函数 ▼▼▼
+  /**
+   * 【剧本杀】渲染游戏主界面
+   */
+  function renderScriptKillGameScreen(options = {}) {
+    const playersGrid = document.getElementById('script-kill-players-grid');
+    const logContainer = document.getElementById('script-kill-game-log');
+
+    playersGrid.innerHTML = '';
+    scriptKillGameState.players.forEach(player => {
+      const seat = document.createElement('div');
+      seat.className = 'player-seat';
+      const avatarClass = `player-avatar ${options.speakingPlayerId === player.id ? 'speaking' : ''}`;
+
+      seat.innerHTML = `
+            <img src="${player.avatar}" class="${avatarClass}">
+            <span class="player-name">${player.role.name}</span>
+        `;
+      playersGrid.appendChild(seat);
+    });
+
+    logContainer.innerHTML = '';
+    scriptKillGameState.gameLog.forEach((log, index) => {
+      // ★ 核心修改1：增加了index参数
+      const logEl = document.createElement('div');
+      // ★ 核心修改2：判断是否是AI的发言
+      if (log.type === 'speech' && typeof log.message === 'object' && !log.message.player.isUser) {
+        logEl.className = 'log-entry speech';
+        const { player, speech } = log.message;
+
+        // ★ 核心修改3：为AI发言添加重roll按钮
+        logEl.innerHTML = `
+            <img src="${player.avatar}" class="speech-avatar">
+            <div class="speech-content">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span class="speaker">${player.role.name} (${player.name})</span>
+                    <button class="sk-reroll-btn" data-log-index="${index}" title="重新生成发言" style="background:none; border:none; cursor:pointer; padding:0; color:var(--text-secondary);">
+                        <svg class="reroll-btn-icon" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                    </button>
+                </div>
+                <span class="speech-text">${speech.replace(/\n/g, '<br>')}</span>
+            </div>
+        `;
+      } else if (log.type === 'speech') {
+        // 用户的发言保持原样
+        logEl.className = 'log-entry speech';
+        const { player, speech } = log.message;
+        logEl.innerHTML = `
+            <img src="${player.avatar}" class="speech-avatar">
+            <div class="speech-content">
+                <span class="speaker">${player.role.name} (${player.name})</span>
+                <span class="speech-text">${speech.replace(/\n/g, '<br>')}</span>
+            </div>
+        `;
+      } else {
+        // 其他系统消息也保持原样
+        logEl.className = `log-entry ${log.type}`;
+        logEl.innerHTML = String(log.message).replace(/\n/g, '<br>');
+      }
+      logContainer.appendChild(logEl);
+    });
+    logContainer.scrollTop = logContainer.scrollHeight;
+  }
+  // ▲▲▲ 替换结束 ▲▲▲
+
+  /**
+   * 【剧本杀】添加一条游戏日志
+   */
+  function logToScriptKillGame(message, type = 'system') {
+    scriptKillGameState.gameLog.push({ message, type });
+    renderScriptKillGameScreen();
+  }
+
+  /**
+   * 【剧本杀 V4 - 新流程版】更新底部操作区域的按钮
+   */
+  function updateActionAreaSK() {
+    const actionArea = document.getElementById('script-kill-action-area');
+    actionArea.innerHTML = '';
+    const user = scriptKillGameState.players.find(p => p.isUser);
+
+    const phase = scriptKillGameState.gamePhase;
+    const searchCount = scriptKillGameState.evidenceCounts[user.id] || 0;
+
+    if (phase === 'evidence_round_1' || phase === 'evidence_round_2') {
+      let searchesLeftInRound, totalInRound;
+      if (phase === 'evidence_round_1') {
+        searchesLeftInRound = 2 - searchCount;
+        totalInRound = 2;
+      } else {
+        // evidence_round_2
+        searchesLeftInRound = 3 - searchCount;
+        totalInRound = 1;
+      }
+
+      const searchBtn = document.createElement('button');
+      searchBtn.id = 'sk-search-evidence-btn';
+      searchBtn.className = 'form-button';
+      searchBtn.textContent = `搜证 (${searchesLeftInRound}/${totalInRound})`;
+      searchBtn.disabled = searchesLeftInRound <= 0;
+      actionArea.appendChild(searchBtn);
+
+      const endSearchBtn = document.createElement('button');
+      endSearchBtn.id = 'sk-end-search-btn';
+      endSearchBtn.className = 'form-button-secondary';
+      endSearchBtn.textContent = phase === 'evidence_round_1' ? '进入第一轮讨论' : '进入第二轮讨论';
+      actionArea.appendChild(endSearchBtn);
+    } else if (phase === 'discussion_round_1' || phase === 'discussion_round_2' || phase === 'discussion_round_3') {
+      const speakBtn = document.createElement('button');
+      speakBtn.id = 'sk-speak-btn';
+      speakBtn.className = 'form-button';
+      speakBtn.textContent = '我要发言';
+      actionArea.appendChild(speakBtn);
+    } else if (!scriptKillGameState.isActive && phase === 'end') {
+      const backBtn = document.createElement('button');
+      backBtn.className = 'form-button';
+      backBtn.textContent = '返回游戏大厅';
+      backBtn.onclick = () => showScreen('game-hall-screen');
+      actionArea.appendChild(backBtn);
+    }
+  }
+
+  // ▼▼▼ 【剧本杀输入框美化版】请用这个【全新】的函数，完整替换掉你旧的 waitForUserActionSK 函数 ▼▼▼
+  /**
+   * 【剧本杀 V2 - 输入框美化版】等待用户行动的通用函数
+   */
+  function waitForUserActionSK(promptText, actionType, placeholder = '') {
+    return new Promise(resolve => {
+      const actionArea = document.getElementById('script-kill-action-area');
+      actionArea.innerHTML = '';
+      actionArea.className = 'script-kill-action-area'; // 重置class
+
+      if (actionType === 'speak') {
+        // --- 这是我们美化后的发言输入区 ---
+        actionArea.classList.add('speaking-mode'); // 激活新CSS
+
+        const textarea = document.createElement('textarea');
+        textarea.id = 'user-sk-speech-input'; // 使用剧本杀专用的ID
+        textarea.rows = 1;
+        textarea.placeholder = placeholder || '请输入你的发言...';
+        // 实时调整高度
+        textarea.addEventListener('input', () => {
+          textarea.style.height = 'auto';
+          textarea.style.height = textarea.scrollHeight + 'px';
+        });
+
+        const endBtn = document.createElement('button');
+        endBtn.id = 'sk-end-speech-btn'; // 使用剧本杀专用的ID
+        endBtn.className = 'form-button';
+        endBtn.textContent = '结束发言';
+
+        actionArea.appendChild(textarea);
+        actionArea.appendChild(endBtn);
+
+        textarea.focus();
+
+        endBtn.onclick = () => {
+          const speech = textarea.value.trim() || '我没什么好说的，过。';
+          actionArea.innerHTML = '';
+          actionArea.classList.remove('speaking-mode');
+          resolve(speech);
+        };
+        return; // 结束 'speak' 分支
+      }
+
+      // --- 以下是投票逻辑，保持原样 ---
+      else if (actionType === 'vote') {
+        const modal = document.getElementById('script-kill-vote-modal');
+        const optionsEl = document.getElementById('sk-vote-options-list');
+        optionsEl.innerHTML = '';
+
+        scriptKillGameState.players.forEach(player => {
+          const label = document.createElement('label');
+          label.innerHTML = `<input type="radio" name="sk_vote_target" value="${player.id}"> ${player.role.name} (${player.name})`;
+          optionsEl.appendChild(label);
+        });
+
+        document.getElementById('confirm-sk-vote-btn').onclick = () => {
+          const selected = document.querySelector('input[name="sk_vote_target"]:checked');
+          if (selected) {
+            modal.classList.remove('visible');
+            resolve(selected.value);
+          } else {
+            alert('请选择一个投票对象！');
+          }
+        };
+        document.getElementById('cancel-sk-vote-btn').onclick = () => {
+          modal.classList.remove('visible');
+          resolve(null); // 用户取消
+        };
+        modal.classList.add('visible');
+      }
+    });
+  }
+  // ▲▲▲ 替换结束 ▲▲▲
+  /**
+   * 【全新】处理单个AI的搜证行动 (每次只搜一个线索)
+   * @param {object} player - 正在行动的AI玩家对象
+   */
+  async function handleAiSearch(player) {
+    const script = scriptKillGameState.script;
+
+    // 消耗一次搜证机会
+    scriptKillGameState.evidenceCounts[player.id] = (scriptKillGameState.evidenceCounts[player.id] || 0) + 1;
+
+    let foundMessage = ''; // 用于记录本轮搜证的结果
+
+    // 1. 增加随机性：有30%的几率什么都搜不到
+    if (Math.random() < 0.3) {
+      foundMessage = '什么都没发现。';
+    } else {
+      // 2. 找出所有【全局还未被发现】的线索
+      const uncollectedClues = script.clues.filter(c => !scriptKillGameState.collectedClueIds.has(c.description));
+
+      if (uncollectedClues.length > 0) {
+        // 3. 随机找到一条新线索
+        const foundClue = uncollectedClues[Math.floor(Math.random() * uncollectedClues.length)];
+        const clueSource = foundClue.owner === '公共' ? '公共区域' : `角色 ${foundClue.owner} 的私人物品`;
+
+        // 4. 将线索存入AI手牌和全局线索池
+        player.evidence.push({ description: foundClue.description, source: clueSource });
+        scriptKillGameState.collectedClueIds.add(foundClue.description);
+
+        let revealed = true; // 默认公开
+
+        // 5. 如果线索是关于自己的，让AI决策是否公开
+        if (foundClue.owner === player.role.name) {
+          const revealDecision = await triggerScriptKillAiAction(player.id, 'reveal_clue', {
+            clue: foundClue.description,
+          });
+          if (revealDecision && revealDecision.action === 'hide') {
+            revealed = false;
+          }
+        }
+
+        // 6. 根据AI的决策，记录不同的搜证结果
+        if (revealed) {
+          foundMessage = `在【${clueSource}】发现并公开了线索：“${foundClue.description}”`;
+        } else {
+          foundMessage = `在【${clueSource}】发现了一条关于自己的线索，并选择将其隐藏。`;
+        }
+      } else {
+        foundMessage = '没有发现更多新线索了。';
+      }
+    }
+
+    // 7. 将搜证结果记录到游戏日志
+    logToScriptKillGame(`${player.name} 完成了一次搜证: ${foundMessage}`);
+    await sleep(1500);
+  }
+
+  /**
+   * 【剧本杀-AI核心】触发AI行动
+   */
+  async function triggerScriptKillAiAction(playerId, action, context = {}) {
+    const player = scriptKillGameState.players.find(p => p.id === playerId);
+    if (!player) return;
+
+    const { proxyUrl, apiKey, model } = state.apiConfig;
+
+    // ▼▼▼ 请用下面这【一整块】代码，完整替换掉旧的 systemPrompt 变量定义 ▼▼▼
+    let jsonFormat = '';
+    let extraContext = '';
+    let systemPrompt = `
+# 任务: 剧本杀角色扮演
+# 你的双重身份 (必须严格遵守)
+1.  **你的本体**: 你的真实身份是 **${player.name}**，你的核心性格是：**${player.persona}**。
+2.  **你的剧本角色**: 在这场游戏中，你需要扮演角色 **【${player.role.name}】**。
+    -   **剧本身份设定**: ${player.role.description}
+    -   **你的故事线 (时间线)**: ${player.role.storyline} 
+    -   **剧本秘密任务**: ${player.role.tasks}
+
+# 你已掌握的线索: 
+${player.evidence.map(e => `- ${e.description}`).join('\n') || '(暂无线索)'}
+
+# 当前游戏阶段: ${scriptKillGameState.gamePhase}
+# 游戏日志 (最近50条):
+${scriptKillGameState.gameLog
+  .slice(-50)
+  .map(log => {
+    if (log.type === 'speech') return `${log.message.player.role.name}: ${log.message.speech}`;
+    return log.message;
+  })
+  .join('\n')}
+${extraContext}
+# 你的行动指令
+`;
+
+    // ▲▲▲ 替换结束 ▲▲▲
+
+    switch (action) {
+      case 'introduce':
+        systemPrompt += '现在轮到你进行自我介绍。请根据你的人设，以第一人称进行一段简短的介绍。';
+        jsonFormat = '{"action": "speak", "speech": "你的自我介绍..."}';
+        break;
+      // ▼▼▼ 【全新】在这里为AI添加“讨论时间线”的新指令 ▼▼▼
+      case 'discuss_timeline':
+        systemPrompt +=
+          '现在是时间线陈述环节。请根据你的角色剧本（包括身份设定和秘密任务），详细、清晰地陈述你在案发时间段内的行动轨迹。你的发言必须是第一人称，并且要听起来自然，可以适当隐藏对你不利的信息，但不能凭空捏造。';
+        jsonFormat = '{"action": "speak", "speech": "你的时间线陈述..."}';
+        break;
+      // ▲▲▲ 新增指令结束 ▲▲▲
+      case 'discuss':
+        systemPrompt += '现在是自由讨论环节。请根据你掌握的线索和场上其他人的发言，发表你的看法、提出疑问或指证他人。';
+        jsonFormat = '{"action": "speak", "speech": "你的发言..."}';
+        break;
+      case 'vote':
+        systemPrompt += '现在是最终投票环节。请综合所有信息，投出你认为的凶手。';
+        jsonFormat = '{"action": "vote", "targetId": "你投票的玩家ID"}';
+        break;
+      // ▼▼▼ 在 triggerScriptKillAiAction 函数的 switch 语句内添加这个 case ▼▼▼
+      case 'reveal_clue':
+        systemPrompt += `你刚刚搜到了一个关于你自己的线索：“${context.clue}”。\n公开这条线索可能会让你暴露，但也可能洗清嫌疑；隐藏它可能会让你在后期被动。\n请根据你的人设和任务，决定是公开还是隐藏。`;
+        jsonFormat = '{"action": "reveal" or "hide", "reasoning": "你的决策理由..."}';
+        break;
+      // ▲▲▲ 添加结束 ▲▲▲
+    }
+
+    systemPrompt += `\n# 存活玩家列表:\n${scriptKillGameState.players
+      .map(p => `- ${p.role.name} (id: ${p.id})`)
+      .join('\n')}\n# 输出格式: 你的回复【必须且只能】是一个严格的JSON对象，格式如下:\n${jsonFormat}`;
+
+    try {
+      let isGemini = proxyUrl === GEMINI_API_URL;
+      let messagesForApi = [{ role: 'user', content: systemPrompt }];
+      let geminiConfig = toGeminiRequestData(
+        model,
+        apiKey,
+        systemPrompt,
+        messagesForApi,
+        isGemini,
+        state.apiConfig.temperature,
+      );
+
+      const response = isGemini
+        ? await fetch(geminiConfig.url, geminiConfig.data)
+        : await fetch(`${proxyUrl}/v1/chat/completions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+            body: JSON.stringify({
+              model,
+              messages: messagesForApi,
+              temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+              response_format: { type: 'json_object' },
+            }),
+          });
+
+      if (!response.ok) throw new Error(await response.text());
+      const data = await response.json();
+      const content = (isGemini ? data.candidates[0].content.parts[0].text : data.choices[0].message.content).replace(
+        /^```json\s*|```$/g,
+        '',
+      );
+      // ▼▼▼ 用这块新代码替换旧的 return 逻辑 ▼▼▼
+      const aiAction = JSON.parse(content);
+
+      if (aiAction.action === 'speak') return aiAction.speech;
+      if (aiAction.action === 'vote') return aiAction.targetId;
+      if (action === 'reveal_clue') return aiAction; // 【核心修改】返回整个决策对象
+
+      return null;
+      // ▲▲▲ 替换结束 ▲▲▲
+    } catch (error) {
+      console.error(`AI (${player.name}) 行动失败:`, error);
+      // 返回一个保底的行动，防止游戏卡死
+      if (action === 'vote') {
+        const potentialTargets = scriptKillGameState.players.filter(p => p.id !== player.id);
+        return potentialTargets[Math.floor(Math.random() * potentialTargets.length)].id;
+      }
+      return '我...我需要再想想。';
+    }
+  }
+
+  // ▼▼▼ 用这块新代码替换旧的 getBuiltInScript 函数 ▼▼▼
+
+  /**
+   * 【剧本杀】根据ID获取一个内置剧本
+   * @param {string} scriptId - 要获取的剧本的ID, 例如 'built_in_1'
+   * @returns {object|null} - 找到的剧本对象，或 null
+   */
+  function getBuiltInScript(scriptId) {
+    // 【核心修改】我们现在从 BUILT_IN_SCRIPTS 数组中查找匹配的剧本
+    return BUILT_IN_SCRIPTS.find(script => script.id === scriptId) || null;
+  }
+
+  // ▲▲▲ 替换结束 ▲▲▲
+
+  // --- 【全新】剧本杀自定义剧本管理核心功能 ---
+
+  let editingScriptId = null; // 用于追踪正在编辑的剧本ID
+
+  /**
+   * 【总入口】打开自定义剧本管理模态框
+   */
+  async function openScriptManager() {
+    await renderScriptManagerList();
+    document.getElementById('script-kill-manager-modal').classList.add('visible');
+  }
+
+  /**
+   * 渲染自定义剧本列表
+   */
+  async function renderScriptManagerList() {
+    const listEl = document.getElementById('custom-scripts-list');
+    listEl.innerHTML = '';
+    const scripts = await db.scriptKillScripts.toArray();
+
+    if (scripts.length === 0) {
+      listEl.innerHTML =
+        '<p style="text-align:center; color: var(--text-secondary); padding: 50px 0;">还没有自定义剧本，点击右上角“添加”创建一个吧！</p>';
+      return;
+    }
+
+    scripts.forEach(script => {
+      const item = document.createElement('div');
+      item.className = 'list-item';
+      item.innerHTML = `
+        <div class="item-title">${script.name}</div>
+        <div class="item-content">${(script.storyBackground || '暂无简介').substring(0, 50)}...</div>
+    `;
+
+      item.addEventListener('click', () => openScriptEditorForEdit(script.id));
+
+      addLongPressListener(item, async () => {
+        // ▼▼▼ 核心修改：在菜单里增加 'export' 选项 ▼▼▼
+        const choice = await showChoiceModal(`操作《${script.name}》`, [
+          { text: '📤 导出剧本', value: 'export' }, // <-- 新增
+          { text: '🗑️ 删除剧本', value: 'delete', isDanger: true },
+        ]);
+
+        if (choice === 'delete') {
+          deleteCustomScript(script.id, script.name);
+        } else if (choice === 'export') {
+          // <-- 新增处理逻辑
+          await exportCustomScript(script.id);
+        }
+        // ▲▲▲ 修改结束 ▲▲▲
+      });
+      listEl.appendChild(item);
+    });
+  }
+
+  /**
+   * 打开剧本编辑器（用于创建新剧本）
+   */
+  function openScriptEditorForCreate() {
+    editingScriptId = null; // 标记为创建模式
+    document.getElementById('script-editor-title').textContent = '创建新剧本';
+    document.getElementById('script-name-input').value = '';
+    document.getElementById('script-background-input').value = '';
+    // 提供一个JSON结构示例，方便用户填写
+    const jsonExample = {
+      roles: [
+        { name: '角色A', description: '...', tasks: '...', isKiller: true },
+        { name: '角色B', description: '...', tasks: '...', isKiller: false },
+      ],
+      clues: [
+        { owner: '角色A', description: '线索描述...', isKey: false },
+        { owner: '公共', description: '公共线索...' },
+      ],
+      truth: '真相是...',
+    };
+    document.getElementById('script-roles-json-input').value = JSON.stringify(jsonExample, null, 2);
+
+    document.getElementById('script-kill-editor-modal').classList.add('visible');
+  }
+
+  /**
+   * 打开剧本编辑器（用于编辑现有剧本）
+   * @param {number} scriptId - 要编辑的剧本ID
+   */
+  async function openScriptEditorForEdit(scriptId) {
+    editingScriptId = scriptId;
+    const script = await db.scriptKillScripts.get(scriptId);
+    if (!script) return;
+
+    document.getElementById('script-editor-title').textContent = `编辑剧本: ${script.name}`;
+    document.getElementById('script-name-input').value = script.name;
+    document.getElementById('script-background-input').value = script.storyBackground;
+
+    // 将 roles, clues, truth 重新组合成一个对象并格式化为JSON
+    const jsonData = {
+      roles: script.roles,
+      clues: script.clues,
+      truth: script.truth,
+    };
+    document.getElementById('script-roles-json-input').value = JSON.stringify(jsonData, null, 2);
+
+    document.getElementById('script-kill-editor-modal').classList.add('visible');
+  }
+
+  // ▼▼▼ 用这块【可视化版】代码，替换旧的 saveCustomScript 函数 ▼▼▼
+  /**
+   * 【可视化版】保存或更新自定义剧本
+   */
+  async function saveCustomScript() {
+    const name = document.getElementById('script-name-input').value.trim();
+    const background = document.getElementById('script-background-input').value.trim();
+    const truth = document.getElementById('sk-truth-input').value.trim();
+
+    if (!name || !background || !truth) {
+      alert('剧本名称、故事背景和最终真相都不能为空！');
+      return;
+    }
+
+    // 从 currentEditingScriptData 全局变量中获取角色和线索数据
+    if (!currentEditingScriptData.roles || currentEditingScriptData.roles.length === 0) {
+      alert('请至少添加一个角色！');
+      return;
+    }
+
+    try {
+      const scriptData = {
+        name: name,
+        storyBackground: background,
+        roles: currentEditingScriptData.roles,
+        clues: currentEditingScriptData.clues,
+        truth: truth,
+        isBuiltIn: false,
+      };
+
+      if (editingScriptId) {
+        await db.scriptKillScripts.update(editingScriptId, scriptData);
+        alert('剧本更新成功！');
+      } else {
+        await db.scriptKillScripts.add(scriptData);
+        alert('新剧本保存成功！');
+      }
+
+      document.getElementById('script-kill-editor-modal').classList.remove('visible');
+      await renderScriptManagerList(); // 刷新管理列表
+      editingScriptId = null;
+    } catch (error) {
+      alert(`保存失败: ${error.message}`);
+    }
+  }
+  // ▲▲▲ 替换结束 ▲▲▲
+  // ▼▼▼ 把这一整块全新的功能函数，粘贴到 init() 函数的【正上方】 ▼▼▼
+
+  // --- 【全新】剧本杀可视化编辑器核心功能 ---
+
+  let currentEditingScriptData = { roles: [], clues: [] }; // 用于暂存正在编辑的剧本数据
+  let editingItemIndex = -1; // -1 表示新建，否则为被编辑项的索引
+
+  /**
+   * 渲染可视化剧本编辑器的主界面
+   */
+  function renderVisualScriptEditor() {
+    const rolesContainer = document.getElementById('sk-roles-container');
+    const cluesContainer = document.getElementById('sk-clues-container');
+    rolesContainer.innerHTML = '';
+    cluesContainer.innerHTML = '';
+
+    // 渲染角色列表
+    currentEditingScriptData.roles.forEach((role, index) => {
+      const itemEl = document.createElement('div');
+      itemEl.className = 'sk-editor-item';
+      itemEl.innerHTML = `
+            <div class="item-info">
+                <div class="item-name">${role.name} ${role.isKiller ? '🔪' : ''}</div>
+                <div class="item-meta">${role.description.substring(0, 20)}...</div>
+            </div>
+            <div class="item-actions">
+                <button class="form-button-secondary edit-role-btn" data-index="${index}">编辑</button>
+                <button class="form-button-secondary delete-role-btn" data-index="${index}" style="border-color:#ff3b30; color:#ff3b30;">删除</button>
+            </div>
+        `;
+      rolesContainer.appendChild(itemEl);
+    });
+
+    // 渲染线索列表
+    currentEditingScriptData.clues.forEach((clue, index) => {
+      const itemEl = document.createElement('div');
+      itemEl.className = 'sk-editor-item';
+      itemEl.innerHTML = `
+            <div class="item-info">
+                <div class="item-name">线索 ${index + 1}</div>
+                <div class="item-meta">归属于: ${clue.owner}</div>
+            </div>
+            <div class="item-actions">
+                <button class="form-button-secondary edit-clue-btn" data-index="${index}">编辑</button>
+                <button class="form-button-secondary delete-clue-btn" data-index="${index}" style="border-color:#ff3b30; color:#ff3b30;">删除</button>
+            </div>
+        `;
+      cluesContainer.appendChild(itemEl);
+    });
+  }
+
+  /**
+   * 打开角色编辑器（新建或编辑）
+   */
+  function openRoleEditor(index = -1) {
+    editingItemIndex = index;
+    const modal = document.getElementById('sk-item-editor-modal');
+    document.getElementById('sk-role-editor-fields').style.display = 'block';
+    document.getElementById('sk-clue-editor-fields').style.display = 'none';
+
+    if (index > -1) {
+      // 编辑模式
+      const role = currentEditingScriptData.roles[index];
+      document.getElementById('sk-item-editor-title').textContent = `编辑角色: ${role.name}`;
+      document.getElementById('sk-role-name-input').value = role.name;
+      document.getElementById('sk-role-desc-input').value = role.description;
+      // ▼▼▼ 在这里添加下面这行新代码 ▼▼▼
+      document.getElementById('sk-role-storyline-input').value = role.storyline || ''; // 使用 || '' 确保旧数据不会显示'undefined'
+      // ▲▲▲ 新代码粘贴结束 ▲▲▲
+      document.getElementById('sk-role-tasks-input').value = role.tasks;
+      document.getElementById('sk-role-killer-toggle').checked = role.isKiller;
+    } else {
+      // 新建模式
+      document.getElementById('sk-item-editor-title').textContent = '添加新角色';
+      document.getElementById('sk-role-name-input').value = '';
+      document.getElementById('sk-role-desc-input').value = '';
+      // ▼▼▼ 在这里添加下面这行新代码 ▼▼▼
+      document.getElementById('sk-role-storyline-input').value = ''; // 新建时清空
+      // ▲▲▲ 新代码粘贴结束 ▲▲▲
+      document.getElementById('sk-role-tasks-input').value = '';
+      document.getElementById('sk-role-killer-toggle').checked = false;
+    }
+    modal.classList.add('visible');
+  }
+
+  /**
+   * 打开线索编辑器（新建或编辑）
+   */
+  function openClueEditor(index = -1) {
+    editingItemIndex = index;
+    const modal = document.getElementById('sk-item-editor-modal');
+    document.getElementById('sk-role-editor-fields').style.display = 'none';
+    document.getElementById('sk-clue-editor-fields').style.display = 'block';
+
+    // 动态填充线索归属的下拉菜单
+    const ownerSelect = document.getElementById('sk-clue-owner-select');
+    ownerSelect.innerHTML = '<option value="公共">公共线索</option>';
+    currentEditingScriptData.roles.forEach(role => {
+      const option = document.createElement('option');
+      option.value = role.name;
+      option.textContent = `角色: ${role.name}`;
+      ownerSelect.appendChild(option);
+    });
+
+    if (index > -1) {
+      // 编辑模式
+      const clue = currentEditingScriptData.clues[index];
+      document.getElementById('sk-item-editor-title').textContent = `编辑线索 ${index + 1}`;
+      ownerSelect.value = clue.owner;
+      document.getElementById('sk-clue-desc-input').value = clue.description;
+      document.getElementById('sk-clue-key-toggle').checked = clue.isKey || false;
+    } else {
+      // 新建模式
+      document.getElementById('sk-item-editor-title').textContent = '添加新线索';
+      ownerSelect.value = '公共';
+      document.getElementById('sk-clue-desc-input').value = '';
+      document.getElementById('sk-clue-key-toggle').checked = false;
+    }
+    modal.classList.add('visible');
+  }
+
+  /**
+   * 保存子编辑器（角色或线索）中的数据
+   */
+  function saveItemFromEditor() {
+    const isRoleEditor = document.getElementById('sk-role-editor-fields').style.display === 'block';
+
+    if (isRoleEditor) {
+      const roleData = {
+        name: document.getElementById('sk-role-name-input').value.trim(),
+        description: document.getElementById('sk-role-desc-input').value.trim(),
+        // ▼▼▼ 在这里添加下面这行新代码 ▼▼▼
+        storyline: document.getElementById('sk-role-storyline-input').value.trim(),
+        // ▲▲▲ 新代码粘贴结束 ▲▲▲
+        tasks: document.getElementById('sk-role-tasks-input').value.trim(),
+        isKiller: document.getElementById('sk-role-killer-toggle').checked,
+      };
+      if (!roleData.name) {
+        alert('角色名称不能为空！');
+        return;
+      }
+
+      if (editingItemIndex > -1) {
+        currentEditingScriptData.roles[editingItemIndex] = roleData;
+      } else {
+        currentEditingScriptData.roles.push(roleData);
+      }
+    } else {
+      const clueData = {
+        owner: document.getElementById('sk-clue-owner-select').value,
+        description: document.getElementById('sk-clue-desc-input').value.trim(),
+        isKey: document.getElementById('sk-clue-key-toggle').checked,
+      };
+      if (!clueData.description) {
+        alert('线索描述不能为空！');
+        return;
+      }
+
+      if (editingItemIndex > -1) {
+        currentEditingScriptData.clues[editingItemIndex] = clueData;
+      } else {
+        currentEditingScriptData.clues.push(clueData);
+      }
+    }
+
+    document.getElementById('sk-item-editor-modal').classList.remove('visible');
+    renderVisualScriptEditor(); // 刷新主编辑器界面
+  }
+
+  /**
+   * 替换 openScriptEditorForCreate 函数
+   */
+  function openScriptEditorForCreate() {
+    editingScriptId = null;
+    currentEditingScriptData = { roles: [], clues: [] }; // 清空暂存数据
+    document.getElementById('script-editor-title').textContent = '创建新剧本';
+    document.getElementById('script-name-input').value = '';
+    document.getElementById('script-background-input').value = '';
+    document.getElementById('sk-truth-input').value = '';
+    renderVisualScriptEditor(); // 渲染空的编辑器
+    document.getElementById('script-kill-editor-modal').classList.add('visible');
+  }
+
+  /**
+   * 替换 openScriptEditorForEdit 函数
+   */

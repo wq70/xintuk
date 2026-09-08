@@ -1,0 +1,603 @@
+              response_format: { type: 'json_object' },
+            }),
+          });
+
+      if (!response.ok) throw new Error(`API请求失败: ${response.status}`);
+
+      const data = await response.json();
+      const rawContent = (isGemini ? data.candidates[0].content.parts[0].text : data.choices[0].message.content)
+        .replace(/^```json\s*|```$/g, '')
+        .trim();
+      const wordPair = JSON.parse(rawContent);
+
+      if (wordPair.civilianWord && wordPair.undercoverWord) {
+        return { civilian: wordPair.civilianWord, undercover: wordPair.undercoverWord };
+      }
+      throw new Error('AI返回的词语格式不正确。');
+    } catch (error) {
+      console.error('AI生成词语失败:', error);
+      throw error; // 将错误抛出，由调用者处理
+    }
+  }
+
+  // ▲▲▲ 新功能函数粘贴结束 ▲▲▲
+
+  // (请确保你把上面提到的所有游戏相关函数都从原文件剪切过来了)
+  // 下面是完整的函数示例，你只需确保你的代码里有这些函数即可
+
+  /* ******************************************* */
+  /* ***           完整的游戏函数代码            *** */
+  /* ******************************************* */
+
+  // ▼▼▼ 用这块【已添加飞行棋】的代码，替换旧的 game-hall-grid 事件监听器 ▼▼▼
+  document.getElementById('game-hall-grid').addEventListener('click', e => {
+    const gameCard = e.target.closest('.game-card');
+    if (!gameCard) return;
+
+    const gameId = gameCard.dataset.game;
+    if (gameId === 'werewolf') {
+      openWerewolfSetup();
+    } else if (gameId === 'sea-turtle-soup') {
+      openSeaTurtleSoupSetup();
+    } else if (gameId === 'script-kill') {
+      openScriptKillSetup();
+    } else if (gameId === 'guess-what') {
+      openGuessWhatSetup();
+    }
+    // ★★★ 这就是我们新增的分支 ★★★
+    else if (gameId === 'ludo') {
+      openLudoSetup(); // 调用我们新写的函数
+    }
+    // ★★★ 新增结束 ★★★
+    // ▼▼▼ 在这里添加新的 else if 分支 ▼▼▼
+    else if (gameId === 'undercover') {
+      openUndercoverSetup();
+    }
+    // ▲▲▲ 新增代码结束 ▲▲▲
+    else {
+      alert(`“${gameCard.querySelector('.game-title').textContent}”还在开发中，敬请期待！`);
+    }
+  });
+  // ▲▲▲ 替换结束 ▲▲▲
+
+  // ▼▼▼ 【全新】狼人杀游戏事件监听器 ▼▼▼
+  document.getElementById('start-werewolf-game-btn').addEventListener('click', startWerewolfGame);
+
+  document.getElementById('exit-werewolf-game-btn').addEventListener('click', async () => {
+    const confirmed = await showCustomConfirm('退出游戏', '确定要中途退出游戏吗？当前进度不会保存。');
+    if (confirmed) {
+      werewolfGameState.isActive = false; // 停止游戏循环
+      showScreen('game-hall-screen');
+    }
+  });
+
+  document.getElementById('werewolf-my-role-btn').addEventListener('click', () => {
+    if (werewolfGameState.isActive) {
+      const me = werewolfGameState.players.find(p => p.isUser);
+      if (me) {
+        alert(`你的身份是：【${me.role}】`);
+      }
+    }
+  });
+  // ▲▲▲ 新增事件监听结束 ▲▲▲
+  // ▼▼▼ 【全新】海龟汤游戏事件监听器 ▼▼▼
+
+  // 1. 设置弹窗内的交互
+  document.getElementById('cancel-sts-setup-btn').addEventListener('click', () => {
+    document.getElementById('sea-turtle-soup-setup-modal').classList.remove('visible');
+  });
+  document.getElementById('start-sts-game-btn').addEventListener('click', startSeaTurtleSoupGame);
+
+  // 监听“出题人”下拉框的变化
+  document.getElementById('sts-riddle-provider-select').addEventListener('change', e => {
+    const userArea = document.getElementById('sts-user-riddle-input-area');
+    const aiArea = document.getElementById('sts-ai-riddle-input-area');
+    userArea.style.display = 'none';
+    aiArea.style.display = 'none';
+    if (e.target.value === 'user') {
+      userArea.style.display = 'block';
+    } else if (e.target.value === 'random_ai') {
+      aiArea.style.display = 'block';
+    }
+  });
+
+  // 2. 游戏主界面的按钮
+  document.getElementById('exit-sts-game-btn').addEventListener('click', async () => {
+    const confirmed = await showCustomConfirm('退出游戏', '确定要中途退出游戏吗？');
+    if (confirmed) {
+      seaTurtleSoupState.isActive = false;
+      showScreen('game-hall-screen');
+    }
+  });
+  document.getElementById('reveal-sts-answer-btn').addEventListener('click', async () => {
+    const confirmed = await showCustomConfirm('揭晓答案', '确定要提前揭晓答案并结束游戏吗？');
+    if (confirmed) {
+      revealStsAnswer();
+    }
+  });
+  document.getElementById('send-sts-question-btn').addEventListener('click', handleStsUserQuestion);
+  // ▼▼▼ 在 init() 的事件监听器区域末尾添加 ▼▼▼
+  document.getElementById('guess-sts-answer-btn').addEventListener('click', handleStsUserGuess);
+  // ▲▲▲ 添加结束 ▲▲▲
+  document.getElementById('sts-question-input').addEventListener('keypress', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      document.getElementById('send-sts-question-btn').click();
+    }
+  });
+
+  // ▲▲▲ 新事件监听器结束 ▲▲▲
+  // ▼▼▼ 【全新】剧本杀游戏事件监听器 ▼▼▼
+  document.getElementById('start-script-kill-game-btn').addEventListener('click', startScriptKillGame);
+  document.getElementById('exit-script-kill-game-btn').addEventListener('click', async () => {
+    const confirmed = await showCustomConfirm('退出游戏', '确定要中途退出游戏吗？当前进度不会保存。');
+    if (confirmed) {
+      scriptKillGameState.isActive = false; // 停止游戏循环
+      showScreen('game-hall-screen');
+    }
+  });
+  // 剧本杀游戏事件监听器
+  document.getElementById('script-kill-my-role-btn').addEventListener('click', () => {
+    if (!scriptKillGameState.isActive) return;
+    const myPlayer = scriptKillGameState.players.find(p => p.isUser);
+    if (myPlayer) {
+      const modal = document.getElementById('script-kill-role-modal');
+      document.getElementById('sk-role-name').textContent = `你的角色：${myPlayer.role.name}`;
+      // ▼▼▼ 核心修改在这里 ▼▼▼
+      document.getElementById('sk-role-details').innerHTML = `
+            <p><strong>角色介绍:</strong><br>${myPlayer.role.description}</p>
+            <p><strong>你的时间线:</strong><br>${myPlayer.role.storyline || '（暂无时间线信息）'}</p>
+            <p><strong>你的任务:</strong><br>${myPlayer.role.tasks}</p>
+        `;
+      // ▲▲▲ 修改结束 ▲▲▲
+      modal.classList.add('visible');
+    }
+  });
+  document.getElementById('close-sk-role-modal-btn').addEventListener('click', () => {
+    document.getElementById('script-kill-role-modal').classList.remove('visible');
+  });
+
+  // 查看线索板
+  document.getElementById('script-kill-all-evidence-btn').addEventListener('click', () => {
+    if (!scriptKillGameState.isActive) return;
+    const modal = document.getElementById('script-kill-evidence-modal');
+    const listEl = document.getElementById('sk-evidence-list');
+    listEl.innerHTML = '';
+
+    const myPlayer = scriptKillGameState.players.find(p => p.isUser);
+    if (myPlayer.evidence.length === 0) {
+      listEl.innerHTML = '<p style="text-align:center; color: var(--text-secondary);">你还没有搜到任何线索。</p>';
+    } else {
+      myPlayer.evidence.forEach(clue => {
+        const card = document.createElement('div');
+        card.className = 'sk-evidence-card';
+        card.innerHTML = `
+                <div class="source">来源: ${clue.source}</div>
+                <div class="description">${clue.description}</div>
+            `;
+        listEl.appendChild(card);
+      });
+    }
+    modal.classList.add('visible');
+  });
+  document.getElementById('close-sk-evidence-modal-btn').addEventListener('click', () => {
+    document.getElementById('script-kill-evidence-modal').classList.remove('visible');
+  });
+
+  // ▼▼▼ 【最终流程版】请用这整块代码，完整替换旧的 script-kill-action-area 事件监听器 ▼▼▼
+  document.getElementById('script-kill-action-area').addEventListener('click', async e => {
+    const phase = scriptKillGameState.gamePhase;
+
+    // ▼▼▼ 从这里开始复制，替换掉你旧的 'sk-search-evidence-btn' 的 if 代码块 ▼▼▼
+    if (e.target.id === 'sk-search-evidence-btn') {
+      const user = scriptKillGameState.players.find(p => p.isUser);
+      const script = scriptKillGameState.script;
+
+      const searchCount = scriptKillGameState.evidenceCounts[user.id] || 0;
+      const phase = scriptKillGameState.gamePhase;
+
+      // 检查搜证次数限制
+      if ((phase === 'evidence_round_1' && searchCount >= 2) || (phase === 'evidence_round_2' && searchCount >= 3)) {
+        alert('本轮搜证次数已用完！');
+        return;
+      }
+
+      // 消耗一次搜证机会并更新UI
+      scriptKillGameState.evidenceCounts[user.id] = searchCount + 1;
+      updateActionAreaSK();
+
+      let foundMessage = '';
+
+      // 找出所有还未被发现的线索
+      const uncollectedClues = script.clues.filter(c => !scriptKillGameState.collectedClueIds.has(c.description));
+
+      if (uncollectedClues.length > 0) {
+        // 随机找到一条新线索
+        const foundClue = uncollectedClues[Math.floor(Math.random() * uncollectedClues.length)];
+        const clueSource = foundClue.owner === '公共' ? '公共区域' : `角色 ${foundClue.owner} 的私人物品`;
+
+        // 无论如何，线索都会先加入玩家手牌，并标记为已发现
+        user.evidence.push({ description: foundClue.description, source: clueSource });
+        scriptKillGameState.collectedClueIds.add(foundClue.description);
+
+        // --- ★★★ 核心修改逻辑开始 ★★★ ---
+
+        // 判断这条线索是不是关于玩家自己的
+        if (foundClue.owner === user.role.name) {
+          // 如果是，弹出一个选择框让玩家决定
+          const choice = await showChoiceModal('发现个人线索', [
+            { text: '公开这条线索', value: 'public' },
+            { text: '隐藏这条线索', value: 'private' },
+          ]);
+
+          if (choice === 'public') {
+            // 玩家选择【公开】
+            foundMessage = `在【${clueSource}】发现并公开了线索：“${foundClue.description}”`;
+            logToScriptKillGame(`${user.name} 完成了一次搜证: ${foundMessage}`);
+            await showCustomAlert('搜证结果', foundMessage);
+          } else {
+            // 玩家选择【隐藏】或关闭了弹窗
+            foundMessage = `你在【${clueSource}】发现了一条关于自己的线索，并选择将其隐藏。`;
+            // 只给玩家自己一个弹窗提示，告诉他已经拿到了线索
+            await showCustomAlert('搜证结果', `你已将线索“${foundClue.description}”收入囊中。`);
+            // 在公共日志里只显示一个模糊的信息，告诉大家你搜过证了
+            logToScriptKillGame(`${user.name} 完成了一次搜证。`);
+          }
+        } else {
+          // 如果线索是公共的，或者关于其他人的，就按原来的逻辑直接公开
+          foundMessage = `在【${clueSource}】发现线索：“${foundClue.description}”`;
+          logToScriptKillGame(`${user.name} 完成了一次搜证: ${foundMessage}`);
+          await showCustomAlert('搜证结果', foundMessage);
+        }
+
+        // --- ★★★ 核心修改逻辑结束 ★★★ ---
+      } else {
+        // 如果已经没有新线索了
+        foundMessage = '没有发现更多新线索了。';
+        logToScriptKillGame(`${user.name} 完成了一次搜证: ${foundMessage}`);
+        await showCustomAlert('搜证结果', foundMessage);
+      }
+    }
+    // ▲▲▲ 复制到这里结束 ▲▲▲
+
+    // --- 2. 处理“结束搜证”按钮 ---
+    if (e.target.id === 'sk-end-search-btn') {
+      if (phase === 'evidence_round_1') {
+        scriptKillGameState.gamePhase = 'discussion_round_1';
+        await processScriptKillTurn();
+      } else if (phase === 'evidence_round_2') {
+        // 【核心修改】第二轮搜证后，进入第二轮讨论
+        scriptKillGameState.gamePhase = 'discussion_round_2';
+        await processScriptKillTurn();
+      }
+    }
+
+    // --- 3. 处理“我要发言”按钮 ---
+    if (e.target.id === 'sk-speak-btn') {
+      const speech = await waitForUserActionSK('轮到你发言了', 'speak', '请输入你的发言...');
+      const userPlayer = scriptKillGameState.players.find(p => p.isUser);
+      logToScriptKillGame({ player: userPlayer, speech: speech }, 'speech');
+
+      for (const player of scriptKillGameState.players.filter(p => !p.isUser)) {
+        await sleep(2000);
+        renderScriptKillGameScreen({ speakingPlayerId: player.id });
+        const aiSpeech = await triggerScriptKillAiAction(player.id, 'discuss');
+        logToScriptKillGame({ player: player, speech: aiSpeech }, 'speech');
+      }
+      renderScriptKillGameScreen();
+
+      // 【核心修改】根据当前讨论轮次，决定下一个阶段
+      if (phase === 'discussion_round_1') {
+        scriptKillGameState.gamePhase = 'evidence_round_2';
+        await processScriptKillTurn();
+      } else if (phase === 'discussion_round_2') {
+        // 第二轮讨论后，进入第三轮（最终）讨论
+        scriptKillGameState.gamePhase = 'discussion_round_3';
+        await processScriptKillTurn();
+      } else if (phase === 'discussion_round_3') {
+        // 最终讨论后，才进入投票
+        scriptKillGameState.gamePhase = 'voting';
+        await processScriptKillTurn();
+      }
+    }
+  });
+  // ▲▲▲ 替换结束 ▲▲▲
+
+  // ▼▼▼ 【全新 | 已修复】剧本杀管理功能事件监听器 ▼▼▼
+  document.getElementById('manage-custom-scripts-btn').addEventListener('click', openScriptManager);
+
+  // 管理器弹窗的按钮
+  document.getElementById('add-new-script-btn').addEventListener('click', () => {
+    document.getElementById('script-kill-manager-modal').classList.remove('visible');
+    openScriptEditorForCreate();
+  });
+  document.getElementById('close-script-manager-btn').addEventListener('click', () => {
+    document.getElementById('script-kill-manager-modal').classList.remove('visible');
+    // 关闭后刷新一下设置页面的剧本下拉框
+    openScriptKillSetup();
+    showScreen('script-kill-setup-screen');
+  });
+
+  // 编辑器弹窗的按钮
+  document.getElementById('save-script-btn').addEventListener('click', saveCustomScript);
+  document.getElementById('cancel-script-editor-btn').addEventListener('click', () => {
+    document.getElementById('script-kill-editor-modal').classList.remove('visible');
+    // 如果是从管理界面进来的，就返回管理界面
+    if (document.getElementById('script-kill-manager-modal').classList.contains('visible') === false) {
+      openScriptManager();
+    }
+  });
+  // ▲▲▲ 修复结束 ▲▲▲
+  // ▼▼▼ 【全新】剧本杀可视化编辑器事件监听器 ▼▼▼
+  document.getElementById('sk-add-role-btn').addEventListener('click', () => openRoleEditor());
+  document.getElementById('sk-add-clue-btn').addEventListener('click', () => openClueEditor());
+
+  document.getElementById('sk-item-editor-cancel-btn').addEventListener('click', () => {
+    document.getElementById('sk-item-editor-modal').classList.remove('visible');
+  });
+  document.getElementById('sk-item-editor-save-btn').addEventListener('click', saveItemFromEditor);
+
+  // 使用事件委托处理角色和线索卡片上的按钮点击
+  document.getElementById('script-kill-editor-modal').addEventListener('click', e => {
+    const target = e.target;
+    if (target.classList.contains('edit-role-btn')) {
+      openRoleEditor(parseInt(target.dataset.index));
+    }
+    if (target.classList.contains('delete-role-btn')) {
+      const index = parseInt(target.dataset.index);
+      currentEditingScriptData.roles.splice(index, 1);
+      renderVisualScriptEditor();
+    }
+    if (target.classList.contains('edit-clue-btn')) {
+      openClueEditor(parseInt(target.dataset.index));
+    }
+    if (target.classList.contains('delete-clue-btn')) {
+      const index = parseInt(target.dataset.index);
+      currentEditingScriptData.clues.splice(index, 1);
+      renderVisualScriptEditor();
+    }
+  });
+  // ▲▲▲ 新增事件监听结束 ▲▲▲
+  // ▼▼▼ 在 init() 函数的事件监听器区域末尾，粘贴这块新代码 ▼▼▼
+
+  // 【全新】剧本杀复盘分享功能事件绑定
+  document.getElementById('sk-cancel-share-btn').addEventListener('click', () => {
+    document.getElementById('script-kill-target-picker-modal').classList.remove('visible');
+  });
+  document.getElementById('sk-select-all-btn').addEventListener('click', () => {
+    document.querySelectorAll('.script-kill-target-checkbox').forEach(cb => (cb.checked = true));
+  });
+  document.getElementById('sk-deselect-all-btn').addEventListener('click', () => {
+    document.querySelectorAll('.script-kill-target-checkbox').forEach(cb => (cb.checked = false));
+  });
+  // ▲▲▲ 新代码粘贴结束 ▲▲▲
+  // ▼▼▼ 【全新】AI剧本生成器事件监听器 ▼▼▼
+  document.getElementById('open-sk-ai-generator-btn').addEventListener('click', openAiScriptGenerator);
+  document.getElementById('sk-ai-generator-cancel-btn').addEventListener('click', () => {
+    document.getElementById('sk-ai-generator-modal').classList.remove('visible');
+    // 返回到剧本管理界面
+    openScriptManager();
+  });
+  document.getElementById('sk-trigger-ai-generation-btn').addEventListener('click', generateSkScriptWithAI);
+  document.getElementById('sk-ai-generator-save-btn').addEventListener('click', saveAiGeneratedScript);
+  // ▲▲▲ 新事件监听器结束 ▲▲▲
+
+  // ▲▲▲ 剧本杀事件监听器结束 ▲▲▲
+  // ▼▼▼ 【全新】“你说我猜”游戏事件监听器 ▼▼▼
+
+  // 1. 设置界面的交互
+  document.querySelectorAll('input[name="guess_what_mode"]').forEach(radio => {
+    radio.addEventListener('change', function () {
+      document.getElementById('user-word-input-container').style.display =
+        this.value === 'ai_guesses' ? 'block' : 'none';
+    });
+  });
+  document.getElementById('start-guess-what-game-btn').addEventListener('click', startGuessWhatGame);
+
+  // 2. 游戏界面的交互
+  document.getElementById('exit-guess-what-game-btn').addEventListener('click', async () => {
+    const confirmed = await showCustomConfirm('退出游戏', '确定要中途退出游戏吗？谜底将会揭晓。');
+    if (confirmed) {
+      endGuessWhatGame('none', '游戏被中途放弃。');
+      // 延迟一点再返回大厅，让玩家能看到结果
+      setTimeout(() => {
+        showScreen('game-hall-screen');
+      }, 3000);
+    }
+  });
+
+  document.getElementById('give-up-guess-what-btn').addEventListener('click', () => {
+    endGuessWhatGame(guessWhatGameState.currentTurn === 'user' ? 'ai' : 'user', '玩家放弃了游戏。');
+  });
+
+  document.getElementById('send-guess-what-input-btn').addEventListener('click', () => {
+    const input = document.getElementById('guess-what-user-input');
+    const text = input.value.trim();
+    if (text) {
+      processGuessWhatTurn(text);
+      input.value = '';
+    }
+  });
+
+  document.getElementById('guess-what-user-input').addEventListener('keypress', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      document.getElementById('send-guess-what-input-btn').click();
+    }
+  });
+
+  // ▲▲▲ “你说我猜”事件监听器结束 ▲▲▲
+  // ▼▼▼ 在这里粘贴下面这整块【全新的】事件监听器代码 ▼▼▼
+  // ▼▼▼ 用这整块新代码，替换旧的飞行棋事件监听器 ▼▼▼
+  /* --- 【全新 | V2分类版】心动飞行棋功能事件监听器 --- */
+
+  // 1. 设置页面的按钮
+  document.getElementById('start-ludo-game-btn').addEventListener('click', startLudoGame);
+  document.getElementById('manage-ludo-question-banks-btn').addEventListener('click', openLudoQuestionBankManager);
+
+  // 2. 游戏主界面的按钮
+  document.getElementById('exit-ludo-game-btn').addEventListener('click', async () => {
+    const confirmed = await showCustomConfirm('退出游戏', '确定要中途退出游戏吗？');
+    if (confirmed) {
+      ludoGameState.isActive = false;
+      showScreen('game-hall-screen');
+    }
+  });
+  document.getElementById('restart-ludo-game-btn').addEventListener('click', async () => {
+    const confirmed = await showCustomConfirm('重新开始', '确定要重新开始这一局吗？');
+    if (confirmed) {
+      startLudoGame();
+    }
+  });
+
+  // 3. 问题库管理弹窗的按钮
+  document.getElementById('close-qbank-manager-btn').addEventListener('click', async () => {
+    document.getElementById('ludo-qbank-manager-modal').classList.remove('visible');
+    // 如果设置页面还开着，就刷新一下下拉框
+    if (document.getElementById('ludo-setup-screen').classList.contains('active')) {
+      await openLudoSetup();
+    }
+  });
+  document.getElementById('add-ludo-qbank-btn').addEventListener('click', addNewLudoQuestionBank);
+
+  // 4. 问题编辑器弹窗的按钮
+  document.getElementById('back-to-qbank-manager-btn').addEventListener('click', () => {
+    document.getElementById('ludo-question-editor-modal').classList.remove('visible');
+    openLudoQuestionBankManager(); // 返回到题库管理列表
+  });
+  document.getElementById('add-ludo-question-btn').addEventListener('click', () => openSingleQuestionEditor(null));
+
+  // 5. 单个问题编辑/添加弹窗的按钮
+  document.getElementById('cancel-single-question-btn').addEventListener('click', () => {
+    document.getElementById('ludo-single-question-editor-modal').classList.remove('visible');
+  });
+  document.getElementById('save-single-question-btn').addEventListener('click', saveSingleQuestion);
+  // ▼▼▼ 在这里粘贴下面的新代码 ▼▼▼
+  /* --- 【全新】飞行棋题库导入功能事件监听 --- */
+  document.getElementById('import-ludo-qbank-btn').addEventListener('click', () => {
+    // 点击“导入”按钮时，触发隐藏的文件选择框
+    document.getElementById('ludo-qbank-import-input').click();
+  });
+
+  document.getElementById('ludo-qbank-import-input').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (file) {
+      // 当用户选择了文件后，调用我们的导入处理函数
+      importLudoQuestionBank(file);
+    }
+    e.target.value = null; // 清空，以便下次能选择同一个文件
+  });
+  /* --- 事件监听结束 --- */
+  // ▲▲▲ 新代码粘贴结束 ▲▲▲
+
+  /* --- 飞行棋事件监听器结束 --- */
+  // ▼▼▼ 【全新】“谁是卧底”游戏事件监听器 ▼▼▼
+  document.getElementById('start-undercover-game-btn').addEventListener('click', startUndercoverGame);
+  document.getElementById('exit-undercover-game-btn').addEventListener('click', async () => {
+    const confirmed = await showCustomConfirm('退出游戏', '确定要中途退出游戏吗？当前进度不会保存。');
+    if (confirmed) {
+      undercoverGameState.isActive = false; // 停止游戏循环
+      showScreen('game-hall-screen');
+    }
+  });
+  document.getElementById('undercover-my-word-btn').addEventListener('click', () => {
+    if (undercoverGameState.isActive) {
+      const me = undercoverGameState.players.find(p => p.isUser);
+      if (me) {
+        const roleName = { undercover: '卧底', civilian: '平民', whiteboard: '白板' }[me.role] || '未知';
+        const wordText = me.word ? `你的词语是：【${me.word}】` : '你是一个白板，需要根据他人描述猜测平民词语。';
+        showCustomAlert(`你的身份是：【${roleName}】`, wordText);
+      }
+    }
+  });
+  // ▲▲▲ 新增事件监听器结束 ▲▲▲
+  // ▼▼▼ 在init()的事件监听区添加 ▼▼▼
+  document.getElementById('werewolf-game-log').addEventListener('click', e => {
+    const rerollBtn = e.target.closest('.werewolf-reroll-btn');
+    if (rerollBtn) {
+      const logIndex = parseInt(rerollBtn.dataset.logIndex);
+      if (!isNaN(logIndex)) {
+        handleWerewolfReroll(logIndex);
+      }
+    }
+  });
+  // ▲▲▲ 添加结束 ▲▲▲
+  // ▼▼▼ 在init()的事件监听区添加 ▼▼▼
+  document.getElementById('sts-action-area').addEventListener('click', e => {
+    const rerollBtn = e.target.closest('#sts-reroll-ai-turn-btn');
+    if (rerollBtn) {
+      handleStsReroll();
+    }
+  });
+  // ▲▲▲ 添加结束 ▲▲▲
+  // ▼▼▼ 在init()的事件监听区添加 ▼▼▼
+  // 剧本杀重roll事件
+  document.getElementById('script-kill-game-log').addEventListener('click', e => {
+    const rerollBtn = e.target.closest('.sk-reroll-btn');
+    if (rerollBtn) {
+      const logIndex = parseInt(rerollBtn.dataset.logIndex);
+      if (!isNaN(logIndex)) {
+        handleScriptKillReroll(logIndex);
+      }
+    }
+  });
+  // ▲▲▲ 添加结束 ▲▲▲
+  // ▼▼▼ 在init()的事件监听区添加 ▼▼▼
+  // “你说我猜”重roll事件
+  document.getElementById('guess-what-game-log').addEventListener('click', e => {
+    const rerollBtn = e.target.closest('.gw-reroll-btn');
+    if (rerollBtn) {
+      const logIndex = parseInt(rerollBtn.dataset.logIndex);
+      if (!isNaN(logIndex)) {
+        handleGuessWhatReroll(logIndex);
+      }
+    }
+  });
+  // ▲▲▲ 添加结束 ▲▲▲
+  // ▼▼▼ 在init()的事件监听区添加 ▼▼▼
+  // 飞行棋重roll事件
+  document.getElementById('ludo-game-log').addEventListener('click', e => {
+    const rerollBtn = e.target.closest('.ludo-reroll-btn');
+    if (rerollBtn) {
+      const logIndex = parseInt(rerollBtn.dataset.logIndex);
+      if (!isNaN(logIndex)) {
+        handleLudoReroll(logIndex);
+      }
+    }
+  });
+  // ▲▲▲ 添加结束 ▲▲▲
+  // ▼▼▼ 在init()的事件监听区添加 ▼▼▼
+  // “谁是卧底”重roll事件
+  document.getElementById('undercover-game-log').addEventListener('click', e => {
+    const rerollBtn = e.target.closest('.uc-reroll-btn');
+    if (rerollBtn) {
+      const logIndex = parseInt(rerollBtn.dataset.logIndex);
+      if (!isNaN(logIndex)) {
+        handleUndercoverReroll(logIndex);
+      }
+    }
+  });
+  // ▲▲▲ 添加结束 ▲▲▲
+  // --- 【全新】剧本杀导入功能事件监听 ---
+
+  // 1. 点击“导入”按钮，触发文件选择
+  const importScriptBtn = document.getElementById('import-script-btn');
+  if (importScriptBtn) {
+    importScriptBtn.addEventListener('click', () => {
+      document.getElementById('script-kill-import-input').click();
+    });
+  }
+
+  // 2. 监听文件选择变化，执行导入
+  const importScriptInput = document.getElementById('script-kill-import-input');
+  if (importScriptInput) {
+    importScriptInput.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (file) {
+        importCustomScript(file);
+      }
+      e.target.value = null; // 清空，以便下次能选择同一个文件
+    });
+  }
+  // --- 事件监听结束 ---
+});

@@ -1,0 +1,437 @@
+    <div id="tukey-accounting-screen" class="screen">
+      <!-- 1. 页面头部 (保持不变) -->
+      <div class="header">
+        <span class="back-btn" onclick="showScreen('home-screen')">‹</span>
+        <span id="tukey-header-title">记账群聊</span>
+        <span style="width: 30px"></span>
+      </div>
+
+      <!-- 2. 页面内容容器 (保持不变) -->
+      <div class="tukey-content">
+        <!-- 视图1: 钱包 (这是我们要修改的核心) -->
+        <div id="tukey-wallet-view" class="tukey-view">
+          <div id="wallet-summary-card">
+            <div class="summary-item net-assets">
+              <span class="label">净资产</span>
+              <span class="value" id="net-assets-value">¥ 0.00</span>
+            </div>
+            <div class="summary-details">
+              <div class="summary-item">
+                <span class="label">总资产</span>
+                <span class="value" id="total-assets-value">¥ 0.00</span>
+              </div>
+              <div class="summary-item">
+                <span class="label">总负债</span>
+                <span class="value" id="total-liabilities-value">¥ 0.00</span>
+              </div>
+            </div>
+          </div>
+          <div id="wallet-accounts-list">
+            <!-- 账户列表将由JS动态生成在这里 -->
+          </div>
+          <button
+            id="add-new-account-fab"
+            class="ls-fab-btn"
+            title="添加新账户"
+          >
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <line
+                x1="12"
+                y1="5"
+                x2="12"
+                y2="19"
+                stroke="currentColor"
+                stroke-width="3"
+                stroke-linecap="round"
+              />
+              <line
+                x1="5"
+                y1="12"
+                x2="19"
+                y2="12"
+                stroke="currentColor"
+                stroke-width="3"
+                stroke-linecap="round"
+              />
+            </svg>
+          </button>
+        </div>
+
+        <div id="tukey-reports-view" class="tukey-view">
+          <!-- 1. 报表控制/筛选区域 -->
+          <div class="report-controls">
+            <select id="report-account-filter">
+              <!-- 账户选项将由JS动态生成 -->
+            </select>
+            <select id="report-month-filter">
+              <!-- 月份选项将由JS动态生成 -->
+            </select>
+            <select id="report-type-filter">
+              <option value="daily_details">每日明细</option>
+              <option value="monthly_summary">月度统计</option>
+            </select>
+          </div>
+
+          <!-- 2. 报表内容显示区域 -->
+          <div id="report-display-area">
+            <!-- 视图切换容器 -->
+            <div id="daily-report-view" class="report-view active">
+              <!-- 每日明细将由JS动态生成在这里 -->
+              <p class="report-placeholder">正在加载报表...</p>
+            </div>
+            <div id="monthly-report-view" class="report-view">
+              <!-- 月度统计将由JS动态生成在这里 -->
+              <div id="monthly-summary-card">
+                <!-- 月度总收支 -->
+              </div>
+              <div class="chart-container">
+                <h3>支出分类占比</h3>
+                <canvas id="category-pie-chart"></canvas>
+              </div>
+              <div class="chart-container">
+                <h3>月度支出趋势</h3>
+                <canvas id="expenditure-line-chart"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="tukey-group-chat-view" class="tukey-view active">
+          <!-- 这个容器会在没有群聊时显示 -->
+          <div id="tukey-no-group-placeholder">
+            <p>你还没有创建记账群聊哦</p>
+            <button id="tukey-create-group-btn" class="form-button">
+              立即创建
+            </button>
+          </div>
+
+          <div id="tukey-group-chat-container" style="display: none">
+            <div id="tukey-group-chat-header">
+              <span id="tukey-group-name">群聊名称</span>
+              <button id="tukey-group-settings-btn" title="群聊设置">⚙️</button>
+            </div>
+
+            <!-- 记账和回复历史记录 -->
+            <div id="tukey-records-list">
+              <!-- JS会在这里渲染内容 -->
+            </div>
+
+            <!-- 记账输入区域 -->
+            <div id="tukey-record-input-area">
+              <button id="tukey-add-record-btn">+</button>
+            </div>
+
+            <div id="tukey-record-input-card">
+              <div class="card-header">
+                <button class="close-card-btn">×</button>
+                <div class="type-selector">
+                  <button class="type-btn active" data-type="expense">
+                    支出
+                  </button>
+                  <button class="type-btn" data-type="income">收入</button>
+                </div>
+              </div>
+              <div class="card-body">
+                <!-- 金额和备注输入区域 -->
+                <div class="input-fields">
+                  <div class="amount-input-wrapper">
+                    <span class="currency-symbol">¥</span>
+                    <input
+                      type="number"
+                      id="tukey-card-amount-input"
+                      placeholder="0.00"
+                    />
+                    <!-- 已选分类显示区 -->
+                    <div id="tukey-card-selected-category">
+                      <img src="" alt="" />
+                      <span>请选择分类</span>
+                    </div>
+                  </div>
+                  <input
+                    type="text"
+                    id="tukey-card-remarks-input"
+                    placeholder="点击输入备注..."
+                  />
+                </div>
+                <!-- 分类网格 -->
+                <div class="category-grid">
+                  <!-- 分类将由JS动态生成 -->
+                </div>
+              </div>
+              <div class="card-footer">
+                <!-- 账户和时间选择器 -->
+                <div class="additional-options">
+                  <div class="option-item">
+                    <label for="tukey-card-account-select">账户</label>
+                    <select id="tukey-card-account-select">
+                      <!-- 账户将由JS动态生成 -->
+                    </select>
+                  </div>
+                  <div class="option-item">
+                    <label for="tukey-card-time-input">时间</label>
+                    <input type="datetime-local" id="tukey-card-time-input" />
+                  </div>
+                </div>
+                <button id="tukey-save-from-card-btn">保 存</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="tukey-settings-view" class="tukey-view">
+          <div class="form-container" style="padding-top: 20px">
+            <!-- 1. 个人资料设置 -->
+            <div class="form-group">
+              <label>我的个人资料</label>
+              <div class="avatar-upload">
+                <img
+                  id="tukey-user-avatar-preview"
+                  src="https://i.postimg.cc/PxZrFFFL/o-o-1.jpg"
+                />
+                <button
+                  onclick="
+                    document.getElementById('tukey-user-avatar-input').click()
+                  "
+                >
+                  上传我的头像
+                </button>
+                <input
+                  type="file"
+                  id="tukey-user-avatar-input"
+                  accept="image/*"
+                  hidden
+                />
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="tukey-user-name-input">用户名</label>
+              <input
+                type="text"
+                id="tukey-user-name-input"
+                placeholder="输入你在群聊中显示的昵称"
+              />
+            </div>
+            <div class="form-group">
+              <label for="tukey-user-profession-input">职业 (选填)</label>
+              <input
+                type="text"
+                id="tukey-user-profession-input"
+                placeholder="你的职业，会展示给群友"
+              />
+            </div>
+
+            <hr style="opacity: 0.2; margin: 20px 0" />
+
+            <!-- 2. 同步设置 -->
+            <div class="form-group">
+              <label for="sync-to-taobao-toggle" class="toggle-switch-label">
+                <span class="toggle-switch-text">
+                  同步至桃宝余额
+                  <p
+                    style="
+                      font-size: 12px;
+                      font-weight: normal;
+                      color: #999;
+                      margin-top: 5px;
+                    "
+                  >
+                    开启后，所有记账记录将同步影响桃宝的余额和收支明细。
+                  </p>
+                </span>
+                <input type="checkbox" id="sync-to-taobao-toggle" />
+                <span class="toggle-switch-slider"></span>
+              </label>
+            </div>
+
+            <hr style="opacity: 0.2; margin: 20px 0" />
+
+            <!-- 3. 导出设置 (新增) -->
+            <div class="form-group">
+              <label>数据导出</label>
+              <button
+                id="export-tukey-report-btn"
+                class="form-button form-button-secondary"
+              >
+                导出账单为 Excel
+              </button>
+            </div>
+
+            <button class="form-button" id="save-tukey-settings-btn">
+              保存所有设置
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. 底部导航栏 (保持不变) -->
+      <div id="tukey-bottom-nav">
+        <div class="tukey-nav-item" data-view="tukey-wallet-view">
+          <svg width="24" height="24" viewBox="0 0 1024 1024">
+            <path
+              d="M517.7 660c-4 26.6-19.2 46.3-37.3 46.3H290.1c-21.2 0-38.4-27-38.4-60.3V435.3c0-33.3 17.2-60.3 38.4-60.3h190.3c17.6 0 32.5 18.7 37 44.1"
+              fill="#BAF4EA"
+            ></path>
+            <path
+              d="M668.7 761.8H321.6c-54 0-97.9-43.9-97.9-97.9V419.6c0-54 43.9-97.9 97.9-97.9h347.1c43.8 0 82.6 29.5 94.4 71.6 4.1 14.9-4.6 30.3-19.5 34.5-14.9 4.1-30.3-4.6-34.5-19.5-5-18-21.6-30.6-40.4-30.6H321.6c-23.1 0-41.9 18.8-41.9 41.9v244.3c0 23.1 18.8 41.9 41.9 41.9h347.1c19.5 0 36.3-13.2 40.8-32.2 3.6-15 18.7-24.3 33.7-20.8 15 3.6 24.3 18.7 20.8 33.7-5 21.1-17.1 40.2-34.1 53.8-17.3 13.9-39 21.5-61.2 21.5z"
+              fill="#2D5B56"
+            ></path>
+            <path
+              d="M719.9 614.4H641c-39.9 0-72.6-32.7-72.6-72.6 0-39.9 32.7-72.6 72.6-72.6h78.9c39.9 0 72.6 32.7 72.6 72.6 0 39.9-32.7 72.6-72.6 72.6z"
+              fill="#BAF4EA"
+            ></path>
+            <path
+              d="M719.9 642.4H641c-55.5 0-100.6-45.1-100.6-100.6 0-55.5 45.1-100.6 100.6-100.6h78.9c55.5 0 100.6 45.1 100.6 100.6 0 55.4-45.2 100.6-100.6 100.6zM641 497.1c-24.6 0-44.6 20-44.6 44.6s20 44.6 44.6 44.6h78.9c24.6 0 44.6-20 44.6-44.6s-20-44.6-44.6-44.6H641z"
+              fill="#2D5B56"
+            ></path>
+            <path
+              d="M650.1 542.4m-0.4 0a0.4 0.4 0 1 0 0.8 0 0.4 0.4 0 1 0-0.8 0Z"
+              fill="#FFFFFF"
+            ></path>
+            <path
+              d="M650.1 570.8c-15.7 0-28.4-12.7-28.4-28.4s12.7-28.4 28.4-28.4 28.4 12.7 28.4 28.4-12.7 28.4-28.4 28.4z m0-56c-15.2 0-27.6 12.4-27.6 27.6s12.4 27.6 27.6 27.6 27.6-12.4 27.6-27.6-12.4-27.6-27.6-27.6z"
+              fill="#2D5B56"
+            ></path>
+            <path
+              d="M155.2 152.2c12 0 21.7 9.7 21.7 21.7s-9.7 21.7-21.7-21.7-21.7-9.7-21.7-21.7 9.7-21.7 21.7-21.7m0-40c-34 0-61.7 27.7-61.7 61.7s27.7 61.7 61.7 61.7 61.7-27.7 61.7-61.7-27.7-61.7-61.7-61.7zM162.7 956.8h-0.2c-8.3-0.1-14.9-6.9-14.8-15.2l1-69.5c0.1-8.2 6.8-14.8 15-14.8h0.2c8.3 0.1 14.9 6.9 14.8 15.2l-1 69.5c-0.1 8.2-6.8 14.8-15 14.8z"
+              fill="#2D5B56"
+            ></path>
+            <path
+              d="M212.9 907.5v0.2c-0.1 8.3-6.9 14.9-15.2 14.8l-69.5-1c-8.2-0.1-14.8-6.8-14.8-15v-0.2c0.1-8.3 6.9-14.9 15.2-14.8l69.5 1c8.3 0.2 14.8 6.9 14.8 15z"
+              fill="#2D5B56"
+            ></path>
+            <path
+              d="M895.4 905.5m-30.9 0a30.9 30.9 0 1 0 61.8 0 30.9 30.9 0 1 0-61.8 0Z"
+              fill="#2D5B56"
+            ></path>
+            <path
+              d="M121.4 613.5m-20.7 0a20.7 20.7 0 1 0 41.4 0 20.7 20.7 0 1 0-41.4 0Z"
+              fill="#2D5B56"
+            ></path>
+            <path
+              d="M861.5 115.5v30.8M861.5 156.3c-5.5 0-10-4.5-10-10v-30.8c0-5.5 4.5-10 10-10s10 4.5 10 10v30.8c0 5.5-4.5 10-10 10zM804.8 172.2h30.8M835.6 182.2h-30.8c-5.5 0-10-4.5-10-10s4.5-10 10-10h30.8c5.5 0 10 4.5 10 10s-4.5 10-10 10zM887.4 172.2h30.8M918.2 182.2h-30.8c-5.5 0-10-4.5-10-10s4.5-10 10-10h30.8c5.5 0 10 4.5 10 10s-4.5 10-10 10z"
+              fill="#2D5B56"
+            ></path>
+            <path
+              d="M821.4 212.3l21.8-21.8M821.4 222.3c-2.6 0-5.1-1-7.1-2.9-3.9-3.9-3.9-10.2 0-14.1l21.8-21.8c3.9-3.9 10.2-3.9 14.1 0 3.9 3.9 3.9 10.2 0 14.1l-21.8 21.8c-1.8 1.9-4.4 2.9-7 2.9z"
+              fill="#2D5B56"
+            ></path>
+            <path
+              d="M879.8 153.9l21.8-21.8M879.8 163.9c-2.6 0-5.1-1-7.1-2.9-3.9-3.9-3.9-10.2 0-14.1l21.8-21.8c3.9-3.9 10.2-3.9 14.1 0 3.9 3.9 3.9 10.2 0 14.1L886.9 161c-2 1.9-4.5 2.9-7.1 2.9z"
+              fill="#2D5B56"
+            ></path>
+            <path
+              d="M901.6 212.3l-21.8-21.8M901.6 222.3c-2.6 0-5.1-1-7.1-2.9l-21.8-21.8c-3.9-3.9-3.9-10.2 0-14.1 3.9-3.9 10.2-3.9 14.1 0l21.8 21.8c3.9 3.9 3.9 10.2 0 14.1-1.9 1.9-4.5 2.9-7 2.9z"
+              fill="#2D5B56"
+            ></path>
+            <path
+              d="M843.2 153.9l-21.8-21.8M843.2 163.9c-2.6 0-5.1-1-7.1-2.9l-21.8-21.8c-3.9-3.9-3.9-10.2 0-14.1 3.9-3.9 10.2-3.9 14.1 0l21.8 21.8c3.9 3.9 3.9 10.2 0 14.1-1.9 1.9-4.4 2.9-7 2.9z"
+              fill="#2D5B56"
+            ></path>
+          </svg>
+          <span>钱包</span>
+        </div>
+        <div class="tukey-nav-item" data-view="tukey-reports-view">
+          <svg width="24" height="24" viewBox="0 0 1024 1024">
+            <path
+              d="M692.24 787.29h-175.3a24.65 24.65 0 0 1 0-49.3h175.3a24.65 24.65 0 0 1 0 49.3z"
+              fill="#303030"
+              p-id="13093"
+            ></path>
+            <path
+              d="M692.24 186.92v89.18H336.29v463.27h-89.34V186.92h445.29z"
+              fill="#279ACC"
+              p-id="13094"
+            ></path>
+            <path
+              d="M810.83 869.58H322.21V660.12a24.65 24.65 0 0 1 49.3 0v160.16h390V318.74h-390v148.19a24.65 24.65 0 1 1-49.3 0V269.44h488.62z"
+              fill="#303030"
+              p-id="13095"
+            ></path>
+            <path
+              d="M346.86 767H225.28V166.87H713.9v127.22a24.65 24.65 0 1 1-49.29 0v-77.93h-390v501.55h72.28a24.65 24.65 0 1 1 0 49.29z"
+              fill="#303030"
+              p-id="13096"
+            ></path>
+            <path
+              d="M751.63 395.07m-78.65 0a78.65 78.65 0 1 0 157.3 0 78.65 78.65 0 1 0-157.3 0Z"
+              fill="#279ACC"
+              p-id="13097"
+            ></path>
+            <path
+              d="M317.28 626.59a24.65 24.65 0 0 1-17.42-42.07l89.58-89.59c10.84-10.85 25-16.36 40.58-16.34a55.34 55.34 0 0 1 39.89 18l64.43 69.85 150.17-148a24.65 24.65 0 0 1 34.63 35.08l-150 148.05a49.43 49.43 0 0 1-71-1.66L433.68 530a6.42 6.42 0 0 0-4.65-2.1 5.84 5.84 0 0 0-4.73 1.91l-89.59 89.59a24.58 24.58 0 0 1-17.43 7.19z"
+              fill="#303030"
+              p-id="13098"
+            ></path>
+            <path
+              d="M751.63 481.75a86.67 86.67 0 1 1 86.67-86.67 86.77 86.77 0 0 1-86.67 86.67z m0-124A37.38 37.38 0 1 0 789 395.08a37.42 37.42 0 0 0-37.37-37.38z"
+              fill="#303030"
+              p-id="13099"
+            ></path>
+          </svg>
+          <span>报表</span>
+        </div>
+        <div class="tukey-nav-item active" data-view="tukey-group-chat-view">
+          <svg width="24" height="24" viewBox="0 0 1024 1024">
+            <path
+              d="M134.588 151C118.247 151 105 164.247 105 180.584v557.964c0 16.339 13.255 29.584 29.599 29.584h155.746l31.872 99.6c2.489 7.777 8.981 9.197 14.504 3.169l94.146-102.769h457.72c16.341 0 29.59-13.247 29.59-29.584V180.584c0-16.339-13.248-29.584-29.588-29.584H134.588z"
+              fill="#0FC8B2"
+              p-id="32320"
+            ></path>
+            <path
+              d="M511.213 422c19.045 0 34.484 15.44 34.484 34.486s-15.44 34.483-34.484 34.483c-19.046 0-34.485-15.438-34.485-34.483 0-19.046 15.439-34.486 34.485-34.486z m-199.727 0c19.046 0 34.483 15.44 34.483 34.486s-15.437 34.483-34.483 34.483S277 475.531 277 456.486C277 437.44 292.44 422 311.486 422z m399.454 0c19.045 0 34.485 15.439 34.485 34.484 0 19.046-15.439 34.483-34.485 34.483-19.045 0-34.485-15.438-34.485-34.483 0-19.045 15.44-34.484 34.485-34.484z"
+              fill="#FFFFFF"
+              p-id="32321"
+            ></path>
+          </svg>
+          <span>记账群聊</span>
+        </div>
+        <div class="tukey-nav-item" data-view="tukey-settings-view">
+          <svg width="24" height="24" viewBox="0 0 1024 1024">
+            <path
+              d="M785.749333 564.770133a231.150933 231.150933 0 0 0 47.035734-258.730666l-145.476267 145.442133a41.5744 41.5744 0 0 1-58.811733 0l-55.876267-55.876267a41.5744 41.5744 0 0 1 0-58.811733l145.476267-145.476267a230.843733 230.843733 0 0 0-305.834667 305.664l-263.509333 263.406934a41.5744 41.5744 0 0 0 0 58.811733l55.842133 55.842133a41.5744 41.5744 0 0 0 58.811733 0l263.406934-263.3728a230.638933 230.638933 0 0 0 258.730666-47.069866l0.170667 0.170666z"
+              fill="#FFFFFF"
+              p-id="33627"
+            ></path>
+            <path
+              d="M435.2 214.084267a264.977067 264.977067 0 0 1 297.028267-53.828267 34.133333 34.133333 0 0 1 10.001066 55.227733l-145.476266 145.442134a7.441067 7.441067 0 0 0 0 10.581333l55.876266 55.842133a7.441067 7.441067 0 0 0 10.5472 0l145.476267-145.476266a34.133333 34.133333 0 0 1 55.227733 10.069333 265.216 265.216 0 0 1-54.033066 296.96 34.474667 34.474667 0 0 1-3.208534 2.833067l-0.238933 0.170666-3.925333 3.822934a264.704 264.704 0 0 1-262.144 57.7536l-5.290667-1.8432-247.5008 247.534933a75.707733 75.707733 0 0 1-102.741333 4.027733l-4.334934-4.027733-55.876266-55.842133a75.707733 75.707733 0 0 1 0-107.1104l247.7056-247.569067-1.809067-5.2224a265.216 265.216 0 0 1 57.719467-262.075733l6.997333-7.2704z m211.285333-7.850667a196.539733 196.539733 0 0 0-163.0208 56.1152 196.983467 196.983467 0 0 0-40.072533 220.535467 34.133333 34.133333 0 0 1-6.9632 38.229333l-263.5776 263.406933a7.441067 7.441067 0 0 0 0 10.513067l55.876267 55.876267a7.441067 7.441067 0 0 0 10.5472 0l263.406933-263.406934a34.133333 34.133333 0 0 1 38.229333-6.929066 196.5056 196.5056 0 0 0 220.501334-40.072534l1.9456-1.7408 4.334933-4.5056a196.8128 196.8128 0 0 0 50.107733-156.672l-1.058133-7.304533-105.301333 105.335467a75.707733 75.707733 0 0 1-102.741334 4.027733l-4.334933-4.027733-55.876267-55.876267a75.707733 75.707733 0 0 1 0-107.076267l105.3696-105.3696-7.3728-1.058133z"
+              fill="#222222"
+              p-id="33628"
+            ></path>
+            <path
+              d="M284.8768 690.858667a34.133333 34.133333 0 0 1 48.298667 48.264533l-61.781334 61.7472a34.133333 34.133333 0 1 1-48.264533-48.264533l61.781333-61.781334z"
+              fill="#009898"
+              p-id="33629"
+            ></path>
+          </svg>
+          <span>设置</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ... </div> 标签来自 id="tukey-accounting-screen" -->
+
+    <!-- 兔k记账导出选项模态框 -->
+    <div id="tukey-export-modal" class="modal">
+      <div class="modal-content" style="height: auto; max-height: 70%">
+        <div class="modal-header">
+          <span>选择要导出的账户</span>
+        </div>
+        <div class="modal-body">
+          <div id="tukey-export-account-list" class="contact-picker-list">
+            <!-- 账户列表将由JS动态生成 -->
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="cancel-tukey-export-btn">取消</button>
+          <button class="save" id="confirm-tukey-export-btn">确认导出</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1. 查岗 - 角色选择屏幕 -->

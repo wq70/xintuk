@@ -1,0 +1,794 @@
+                const timestamp = parseInt(linkCard.dataset.timestamp);
+                if (!isNaN(timestamp)) {
+                  openBrowser(timestamp);
+                }
+              }
+              const packetCard = e.target.closest(".red-packet-card");
+              if (packetCard) {
+                const messageBubble = packetCard.closest(".message-bubble");
+                if (messageBubble && messageBubble.dataset.timestamp) {
+                  const timestamp = parseInt(messageBubble.dataset.timestamp);
+                  handlePacketClick(timestamp);
+                }
+              }
+              const pollCard = e.target.closest(".poll-card");
+              if (pollCard) {
+                const timestamp = parseInt(pollCard.dataset.pollTimestamp);
+                if (isNaN(timestamp)) return;
+                const optionItem = e.target.closest(".poll-option-item");
+                if (optionItem && !pollCard.classList.contains("closed")) {
+                  handleUserVote(timestamp, optionItem.dataset.option);
+                  return;
+                }
+                const actionBtn = e.target.closest(".poll-action-btn");
+                if (actionBtn) {
+                  if (pollCard.classList.contains("closed")) {
+                    showPollResults(timestamp);
+                  } else {
+                    endPoll(timestamp);
+                  }
+                  return;
+                }
+                if (pollCard.classList.contains("closed")) {
+                  showPollResults(timestamp);
+                }
+              }
+              const card = e.target.closest(".waimai-card");
+              if (card) {
+                const messageBubble = card.closest(".message-bubble");
+                const invitationMsg = state.chats[
+                  state.activeChatId
+                ].history.find(
+                  (m) =>
+                    m.timestamp === parseInt(messageBubble.dataset.timestamp),
+                );
+                if (
+                  invitationMsg &&
+                  invitationMsg.type === "lovers_space_invitation" &&
+                  invitationMsg.status === "pending"
+                ) {
+                  const choice = e.target.dataset.choice;
+                  if (choice) {
+                    handleLoversSpaceResponse(invitationMsg.timestamp, choice);
+                  }
+                }
+              }
+              const repostCard = e.target.closest(
+                ".link-share-card[data-post-id]",
+              );
+              if (repostCard) {
+                const postId = parseInt(repostCard.dataset.postId);
+                if (!isNaN(postId)) {
+                  openPost(postId);
+                }
+              }
+
+              // 处理分享卡片的点击
+              const shareCard = e.target.closest(
+                ".link-share-card[data-timestamp]",
+              );
+              if (
+                shareCard &&
+                shareCard.closest(".message-bubble.is-link-share")
+              ) {
+                const timestamp = parseInt(shareCard.dataset.timestamp);
+                if (!isNaN(timestamp)) {
+                  const msg = state.chats[state.activeChatId].history.find(
+                    (m) => m.timestamp === timestamp,
+                  );
+                  if (msg && msg.type === "share_card")
+                    openSharedHistoryViewer(timestamp);
+                  else if (msg && msg.type === "share_link")
+                    openBrowser(timestamp);
+                }
+              }
+
+              // 处理已撤回消息的点击
+              const placeholder = e.target.closest(
+                ".recalled-message-placeholder",
+              );
+              if (placeholder) {
+                const wrapper = placeholder.closest(".message-wrapper");
+                const chat = state.chats[state.activeChatId];
+                if (chat && wrapper) {
+                  const timestamp = parseInt(wrapper.dataset.timestamp);
+                  const recalledMsg = chat.history.find(
+                    (m) => m.timestamp === timestamp,
+                  );
+                  if (recalledMsg && recalledMsg.recalledData) {
+                    let originalContentText = "";
+                    const recalled = recalledMsg.recalledData;
+                    if (recalled.originalType === "text") {
+                      originalContentText = `原文: "${recalled.originalContent}"`;
+                    } else {
+                      originalContentText = `撤回了一条[${recalled.originalType}]类型的消息`;
+                    }
+                    showCustomAlert("已撤回的消息", originalContentText);
+                  }
+                }
+              }
+
+              const chatCard = e.target.closest(".dating-summary-chat-card");
+              if (chatCard && chatCard.dataset.summaryPayload) {
+                try {
+                  // 读取并解析存储在 data-* 属性中的卡片数据
+                  const payloadString = chatCard.dataset.summaryPayload
+                    .replace(/&apos;/g, "'")
+                    .replace(/"/g, "&quot;");
+                  const payload = JSON.parse(payloadString);
+                  // 调用我们新写的函数，打开详情卡片
+                  reopenDatingSummary(payload);
+                } catch (error) {
+                  console.error("解析分享的约会记录失败:", error);
+                  alert("无法打开这个约会记录。");
+                }
+              }
+            });
+
+          const chatSettingsModal = document.getElementById(
+            "chat-settings-modal",
+          );
+          const worldBookSelectBox = document.querySelector(
+            ".custom-multiselect .select-box",
+          );
+          const worldBookCheckboxesContainer = document.getElementById(
+            "world-book-checkboxes-container",
+          );
+
+          function updateWorldBookSelectionDisplay() {
+            const checkedBoxes =
+              worldBookCheckboxesContainer.querySelectorAll("input:checked");
+            const displayText = document.querySelector(
+              ".selected-options-text",
+            );
+            if (checkedBoxes.length === 0) {
+              displayText.textContent = "-- 点击选择 --";
+            } else if (checkedBoxes.length > 2) {
+              displayText.textContent = `已选择 ${checkedBoxes.length} 项`;
+            } else {
+              displayText.textContent = Array.from(checkedBoxes)
+                .map((cb) => cb.parentElement.textContent.trim())
+                .join(", ");
+            }
+          }
+
+          worldBookSelectBox.addEventListener("click", (e) => {
+            e.stopPropagation();
+            worldBookCheckboxesContainer.classList.toggle("visible");
+            worldBookSelectBox.classList.toggle("expanded");
+          });
+          document
+            .getElementById("world-book-checkboxes-container")
+            .addEventListener("change", updateWorldBookSelectionDisplay);
+          window.addEventListener("click", (e) => {
+            if (
+              !document.querySelector(".custom-multiselect").contains(e.target)
+            ) {
+              worldBookCheckboxesContainer.classList.remove("visible");
+              worldBookSelectBox.classList.remove("expanded");
+            }
+          });
+
+          document
+            .getElementById("chat-settings-btn")
+            .addEventListener("click", async () => {
+              if (!state.activeChatId) return;
+              const chat = state.chats[state.activeChatId];
+              const isGroup = chat.isGroup;
+              document.getElementById("offline-mode-section").style.display =
+                isGroup ? "none" : "block";
+              document.getElementById("couple-avatar-group").style.display =
+                isGroup ? "none" : "block";
+              document.getElementById("streak-settings-section").style.display =
+                isGroup ? "none" : "block";
+
+              // 计算总消息条数并更新显示
+              const totalMessages = chat.history.length;
+              const countDisplay = document.getElementById(
+                "total-message-count-display",
+              );
+              if (countDisplay) {
+                countDisplay.textContent = `${totalMessages} 条`;
+              }
+
+              // --- 修改开始：使用深度分析逻辑来更新主界面的Token显示 ---
+              const tokenDisplay = document.getElementById(
+                "context-token-count-display",
+              );
+
+              const updateTokenDisplay = async () => {
+                tokenDisplay.textContent = "计算中...";
+
+                // 复用深度分析的计算逻辑
+                const result = await getTokenDetailedBreakdown(
+                  state.activeChatId,
+                );
+
+                if (result && result.items) {
+                  const totalCount = result.items.reduce(
+                    (sum, item) => sum + item.count,
+                    0,
+                  );
+                  tokenDisplay.textContent = totalCount.toLocaleString();
+                } else {
+                  tokenDisplay.textContent = "0";
+                }
+              };
+
+              await updateTokenDisplay();
+
+              // 3. 【关键】移除旧的监听器（防止重复），并添加新的点击监听器
+              // 使用 cloneNode 技巧快速清除旧的 event listeners
+              const newTokenDisplay = tokenDisplay.cloneNode(true);
+              tokenDisplay.parentNode.replaceChild(
+                newTokenDisplay,
+                tokenDisplay,
+              );
+              newTokenDisplay.addEventListener("click", async () => {
+                // 注意：现在返回的是一个对象 { items, outliers }
+                const result = await getTokenDetailedBreakdown(
+                  state.activeChatId,
+                );
+                if (!result) return;
+
+                const breakdown = result.items;
+                const outliers = result.outliers;
+
+                let total = 0;
+                breakdown.forEach((item) => (total += item.count));
+
+                let htmlContent =
+                  '<div style="text-align: left; font-size: 13px;">';
+
+                // 1. 渲染正常的进度条 (保持不变)
+                const colorMap = {
+                  核心人设: "#FF6B6B",
+                  世界书: "#4ECDC4",
+                  表情包定义: "#FFD93D",
+                  "长期记忆(总结)": "#45B7D1",
+                  "短期记忆(用户)": "#96CEB4",
+                  "短期记忆(AI)": "#A8E6CF",
+                  系统格式指令: "#D4A5A5",
+                };
+
+                breakdown.forEach((item) => {
+                  if (item.count > 0) {
+                    const percent =
+                      total > 0 ? Math.round((item.count / total) * 100) : 0;
+                    const color = colorMap[item.name] || "#ccc";
+                    htmlContent += `
+                    <div style="margin-bottom: 6px;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
+                            <span>${item.name}</span>
+                            <span style="color:#888;">${item.count} (${percent}%)</span>
+                        </div>
+                        <div style="width: 100%; background-color: #f0f0f0; height: 6px; border-radius: 3px; overflow: hidden;">
+                            <div style="width: ${percent}%; background-color: ${color}; height: 100%;"></div>
+                        </div>
+                    </div>
+                `;
+                  }
+                });
+
+                // 2. 【新增】渲染异常大消息列表
+                if (outliers.length > 0) {
+                  htmlContent += `<hr style="opacity:0.2; margin:15px 0 10px 0;">`;
+                  htmlContent += `<div style="color: #ff3b30; font-weight: bold; margin-bottom: 8px;">⚠️ 发现占用较大的消息 (Top ${outliers.length})</div>`;
+                  htmlContent += `<div style="max-height: 150px; overflow-y: auto; background: #f9f9f9; border-radius: 6px; padding: 5px;">`;
+
+                  outliers.forEach((msg) => {
+                    const roleTag =
+                      msg.role === "user"
+                        ? '<span style="color:#007bff">[我]</span>'
+                        : '<span style="color:#28a745">[AI]</span>';
+                    // 添加 onclick 调用我们刚刚暴露的 window.jumpToMessage
+                    htmlContent += `
+                    <div onclick="window.jumpToMessage(${msg.timestamp})" 
+                         style="display:flex; justify-content:space-between; align-items:center; padding: 8px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 12px;">
+                        <div style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                            ${roleTag} ${msg.preview}
+                        </div>
+                        <div style="color: #666; margin-left: 10px; font-family: monospace;">
+                            ${msg.count} 字符 &rarr;
+                        </div>
+                    </div>
+                `;
+                  });
+                  htmlContent += `</div>`;
+                  htmlContent += `<p style="font-size:11px; color:#aaa; margin-top:4px;">点击即可定位并高亮该消息，您可以选择删除它。</p>`;
+                }
+
+                // 3. 底部汇总
+                htmlContent += `<hr style="opacity:0.2; margin:10px 0;">
+            <div style="text-align:right; font-weight:bold; font-size:15px;">总计: ${total} 字符</div>
+        </div>`;
+
+                await showCustomAlert("Token 深度分析", htmlContent);
+              });
+
+              // --- 统一显示/隐藏控件 ---
+
+              const videoCallSettingsGroup = document.getElementById(
+                "video-call-settings-group",
+              );
+              const visualCallSwitch = document.getElementById(
+                "visual-video-call-switch",
+              );
+              const imageUploadsDiv = document.getElementById(
+                "video-call-image-uploads",
+              );
+              // --- 加载聊天总结设置 ---
+              const summarySettings = chat.settings.summary || {};
+              const summaryToggle = document.getElementById("summary-toggle");
+              const summaryDetails = document.getElementById(
+                "summary-details-container",
+              );
+
+              summaryToggle.checked = summarySettings.enabled || false;
+              summaryDetails.style.display = summaryToggle.checked
+                ? "block"
+                : "none";
+
+              document.querySelector(
+                `input[name="summary-mode"][value="${summarySettings.mode || "auto"}"]`,
+              ).checked = true;
+              document.getElementById("summary-count-input").value =
+                summarySettings.count || 20;
+              document.getElementById("summary-prompt-input").value =
+                summarySettings.prompt ||
+                "请你以第三人称的视角，客观、冷静、不带任何感情色彩地总结以下对话的核心事件和信息。禁止进行任何角色扮演或添加主观评论。";
+
+              // 为开关添加实时交互
+              summaryToggle.onchange = () => {
+                summaryDetails.style.display = summaryToggle.checked
+                  ? "block"
+                  : "none";
+              };
+
+              if (isGroup) {
+                videoCallSettingsGroup.style.display = "none"; // 群聊不支持，隐藏整个设置区
+              } else {
+                videoCallSettingsGroup.style.display = "block"; // 单聊显示
+
+                // 加载当前设置
+                visualCallSwitch.checked =
+                  chat.settings.visualVideoCallEnabled || false;
+                imageUploadsDiv.style.display = visualCallSwitch.checked
+                  ? "block"
+                  : "none";
+                document.getElementById("char-video-image-preview").src =
+                  chat.settings.charVideoImage ||
+                  "https://i.postimg.cc/pT2xKzPz/album-cover-placeholder.png";
+                document.getElementById("user-video-image-preview").src =
+                  chat.settings.userVideoImage ||
+                  "https://i.postimg.cc/pT2xKzPz/album-cover-placeholder.png";
+                const voiceAccessSwitch = document.getElementById(
+                  "video-call-voice-access-switch",
+                );
+                voiceAccessSwitch.checked =
+                  chat.settings.videoCallVoiceAccess || false;
+
+                // 为开关添加实时交互
+                visualCallSwitch.onchange = () => {
+                  imageUploadsDiv.style.display = visualCallSwitch.checked
+                    ? "block"
+                    : "none";
+                };
+              }
+              const realCameraSwitch = document.getElementById(
+                "user-real-camera-switch",
+              );
+              if (realCameraSwitch) {
+                realCameraSwitch.checked = chat.settings.useRealCamera || false;
+              }
+              // --- 线下模式UI渲染 ---
+              const offlineModeSettings = chat.settings.offlineMode || {
+                enabled: false,
+                presets: [],
+              }; // 安全获取
+              const offlineToggle = document.getElementById(
+                "offline-mode-toggle",
+              );
+              const offlineDetails = document.getElementById(
+                "offline-mode-details",
+              );
+
+              // 1. 设置开关状态并绑定事件
+              offlineToggle.checked = offlineModeSettings.enabled;
+              offlineDetails.style.display = offlineToggle.checked
+                ? "block"
+                : "none";
+              offlineToggle.onchange = () => {
+                offlineDetails.style.display = offlineToggle.checked
+                  ? "block"
+                  : "none";
+              };
+
+              // 2. 填充输入框
+              document.getElementById("offline-prompt-input").value =
+                offlineModeSettings.prompt || "";
+              document.getElementById("offline-style-input").value =
+                offlineModeSettings.style || "";
+              document.getElementById("offline-word-count-input").value =
+                offlineModeSettings.wordCount || 300;
+              // 加载生图开关状态
+              document.getElementById("offline-novelai-toggle").checked =
+                offlineModeSettings.enableNovelAI || false;
+
+              // 3. 渲染预设下拉框
+              renderOfflinePresetsSelector();
+
+              // 为气泡导入/导出按钮绑定事件
+              document
+                .getElementById("export-bubble-preset-btn")
+                .addEventListener("click", exportSelectedBubblePreset);
+
+              document
+                .getElementById("import-bubble-preset-btn")
+                .addEventListener("click", () => {
+                  // 点击“导入”按钮时，触发隐藏的文件选择框
+                  document.getElementById("import-bubble-preset-input").click();
+                });
+
+              document
+                .getElementById("import-bubble-preset-input")
+                .addEventListener("change", (e) => {
+                  // 当用户选择了文件后，调用导入函数处理
+                  importBubblePreset(e.target.files[0]);
+                  e.target.value = null; // 每次用完后清空，方便下次选择同一个文件
+                });
+
+              document.getElementById("chat-name-group").style.display =
+                "block";
+              document.getElementById("minimax-voice-id-group").style.display =
+                isGroup ? "none" : "block";
+              document.getElementById("my-persona-group").style.display =
+                "block";
+              document.getElementById("my-avatar-group").style.display =
+                "block";
+              document.getElementById("my-group-nickname-group").style.display =
+                isGroup ? "block" : "none";
+              document.getElementById("group-avatar-group").style.display =
+                isGroup ? "block" : "none";
+              document.getElementById("group-members-group").style.display =
+                isGroup ? "block" : "none";
+              document.getElementById("ai-persona-group").style.display =
+                isGroup ? "none" : "block";
+              document.getElementById("ai-avatar-group").style.display = isGroup
+                ? "none"
+                : "block";
+
+              document.getElementById("npc-library-group").style.display =
+                isGroup ? "none" : "block";
+
+              // NAI出图设置的显示/隐藏和加载
+              const naiCharacterSettingsGroup = document.getElementById(
+                "nai-character-settings-group",
+              );
+              // 检查系统是否启用了NovelAI
+              const novelaiEnabled =
+                localStorage.getItem("novelai-enabled") === "true";
+              if (!isGroup && novelaiEnabled) {
+                naiCharacterSettingsGroup.style.display = "block";
+
+                // 加载角色NAI设置
+                const naiSettings = chat.settings.naiSettings || {
+                  promptSource: "system",
+                  characterPositivePrompt: "",
+                  characterNegativePrompt: "",
+                };
+
+                console.log("📖 [加载设置] 角色NAI设置:", naiSettings);
+                console.log("   promptSource:", naiSettings.promptSource);
+                console.log(
+                  "   characterPositivePrompt:",
+                  naiSettings.characterPositivePrompt,
+                );
+                console.log(
+                  "   characterNegativePrompt:",
+                  naiSettings.characterNegativePrompt,
+                );
+
+                // 设置提示词来源选项
+                const promptSourceRadios = document.querySelectorAll(
+                  'input[name="nai-prompt-source"]',
+                );
+                promptSourceRadios.forEach((radio) => {
+                  radio.checked = radio.value === naiSettings.promptSource;
+                  console.log(
+                    `   设置单选按钮 ${radio.value}: ${radio.checked}`,
+                  );
+                });
+              } else {
+                naiCharacterSettingsGroup.style.display = "none";
+              }
+
+              // 群聊NAI出图设置的显示/隐藏和加载
+              const groupNaiSettingsGroup = document.getElementById(
+                "group-nai-settings-group",
+              );
+              if (isGroup && novelaiEnabled) {
+                groupNaiSettingsGroup.style.display = "block";
+
+                // 加载群聊角色NAI设置
+                const groupNaiSettings = chat.settings.naiSettings || {
+                  promptSource: "system",
+                  characterPositivePrompt: "",
+                  characterNegativePrompt: "",
+                };
+
+                console.log("📖 [加载设置] 群聊角色NAI设置:", groupNaiSettings);
+                console.log("   promptSource:", groupNaiSettings.promptSource);
+                console.log(
+                  "   characterPositivePrompt:",
+                  groupNaiSettings.characterPositivePrompt,
+                );
+                console.log(
+                  "   characterNegativePrompt:",
+                  groupNaiSettings.characterNegativePrompt,
+                );
+
+                // 设置提示词来源选项
+                const groupPromptSourceRadios = document.querySelectorAll(
+                  'input[name="group-nai-prompt-source"]',
+                );
+                groupPromptSourceRadios.forEach((radio) => {
+                  radio.checked = radio.value === groupNaiSettings.promptSource;
+                  console.log(
+                    `   设置单选按钮 ${radio.value}: ${radio.checked}`,
+                  );
+                });
+              } else {
+                groupNaiSettingsGroup.style.display = "none";
+              }
+
+              // 根据是否为单聊或群聊，显示表情管理按钮
+              const charStickerGroup =
+                document.getElementById("char-sticker-group");
+              if (charStickerGroup) {
+                // 现在无论是单聊还是群聊，这个按钮都会显示
+                charStickerGroup.style.display = "block";
+              }
+
+              // 根据是否为群聊，显示或隐藏微博设置
+              document.getElementById("weibo-profession-group").style.display =
+                isGroup ? "none" : "block";
+              document.getElementById("weibo-instruction-group").style.display =
+                isGroup ? "none" : "block";
+              // 根据是否为群聊，显示或隐藏“好友分组”区域
+              document.getElementById("assign-group-section").style.display =
+                isGroup ? "none" : "block";
+
+              // --- 加载表单数据 ---
+              document.getElementById("chat-name-input").value = chat.name;
+              const remarkGroup = document.getElementById("chat-remark-group");
+              const remarkInput = document.getElementById("chat-remark-input");
+
+              if (chat.isGroup) {
+                remarkGroup.style.display = "none"; // 群聊不显示备注设置
+              } else {
+                remarkGroup.style.display = "block"; // 单聊显示
+                // 如果没有settings对象，初始化它
+                if (!chat.settings) chat.settings = {};
+                remarkInput.value = chat.settings.remarkName || "";
+              }
+
+              document.getElementById("my-persona").value =
+                chat.settings.myPersona;
+              document.getElementById("my-avatar-preview").src =
+                chat.settings.myAvatar ||
+                (isGroup ? defaultMyGroupAvatar : defaultAvatar);
+              document.getElementById("max-memory").value =
+                chat.settings.maxMemory;
+              const defaultMin = chat.isGroup ? 3 : 2;
+              const defaultMax = chat.isGroup ? 8 : 5;
+              const savedRange = chat.settings.replyCountRange || {
+                min: defaultMin,
+                max: defaultMax,
+              };
+
+              document.getElementById("min-reply-count-input").value =
+                savedRange.min;
+              document.getElementById("max-reply-count-input").value =
+                savedRange.max;
+              // 记忆互通功能 - UI渲染逻辑
+              const memoryLinkSelectBox = document.querySelector(
+                "#memory-link-multiselect .select-box",
+              );
+              const memoryLinkCheckboxesContainer = document.getElementById(
+                "memory-link-checkboxes-container",
+              );
+              memoryLinkCheckboxesContainer.innerHTML = ""; // 清空旧选项
+
+              // 1. 获取除了当前聊天以外的所有聊天
+              const otherChats = Object.values(state.chats).filter(
+                (c) => c.id !== chat.id,
+              );
+
+              // 2. 动态创建带头像的复选框
+              otherChats.forEach((otherChat) => {
+                const existingLink = chat.settings.linkedMemories.find(
+                  (link) => link.chatId === otherChat.id,
+                );
+                const isChecked = existingLink ? "checked" : "";
+
+                // 根据是群聊还是单聊，获取正确的头像URL
+                const avatarUrl = otherChat.isGroup
+                  ? otherChat.settings.groupAvatar || defaultGroupAvatar
+                  : otherChat.settings.aiAvatar || defaultAvatar;
+
+                const label = document.createElement("label");
+
+                // 构建包含 <img> 标签的新HTML结构
+                label.innerHTML = `
+			        <input type="checkbox" value="${otherChat.id}" ${isChecked}>
+			        <img src="${avatarUrl}" class="avatar-preview">
+			        <span>${otherChat.name} ${otherChat.isGroup ? "(群聊)" : ""}</span>
+			    `;
+                memoryLinkCheckboxesContainer.appendChild(label);
+              });
+
+              // 3. 更新已选数量的显示和记忆条数
+              function updateMemoryLinkDisplay() {
+                const checkedBoxes =
+                  memoryLinkCheckboxesContainer.querySelectorAll(
+                    "input:checked",
+                  );
+                const displayText = memoryLinkSelectBox.querySelector(
+                  ".selected-options-text",
+                );
+                if (checkedBoxes.length === 0) {
+                  displayText.textContent = "-- 点击选择 --";
+                } else {
+                  displayText.textContent = `已链接 ${checkedBoxes.length} 个聊天`;
+                }
+              }
+
+              // 4. 加载记忆条数设置
+              // 我们现在从一个独立的设置项加载，确保它总能被正确读取
+              document.getElementById("link-memory-depth-input").value =
+                chat.settings.linkMemoryDepth || 5;
+
+              // 5. 绑定事件
+              updateMemoryLinkDisplay(); // 初始化显示
+              memoryLinkCheckboxesContainer.addEventListener(
+                "change",
+                updateMemoryLinkDisplay,
+              );
+              // 使用克隆节点技巧来防止事件重复绑定
+              const newSelectBox = memoryLinkSelectBox.cloneNode(true);
+              memoryLinkSelectBox.parentNode.replaceChild(
+                newSelectBox,
+                memoryLinkSelectBox,
+              );
+              newSelectBox.addEventListener("click", (e) => {
+                e.stopPropagation();
+                memoryLinkCheckboxesContainer.classList.toggle("visible");
+                newSelectBox.classList.toggle("expanded");
+              });
+
+              const timeToggle = document.getElementById(
+                "time-perception-toggle",
+              );
+              const customTimeContainer = document.getElementById(
+                "custom-time-container",
+              );
+              const customTimeInput =
+                document.getElementById("custom-time-input");
+
+              // 如果是旧聊天，给一个默认值 true（开启）
+              const isTimeEnabled = chat.settings.timePerceptionEnabled ?? true;
+              timeToggle.checked = isTimeEnabled;
+              customTimeInput.value = chat.settings.customTime || "";
+
+              // 根据开关状态，决定是否显示自定义时间输入框
+              customTimeContainer.style.display = isTimeEnabled
+                ? "none"
+                : "block";
+
+              const bgPreview = document.getElementById("bg-preview");
+              const removeBgBtn = document.getElementById("remove-bg-btn");
+              if (chat.settings.background) {
+                bgPreview.src = chat.settings.background;
+                bgPreview.style.display = "block";
+                removeBgBtn.style.display = "inline-block";
+              } else {
+                bgPreview.style.display = "none";
+                removeBgBtn.style.display = "none";
+              }
+
+              if (isGroup) {
+                document.getElementById("my-group-nickname-input").value =
+                  chat.settings.myNickname || "";
+                document.getElementById("group-avatar-preview").src =
+                  chat.settings.groupAvatar || defaultGroupAvatar;
+                renderGroupMemberSettings(chat.members);
+                // 加载群聊后台活动设置
+                const groupActivityGroup = document.getElementById(
+                  "group-background-activity-group",
+                );
+                const groupActivitySwitch = document.getElementById(
+                  "group-background-activity-switch",
+                );
+                const groupIntervalSettings = document.getElementById(
+                  "group-background-interval-settings",
+                );
+                const groupIntervalInput = document.getElementById(
+                  "group-background-interval-input",
+                );
+
+                groupActivityGroup.style.display = "block"; // 显示设置区域
+                const bgSettings = chat.settings.backgroundActivity || {
+                  enabled: false,
+                  interval: 120,
+                };
+                groupActivitySwitch.checked = bgSettings.enabled;
+                groupIntervalInput.value = bgSettings.interval;
+                groupIntervalSettings.style.display = bgSettings.enabled
+                  ? "block"
+                  : "none";
+
+                // 为开关添加实时交互
+                groupActivitySwitch.onchange = () => {
+                  groupIntervalSettings.style.display =
+                    groupActivitySwitch.checked ? "block" : "none";
+                };
+              } else {
+                document.getElementById("ai-persona").value =
+                  chat.settings.aiPersona;
+                // 加载当前角色的微博职业和指令
+                document.getElementById("weibo-profession-input").value =
+                  chat.settings.weiboProfession || "";
+                document.getElementById("weibo-instruction-input").value =
+                  chat.settings.weiboInstruction || "";
+                document.getElementById("ai-avatar-preview").src =
+                  chat.settings.aiAvatar || defaultAvatar;
+                document.getElementById("minimax-voice-id-input").value =
+                  chat.settings.minimaxVoiceId || "";
+                // 加载语言增强和语速设置
+                const langBoostSelect = document.getElementById(
+                  "minimax-language-boost-select",
+                );
+                const speedSlider = document.getElementById(
+                  "minimax-speed-slider",
+                );
+                const speedValueDisplay = document.getElementById(
+                  "minimax-speed-value",
+                );
+
+                // 根据聊天类型，决定是否显示这两个新设置
+                const showMinimaxSpecificSettings = !isGroup;
+                document.getElementById(
+                  "minimax-language-boost-group",
+                ).style.display = showMinimaxSpecificSettings
+                  ? "block"
+                  : "none";
+                document.getElementById("minimax-speed-group").style.display =
+                  showMinimaxSpecificSettings ? "block" : "none";
+
+                if (showMinimaxSpecificSettings) {
+                  // 加载 language_boost，如果不存在则默认为空（即"无"）
+                  langBoostSelect.value = chat.settings.language_boost || "";
+
+                  // 加载 speed，如果不存在则默认为 1.0
+                  const speed = chat.settings.speed ?? 1.0; // 使用 ?? 确保即使值为0也能正确处理
+                  speedSlider.value = speed;
+                  speedValueDisplay.textContent = parseFloat(speed).toFixed(1);
+                }
+
+                // 为语速滑块添加实时更新显示值的事件
+                speedSlider.oninput = () => {
+                  speedValueDisplay.textContent = parseFloat(
+                    speedSlider.value,
+                  ).toFixed(1);
+                };
+
+                const coupleAvatarToggle = document.getElementById(
+                  "couple-avatar-toggle",
+                );
+                const coupleAvatarDescContainer = document.getElementById(
+                  "couple-avatar-desc-container",
+                );
+                const coupleAvatarDescInput = document.getElementById(
+                  "couple-avatar-description",
+                );

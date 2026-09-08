@@ -1,0 +1,483 @@
+    <div id="contact-picker-screen" class="screen">
+      <div class="header">
+        <span class="back-btn" id="cancel-contact-picker-btn">取消</span>
+        <span>选择联系人</span>
+        <span class="save-btn" id="confirm-contact-picker-btn">完成(0)</span>
+      </div>
+      <div class="list-container" id="contact-picker-list">
+        <!-- 联系人列表将由JS动态生成 -->
+      </div>
+    </div>
+
+    <!-- 群成员管理屏幕 -->
+    <div id="member-management-screen" class="screen">
+      <div class="header">
+        <span class="back-btn" id="back-from-member-management">‹</span>
+        <span>群成员管理</span>
+        <span style="width: 30px"></span>
+      </div>
+      <div class="list-container" id="member-management-list">
+        <!-- 现有成员列表会在这里动态生成 -->
+      </div>
+      <div id="member-management-actions">
+        <button id="add-existing-contact-btn">从好友列表添加</button>
+        <button id="create-new-member-btn">创建群内新成员</button>
+        <button id="ai-generate-members-btn">✨ AI 生成成员</button>
+      </div>
+    </div>
+
+    <!-- 微博用户人设与职业设置模态框 -->
+    <div id="weibo-user-settings-modal" class="modal">
+      <div class="modal-content" style="height: auto; max-height: 80%">
+        <div class="modal-header">
+          <span>我的微博设定</span>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>预设方案</label>
+            <div class="bubble-preset-manager">
+              <!-- 复用现有样式 -->
+              <select
+                id="weibo-user-preset-select"
+                class="form-group select"
+              ></select>
+              <button id="manage-weibo-user-presets-btn" class="action-btn">
+                管理
+              </button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="weibo-user-profession-modal-input"
+              >职业 (显示在昵称下方)</label
+            >
+            <input
+              type="text"
+              id="weibo-user-profession-modal-input"
+              placeholder="例如：职业电竞选手、美妆博主"
+            />
+          </div>
+          <div class="form-group">
+            <label for="weibo-user-persona-modal-input"
+              >隐藏人设 (仅供AI生成评论时参考)</label
+            >
+            <textarea
+              id="weibo-user-persona-modal-input"
+              rows="4"
+              placeholder="例如：性格高冷，少与粉丝互动，只回复赞助商的评论。"
+            ></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="cancel-weibo-user-settings-btn">
+            取消
+          </button>
+          <button class="save" id="save-weibo-user-settings-btn">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="weibo-action-modal" class="modal">
+      <div class="modal-content" style="height: auto; max-height: 80%">
+        <div class="modal-header">
+          <span id="weibo-action-modal-title">执行操作</span>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="weibo-action-actor-select">选择操作者 (Actor)</label>
+            <select
+              id="weibo-action-actor-select"
+              class="form-group select"
+            ></select>
+          </div>
+          <div class="form-group">
+            <label>选择操作类型</label>
+
+            <div id="weibo-action-type-select" style="text-align: left">
+              <label
+                ><input
+                  type="radio"
+                  name="weibo_action_type"
+                  value="post"
+                  checked
+                />
+                发布一条新微博</label
+              >
+              <label
+                ><input
+                  type="radio"
+                  name="weibo_action_type"
+                  value="comment_plaza"
+                />
+                评论广场最新微博</label
+              >
+
+              <label
+                ><input
+                  type="radio"
+                  name="weibo_action_type"
+                  value="comment_user"
+                />
+                评论用户最新微博</label
+              >
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="weibo-action-prompt-input"
+              >关于... (可选, 简要提示)</label
+            >
+            <textarea
+              id="weibo-action-prompt-input"
+              rows="2"
+              placeholder="例如：今天比赛赢了很开心 or 回应最近的热搜"
+            ></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="cancel-weibo-action-btn">取消</button>
+          <button class="save" id="confirm-weibo-action-btn">执行</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="char-sticker-manager-screen" class="screen">
+      <div class="header">
+        <span class="back-btn" id="back-from-sticker-manager">‹</span>
+        <span id="sticker-manager-title">表情包管理</span>
+        <!-- 在这里添加“编辑/完成”按钮 -->
+        <div class="header-actions">
+          <span class="action-btn" id="edit-char-stickers-btn">编辑</span>
+          <span
+            class="action-btn"
+            id="done-char-stickers-btn"
+            style="display: none"
+            >完成</span
+          >
+        </div>
+      </div>
+      <input
+        type="file"
+        id="char-sticker-upload-input"
+        accept="image/*"
+        style="display: none"
+        multiple
+      />
+      <div
+        class="modal-body"
+        style="padding: 0; display: flex; flex-direction: column; flex-grow: 1"
+      >
+        <!-- 页签切换 -->
+        <div class="frame-tabs">
+          <div id="sticker-tab-exclusive" class="frame-tab active">
+            专属表情
+          </div>
+          <div id="sticker-tab-common" class="frame-tab">通用表情</div>
+        </div>
+
+        <!-- 专属表情内容区 -->
+        <div id="sticker-content-exclusive" class="frame-content active">
+          <div class="sticker-panel-header" style="justify-content: flex-end">
+            <div style="display: flex; gap: 10px">
+              <span class="panel-btn" id="add-exclusive-sticker-btn"
+                >批量添加</span
+              >
+              <span class="panel-btn" id="upload-exclusive-sticker-btn"
+                >本地上传</span
+              >
+            </div>
+          </div>
+          <div id="exclusive-sticker-grid" class="sticker-grid"></div>
+        </div>
+
+        <!-- 通用表情内容区 -->
+        <div id="sticker-content-common" class="frame-content">
+          <div class="sticker-panel-header" style="justify-content: flex-end">
+            <div style="display: flex; gap: 10px">
+              <span class="panel-btn" id="add-common-sticker-btn"
+                >批量添加</span
+              >
+              <span class="panel-btn" id="upload-common-sticker-btn"
+                >本地上传</span
+              >
+            </div>
+          </div>
+          <div id="common-sticker-grid" class="sticker-grid"></div>
+        </div>
+      </div>
+      <!-- 用于批量删除的操作栏 -->
+      <div id="char-sticker-footer" style="display: none">
+        <button id="delete-selected-char-stickers-btn">删除已选 (0)</button>
+      </div>
+    </div>
+
+    <!-- 来电请求模态框 -->
+    <div id="incoming-call-modal" class="modal">
+      <div class="incoming-call-content">
+        <img id="caller-avatar" class="caller-avatar" src="" />
+        <div id="caller-name" class="caller-name"></div>
+        <div class="caller-text">邀请你视频通话</div>
+        <div class="incoming-call-actions">
+          <div class="action-button-wrapper">
+            <button
+              id="decline-call-btn"
+              class="call-action-btn decline"
+            ></button>
+            <span>拒绝</span>
+          </div>
+          <div class="action-button-wrapper">
+            <button
+              id="accept-call-btn"
+              class="call-action-btn accept"
+            ></button>
+            <span>接听</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="music-search-results-modal" class="modal">
+      <div class="modal-content" style="height: 70%">
+        <div class="modal-header">
+          <span>搜索结果</span>
+        </div>
+        <div class="modal-body" id="search-results-list" style="padding: 0">
+          <!-- 搜索结果将由JS动态生成在这里 -->
+        </div>
+        <div class="modal-footer">
+          <button
+            class="cancel"
+            id="cancel-music-search-btn"
+            style="width: 100%"
+          >
+            取消
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="video-call-screen" class="screen">
+      <!-- 这个 screen 同时为两种模式服务 -->
+
+      <!-- ======================================================= -->
+      <!-- 模式一：全新的【可视化】视频通话界面 -->
+      <!-- ======================================================= -->
+      <div id="visual-call-interface" style="display: none">
+        <!-- 默认隐藏 -->
+        <!-- 1. 视频背景层 (大图和小图都在这里) -->
+        <div class="video-background">
+          <!-- 大图容器 -->
+          <div id="video-main-view" class="video-container">
+            <img src="" alt="主视频画面" />
+            <video
+              id="video-main-stream"
+              autoplay
+              playsinline
+              muted
+              style="
+                display: none;
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+              "
+            ></video>
+          </div>
+          <!-- 小图容器 (画中画) -->
+          <div id="video-pip-view" class="video-container pip">
+            <img src="" alt="小窗视频画面" />
+            <video
+              id="video-pip-stream"
+              autoplay
+              playsinline
+              muted
+              style="
+                display: none;
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                transform: scaleX(-1);
+              "
+            ></video>
+          </div>
+        </div>
+
+        <!-- 2. 顶部状态栏 -->
+        <div class="video-call-top-bar">
+          <button class="video-minimize-btn" onclick="minimizeVideoCall()">
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <polyline points="4 14 10 14 10 20"></polyline>
+              <polyline points="20 10 14 10 14 4"></polyline>
+            </svg>
+          </button>
+
+          <span id="visual-call-timer">00:00</span>
+        </div>
+
+        <!-- 3. 聊天气泡显示区域 -->
+        <div id="video-call-messages-visual" class="video-call-main">
+          <!-- 聊天气泡会由JS动态生成在这里 -->
+        </div>
+        <!-- ▼▼▼ 用下面这【一整块】代码，替换掉 id="visual-call-interface" 里面那个旧的 video-call-controls 的 div ▼▼▼ -->
+        <div class="video-call-controls">
+          <!-- 重-roll按钮 -->
+          <button
+            id="reroll-call-btn"
+            class="control-btn reroll-btn"
+            title="重新生成"
+          ></button>
+          <button
+            id="flip-real-camera-btn"
+            class="control-btn"
+            style="
+              display: none;
+              background-image: url(&quot;https://api.iconify.design/ion:camera-reverse-outline.svg?color=white&quot;);
+              background-size: 60%;
+              background-repeat: no-repeat;
+              background-position: center;
+            "
+            title="翻转前后镜头"
+          ></button>
+          <!-- 【核心新增】发言按钮 -->
+          <button
+            id="user-speak-btn-visual"
+            class="control-btn speak-btn"
+            title="发言"
+          ></button>
+          <!-- 切换镜头按钮 -->
+          <button
+            id="switch-camera-btn"
+            class="control-btn switch-camera-btn"
+            title="切换镜头"
+          ></button>
+          <!-- 挂断按钮 -->
+          <button
+            id="hang-up-btn-visual"
+            class="control-btn hangup-btn"
+          ></button>
+        </div>
+        <!-- ▲▲▲ 替换结束 ▲▲▲ -->
+      </div>
+
+      <!-- ======================================================= -->
+
+      <!-- ======================================================= -->
+      <div id="text-call-interface" style="display: none">
+        <!-- 默认隐藏 -->
+        <div class="video-call-top-bar">
+          <button class="video-minimize-btn" onclick="minimizeVideoCall()">
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <polyline points="4 14 10 14 10 20"></polyline>
+              <polyline points="20 10 14 10 14 4"></polyline>
+            </svg>
+          </button>
+          <!-- ▲▲▲ -->
+          <span id="call-timer">00:00</span>
+        </div>
+        <div class="video-call-avatar-area">
+          <div id="participant-avatars-grid">
+            <!-- JS会在这里动态生成头像 -->
+          </div>
+        </div>
+        <div id="video-call-main" class="video-call-main">
+          <!-- 对话内容会动态生成在这里 -->
+        </div>
+        <div class="video-call-controls">
+          <!-- 【新增】为旧模式也加上重roll按钮 -->
+          <button
+            id="reroll-call-btn-text"
+            class="control-btn reroll-btn"
+            title="重新生成"
+          ></button>
+          <button id="user-speak-btn" class="control-btn speak-btn"></button>
+          <button id="hang-up-btn" class="control-btn hangup-btn"></button>
+          <button
+            id="join-call-btn"
+            class="control-btn join-btn"
+            style="display: none"
+          ></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 正在呼叫界面 -->
+    <div id="outgoing-call-screen" class="screen">
+      <div class="outgoing-call-content">
+        <img id="outgoing-call-avatar" class="caller-avatar" src="" />
+        <div id="outgoing-call-name" class="caller-name"></div>
+        <div class="caller-text">正在呼叫...</div>
+        <div class="outgoing-call-actions">
+          <button id="cancel-call-btn" class="call-action-btn decline"></button>
+          <span>取消</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 通话记录页面 -->
+    <div id="call-history-screen" class="screen">
+      <div class="header">
+        <span class="back-btn" id="call-history-back-btn">‹</span>
+        <span id="call-history-title">通话记录</span>
+        <span style="width: 30px"></span>
+        <!-- 占位符，保持标题居中 -->
+      </div>
+      <div
+        id="call-history-list"
+        class="list-container"
+        style="padding: 15px; display: flex; flex-direction: column; gap: 15px"
+      >
+        <!-- 通话记录卡片将由JS动态生成在这里 -->
+      </div>
+    </div>
+
+    <div id="chat-search-screen" class="screen">
+      <div class="header">
+        <span class="back-btn" id="search-back-btn">‹</span>
+        <span>查找聊天记录</span>
+        <span style="width: 30px"></span>
+        <!-- 占位符 -->
+      </div>
+      <div class="form-container" style="padding-bottom: 0">
+        <!-- 搜索条件输入区 -->
+        <div class="form-group">
+          <label for="keyword-search-input">关键词</label>
+          <input
+            type="text"
+            id="keyword-search-input"
+            placeholder="输入要查找的关键词..."
+          />
+        </div>
+        <div class="form-group">
+          <label for="sender-search-select">人物</label>
+          <select id="sender-search-select">
+            <!-- 选项将由JS动态生成 -->
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="date-search-input">日期</label>
+          <input type="date" id="date-search-input" />
+        </div>
+        <button class="form-button" id="perform-search-btn">开始查找</button>
+
+        <!-- 搜索结果显示区 -->
+        <div
+          id="chat-search-results-list"
+          class="list-container"
+          style="margin-top: 15px; padding: 0"
+        >
+          <!-- 搜索结果将由JS动态生成在这里 -->
+        </div>
+      </div>
+    </div>
+

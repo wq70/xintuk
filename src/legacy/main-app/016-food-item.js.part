@@ -1,0 +1,806 @@
+                    };
+                  } else {
+                    // 3. 余额充足！执行扣款和下单逻辑
+                    await updateCharacterBankBalance(
+                      chatId,
+                      -price,
+                      `为你点外卖: ${foodName}`,
+                    );
+
+                    const foodItem = await db.elemeFoods
+                      .where({
+                        name: foodName,
+                        restaurant: restaurant || "私房小厨",
+                      })
+                      .first();
+                    const imageUrl = foodItem
+                      ? foodItem.imageUrl
+                      : getRandomWaimaiImage();
+                    // 4. 创建一个漂亮的外卖卡片消息
+                    aiMessage = {
+                      ...baseMessage,
+                      type: "waimai_gift_from_char",
+                      content: `[外卖惊喜] 我给你点了份“${foodName}”，记得吃哦！`, // 这段文本主要用于历史记录和通知
+                      payload: {
+                        foodName: foodName,
+                        restaurant: restaurant || "神秘小店",
+                        price: price,
+                        greeting: greeting || "给你点了个好吃的，快尝尝！",
+                        foodImageUrl: imageUrl, // <-- 使用我们刚刚获取到的、正确的图片URL
+                      },
+                    };
+                  }
+                  break; // 结束这个case
+                }
+
+                case "set_group_admin": {
+                  const actorName = msgData.name;
+                  const targetName = msgData.targetName;
+                  const isAdmin = msgData.isAdmin;
+                  const myNickname = chat.settings.myNickname || "我"; // 获取你自己的昵称
+
+                  // 权限检查：确认操作者是群主
+                  const actorMember = chat.members.find(
+                    (m) => m.originalName === actorName,
+                  );
+                  if (!actorMember || chat.ownerId !== actorMember.id) {
+                    console.warn(
+                      `AI "${actorName}" 尝试设置管理员失败，因为它不是群主。`,
+                    );
+                    continue; // 如果不是群主，就跳过此指令
+                  }
+
+                  if (targetName === myNickname) {
+                    // 如果AI操作的目标是你自己
+                    chat.settings.isUserAdmin = isAdmin;
+                    console.log(
+                      `群主将用户 "${myNickname}" 设置为管理员: ${isAdmin}`,
+                    );
+                  } else {
+                    // 如果AI操作的目标是其他成员
+                    const targetMember = chat.members.find(
+                      (m) => m.groupNickname === targetName,
+                    );
+                    if (targetMember) {
+                      // 不能对群主进行操作
+                      if (targetMember.id === chat.ownerId) {
+                        console.warn(
+                          `AI "${actorName}" 尝试修改群主 "${targetName}" 的管理员身份，操作被阻止。`,
+                        );
+                        continue;
+                      }
+                      targetMember.isAdmin = isAdmin;
+                      console.log(
+                        `群主将成员 "${targetName}" 设置为管理员: ${isAdmin}`,
+                      );
+                    } else {
+                      // 如果在成员列表里也找不到目标，就跳过
+                      console.warn(
+                        `AI "${actorName}" 尝试设置管理员失败，因为找不到目标成员 "${targetName}"。`,
+                      );
+                      continue;
+                    }
+                  }
+
+                  // 统一发送系统消息通知
+                  const actionText = isAdmin
+                    ? "设为管理员"
+                    : "取消了管理员身份";
+                  await logSystemMessage(
+                    chat.id,
+                    `“${actorName}”将“${targetName}”${actionText}。`,
+                  );
+
+                  // 刷新成员列表UI（如果打开了的话）
+                  if (
+                    document
+                      .getElementById("member-management-screen")
+                      .classList.contains("active")
+                  ) {
+                    renderMemberManagementList();
+                  }
+
+                  continue; // 这是一个后台操作，继续处理AI可能返回的其他消息
+                }
+
+                case "kick_member": {
+                  const actorName = msgData.name;
+                  const targetName = msgData.targetName;
+                  const actorMember = chat.members.find(
+                    (m) => m.originalName === actorName,
+                  );
+
+                  // 权限检查：只有群主能执行
+                  if (actorMember && chat.ownerId === actorMember.id) {
+                    const targetMemberIndex = chat.members.findIndex(
+                      (m) => m.groupNickname === targetName,
+                    );
+                    if (targetMemberIndex > -1) {
+                      const removedMember = chat.members.splice(
+                        targetMemberIndex,
+                        1,
+                      )[0];
+
+                      // 将改动保存到数据库
+                      await db.chats.put(chat);
+
+                      // 发送系统通知（这行代码不变，但位置更合理了）
+                      await logSystemMessage(
+                        chat.id,
+                        `“${actorName}”将“${removedMember.groupNickname}”移出了群聊。`,
+                      );
+
+                      // 如果当前正在成员管理页面，就刷新列表
+                      if (
+                        document
+                          .getElementById("member-management-screen")
+                          .classList.contains("active")
+                      ) {
+                        renderMemberManagementList();
+                      }
+                    }
+                  }
+                  continue; // 保持后台操作，继续处理
+                }
+
+                case "dating_summary_card": {
+                  bubble.classList.add("is-dating-summary"); // 应用透明气泡样式
+                  const payload = msg.payload;
+                  let cardClass = "";
+
+                  // 根据卡片类型设置背景色
+                  if (payload.ratingType === "romantic") {
+                    cardClass = "romantic";
+                  } else if (payload.ratingType === "passionate") {
+                    cardClass = "passionate";
+                  } else if (payload.ratingType === "perfect") {
+                    cardClass = "perfect";
+                  }
+
+                  // 把 payload 字符串化后存入 data-* 属性，方便点击时读取
+                  const payloadString = JSON.stringify(payload)
+                    .replace(/'/g, "&apos;")
+                    .replace(/"/g, "&quot;");
+
+                  contentHtml = `
+			            <div class="dating-summary-chat-card ${cardClass}" data-summary-payload='${payloadString}'>
+			                <div class="rating">${payload.rating}</div>
+			                <div class="tip">点击查看详情</div>
+			            </div>
+			        `;
+                  break;
+                }
+                case "set_group_announcement": {
+                  const actorName = msgData.name;
+                  const newAnnouncement = msgData.content;
+
+                  if (!actorName || typeof newAnnouncement === "undefined") {
+                    console.warn("AI尝试修改公告失败，缺少必要参数。");
+                    continue; // 指令不完整，跳过
+                  }
+
+                  // 1. 权限检查：必须确保执行操作的角色是群主或管理员
+                  const actorMember = chat.members.find(
+                    (m) => m.originalName === actorName,
+                  );
+                  if (!actorMember) {
+                    console.warn(
+                      `AI尝试修改公告失败，找不到名为“${actorName}”的成员。`,
+                    );
+                    continue;
+                  }
+
+                  const isOwner = chat.ownerId === actorMember.id;
+                  const isAdmin = actorMember.isAdmin;
+
+                  if (!isOwner && !isAdmin) {
+                    console.warn(
+                      `AI角色“${actorName}”权限不足，尝试修改群公告失败。`,
+                    );
+                    continue; // 没有权限，跳过
+                  }
+
+                  // 2. 更新公告内容
+                  chat.settings.groupAnnouncement = newAnnouncement;
+                  await db.chats.put(chat);
+
+                  // 3. 发送一条系统消息，通知所有人群公告已更新
+                  await logSystemMessage(
+                    chat.id,
+                    `“${actorMember.groupNickname}”修改了群公告。`,
+                  );
+
+                  // 这是一个后台管理操作，不需要在聊天中生成新的对话气泡，所以我们用 continue
+                  continue;
+                }
+
+                case "mute_member": {
+                  const actorName = msgData.name;
+                  const targetName = msgData.targetName;
+                  const actorMember = chat.members.find(
+                    (m) => m.originalName === actorName,
+                  );
+                  const targetMember = chat.members.find(
+                    (m) => m.groupNickname === targetName,
+                  );
+
+                  if (actorMember && targetMember) {
+                    const isActorOwner = chat.ownerId === actorMember.id;
+                    const isActorAdmin = actorMember.isAdmin;
+                    const isTargetOwner = chat.ownerId === targetMember.id;
+                    const isTargetAdmin = targetMember.isAdmin;
+
+                    // 权限检查：群主可以禁言管理员和普通人；管理员只能禁言普通人。
+                    if (
+                      (isActorOwner && !isTargetOwner) ||
+                      (isActorAdmin && !isTargetOwner && !isTargetAdmin)
+                    ) {
+                      // 发送系统消息
+                      await logSystemMessage(
+                        chat.id,
+                        `“${actorName}”将“${targetName}”禁言。`,
+                      );
+                    } else {
+                      console.warn(
+                        `AI (${actorName}) 权限不足，无法禁言 (${targetName})。`,
+                      );
+                    }
+                  }
+                  continue; // 这也是一个后台管理操作，继续处理AI可能返回的其他消息
+                }
+
+                case "unmute_member": {
+                  const actorName = msgData.name;
+                  const targetName = msgData.targetName;
+                  const actorMember = chat.members.find(
+                    (m) => m.originalName === actorName,
+                  );
+                  const targetMember = chat.members.find(
+                    (m) => m.groupNickname === targetName,
+                  );
+
+                  // 确保操作者和目标都存在
+                  if (actorMember && targetMember) {
+                    // 权限检查
+                    const isActorOwner = chat.ownerId === actorMember.id;
+                    const isActorAdmin = actorMember.isAdmin;
+                    const isTargetOwner = chat.ownerId === targetMember.id;
+                    const isTargetAdmin = targetMember.isAdmin;
+
+                    // 只有群主和管理员有权限解禁
+                    if (isActorOwner || isActorAdmin) {
+                      // 设置 isMuted 为 false，实现解禁
+                      targetMember.isMuted = false;
+
+                      // 发送一条系统消息通知大家
+                      await logSystemMessage(
+                        chat.id,
+                        `“${actorName}”解除了“${targetName}”的禁言。`,
+                      );
+
+                      // 如果当前正在成员管理页面，刷新列表
+                      if (
+                        document
+                          .getElementById("member-management-screen")
+                          .classList.contains("active")
+                      ) {
+                        renderMemberManagementList();
+                      }
+                    } else {
+                      console.warn(
+                        `AI (${actorName}) 权限不足，无法解禁 (${targetName})。`,
+                      );
+                    }
+                  }
+                  continue; // 这也是一个后台管理操作，继续处理AI可能返回的其他消息
+                }
+
+                case "weibo_post": {
+                  const newPost = {
+                    authorId: chatId,
+                    authorType: "char",
+                    authorNickname: chat.name,
+                    authorAvatar: chat.settings.aiAvatar || defaultAvatar,
+                    content: msgData.content || "",
+                    postType: msgData.postType || "text_only",
+                    hiddenContent: msgData.hiddenContent || "",
+                    imageUrl: msgData.imageUrl || "",
+                    imageDescription: msgData.imageDescription || "",
+                    timestamp: Date.now(),
+                    likes: [],
+                    comments: [], // 先初始化为空数组
+                    baseLikesCount: msgData.baseLikesCount || 0,
+                    baseCommentsCount: msgData.baseCommentsCount || 0,
+                  };
+
+                  let commentsToProcess = [];
+
+                  // 1. 优先处理新的、正确的【数组格式】
+                  if (msgData.comments && Array.isArray(msgData.comments)) {
+                    // 直接使用AI返回的数组
+                    commentsToProcess = msgData.comments;
+                  }
+                  // 2. 兼容旧的【字符串格式】
+                  else if (
+                    msgData.comments &&
+                    typeof msgData.comments === "string"
+                  ) {
+                    // 如果是字符串，就按老方法解析
+                    commentsToProcess = msgData.comments
+                      .split("\n")
+                      .map((c) => {
+                        const parts = c.split(/[:：]/);
+                        const commenter = parts.shift() || "路人";
+                        const commentText = parts.join(":").trim();
+                        return {
+                          authorNickname: commenter,
+                          commentText: commentText,
+                        };
+                      })
+                      .filter((c) => c.commentText);
+                  }
+
+                  // 3. 为所有解析好的评论，统一添加前端需要的 commentId
+                  if (commentsToProcess.length > 0) {
+                    newPost.comments = commentsToProcess.map((c) => ({
+                      commentId: "comment_" + Date.now() + Math.random(), // 确保每条评论都有唯一ID
+                      authorNickname: c.authorNickname,
+                      commentText: c.commentText,
+                      // 这里我们不再需要 authorId 和 timestamp，因为它们不是渲染所必需的
+                    }));
+                  }
+
+                  await db.weiboPosts.add(newPost);
+
+                  showNotification(chatId, `${chat.name} 发了一条新微博`);
+
+                  if (
+                    document
+                      .getElementById("weibo-screen")
+                      .classList.contains("active")
+                  ) {
+                    await renderFollowingWeiboFeed();
+                  }
+
+                  continue; // 这是后台操作，用 continue 跳过
+                }
+
+                case "weibo_comment": {
+                  // 这是一个AI评论微博的指令
+                  const postIdToComment = msgData.postId;
+                  const commentText = msgData.commentText;
+
+                  // 1. 根据 postId 从数据库里找到那条微博
+                  const postToComment =
+                    await db.weiboPosts.get(postIdToComment);
+
+                  if (postToComment) {
+                    // 2. 如果找到了微博，就准备一条新评论
+                    if (!postToComment.comments) postToComment.comments = []; // 确保评论区存在
+                    const newComment = {
+                      commentId: "comment_" + Date.now(), // 给评论一个独一无二的ID
+                      authorId: chatId, // 评论者是当前AI
+                      authorNickname: chat.name, // 评论者的名字
+                      commentText: commentText, // 评论内容
+                      timestamp: Date.now(), // 评论时间
+                    };
+
+                    // 3. 把新评论加到微博的评论列表里
+                    postToComment.comments.push(newComment);
+
+                    // 4. 把更新后的微博存回数据库
+                    await db.weiboPosts.put(postToComment);
+
+                    // 5. 刷新“我的微博”和“关注的人”两个列表，让新评论显示出来
+                    await renderMyWeiboFeed();
+                    await renderFollowingWeiboFeed();
+                  }
+                  continue; // 处理完后，继续处理AI可能返回的其他指令
+                }
+                case "weibo_reply": {
+                  // 这是一个AI回复微博评论的指令
+                  const postIdToReply = msgData.postId;
+                  const commentIdToReply = msgData.commentId;
+                  const replyText = msgData.replyText;
+
+                  const postToReply = await db.weiboPosts.get(postIdToReply);
+
+                  if (postToReply && postToReply.comments) {
+                    // 1. 在微博的评论区里，找到被回复的那条评论
+                    const targetComment = postToReply.comments.find(
+                      (c) => c.commentId === commentIdToReply,
+                    );
+
+                    if (targetComment) {
+                      // 2. 准备一条新的“回复”
+                      const newReply = {
+                        commentId: "comment_" + Date.now(),
+                        authorId: chatId,
+                        authorNickname: chat.name,
+                        commentText: replyText,
+                        timestamp: Date.now(),
+                        replyToId: commentIdToReply, // 标记这是对哪条评论的回复
+                        replyToNickname: targetComment.authorNickname, // 记下被回复人的名字
+                      };
+                      postToReply.comments.push(newReply);
+                      await db.weiboPosts.put(postToReply);
+
+                      // 3. 同样，刷新所有列表
+                      await renderMyWeiboFeed();
+                      await renderFollowingWeiboFeed();
+                    }
+                  }
+                  continue; // 继续处理
+                }
+                case "lovers_space_response": {
+                  const invitationMsg = chat.history.find(
+                    (m) =>
+                      m.type === "lovers_space_invitation" &&
+                      m.status === "pending",
+                  );
+                  if (invitationMsg) {
+                    invitationMsg.status =
+                      msgData.decision === "accept" ? "accepted" : "rejected";
+
+                    // 1. 创建AI想说的那句话的消息
+                    if (msgData.responseText) {
+                      const responseMessage = {
+                        ...baseMessage, // 复用时间戳和发送者信息
+                        type: "text",
+                        content: msgData.responseText,
+                      };
+                      chat.history.push(responseMessage);
+                      if (isViewingThisChat) {
+                        appendMessage(responseMessage, chat);
+                      }
+                    }
+
+                    // 2. 根据同意或拒绝，执行后续操作
+                    if (msgData.decision === "accept") {
+                      chat.loversSpaceData = {
+                        background:
+                          "https://i.postimg.cc/k495F4W5/profile-banner.jpg",
+                        relationshipStartDate: null,
+                        moments: [],
+                        photos: [],
+                        albums: [],
+                        loveLetters: [],
+                        shares: [],
+                        questions: [],
+                      };
+                      const systemNotice = {
+                        role: "system",
+                        type: "pat_message",
+                        content: `[系统：你和“${chat.name}”的情侣空间已成功开启！]`,
+                        timestamp: Date.now(),
+                      };
+                      chat.history.push(systemNotice);
+                      if (isViewingThisChat) {
+                        appendMessage(systemNotice, chat);
+                      }
+                    }
+                  }
+                  // 处理完后，不再需要重新触发AI，所以我们用 continue
+                  continue;
+                }
+
+                case "interact_with_pet": {
+                  const pet = chat.settings.pet;
+                  if (pet && pet.type !== "无") {
+                    let actionText = "";
+                    // 根据AI的互动，修改数值
+                    switch (msgData.action) {
+                      case "feed":
+                        pet.status.hunger = Math.min(
+                          100,
+                          (pet.status.hunger || 0) + 20,
+                        );
+                        pet.status.happiness = Math.min(
+                          100,
+                          (pet.status.happiness || 0) + 5,
+                        );
+                        // AI喂食，增加对AI的亲密度
+                        pet.status.intimacyToChar = Math.min(
+                          100,
+                          (pet.status.intimacyToChar || 0) + 10,
+                        );
+                        actionText = `${chat.name} 喂了 ${pet.name} 一些食物。`;
+                        break;
+                      case "play":
+                        pet.status.hunger = Math.max(
+                          0,
+                          (pet.status.hunger || 0) - 10,
+                        );
+                        pet.status.happiness = Math.min(
+                          100,
+                          (pet.status.happiness || 0) + 15,
+                        );
+                        // AI玩耍，增加对AI的亲密度
+                        pet.status.intimacyToChar = Math.min(
+                          100,
+                          (pet.status.intimacyToChar || 0) + 15,
+                        );
+                        actionText = `${chat.name} 陪 ${pet.name} 玩了一会儿。`;
+                        break;
+                      case "touch":
+                        pet.status.happiness = Math.min(
+                          100,
+                          (pet.status.happiness || 0) + 10,
+                        );
+                        // 核心修改：AI抚摸，增加对AI的亲密度
+                        pet.status.intimacyToChar = Math.min(
+                          100,
+                          (pet.status.intimacyToChar || 0) + 5,
+                        );
+                        actionText = `${chat.name} 轻轻地抚摸了 ${pet.name}。`;
+                        break;
+                    }
+
+                    // 创建一条对用户可见的系统消息
+                    const visibleMessage = {
+                      role: "system",
+                      type: "pat_message",
+                      content: `[系统：${actionText}]`,
+                      timestamp: Date.now(),
+                    };
+                    chat.history.push(visibleMessage);
+                    if (isViewingThisChat) {
+                      appendMessage(visibleMessage, chat);
+                    }
+
+                    // 如果 AI 在互动后还想说点什么
+                    if (msgData.response) {
+                      aiMessage = { ...baseMessage, content: msgData.response };
+                    }
+                  }
+                  // 如果AI只是互动没说话，就不创建aiMessage，直接跳到下一个指令
+                  if (!aiMessage) {
+                    continue;
+                  }
+                  break;
+                }
+
+                case "talk_to_pet": {
+                  if (
+                    !chat.isGroup &&
+                    chat.settings.pet &&
+                    chat.settings.pet.type !== "无"
+                  ) {
+                    const pet = chat.settings.pet;
+
+                    // 同时兼容 content 和 message 字段
+                    const charMessageContent =
+                      msgData.content || msgData.message;
+                    if (!charMessageContent) continue; // 如果没内容，就跳过
+
+                    // 将Char的话添加到宠物聊天记录
+                    const charMessageToPet = {
+                      sender: "char",
+                      senderName: chat.name,
+                      content: charMessageContent,
+                    };
+                    pet.petChatHistory.push(charMessageToPet);
+
+                    // 获取宠物的回应
+                    const petResponseToChar = await getPetApiResponse(pet);
+                    if (petResponseToChar) {
+                      pet.petChatHistory.push({
+                        sender: "pet",
+                        content: petResponseToChar,
+                      });
+                    }
+
+                    // 创建对用户可见的系统日志
+                    const visibleLog = `[系统：“${chat.name}”对宠物“${pet.name}”说：“${charMessageContent}”，它回应：“${
+                      petResponseToChar || "(没有回应)"
+                    }”。]`;
+                    const visibleMessage = {
+                      role: "system",
+                      type: "pat_message",
+                      content: visibleLog,
+                      timestamp: messageTimestamp++,
+                    };
+                    chat.history.push(visibleMessage);
+
+                    if (isViewingThisChat) {
+                      appendMessage(visibleMessage, chat);
+                    }
+                  }
+                  continue;
+                }
+
+                case "cart_payment_response": {
+                  const decision = msgData.decision;
+                  const responseText = msgData.response_text;
+
+                  // 找到用户发出的、还处于“等待中”的那个代付请求
+                  const requestMsg = chat.history.find(
+                    (m) =>
+                      m.type === "cart_share_request" &&
+                      m.payload.status === "pending",
+                  );
+                  if (!requestMsg) continue; // 如果找不到，说明请求可能已被处理，跳过
+
+                  if (decision === "accept") {
+                    const totalPrice = requestMsg.payload.totalPrice;
+                    const charBalance =
+                      chat.characterPhoneData?.bank?.balance || 0;
+
+                    // 再次确认AI的余额是否足够
+                    if (charBalance < totalPrice) {
+                      // 如果AI想付但钱不够，就让它说一句俏皮话
+                      aiMessage = {
+                        ...baseMessage,
+                        content:
+                          responseText ||
+                          "呜呜，想给你买，但是我的钱包空空了...",
+                      };
+                    } else {
+                      // 钱够，执行代付流程！
+                      requestMsg.payload.status = "paid";
+
+                      // 使用 await 确保这些数据库操作按顺序完成
+                      await updateCharacterPhoneBankBalance(
+                        chat.id,
+                        -totalPrice,
+                        `为“我”的桃宝购物车买单`,
+                      );
+                      const cartItems = await db.taobaoCart.toArray();
+                      await createOrdersFromCart(cartItems);
+                      await clearTaobaoCart();
+
+                      // 创建AI的回复消息
+                      aiMessage = {
+                        ...baseMessage,
+                        content: responseText || "买好啦，快去订单里看看吧！",
+                      };
+                    }
+                  } else {
+                    // 如果AI决定拒绝
+                    requestMsg.payload.status = "rejected";
+                    aiMessage = {
+                      ...baseMessage,
+                      content: responseText || "这次就算了吧，下次一定！",
+                    };
+                  }
+
+                  // 将AI的回复消息推入历史记录，并更新UI
+                  if (aiMessage) {
+                    chat.history.push(aiMessage);
+                  }
+
+                  // 重新渲染聊天界面，以更新代付卡片的状态
+                  if (isViewingThisChat) {
+                    renderChatInterface(chatId);
+                  }
+                  // 跳过后续的默认消息处理
+                  continue;
+                }
+
+                case "buy_gift_for_user": {
+                  // 1. 从商品数据库中获取所有已添加的商品
+                  const allProducts = await db.taobaoProducts.toArray();
+
+                  // 如果桃宝里一件商品都没有，AI就发条消息吐槽一下
+                  if (allProducts.length === 0) {
+                    aiMessage = {
+                      ...baseMessage,
+                      content: msgData.greeting
+                        ? `${msgData.greeting} ...啊，想给你买点什么，但是桃宝里空空如也呢...`
+                        : "想给你买个礼物，但是桃宝现在没东西卖了。",
+                    };
+                    break; // 跳出 case，让这条文本消息被正常处理和显示
+                  }
+
+                  // 2. 从所有商品中随机挑选一件作为礼物
+                  const productToBuy = getRandomItem(allProducts);
+
+                  // 3. 检查角色的钱包余额是否足够
+                  const charBalance =
+                    chat.characterPhoneData?.bank?.balance || 0;
+                  if (charBalance < productToBuy.price) {
+                    // 余额不足，AI也会发消息告诉你
+                    aiMessage = {
+                      ...baseMessage,
+                      content: msgData.greeting
+                        ? `${msgData.greeting} ...哎呀，我的钱包好像不够了。`
+                        : "我想给你买个礼物，但是钱包空了...",
+                    };
+                    break;
+                  }
+
+                  // 4. 余额充足！执行购买流程
+                  // 4a. 从角色的钱包扣款，并生成一条交易记录
+                  await updateCharacterPhoneBankBalance(
+                    chat.id,
+                    -productToBuy.price,
+                    `为“我”购买礼物: ${productToBuy.name}`,
+                  );
+
+                  // 4b. 在你的“我的订单”中创建一条新订单
+                  const newOrder = {
+                    productId: productToBuy.id,
+                    quantity: 1,
+                    timestamp: Date.now(),
+                    status: "已付款，等待发货",
+                  };
+                  await db.taobaoOrders.add(newOrder);
+
+                  // 4c. 创建一个漂亮的“礼物通知”卡片消息，发送给你
+                  aiMessage = {
+                    ...baseMessage, // 复用基础消息属性（发送者、时间戳等）
+                    type: "gift_notification",
+                    // 这是卡片渲染需要的数据
+                    payload: {
+                      senderName: chat.name,
+                      itemSummary: `${productToBuy.name} x1`,
+                      totalPrice: productToBuy.price,
+                      itemCount: 1,
+                    },
+                    // 这是给AI自己看的、用于形成记忆的文本内容
+                    content: `我给你买了礼物“${productToBuy.name}”。${msgData.greeting || ""}`,
+                  };
+
+                  // 4d. 模拟一个10秒后的“已发货”物流更新
+                  setTimeout(async () => {
+                    const orderToUpdate = await db.taobaoOrders
+                      .where({ timestamp: newOrder.timestamp })
+                      .first();
+                    if (orderToUpdate) {
+                      await db.taobaoOrders.update(orderToUpdate.id, {
+                        status: "已发货，运输中",
+                      });
+                    }
+                  }, 1000 * 10);
+
+                  break; // 完成礼物购买逻辑，跳出 case
+                }
+
+                case "ls_answer_question": {
+                  // 使用大括号创建块级作用域
+                  const { questionId, answerText } = msgData;
+                  if (questionId && answerText) {
+                    const question = chat.loversSpaceData.questions.find(
+                      (q) => q.id === questionId,
+                    );
+                    if (question && !question.answerText) {
+                      // 确保是未回答的问题
+                      question.answerer = "char";
+                      question.answerText = answerText;
+                      console.log(`AI 回答了情侣提问 (ID: ${questionId})`);
+                    }
+                  }
+                  continue; // 这是一个后台操作，不需要在聊天界面显示，所以用 continue 跳过
+                }
+
+                case "ls_ask_question": {
+                  const { questionText } = msgData;
+                  if (questionText) {
+                    const newQuestion = {
+                      id: "q_" + Date.now(),
+                      questioner: "char",
+                      questionText: questionText,
+                      timestamp: Date.now(),
+                      answerer: "user", // 指定由用户来回答
+                      answerText: null,
+                    };
+                    if (!chat.loversSpaceData.questions) {
+                      chat.loversSpaceData.questions = [];
+                    }
+                    chat.loversSpaceData.questions.push(newQuestion);
+                    console.log(`AI 发起了一个情侣提问: ${questionText}`);
+                  }
+                  continue; // 同样是后台操作
+                }
+
+                case "ls_moment": {
+                  if (chat.loversSpaceData) {
+                    if (!chat.loversSpaceData.moments) {
+                      chat.loversSpaceData.moments = [];
+                    }
+                    const newMoment = {
+                      author: "char", // 标记是AI发的
+                      content: msgData.content,
+                      timestamp: Date.now(),
+                      comments: [], // 为新说说初始化一个空的评论区
+                    };

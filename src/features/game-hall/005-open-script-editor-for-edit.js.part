@@ -1,0 +1,894 @@
+  async function openScriptEditorForEdit(scriptId) {
+    editingScriptId = scriptId;
+    const script = await db.scriptKillScripts.get(scriptId);
+    if (!script) return;
+
+    // 将数据库数据加载到暂存对象
+    currentEditingScriptData = {
+      roles: script.roles || [],
+      clues: script.clues || [],
+    };
+
+    document.getElementById('script-editor-title').textContent = `编辑剧本: ${script.name}`;
+    document.getElementById('script-name-input').value = script.name;
+    document.getElementById('script-background-input').value = script.storyBackground;
+    document.getElementById('sk-truth-input').value = script.truth;
+
+    renderVisualScriptEditor(); // 渲染带有数据的编辑器
+    document.getElementById('script-kill-editor-modal').classList.add('visible');
+  }
+
+  // --- ▲▲▲ 新增功能函数结束 ▲▲▲
+
+  /**
+   * 删除一个自定义剧本
+   * @param {number} scriptId - 要删除的剧本ID
+   * @param {string} scriptName - 剧本名称，用于确认提示
+   */
+  async function deleteCustomScript(scriptId, scriptName) {
+    const confirmed = await showCustomConfirm('删除剧本', `确定要永久删除自定义剧本《${scriptName}》吗？`, {
+      confirmButtonClass: 'btn-danger',
+    });
+    if (confirmed) {
+      await db.scriptKillScripts.delete(scriptId);
+      await renderScriptManagerList();
+      alert('剧本已删除。');
+    }
+  }
+  /**
+   * 【全新】导出指定的自定义剧本
+   * @param {number} scriptId - 要导出的剧本ID
+   */
+  async function exportCustomScript(scriptId) {
+    try {
+      const script = await db.scriptKillScripts.get(scriptId);
+      if (!script) {
+        alert('错误：找不到要导出的剧本。');
+        return;
+      }
+
+      // 1. 准备要导出的纯数据结构 (去除本地数据库ID，保留核心内容)
+      const exportData = {
+        type: 'EPhoneScriptKill', // 标记文件类型
+        version: 1,
+        name: script.name,
+        storyBackground: script.storyBackground,
+        truth: script.truth,
+        roles: script.roles,
+        clues: script.clues,
+      };
+
+      // 2. 转换为JSON字符串
+      const jsonString = JSON.stringify(exportData, null, 2);
+
+      // 3. 创建并下载文件
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const dateStr = new Date().toISOString().split('T')[0];
+      // 文件名示例: [剧本杀]古堡之谜-2024-01-01.json
+      link.href = url;
+      link.download = `[剧本杀]${script.name}-${dateStr}.json`;
+      document.body.appendChild(link);
+      link.click();
+
+      // 4. 清理
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      await showCustomAlert('导出成功', `剧本《${script.name}》已成功导出！`);
+    } catch (error) {
+      console.error('导出剧本失败:', error);
+      await showCustomAlert('导出失败', `发生错误: ${error.message}`);
+    }
+  }
+
+  /**
+   * 【全新】导入剧本杀剧本文件
+   * @param {File} file - 用户选择的JSON文件
+   */
+  async function importCustomScript(file) {
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async e => {
+      try {
+        const text = e.target.result;
+        const data = JSON.parse(text);
+
+        // 1. 简单的格式验证
+        if (!data.name || !data.roles || !data.clues || !data.truth) {
+          throw new Error('文件格式无效。缺少必要的剧本字段(name, roles, clues, truth)。');
+        }
+
+        // 2. 检查是否重名，如果重名自动重命名
+        let newScriptName = data.name;
+        const existingScript = await db.scriptKillScripts.where('name').equals(newScriptName).first();
+        if (existingScript) {
+          newScriptName = `${newScriptName} (导入)`;
+        }
+
+        // 3. 构建入库数据
+        const scriptToAdd = {
+          name: newScriptName,
+          storyBackground: data.storyBackground || '（无背景介绍）',
+          truth: data.truth,
+          roles: data.roles,
+          clues: data.clues,
+          isBuiltIn: false, // 标记为自定义剧本
+        };
+
+        // 4. 存入数据库
+        await db.scriptKillScripts.add(scriptToAdd);
+
+        // 5. 刷新列表并提示
+        await renderScriptManagerList();
+        await showCustomAlert('导入成功', `剧本《${newScriptName}》已成功导入！`);
+      } catch (error) {
+        console.error('导入剧本失败:', error);
+        await showCustomAlert('导入失败', `解析文件时出错: ${error.message}`);
+      }
+    };
+    reader.readAsText(file, 'UTF-8');
+  }
+
+  // --- ▲▲▲ 新增功能函数结束 ▲▲▲
+  // ▼▼▼ 在 init() 函数的【正上方】粘贴下面这一整块新代码 ▼▼▼
+
+  /**
+   * 【剧本杀】AI核心：调用AI为整局游戏生成复盘摘要
+   * @returns {Promise<string>} - AI生成的摘要文本
+   */
+  async function generateAiSkSummary() {
+    const { proxyUrl, apiKey, model } = state.apiConfig;
+    if (!proxyUrl || !apiKey || !model) {
+      return '（AI摘要生成失败：API未配置）';
+    }
+
+    const formattedLog = scriptKillGameState.gameLog
+      .map(log => {
+        if (log.type === 'speech') {
+          return `${log.message.player.role.name}: ${log.message.speech}`;
+        }
+        return log.message;
+      })
+      .join('\n');
+
+    const killer = scriptKillGameState.players.find(p => p.role.isKiller)?.role.name || '未知';
+
+    const prompt = `
+# 任务
+你是一位专业的剧本杀复盘DM。请根据以下完整的游戏日志，用200字左右，客观、精炼地总结本局游戏的【关键事件】、【重要线索】和【玩家逻辑】。
+
+# 核心要求
+- 你的总结需要有逻辑、有条理，像一个真正的游戏复盘。
+- 点出关键线索是如何被发现和利用的。
+- 分析凶手(${killer})是如何隐藏自己的，以及好人阵营的推理亮点或误区。
+- 你的输出【必须且只能】是复盘摘要的纯文本内容，不要包含任何额外的对话或标题。
+
+# 游戏日志
+${formattedLog}
+`;
+
+    try {
+      const messagesForApi = [{ role: 'user', content: prompt }];
+      let isGemini = proxyUrl === GEMINI_API_URL;
+      let geminiConfig = toGeminiRequestData(model, apiKey, prompt, messagesForApi, isGemini);
+
+      const response = isGemini
+        ? await fetch(geminiConfig.url, geminiConfig.data)
+        : await fetch(`${proxyUrl}/v1/chat/completions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+            body: JSON.stringify({
+              model: model,
+              messages: messagesForApi,
+              temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+            }),
+          });
+
+      if (!response.ok) throw new Error(await response.text());
+      const data = await response.json();
+      return (isGemini ? data.candidates[0].content.parts[0].text : data.choices[0].message.content).trim();
+    } catch (error) {
+      console.error('AI摘要生成失败:', error);
+      return '（AI摘要生成失败，请检查网络或API设置）';
+    }
+  }
+
+  // ▼▼▼ 用这个【功能增强版】函数，完整替换你旧的 generateSkSummary 函数 ▼▼▼
+  /**
+   * 【剧本杀 V2 - 增强版】生成游戏复盘的文本，包含AI摘要和投票详情
+   * @param {string} winner - 胜利的阵营名称
+   * @param {string} aiSummary - AI生成的摘要文本
+   * @returns {string} - 格式化后的完整复盘Markdown文本
+   */
+  function generateSkSummary(winner, aiSummary) {
+    const roleNameMap = {
+      wolf: '狼人',
+      villager: '平民',
+      seer: '预言家',
+      witch: '女巫',
+      hunter: '猎人',
+      guard: '守卫',
+      idiot: '白痴',
+    };
+
+    let summaryText = `**剧本杀 - 游戏复盘**\n\n`;
+    summaryText += `**剧本:** ${scriptKillGameState.script.name}\n`;
+    summaryText += `🏆 **胜利方:** ${winner}\n\n`;
+
+    summaryText += `**本局摘要:**\n${aiSummary}\n\n`;
+
+    summaryText += `**玩家身份:**\n`;
+    scriptKillGameState.players.forEach(p => {
+      const roleName = p.role.name || '未知角色';
+      const isKiller = p.role.isKiller ? ' (🔪凶手)' : '';
+      summaryText += `- ${p.name}: 扮演 ${roleName}${isKiller}\n`;
+    });
+
+    // --- ▼▼▼ 这就是我们本次新增的核心代码！▼▼▼ ---
+    summaryText += `\n**投票详情:**\n`;
+    const votes = scriptKillGameState.votes;
+    const playerMap = new Map(scriptKillGameState.players.map(p => [p.id, p.name]));
+
+    for (const voterId in votes) {
+      const voterName = playerMap.get(voterId) || '未知投票者';
+      const targetId = votes[voterId];
+
+      if (targetId) {
+        // 如果不是弃票
+        const targetName = playerMap.get(targetId) || '未知目标';
+        summaryText += `- ${voterName}  →  ${targetName}\n`;
+      } else {
+        // 如果是弃票
+        summaryText += `- ${voterName}  →  弃票\n`;
+      }
+    }
+    // --- ▲▲▲ 新增代码结束 ▲▲▲ ---
+
+    return summaryText;
+  }
+  // ▲▲▲ 替换结束 ▲▲▲
+
+  /**
+   * 【剧本杀】显示游戏结算卡片模态框
+   * @param {string} summaryText - 复盘文本
+   */
+  function showScriptKillSummaryModal(summaryText) {
+    const modal = document.getElementById('script-kill-summary-modal');
+    const contentEl = document.getElementById('script-kill-summary-content');
+
+    contentEl.innerHTML = renderMarkdown(summaryText);
+
+    const repostBtn = document.getElementById('repost-sk-summary-btn');
+    const newRepostBtn = repostBtn.cloneNode(true);
+    repostBtn.parentNode.replaceChild(newRepostBtn, repostBtn);
+    newRepostBtn.onclick = () => openSkSummaryTargetPicker(summaryText);
+
+    const backBtn = document.getElementById('back-to-hall-from-sk-btn');
+    const newBackBtn = backBtn.cloneNode(true);
+    backBtn.parentNode.replaceChild(newBackBtn, backBtn);
+    newBackBtn.onclick = () => {
+      modal.classList.remove('visible');
+      showScreen('game-hall-screen');
+    };
+
+    modal.classList.add('visible');
+  }
+
+  /**
+   * 【剧本杀】打开复盘发送目标选择器
+   * @param {string} summaryText - 要转发的复盘文本
+   */
+  function openSkSummaryTargetPicker(summaryText) {
+    const modal = document.getElementById('script-kill-target-picker-modal');
+    const listEl = document.getElementById('script-kill-target-list');
+    listEl.innerHTML = '';
+
+    const aiPlayers = scriptKillGameState.players.filter(p => !p.isUser);
+
+    if (aiPlayers.length === 0) {
+      alert('没有可转发的AI玩家。');
+      return;
+    }
+
+    aiPlayers.forEach(player => {
+      const item = document.createElement('div');
+      item.className = 'player-selection-item';
+      item.innerHTML = `
+            <input type="checkbox" class="script-kill-target-checkbox" value="${player.id}" checked>
+            <img src="${player.avatar || defaultAvatar}" alt="${player.name}">
+            <span class="name">${player.name}</span>
+        `;
+      listEl.appendChild(item);
+    });
+
+    const confirmBtn = document.getElementById('sk-confirm-share-btn');
+    const newConfirmBtn = confirmBtn.cloneNode(true);
+    confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+    newConfirmBtn.onclick = () => {
+      const selectedIds = Array.from(document.querySelectorAll('.script-kill-target-checkbox:checked')).map(
+        cb => cb.value,
+      );
+      if (selectedIds.length > 0) {
+        sendSkSummaryToSelectedPlayers(summaryText, selectedIds);
+      } else {
+        alert('请至少选择一个转发对象！');
+      }
+    };
+
+    modal.classList.add('visible');
+  }
+
+  /**
+   * 【剧本杀】将游戏复盘发送到【选定】的AI角色的单聊中
+   * @param {string} summaryText - 复盘文本
+   * @param {string[]} targetIds - 目标AI角色的ID数组
+   */
+  async function sendSkSummaryToSelectedPlayers(summaryText, targetIds) {
+    document.getElementById('script-kill-summary-modal').classList.remove('visible');
+    document.getElementById('script-kill-target-picker-modal').classList.remove('visible');
+    let sentCount = 0;
+
+    const aiContext = `[系统指令：刚刚结束了一局剧本杀，这是游戏复盘。请根据这个复盘内容，以你的角色人设，和用户聊聊刚才的游戏。]\n\n${summaryText}`;
+
+    for (const chatId of targetIds) {
+      const chat = state.chats[chatId];
+      if (chat) {
+        const visibleMessage = {
+          role: 'user',
+          type: 'share_link',
+          timestamp: Date.now(),
+          title: '剧本杀 - 游戏复盘',
+          description: '点击查看详细复盘记录',
+          source_name: '游戏中心',
+          content: summaryText,
+        };
+
+        const hiddenInstruction = {
+          role: 'system',
+          content: aiContext,
+          timestamp: Date.now() + 1,
+          isHidden: true,
+        };
+
+        chat.history.push(visibleMessage, hiddenInstruction);
+        await db.chats.put(chat);
+        sentCount++;
+      }
+    }
+
+    await showCustomAlert('转发成功', `游戏复盘已发送至 ${sentCount} 位AI玩家的单聊中！`);
+    showScreen('game-hall-screen');
+  }
+
+  // ▲▲▲ 新代码粘贴结束 ▲▲▲
+  // ▼▼▼ 【全新】这是剧本杀AI生成功能的所有核心函数 ▼▼▼
+
+  function openAiScriptGenerator() {
+    // 隐藏剧本管理弹窗
+    document.getElementById('script-kill-manager-modal').classList.remove('visible');
+
+    const modal = document.getElementById('sk-ai-generator-modal');
+    // ▼▼▼ 在这里修改 ▼▼▼
+    document.getElementById('sk-ai-elements-input').value = ''; // 清空要素输入框
+    document.getElementById('sk-ai-summary-input').value = ''; // 清空梗概输入框
+    // ▲▲▲ 修改结束 ▲▲▲
+    document.getElementById('sk-ai-result-preview').textContent = '点击“开始生成”后，结果将显示在这里...';
+    document.getElementById('sk-ai-generator-save-btn').disabled = true;
+    tempGeneratedScriptData = null;
+
+    modal.classList.add('visible');
+  }
+
+  /**
+   * 【AI核心 V2 - 强制时间线版】根据用户的要素和梗概，调用AI生成剧本
+   */
+  async function generateSkScriptWithAI() {
+    // 1. 从新的两个输入框获取数据
+    const elements = document.getElementById('sk-ai-elements-input').value.trim();
+    const summary = document.getElementById('sk-ai-summary-input').value.trim();
+    const playerCount = document.getElementById('sk-ai-player-count-input').value;
+
+    if (!elements) {
+      // 核心要素是必填的
+      alert('请输入剧本的核心要素！');
+      return;
+    }
+
+    const previewEl = document.getElementById('sk-ai-result-preview');
+    const saveBtn = document.getElementById('sk-ai-generator-save-btn');
+    previewEl.textContent = '🧠 AI正在奋力创作中，这可能需要1-2分钟，请耐心等待...';
+    saveBtn.disabled = true;
+
+    // 2. 构建给AI的【全新、更严格】的指令(Prompt)
+    const systemPrompt = `
+# 任务
+你是一个专业的剧本杀剧本创作AI。你的任务是根据用户提供的核心要素和剧情梗概，创作一个【${playerCount}人】的、完整、可玩的剧本杀剧本。
+
+# 用户提供的核心要素:
+-   **玩家人数**: ${playerCount}人
+-   **核心元素**: ${elements}
+-   **剧情梗概**: ${summary || '（用户未提供详细梗概，请根据核心元素自由发挥）'}
+
+# 【【【时间线铁律：这是最高指令，必须严格遵守】】】
+在生成每个角色的 "storyline" (故事线) 字段时，你【必须】遵循以下规则：
+1.  **必须包含明确的时间点**：每一段关键行动前，都必须有一个具体的时间，格式为【**HH:mm**】（例如：**20:30** 或 **晚上8点15分**）。
+2.  **必须是具体的行动轨迹**：禁止使用“后来”、“过了一会儿”等模糊描述。必须清楚地写出角色在【什么时间】、【什么地点】、【做了什么事】。
+3.  **提供清晰的示例**:
+    -   **【【错误的模糊示例】】**: "晚上我和他吵了一架，然后离开了。"
+    -   **【【正确的详细示例】】**: "**20:30**: 我在书房因为项目资金问题和王总监大吵一架，他威胁要解雇我。 **20:45**: 我愤怒地摔门而出，回到了自己的工位。"
+
+# 剧本创作核心要求
+1.  **完整性**: 你必须生成剧本的所有组成部分，包括：剧本名称(name)、故事背景(storyBackground)、角色设定(roles)、线索卡(clues)、以及最终真相(truth)。
+2.  **角色设定 (roles)**:
+    -   必须是一个包含【${playerCount}个】角色对象的数组。
+    -   每个角色对象必须包含以下字段:
+        -   name: 角色名称 (字符串)。
+        -   description: 角色简介 (字符串, 简短描述)。
+        -   storyline: 角色的个人故事线或时间线 (字符串, **必须遵守【时间线铁律】**)。
+        -   tasks: 角色的秘密任务 (字符串)。
+        -   isKiller: 是否是凶手 (布尔值, true 或 false)。
+    -   剧本中【必须有且只有一个】角色的 isKiller 为 true。
+3.  **线索卡 (clues)**:
+    -   必须是一个包含多个线索对象的数组。
+    -   每个线索对象必须包含以下字段:
+        -   owner: 线索归属 (字符串, 可以是某个角色名，也可以是 "公共")。
+        -   description: 线索的详细描述 (字符串)。
+        -   isKey: 是否是关键线索 (布尔值, true 或 false)。
+    -   至少要有一条关键线索。
+4.  **最终真相 (truth)**: 必须清晰、有逻辑地揭示整个案件的真相、凶手的动机和作案手法。
+
+# 【格式铁律】
+你的回复【必须且只能】是一个严格的JSON对象，直接以 '{' 开头，以 '}' 结尾。禁止包含任何 "json", "\`\`\`" 或其他解释性文字。
+`;
+
+    // 3. 调用API (这部分逻辑与之前相同)
+    try {
+      const { proxyUrl, apiKey, model } = state.apiConfig;
+      let isGemini = proxyUrl === GEMINI_API_URL;
+      let messagesForApi = [{ role: 'user', content: systemPrompt }];
+      let geminiConfig = toGeminiRequestData(
+        model,
+        apiKey,
+        systemPrompt,
+        messagesForApi,
+        isGemini,
+        state.apiConfig.temperature,
+      );
+
+      const response = isGemini
+        ? await fetch(geminiConfig.url, geminiConfig.data)
+        : await fetch(`${proxyUrl}/v1/chat/completions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+            body: JSON.stringify({
+              model: model,
+              messages: messagesForApi,
+              temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+              response_format: { type: 'json_object' },
+            }),
+          });
+
+      if (!response.ok) throw new Error(`API请求失败: ${response.status} - ${await response.text()}`);
+
+      const data = await response.json();
+      const rawContent = (isGemini ? data.candidates[0].content.parts[0].text : data.choices[0].message.content)
+        .replace(/^```json\s*|```$/g, '')
+        .trim();
+
+      const generatedScript = JSON.parse(rawContent);
+
+      if (
+        !generatedScript.name ||
+        !generatedScript.storyBackground ||
+        !Array.isArray(generatedScript.roles) ||
+        !Array.isArray(generatedScript.clues) ||
+        !generatedScript.truth
+      ) {
+        throw new Error('AI返回的JSON格式不完整，缺少必要的字段。');
+      }
+
+      previewEl.textContent = JSON.stringify(generatedScript, null, 2);
+      tempGeneratedScriptData = generatedScript;
+      saveBtn.disabled = false;
+
+      await showCustomAlert('生成成功！', '剧本已生成，请在下方预览。如果满意，可以点击保存。');
+    } catch (error) {
+      console.error('AI剧本生成失败:', error);
+      previewEl.textContent = `生成失败！请检查API设置或网络后重试。\n\n错误信息: ${error.message}`;
+      await showCustomAlert('生成失败', `发生了一个错误：\n${error.message}`);
+    }
+  }
+
+  /**
+   * 保存AI生成的剧本
+   */
+  async function saveAiGeneratedScript() {
+    if (!tempGeneratedScriptData) {
+      alert('没有可以保存的剧本数据。');
+      return;
+    }
+
+    try {
+      const scriptToSave = {
+        ...tempGeneratedScriptData,
+        isBuiltIn: false, // 标记为非内置剧本
+      };
+
+      // 存入数据库
+      await db.scriptKillScripts.add(scriptToSave);
+
+      document.getElementById('sk-ai-generator-modal').classList.remove('visible'); // 关闭AI生成器
+      await renderScriptManagerList(); // 刷新剧本管理列表
+
+      alert(`剧本《${scriptToSave.name}》已成功保存到你的自定义剧本库中！`);
+    } catch (error) {
+      console.error('保存AI剧本失败:', error);
+      alert(`保存失败: ${error.message}`);
+    }
+  }
+
+  // ▲▲▲ 新增功能函数结束 ▲▲▲
+
+  // ▲▲▲ 剧本杀功能函数结束 ▲▲▲
+  // ▼▼▼ 【全新】这里是“你说我猜”游戏的所有核心功能函数 ▼▼▼
+
+  // ▼▼▼ 【全新】这里是“你说我猜”游戏的所有核心功能函数 ▼▼▼
+
+  /**
+   * 【你说我猜】打开游戏设置界面 (V2 - 复选框版)
+   */
+  async function openGuessWhatSetup() {
+    // 重置游戏状态，以防上次游戏数据残留
+    guessWhatGameState = {
+      isActive: false,
+      mode: 'ai_guesses',
+      opponent: null,
+      secretWord: '',
+      gameLog: [],
+      currentTurn: 'user',
+    };
+
+    showScreen('guess-what-setup-screen');
+    const selectionEl = document.getElementById('guess-what-player-selection');
+    selectionEl.innerHTML = '<p>正在加载玩伴列表...</p>';
+
+    const singleChats = Object.values(state.chats).filter(chat => !chat.isGroup);
+    const allNpcs = Object.values(state.chats).flatMap(chat =>
+      (chat.npcLibrary || []).map(npc => ({ ...npc, owner: chat.name })),
+    );
+    let playerOptions = [
+      ...singleChats.map(c => ({ id: c.id, name: c.name, avatar: c.settings.aiAvatar, type: '角色' })),
+      ...allNpcs.map(n => ({ id: n.id, name: n.name, avatar: n.avatar, type: `NPC (${n.owner})` })),
+    ];
+
+    selectionEl.innerHTML = '';
+    if (playerOptions.length === 0) {
+      selectionEl.innerHTML =
+        '<p style="text-align:center; color: var(--text-secondary);">还没有可以一起玩的好友哦~</p>';
+      return;
+    }
+
+    // 【核心修改1】使用复选框，并添加专属class
+    playerOptions.forEach((player, index) => {
+      const item = document.createElement('div');
+      item.className = 'player-selection-item';
+      item.innerHTML = `
+            <input type="checkbox" class="guess-what-player-checkbox" value="${player.id}" id="opponent-${player.id}" ${
+        index === 0 ? 'checked' : ''
+      }>
+            <img src="${player.avatar || defaultAvatar}" alt="${player.name}">
+            <span class="name">${player.name}</span>
+            <span class="type-tag">${player.type}</span>
+        `;
+      selectionEl.appendChild(item);
+    });
+
+    // 【核心修改2】添加事件监听，实现单选效果
+    selectionEl.addEventListener('click', e => {
+      if (e.target.type === 'checkbox' && e.target.classList.contains('guess-what-player-checkbox')) {
+        // 当点击一个复选框时，取消其他所有同类复选框的选中状态
+        document.querySelectorAll('.guess-what-player-checkbox').forEach(cb => {
+          if (cb !== e.target) cb.checked = false;
+        });
+      }
+    });
+
+    // 默认显示“我出题”模式的输入框
+    document.getElementById('user-word-input-container').style.display = 'block';
+  }
+
+  /**
+   * 【你说我猜】开始游戏的核心逻辑 (V2 - 复选框版)
+   */
+  async function startGuessWhatGame() {
+    // 【核心修改】修改选择器以匹配新的复选框class
+    const selectedOpponentCheckbox = document.querySelector('.guess-what-player-checkbox:checked');
+    if (!selectedOpponentCheckbox) {
+      alert('请选择一位玩伴！');
+      return;
+    }
+    const opponentId = selectedOpponentCheckbox.value;
+    const gameMode = document.querySelector('input[name="guess_what_mode"]:checked').value;
+    const userWord = document.getElementById('guess-what-user-word').value.trim();
+
+    if (gameMode === 'ai_guesses' && !userWord) {
+      alert('“我出题”模式下，词语不能为空！');
+      return;
+    }
+
+    await showCustomAlert('请稍候...', '正在准备游戏，AI也在摩拳擦掌...');
+
+    const chat = Object.values(state.chats).find(c => c.id === opponentId);
+    let opponentInfo = null;
+    if (chat) {
+      opponentInfo = { id: chat.id, name: chat.name, avatar: chat.settings.aiAvatar, persona: chat.settings.aiPersona };
+    } else {
+      for (const c of Object.values(state.chats)) {
+        const npc = (c.npcLibrary || []).find(n => n.id === opponentId);
+        if (npc) {
+          opponentInfo = { id: npc.id, name: npc.name, avatar: npc.avatar, persona: npc.persona };
+          break;
+        }
+      }
+    }
+    if (!opponentInfo) {
+      alert('找不到所选的玩伴信息！');
+      return;
+    }
+
+    guessWhatGameState.isActive = true;
+    guessWhatGameState.mode = gameMode;
+    guessWhatGameState.opponent = opponentInfo;
+    guessWhatGameState.gameLog = [];
+
+    document.getElementById('guess-what-game-title').textContent = `与 ${opponentInfo.name} 的游戏`;
+    const inputEl = document.getElementById('guess-what-user-input');
+
+    if (gameMode === 'ai_guesses') {
+      guessWhatGameState.secretWord = userWord;
+      guessWhatGameState.currentTurn = 'user';
+      logToGuessWhatGame('游戏开始！你来出题，请给出你的第一个提示。', 'system');
+      inputEl.placeholder = '请给出第一个提示...';
+      inputEl.disabled = false;
+    } else {
+      const { secretWord, firstHint } = await triggerGuessWhatAiAction('generate_word');
+      if (!secretWord) {
+        await showCustomAlert('出题失败', '抱歉，AI今天好像没灵感，想不出题目来。请稍后再试或检查API设置。');
+        guessWhatGameState.isActive = false;
+        showScreen('game-hall-screen');
+        return;
+      }
+      guessWhatGameState.secretWord = secretWord;
+      guessWhatGameState.currentTurn = 'user';
+      logToGuessWhatGame(`游戏开始！${opponentInfo.name} 已经想好了一个词。`, 'system');
+      logToGuessWhatGame(
+        { player: opponentInfo, text: `【${opponentInfo.name}托着下巴想了想】第一个提示是... ${firstHint}` },
+        'ai-turn',
+      );
+      inputEl.placeholder = '请根据提示进行猜测...';
+      inputEl.disabled = false;
+    }
+
+    showScreen('guess-what-game-screen');
+    renderGuessWhatGameScreen();
+    inputEl.focus();
+    const actionArea = document.getElementById('guess-what-action-area');
+    if (actionArea) actionArea.style.display = 'flex';
+  }
+  // ▼▼▼ 【全新】这是“你说我猜”的重roll功能核心函数 ▼▼▼
+  /**
+   * 【你说我猜】处理AI发言的重roll请求
+   * @param {number} logIndex - 要重roll的AI发言在gameLog中的索引
+   */
+  async function handleGuessWhatReroll(logIndex) {
+    // 1. 找到AI的发言和触发它的那条用户发言
+    const aiLogIndex = logIndex;
+    const userLogIndex = logIndex - 1;
+
+    // 安全检查
+    if (
+      userLogIndex < 0 ||
+      !guessWhatGameState.gameLog[userLogIndex] ||
+      guessWhatGameState.gameLog[userLogIndex].type !== 'user-turn'
+    ) {
+      alert('无法重roll，找不到触发此回应的用户消息。');
+      return;
+    }
+
+    // 2. 提取用户原始的输入内容
+    const originalUserInput = guessWhatGameState.gameLog[userLogIndex].message.text;
+
+    // 3. 从日志中移除这两条记录，实现“时间倒流”
+    guessWhatGameState.gameLog.splice(userLogIndex, 2);
+
+    // 4. 立即刷新界面，让用户看到消息消失了
+    renderGuessWhatGameScreen();
+    await showCustomAlert('请稍候...', 'AI正在换个思路...');
+
+    // 5. 使用用户原始的输入，重新调用游戏主流程
+    await processGuessWhatTurn(originalUserInput);
+  }
+  // ▲▲▲ 新增函数结束 ▲▲▲
+
+  // ▼▼▼ 【你说我猜】用这块【已添加重roll按钮】的代码，完整替换旧的 renderGuessWhatGameScreen 函数 ▼▼▼
+  /**
+   * 【你说我猜】渲染游戏主界面
+   */
+  function renderGuessWhatGameScreen() {
+    const logContainer = document.getElementById('guess-what-game-log');
+    logContainer.innerHTML = '';
+
+    guessWhatGameState.gameLog.forEach((log, index) => {
+      // ★ 核心修改1：增加了index参数
+      const logEl = document.createElement('div');
+      logEl.className = `guess-log-entry ${log.type}`;
+
+      if (log.type === 'system') {
+        logEl.textContent = log.message;
+      } else if (log.type === 'ai-turn') {
+        // ★ 核心修改2：定位到AI的发言
+        const avatarUrl = log.message.player.avatar;
+        // ★ 核心修改3：为AI发言添加重roll按钮
+        logEl.innerHTML = `
+                <img src="${avatarUrl}" class="avatar">
+                <div class="bubble">
+                    <div class="name" style="display: flex; align-items: center; gap: 8px;">
+                        ${log.message.player.name}
+                        <button class="gw-reroll-btn" data-log-index="${index}" title="让Ta换个说法" style="background:none; border:none; cursor:pointer; padding:0; color:var(--text-secondary);">
+                           <svg class="reroll-btn-icon" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                        </button>
+                    </div>
+                    <div>${log.message.text.replace(/\n/g, '<br>')}</div>
+                </div>
+            `;
+      } else {
+        // 用户的发言保持原样
+        const avatarUrl = log.message.player.isUser
+          ? state.qzoneSettings.avatar || defaultAvatar
+          : log.message.player.avatar;
+        logEl.innerHTML = `
+                <img src="${avatarUrl}" class="avatar">
+                <div class="bubble">
+                    <div class="name">${log.message.player.name}</div>
+                    <div>${log.message.text.replace(/\n/g, '<br>')}</div>
+                </div>
+            `;
+      }
+      logContainer.appendChild(logEl);
+    });
+
+    logContainer.scrollTop = logContainer.scrollHeight;
+  }
+  // ▲▲▲ 替换结束 ▲▲▲
+
+  /**
+   * 【你说我猜】添加一条游戏日志
+   */
+  function logToGuessWhatGame(message, type = 'system') {
+    guessWhatGameState.gameLog.push({ message, type });
+    renderGuessWhatGameScreen();
+  }
+
+  /**
+   * 【你说我猜 V5 | 裁判逻辑最终修复版】游戏主循环/引擎
+   * @param {string} userInput - 用户刚刚的输入
+   */
+  async function processGuessWhatTurn(userInput) {
+    if (!guessWhatGameState.isActive) return;
+
+    const inputEl = document.getElementById('guess-what-user-input');
+    const userPlayer = { id: 'user', name: state.qzoneSettings.nickname || '我', isUser: true };
+    const aiPlayer = guessWhatGameState.opponent;
+    const currentMode = guessWhatGameState.mode;
+
+    // 1. 记录并显示用户的行为
+    logToGuessWhatGame({ player: userPlayer, text: userInput }, 'user-turn');
+
+    // 2. 轮到AI行动，禁用输入框
+    guessWhatGameState.currentTurn = 'ai';
+    inputEl.placeholder = `等待 ${aiPlayer.name} 的回应...`;
+    inputEl.disabled = true;
+    renderGuessWhatGameScreen();
+    await sleep(1500);
+
+    // 3. 让AI根据上下文执行动作
+    const aiResponse = await triggerGuessWhatAiAction(
+      currentMode === 'ai_guesses' ? 'guess_word' : 'give_hint',
+      userInput,
+    );
+
+    // 4. 【核心修复】使用 switch 结构清晰地处理AI的每一种行动结果
+    if (aiResponse) {
+      switch (aiResponse.type) {
+        case 'guess':
+          const guessText = aiResponse.text;
+          // 先把AI的猜测显示出来
+          logToGuessWhatGame({ player: aiPlayer, text: guessText }, 'ai-turn');
+
+          // 调用裁判函数进行判断
+          if (isGuessCorrect(guessText, guessWhatGameState.secretWord)) {
+            await sleep(1000); // 停顿一下，让玩家看到猜测内容
+            endGuessWhatGame('ai', `我猜对啦！答案就是【${guessWhatGameState.secretWord}】！`);
+            return; // 猜对了，游戏结束，退出函数
+          }
+          // 如果没猜对，则不执行任何操作，流程会自然地走到最后，把控制权还给用户
+          break;
+
+        case 'hint':
+          // AI给出新提示
+          logToGuessWhatGame({ player: aiPlayer, text: aiResponse.text }, 'ai-turn');
+          break;
+
+        case 'game_over':
+          // AI在给提示时直接判断用户猜对了
+          endGuessWhatGame(aiResponse.winner, aiResponse.reason);
+          return; // 游戏结束，退出函数
+
+        case 'error':
+          // AI返回了错误信息
+          logToGuessWhatGame({ player: aiPlayer, text: aiResponse.text }, 'ai-turn');
+          break;
+
+        default:
+          // 未知类型的回复，也记录下来
+          logToGuessWhatGame({ player: aiPlayer, text: '我好像有点跑神了，我们说到哪了？' }, 'ai-turn');
+          console.warn('收到了未知的AI行动类型:', aiResponse);
+          break;
+      }
+    } else {
+      // API调用彻底失败
+      logToGuessWhatGame({ player: aiPlayer, text: '我...好像彻底断线了...' }, 'ai-turn');
+    }
+
+    // 5. 如果游戏没有结束，则轮到用户行动，恢复输入框
+    guessWhatGameState.currentTurn = 'user';
+    inputEl.placeholder = currentMode === 'ai_guesses' ? '请继续给出你的提示...' : '请根据提示继续猜测...';
+    inputEl.disabled = false;
+    inputEl.focus();
+  }
+
+  /**
+   * 【你说我猜】游戏结束处理
+   */
+  function endGuessWhatGame(winner, reason) {
+    if (!guessWhatGameState.isActive) return; // 防止重复执行
+    guessWhatGameState.isActive = false; // 标记游戏为非激活状态
+
+    // 立即隐藏游戏中的输入区域
+    const actionArea = document.getElementById('guess-what-action-area');
+    if (actionArea) actionArea.style.display = 'none';
+
+    // 生成复盘文本
+    const summaryText = generateGuessWhatSummary(winner, reason);
+    // 显示结算卡片
+    showGuessWhatSummaryModal(summaryText);
+  }
+  /**
+   * 【全新】判断AI的猜测是否正确（简单版）
+   * @param {string} guess - AI猜测的词语
+   * @param {string} answer - 正确答案
+   * @returns {boolean}
+   */
+  function isGuessCorrect(guess, answer) {
+    if (!guess || !answer) return false;
+
+    // 为了更宽松的匹配，我们都转为小写并去除空格
+    const cleanGuess = guess.toLowerCase().replace(/\s+/g, '');
+    const cleanAnswer = answer.toLowerCase().replace(/\s+/g, '');
+
+    // 只要猜测包含了答案，或者答案包含了猜测，就认为正确
+    // 例如：答案是“冰淇淋”，猜测“冰淇淋车”或“淇淋”，都算对
+    return cleanGuess.includes(cleanAnswer) || cleanAnswer.includes(cleanGuess);
+  }
+
+  /**
+   * 【你说我猜-AI核心 V4 | 铜墙铁壁版】调用AI执行游戏逻辑，内置强大的重试机制
+   * @param {string} actionType - AI需要执行的动作: 'generate_word', 'give_hint', 'guess_word'
+   * @param {string} userInput - 用户刚刚的输入
+   * @returns {Promise<object|null>} - AI的行动结果
+   */
+  async function triggerGuessWhatAiAction(actionType, userInput = null) {
+    const { proxyUrl, apiKey, model } = state.apiConfig;

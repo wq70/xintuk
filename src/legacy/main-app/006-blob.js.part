@@ -1,0 +1,932 @@
+                "点击编辑文字",
+              "widget-image-2":
+                document.getElementById("widget-image-2")?.src || "",
+              "widget-subtext-2":
+                document.getElementById("widget-subtext-2")?.textContent ||
+                "点击编辑文字",
+
+              // --- 3. 第二页：左侧组合 (图片 + 气泡) ---
+              "widget-image-3":
+                document.getElementById("widget-image-3")?.src || "",
+              "second-page-bubble":
+                document.getElementById("second-page-bubble")?.textContent ||
+                "点击编辑文字",
+              "flat-capsule-bubble":
+                document.getElementById("flat-capsule-bubble")?.textContent ||
+                "可编辑",
+              "circular-bubble":
+                document.getElementById("circular-bubble")?.textContent ||
+                "文字",
+
+              // --- 4. 第二页：透明音乐组件 (核心新增) ---
+              "music-rect-img":
+                document.getElementById("music-rect-img")?.src || "",
+              "music-record-img":
+                document.getElementById("music-record-img")?.src || "",
+              "music-text-line":
+                document.getElementById("music-text-line")?.textContent ||
+                "点击编辑歌名",
+
+              // --- 5. 第二页：月份/头像组合组件 (核心新增) ---
+              "widget-month-display":
+                document.getElementById("widget-month-display")?.textContent ||
+                "12",
+              "new-widget-avatar":
+                document.getElementById("new-widget-avatar")?.src || "",
+              "new-widget-text-1":
+                document.getElementById("new-widget-text-1")?.textContent ||
+                "可编辑文字",
+              "new-widget-text-2":
+                document.getElementById("new-widget-text-2")?.textContent ||
+                "可编辑文字",
+              "new-widget-text-3":
+                document.getElementById("new-widget-text-3")?.textContent ||
+                "可编辑文字",
+
+              // --- 全局设置 ---
+              appIcons: { ...state.globalSettings.appIcons },
+              appLabels: { ...state.globalSettings.appLabels },
+              wallpaper: state.globalSettings.wallpaper,
+              lockscreenWallpaper: state.globalSettings.lockscreenWallpaper,
+            };
+
+            const blob = new Blob([JSON.stringify(backupData, null, 2)], {
+              type: "application/json",
+            });
+            const url = URL.createObjectURL(blob);
+            const link = Object.assign(document.createElement("a"), {
+              href: url,
+              download: `EPhone-Full-Backup-${new Date().toISOString().split("T")[0]}.json`,
+            });
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            await showCustomAlert("导出成功", "已成功导出所有数据！");
+          } catch (error) {
+            console.error("导出数据时出错:", error);
+            await showCustomAlert(
+              "导出失败",
+              `发生了一个错误: ${error.message}`,
+            );
+          }
+        }
+
+        let githubBackupTimer = null;
+
+        /**
+         * 获取完整的备份数据对象 (不触发下载)
+         */
+        async function getFullBackupData() {
+          const backupData = {
+            version: 1,
+            timestamp: Date.now(),
+            deviceCode: getDeviceCode(), // 记录来源设备
+          };
+
+          // 获取所有数据表
+          const [
+            chats,
+            worldBooks,
+            userStickers,
+            charStickers,
+            apiConfig,
+            globalSettings,
+            personaPresets,
+            musicLibrary,
+            qzoneSettings,
+            qzonePosts,
+            qzoneAlbums,
+            qzonePhotos,
+            favorites,
+            qzoneGroups,
+            memories,
+            worldBookCategories,
+            callRecords,
+            customAvatarFrames,
+            themes,
+            apiPresets,
+            bubbleStylePresets,
+            fontPresets,
+            homeScreenPresets,
+            datingScenes,
+            datingPresets,
+            datingSpriteGroups,
+            datingSprites,
+            datingHistory,
+            pomodoroSessions,
+            ludoQuestionBanks,
+            ludoQuestions,
+            scriptKillScripts,
+            taobaoProducts,
+            taobaoOrders,
+            taobaoCart,
+            userWalletTransactions,
+            userStickerCategories,
+          ] = await Promise.all([
+            db.chats.toArray(),
+            db.worldBooks.toArray(),
+            db.userStickers.toArray(),
+            db.charStickers.toArray(),
+            db.apiConfig.get("main"),
+            db.globalSettings.get("main"),
+            db.personaPresets.toArray(),
+            db.musicLibrary.get("main"),
+            db.qzoneSettings.get("main"),
+            db.qzonePosts.toArray(),
+            db.qzoneAlbums.toArray(),
+            db.qzonePhotos.toArray(),
+            db.favorites.toArray(),
+            db.qzoneGroups.toArray(),
+            db.memories.toArray(),
+            db.worldBookCategories.toArray(),
+            db.callRecords.toArray(),
+            db.customAvatarFrames.toArray(),
+            db.themes.toArray(),
+            db.apiPresets.toArray(),
+            db.bubbleStylePresets.toArray(),
+            db.fontPresets.toArray(),
+            db.homeScreenPresets.toArray(),
+            db.datingScenes.toArray(),
+            db.datingPresets.toArray(),
+            db.datingSpriteGroups.toArray(),
+            db.datingSprites.toArray(),
+            db.datingHistory.toArray(),
+            db.pomodoroSessions.toArray(),
+            db.ludoQuestionBanks.toArray(),
+            db.ludoQuestions.toArray(),
+            db.scriptKillScripts.toArray(),
+            db.taobaoProducts.toArray(),
+            db.taobaoOrders.toArray(),
+            db.taobaoCart.toArray(),
+            db.userWalletTransactions.toArray(),
+            db.userStickerCategories.toArray(),
+          ]);
+
+          // 组装数据
+          Object.assign(backupData, {
+            chats,
+            worldBooks,
+            userStickers,
+            charStickers,
+            apiConfig,
+            globalSettings,
+            personaPresets,
+            musicLibrary,
+            qzoneSettings,
+            qzonePosts,
+            qzoneAlbums,
+            qzonePhotos,
+            favorites,
+            qzoneGroups,
+            memories,
+            worldBookCategories,
+            callRecords,
+            customAvatarFrames,
+            themes,
+            apiPresets,
+            bubbleStylePresets,
+            fontPresets,
+            homeScreenPresets,
+            datingScenes,
+            datingPresets,
+            datingSpriteGroups,
+            datingSprites,
+            datingHistory,
+            pomodoroSessions,
+            ludoQuestionBanks,
+            ludoQuestions,
+            scriptKillScripts,
+            taobaoProducts,
+            taobaoOrders,
+            taobaoCart,
+            userWalletTransactions,
+            userStickerCategories,
+          });
+
+          // 这里省略了 homeScreenState 的详细抓取，因为它依赖 DOM 元素，
+          // 自动备份时可能不在主屏幕。为了安全起见，这里仅保存 globalSettings 里的 widgetData。
+          // 如果需要完整还原UI布局，最好只在手动导出时包含 homeScreenState。
+
+          return JSON.stringify(backupData, null, 2);
+        }
+
+        // 支持大文件自动分片上传 + 自动去除敏感Key防止报错
+        async function uploadBackupToGitHub(isAuto = false) {
+          let { githubToken, githubUsername, githubRepo, githubPath } =
+            state.apiConfig;
+
+          // 1. 基础检查
+          if (!githubToken || !githubUsername || !githubRepo) {
+            if (!isAuto) alert("请先在 API 设置中填写 GitHub 配置！");
+            return;
+          }
+          githubToken = githubToken.trim();
+          githubUsername = githubUsername.trim();
+          githubRepo = githubRepo
+            .trim()
+            .replace(/\/$/, "")
+            .split("/")
+            .pop()
+            .replace(".git", "");
+          githubPath = (githubPath || "ephone_backup.json").trim();
+
+          if (!isAuto)
+            await showCustomAlert("准备中...", "正在打包并计算文件大小...");
+
+          try {
+            // 2. 获取原始 JSON 数据字符串
+            const rawJsonContent = await getFullBackupData();
+
+            // GitHub 会拒绝包含 API Key 的文件上传，所以必须在上传前清空它们
+            const backupObj = JSON.parse(rawJsonContent);
+
+            if (backupObj.apiConfig) {
+              // 清空 OpenAI/API Key
+              backupObj.apiConfig.apiKey = "";
+              // 清空 GitHub Token (最关键，不删这个必报 secret detected)
+              backupObj.apiConfig.githubToken = "";
+              // 清空 Minimax Key
+              backupObj.apiConfig.minimaxApiKey = "";
+            }
+
+            // 重新转换回 JSON 字符串
+            const jsonContent = JSON.stringify(backupObj, null, 2);
+
+            // 3. 转成 Base64 (解决中文乱码)
+            const fullBase64 = btoa(unescape(encodeURIComponent(jsonContent)));
+
+            // 计算 Base64 大小 (字节)
+            const totalSize = fullBase64.length;
+            // 设定分片阈值：45MB
+            const CHUNK_SIZE = 45 * 1024 * 1024;
+
+            const totalChunks = Math.ceil(totalSize / CHUNK_SIZE);
+
+            console.log(
+              `[GitHub] 文件大小: ${(totalSize / 1024 / 1024).toFixed(2)} MB, 分片数: ${totalChunks}`,
+            );
+
+            // 如果只有1片，走普通上传；如果多片，走分片上传
+            if (totalChunks === 1) {
+              await uploadSingleFile(
+                githubUsername,
+                githubRepo,
+                githubPath,
+                githubToken,
+                fullBase64,
+                isAuto,
+              );
+            } else {
+              if (!isAuto)
+                await showCustomAlert(
+                  "文件较大",
+                  `将分为 ${totalChunks} 个部分上传，请耐心等待...`,
+                );
+
+              for (let i = 0; i < totalChunks; i++) {
+                const start = i * CHUNK_SIZE;
+                const end = Math.min(start + CHUNK_SIZE, totalSize);
+                const chunkContent = fullBase64.substring(start, end);
+
+                const partName = `${githubPath}.${String(i + 1).padStart(3, "0")}`;
+
+                if (!isAuto) {
+                  console.log(`正在上传分片 ${i + 1}/${totalChunks} ...`);
+                }
+
+                await uploadSingleFile(
+                  githubUsername,
+                  githubRepo,
+                  partName,
+                  githubToken,
+                  chunkContent,
+                  isAuto,
+                  true,
+                );
+              }
+
+              const infoContent = btoa(
+                `{"total_parts": ${totalChunks}, "timestamp": ${Date.now()}}`,
+              );
+              await uploadSingleFile(
+                githubUsername,
+                githubRepo,
+                `${githubPath}.meta`,
+                githubToken,
+                infoContent,
+                true,
+                true,
+              );
+            }
+
+            console.log("GitHub 备份全部完成！");
+            if (!isAuto) {
+              await showCustomAlert(
+                "上传成功",
+                `备份已上传。(为了安全，云端备份已自动移除API Key，恢复时请记得重新填写)`,
+              );
+            }
+          } catch (error) {
+            console.error("GitHub 备份失败:", error);
+            // 如果还是报 Bad credentials，提示用户检查 Token
+            if (error.message.includes("Bad credentials")) {
+              if (!isAuto)
+                await showCustomAlert(
+                  "认证失败",
+                  'GitHub Token 无效或过期。请重新生成 Token 并确保勾选了 "repo" 权限。',
+                );
+            } else {
+              if (!isAuto) await showCustomAlert("上传失败", error.message);
+            }
+          }
+        }
+
+        async function restoreBackupFromGitHub() {
+          let { githubToken, githubUsername, githubRepo, githubPath } =
+            state.apiConfig;
+
+          // 1. 基础检查
+          if (!githubToken || !githubUsername || !githubRepo) {
+            alert("请先在 API 设置中填写 GitHub 配置！");
+            return;
+          }
+
+          // 2. 确认操作
+          const confirmed = await showCustomConfirm(
+            "⚠️ 高能预警",
+            "即将从 GitHub 下载备份并【覆盖】当前所有数据！\n\n如果 GitHub 上的备份较旧，您当前的新数据将会丢失。\n\n确定要继续吗？",
+            { confirmButtonClass: "btn-danger" },
+          );
+          if (!confirmed) return;
+
+          githubToken = githubToken.trim();
+          githubUsername = githubUsername.trim();
+          githubRepo = githubRepo
+            .trim()
+            .replace(/\/$/, "")
+            .split("/")
+            .pop()
+            .replace(".git", "");
+          githubPath = (githubPath || "ephone_backup.json").trim();
+
+          await showCustomAlert(
+            "正在连接...",
+            "正在检查 GitHub 上的备份文件...",
+          );
+
+          try {
+            let finalBase64String = "";
+
+            // 3. 策略 A：检查是否存在分片索引文件 (.meta)
+            const metaUrl = `https://api.github.com/repos/${githubUsername}/${githubRepo}/contents/${githubPath}.meta`;
+            let metaData = null;
+
+            try {
+              const metaRes = await fetch(metaUrl, {
+                headers: { Authorization: `token ${githubToken}` },
+              });
+              if (metaRes.ok) {
+                const metaJson = await metaRes.json();
+                const metaContentStr = atob(
+                  metaJson.content.replace(/\s/g, ""),
+                );
+                metaData = JSON.parse(metaContentStr);
+              }
+            } catch (e) {
+              console.log("未找到 meta 文件，尝试单文件模式。");
+            }
+
+            // 4. 分支处理：分片下载 vs 单文件下载
+            if (metaData && metaData.total_parts) {
+              // === 分片模式 (处理超大文件) ===
+              const totalParts = metaData.total_parts;
+              const modalTitle = document.getElementById("custom-modal-title");
+
+              for (let i = 1; i <= totalParts; i++) {
+                if (modalTitle)
+                  modalTitle.textContent = `正在下载分片 ${i}/${totalParts}...`;
+
+                const partName = `${githubPath}.${String(i).padStart(3, "0")}`;
+                // 获取分片文件的 SHA 信息
+                const partInfoUrl = `https://api.github.com/repos/${githubUsername}/${githubRepo}/contents/${partName}`;
+
+                const partInfoRes = await fetch(partInfoUrl, {
+                  headers: { Authorization: `token ${githubToken}` },
+                });
+
+                if (!partInfoRes.ok)
+                  throw new Error(`获取分片 ${partName} 信息失败`);
+
+                const partJson = await partInfoRes.json();
+
+                // 统一使用 Blob API 获取内容，避免 download_url 的 CORS 问题
+                // 无论是分片还是单文件，只要 SHA 存在，就用 Blob API
+                const blobUrl = `https://api.github.com/repos/${githubUsername}/${githubRepo}/git/blobs/${partJson.sha}`;
+                const blobRes = await fetch(blobUrl, {
+                  headers: { Authorization: `token ${githubToken}` },
+                });
+
+                if (!blobRes.ok)
+                  throw new Error(`分片 ${partName} 内容下载失败`);
+
+                const blobJson = await blobRes.json();
+                finalBase64String += blobJson.content.replace(/\s/g, "");
+              }
+              console.log("所有分片下载并拼接完成。");
+            } else {
+              // === 单文件模式 ===
+              // 1. 先获取文件的元数据（拿到 sha）
+              const singleUrl = `https://api.github.com/repos/${githubUsername}/${githubRepo}/contents/${githubPath}`;
+              const res = await fetch(singleUrl, {
+                headers: { Authorization: `token ${githubToken}` },
+              });
+
+              if (!res.ok) {
+                if (res.status === 404)
+                  throw new Error("未找到备份文件！请检查文件名是否正确。");
+                throw new Error(`下载失败: ${res.status}`);
+              }
+
+              const json = await res.json();
+
+              if (json.content) {
+                // 文件较小 (<1MB)，API 直接返回了 content
+                finalBase64String = json.content.replace(/\s/g, "");
+              } else if (json.sha) {
+                // 文件较大 (>1MB)，API 没有 content，但有 sha
+                // 使用 Blob API 获取内容（它支持 CORS 和 Token）
+                console.log("文件大于1MB，正在通过 Blob API 下载...");
+                if (document.getElementById("custom-modal-title")) {
+                  document.getElementById("custom-modal-title").textContent =
+                    "正在通过 Blob API 下载大文件...";
+                }
+
+                const blobUrl = `https://api.github.com/repos/${githubUsername}/${githubRepo}/git/blobs/${json.sha}`;
+                const blobRes = await fetch(blobUrl, {
+                  headers: { Authorization: `token ${githubToken}` },
+                });
+
+                if (!blobRes.ok)
+                  throw new Error(`Blob API 请求失败: ${blobRes.status}`);
+
+                const blobJson = await blobRes.json();
+                finalBase64String = blobJson.content.replace(/\s/g, "");
+              } else {
+                throw new Error(
+                  "无法获取文件内容: GitHub API 未返回 content 或 sha",
+                );
+              }
+            }
+
+            // 5. 解码与恢复
+            if (document.getElementById("custom-modal-title")) {
+              document.getElementById("custom-modal-title").textContent =
+                "正在解析数据(可能需要几秒)...";
+            }
+
+            // a. Base64 -> 二进制字符串
+            const binaryString = atob(finalBase64String);
+
+            // b. 二进制字符串 -> Uint8Array -> UTF-8 字符串
+            // (这一步是为了解决中文乱码问题)
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+              bytes[i] = binaryString.charCodeAt(i);
+            }
+            const decoder = new TextDecoder("utf-8");
+            const jsonString = decoder.decode(bytes);
+
+            // c. 预检 JSON
+            try {
+              JSON.parse(jsonString);
+            } catch (parseErr) {
+              throw new Error(
+                `JSON解析失败(文件可能不完整): ${parseErr.message}`,
+              );
+            }
+
+            // d. 导入
+            const virtualFile = new File([jsonString], "github_restore.json", {
+              type: "application/json",
+            });
+            hideCustomModal();
+            await importBackup(virtualFile);
+          } catch (error) {
+            console.error("恢复失败:", error);
+            // 如果是 403 错误，通常是 Token 权限问题
+            let extraMsg = "";
+            if (
+              error.message.includes("403") ||
+              error.message.includes("Failed to fetch")
+            ) {
+              extraMsg =
+                "\n\n(提示：这可能是网络问题，或者您的 GitHub Token 没有足够的权限访问该私有仓库。)";
+            }
+            await showCustomAlert(
+              "恢复失败",
+              `错误信息: ${error.message}${extraMsg}`,
+            );
+          }
+        }
+
+        /**
+         * 辅助函数：上传单个文件到 GitHub
+         * 增强版：支持获取SHA以覆盖文件，处理404情况
+         */
+        async function uploadSingleFile(
+          user,
+          repo,
+          path,
+          token,
+          contentBase64,
+          isAuto,
+        ) {
+          const apiUrl = `https://api.github.com/repos/${user}/${repo}/contents/${path}`;
+
+          // 1. 尝试获取现有的 SHA (用于覆盖)
+          let sha = null;
+          try {
+            // 这里的 fetch 可能会因为网络问题失败，所以加 try-catch
+            const getRes = await fetch(apiUrl, {
+              method: "GET",
+              headers: { Authorization: `token ${token}` },
+            });
+            if (getRes.ok) {
+              const json = await getRes.json();
+              sha = json.sha;
+            }
+          } catch (e) {
+            console.warn(
+              `[Github] 获取文件 SHA 失败 (可能是新文件): ${path}`,
+              e,
+            );
+            // 忽略获取SHA的错误，假设是新文件继续尝试上传
+          }
+
+          // 2. 准备上传请求体
+          const body = {
+            message: `Backup ${new Date().toLocaleString()}`,
+            content: contentBase64,
+          };
+          if (sha) body.sha = sha;
+
+          // 3. 执行上传 (PUT)
+          const res = await fetch(apiUrl, {
+            method: "PUT",
+            headers: {
+              Authorization: `token ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(body),
+          });
+
+          if (!res.ok) {
+            const errText = await res.text();
+            let errMsg = `Status ${res.status}`;
+            try {
+              const errJson = JSON.parse(errText);
+              errMsg = errJson.message || errMsg;
+            } catch (e) {}
+            throw new Error(`GitHub API Error: ${errMsg}`);
+          }
+        }
+
+        /**
+         * 管理自动备份定时器 (已修改：支持自定义时间和模式)
+         */
+        function handleAutoBackupTimer() {
+          // 清除旧定时器
+          if (githubBackupTimer) {
+            clearInterval(githubBackupTimer);
+            githubBackupTimer = null;
+          }
+
+          // 如果开启了自动备份
+          if (state.apiConfig && state.apiConfig.githubAutoBackup) {
+            // 获取间隔时间，默认为 30 分钟
+            const intervalMinutes = state.apiConfig.githubBackupInterval || 30;
+            console.log(`已开启 GitHub 自动备份 (每 ${intervalMinutes} 分钟)`);
+
+            githubBackupTimer = setInterval(
+              () => {
+                // 获取备份模式，默认为全量
+                const mode = state.apiConfig.githubBackupMode || "full";
+
+                if (mode === "stream") {
+                  // 传入 true 表示这是自动备份
+                  uploadBackupToGitHubStream(true);
+                } else {
+                  uploadBackupToGitHub(true);
+                }
+              },
+              intervalMinutes * 60 * 1000,
+            );
+          }
+        }
+
+        async function importBackup(file) {
+          if (!file) return;
+
+          const confirmed = await showCustomConfirm(
+            "严重警告！",
+            "导入备份将完全覆盖您当前的所有数据，包括聊天、设置等。此操作不可撤销！您确定要继续吗？",
+            { confirmButtonClass: "btn-danger" },
+          );
+
+          if (!confirmed) return;
+
+          try {
+            const text = await file.text();
+            const data = JSON.parse(text);
+
+            await db.transaction("rw", db.tables, async () => {
+              // 1. 清空所有现有表格
+              for (const table of db.tables) {
+                await table.clear();
+              }
+
+              // 检查备份文件中的每一项数据，只有当当前代码的数据库里也存在对应的表格时，才进行导入
+
+              // 导入数组类型的数据
+              const arrayTables = [
+                "chats",
+                "worldBooks",
+                "userStickers",
+                "charStickers",
+                "personaPresets", // <--- 在这里加入了 'charStickers'
+                "qzonePosts",
+                "qzoneAlbums",
+                "qzonePhotos",
+                "favorites",
+                "qzoneGroups",
+                "memories",
+                "worldBookCategories",
+                "callRecords",
+                "customAvatarFrames",
+                "themes",
+                "apiPresets",
+                "bubbleStylePresets",
+                "fontPresets",
+                "homeScreenPresets",
+              ];
+
+              // 世界书格式兼容转换代码
+              for (const tableName of arrayTables) {
+                if (Array.isArray(data[tableName]) && db[tableName]) {
+                  let itemsToPut = data[tableName];
+
+                  // 当处理世界书表格时，执行特别的转换操作
+                  if (tableName === "worldBooks") {
+                    console.log("正在检查并转换世界书数据格式以兼容...");
+                    itemsToPut.forEach((book) => {
+                      // 如果 content 是数组 (别人的格式)，则将其转换为字符串 (我的格式)
+                      if (Array.isArray(book.content)) {
+                        console.log(
+                          `检测到数组格式的世界书: "${book.name}"，正在转换为字符串...`,
+                        );
+
+                        // 将数组中的每个条目对象转换为格式化的字符串
+                        const convertedEntries = book.content.map((entry) => {
+                          const stringParts = [];
+                          if (entry.comment) {
+                            stringParts.push(`[备注: ${entry.comment}]`);
+                          }
+                          if (entry.keys && entry.keys.length > 0) {
+                            stringParts.push(
+                              `[关键词: ${entry.keys.join(", ")}]`,
+                            );
+                          }
+                          stringParts.push(entry.content); // 条目主要内容
+                          return stringParts.join("\n"); // 每个条目的内部用换行分隔
+                        });
+
+                        // 将所有转换后的条目字符串用一个明显的分隔符连接起来
+                        book.content = convertedEntries.join("\n\n---\n\n");
+                      }
+                    });
+                  }
+
+                  // 过滤并保存数据 (这部分逻辑保持不变)
+                  const validItems = itemsToPut.filter(
+                    (item) =>
+                      item &&
+                      (typeof item.id === "undefined" ||
+                        typeof item.id === "string" ||
+                        typeof item.id === "number"),
+                  );
+                  if (validItems.length > 0) {
+                    console.log(
+                      `正在导入 ${validItems.length} 条数据到表格: ${tableName}...`,
+                    );
+                    await db[tableName].bulkPut(validItems);
+                  }
+                } else {
+                  console.log(
+                    `跳过导入: ${tableName} (在备份文件或当前数据库中不存在)`,
+                  );
+                }
+              }
+
+              // 导入对象类型的数据（通常是设置）
+              const objectTables = [
+                "apiConfig",
+                "globalSettings",
+                "musicLibrary",
+                "qzoneSettings",
+              ];
+              for (const tableName of objectTables) {
+                if (data[tableName] && db[tableName]) {
+                  console.log(`正在导入设置: ${tableName}...`);
+                  await db[tableName].put(data[tableName]);
+                }
+              }
+            });
+
+            // 导入主屏幕样式的逻辑保持不变，因为它不直接操作数据库的多个表
+            if (data.homeScreenState) {
+              const settings = (await db.globalSettings.get("main")) || {
+                id: "main",
+              };
+              settings.widgetData = data.homeScreenState;
+              if (data.homeScreenState.wallpaper)
+                settings.wallpaper = data.homeScreenState.wallpaper;
+              if (data.homeScreenState.lockscreenWallpaper)
+                settings.lockscreenWallpaper =
+                  data.homeScreenState.lockscreenWallpaper;
+              if (data.homeScreenState.appIcons)
+                settings.appIcons = data.homeScreenState.appIcons;
+              await db.globalSettings.put(settings);
+              console.log("已成功导入主屏幕样式数据。");
+            }
+
+            await showCustomAlert(
+              "导入成功",
+              "所有数据已成功恢复！应用即将刷新以应用所有更改。",
+            );
+
+            setTimeout(() => {
+              window.location.reload();
+            }, 1500);
+          } catch (error) {
+            console.error("导入数据时出错:", error);
+            await showCustomAlert(
+              "导入失败",
+              `文件格式不正确或数据已损坏: ${error.message}`,
+            );
+          }
+        }
+
+        function applyCustomFont(fontUrl, isPreviewOnly = false) {
+          if (!fontUrl) {
+            // 如果没有提供字体链接（比如恢复默认），就清空样式
+            dynamicFontStyle.innerHTML = "";
+            document.getElementById("font-preview").style.fontFamily = "";
+            return;
+          }
+
+          // 这是一个统一的内部名字
+          const fontName = "custom-user-font";
+
+          // 这是定义字体的样式规则
+          const newStyle = `
+			        @font-face {
+			          font-family: '${fontName}';
+			          src: url('${fontUrl}');
+			          font-display: swap;
+			        }`;
+
+          if (isPreviewOnly) {
+            // 如果只是预览，这个逻辑保持不变
+            const previewStyle =
+              document.getElementById("preview-font-style") ||
+              document.createElement("style");
+            previewStyle.id = "preview-font-style";
+            previewStyle.innerHTML = newStyle;
+            if (!document.getElementById("preview-font-style"))
+              document.head.appendChild(previewStyle);
+            document.getElementById("font-preview").style.fontFamily =
+              `'${fontName}', 'bulangni', sans-serif`;
+          } else {
+            // 如果是全局应用，就同时定义字体并告诉整个 body 去使用它
+            dynamicFontStyle.innerHTML = `
+			            ${newStyle}
+			            body {
+			              font-family: '${fontName}', 'bulangni', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+			            }`;
+          }
+        }
+
+        async function resetToDefaultFont() {
+          // 1. 清除全局字体样式
+          dynamicFontStyle.innerHTML = "";
+
+          // 2. 更新并保存设置
+          state.globalSettings.fontUrl = "";
+          await db.globalSettings.put(state.globalSettings);
+
+          // 3. 明确地将全局预览区的字体也恢复为默认
+          const globalPreview = document.getElementById("font-preview");
+          globalPreview.style.fontFamily = ""; // 移除内联样式
+
+          // 4. 应用一下空的字体设置，确保所有地方都恢复
+          applyCustomFont("", true);
+
+          alert("已恢复默认字体。");
+        }
+
+        async function loadAllDataFromDB() {
+          const [
+            chatsArr,
+            apiConfig,
+            globalSettings,
+            userStickers,
+            charStickers,
+            worldBooks,
+            musicLib,
+            personaPresets,
+            qzoneSettings,
+            initialFavorites,
+            apiPresets,
+            bubbleStylePresets,
+            datingScenes, // <--- 在这里新增
+            localUserStickerCategories,
+            offlinePresetsFromDB,
+          ] = await Promise.all([
+            db.chats.toArray(),
+            db.apiConfig.get("main"),
+            db.globalSettings.get("main"),
+            db.userStickers.toArray(),
+            db.charStickers.toArray(),
+            db.worldBooks.toArray(),
+            db.musicLibrary.get("main"),
+            db.personaPresets.toArray(),
+            db.qzoneSettings.get("main"),
+            db.favorites.orderBy("timestamp").reverse().toArray(),
+            db.apiPresets.toArray(),
+            db.bubbleStylePresets.toArray(),
+            db.datingScenes.toArray(), // <--- 在这里新增
+            db.userStickerCategories.toArray(),
+            db.offlinePresets.toArray(),
+          ]);
+          state.offlinePresets = offlinePresetsFromDB || [];
+          state.chats = chatsArr.reduce((acc, chat) => {
+            if (!chat.checkpoints) {
+              chat.checkpoints = [];
+            }
+
+            // 为旧的群聊数据兼容专属表情库
+            if (
+              chat.isGroup &&
+              (!chat.settings || !chat.settings.stickerLibrary)
+            ) {
+              if (!chat.settings) chat.settings = {}; // 以防万一连settings都没有
+              chat.settings.stickerLibrary = [];
+              console.log(
+                `为旧群聊 "${chat.name}" 补全了专属表情库(stickerLibrary)属性。`,
+              );
+            }
+            // 兼容旧数据：为没有专属表情库的角色添加一个空的表情库
+            if (
+              !chat.isGroup &&
+              (!chat.settings || !chat.settings.stickerLibrary)
+            ) {
+              if (!chat.settings) chat.settings = {}; // 以防万一连settings都没有
+              chat.settings.stickerLibrary = [];
+              console.log(
+                `为旧角色 "${chat.name}" 补全了专属表情库(stickerLibrary)属性。`,
+              );
+            }
+
+            if (typeof chat.unreadCount === "undefined") {
+              chat.unreadCount = 0; // 如果这个聊天对象没有 unreadCount 属性，就给它初始化为 0
+            }
+
+            // 兼容旧数据：为没有心声背景的角色添加一个空字符串
+            if (typeof chat.innerVoiceBackground === "undefined") {
+              chat.innerVoiceBackground = "";
+            }
+
+            // ★★★ 这就是本次新增的兼容性代码！ ★★★
+            if (
+              chat.settings &&
+              typeof chat.settings.innerVoiceAdopterLabelFormat === "undefined"
+            ) {
+              chat.settings.innerVoiceAdopterLabelFormat = "领养人: {{user}}";
+            }
+            // ★★★ 新增结束 ★★★
+
+            // 检查是否是群聊，并且其成员对象使用的是旧的 `name` 结构
+            if (
+              chat.isGroup &&
+              chat.members &&
+              chat.members.length > 0 &&
+              chat.members[0].name
+            ) {
+              console.log(
+                `检测到旧版群聊数据 for "${chat.name}"，正在执行迁移...`,
+              );
+              chat.members.forEach((member) => {
+                // 如果这个成员对象没有 originalName，说明是旧数据
+                if (typeof member.originalName === "undefined") {

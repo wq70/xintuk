@@ -1,0 +1,395 @@
+function initTaobao() {
+  /* --- “桃宝”App 事件监听器 --- */
+
+  // 1. 绑定主屏幕的App图标
+  document
+    .getElementById("taobao-app-icon")
+    .addEventListener("click", openTaobaoApp);
+  // 绑定新加的“清空”按钮
+  document
+    .getElementById("clear-taobao-products-btn")
+    .addEventListener("click", clearTaobaoProducts);
+
+  /* --- 桃宝购物车功能事件监听器 --- */
+
+  // 1. 绑定App内部的页签切换
+  document.querySelector(".taobao-tabs").addEventListener("click", (e) => {
+    if (e.target.classList.contains("taobao-tab")) {
+      switchTaobaoView(e.target.dataset.view);
+    }
+  });
+
+  // 使用事件委托，统一处理桃宝所有页面的点击事件
+  document
+    .getElementById("taobao-screen")
+    .addEventListener("click", async (e) => {
+      const target = e.target;
+
+      // --- 桃宝首页 ---
+      if (target.closest("#products-view")) {
+        const productCard = target.closest(".product-card");
+        // 如果点击的是商品卡片本身（而不是添加购物车按钮）
+        if (productCard && !target.classList.contains("add-cart-btn")) {
+          // 调用桃宝的详情函数
+          await openProductDetail(parseInt(productCard.dataset.productId));
+        }
+        // 如果点击的是添加购物车按钮
+        else if (target.classList.contains("add-cart-btn")) {
+          await handleAddToCart(parseInt(target.dataset.productId));
+        }
+        // 如果点击的是分类页签
+        else if (target.closest(".category-tab-btn")) {
+          const category =
+            target.closest(".category-tab-btn").dataset.category === "all"
+              ? null
+              : target.closest(".category-tab-btn").dataset.category;
+          await renderTaobaoProducts(category);
+        }
+      }
+
+      // --- 饿了么页  ---
+      else if (target.closest("#eleme-view")) {
+        // 处理顶部的几个功能按钮
+        if (target.closest("#eleme-search-btn")) {
+          handleSearchFoodsAI();
+        } else if (target.closest("#eleme-add-manual-btn")) {
+          openFoodEditor();
+        } else if (target.closest("#eleme-generate-ai-btn")) {
+          handleGenerateFoodsAI();
+        }
+        // 处理美食卡片的点击
+        else {
+          const foodCard = target.closest(".product-card");
+          if (foodCard) {
+            const foodId = parseInt(foodCard.dataset.foodId);
+            if (!isNaN(foodId)) {
+              // ★★★ 当在饿了么页面点击卡片时，确保调用的是 openFoodDetail 函数！ ★★★
+              await openFoodDetail(foodId);
+            }
+          }
+        }
+      }
+
+      // --- 购物车页 ---
+      else if (target.closest("#cart-view")) {
+        if (
+          target.closest(".cart-item-info") ||
+          target.classList.contains("product-image")
+        ) {
+          const cartItem = target.closest(".cart-item");
+          if (cartItem) {
+            // 这里虽然也打开商品详情，但是从购物车点进去是合理的
+            const productId =
+              parseInt(
+                cartItem.querySelector(".delete-cart-item-btn").dataset
+                  .productId,
+              ) || parseInt(target.dataset.productId);
+            await openProductDetail(productId);
+          }
+        } else if (target.classList.contains("quantity-increase")) {
+          await handleChangeCartItemQuantity(
+            parseInt(target.dataset.cartId),
+            1,
+          );
+        } else if (target.classList.contains("quantity-decrease")) {
+          await handleChangeCartItemQuantity(
+            parseInt(target.dataset.cartId),
+            -1,
+          );
+        } else if (target.classList.contains("delete-cart-item-btn")) {
+          const confirmed = await showCustomConfirm(
+            "移出购物车",
+            "确定要删除这个宝贝吗？",
+          );
+          if (confirmed)
+            await handleRemoveFromCart(parseInt(target.dataset.cartId));
+        } else if (target.id === "checkout-btn") {
+          await handleCheckout();
+        } else if (target.id === "share-cart-to-char-btn") {
+          await handleShareCartRequest();
+        } else if (target.id === "buy-for-char-btn") {
+          await handleBuyForChar();
+        }
+      }
+
+      // --- 订单页 ---
+      else if (target.closest("#orders-view")) {
+        const orderItem = target.closest(".order-item");
+        if (orderItem)
+          await openLogisticsView(parseInt(orderItem.dataset.orderId));
+      }
+
+      // --- 我的页面 ---
+      else if (target.closest("#my-view")) {
+        if (target.id === "top-up-btn") {
+          // 调用新写的打开娃娃机函数
+          openClawMachine();
+        } else if (target.classList.contains("delete-transaction-btn")) {
+          await handleDeleteTransaction(parseInt(target.dataset.transactionId));
+        }
+      }
+    });
+
+  // 4. 绑定首页右上角的“+”按钮
+  document
+    .getElementById("add-product-btn")
+    .addEventListener("click", openAddProductChoiceModal);
+
+  // 5. 绑定添加方式选择弹窗的按钮
+  document
+    .getElementById("add-product-manual-btn")
+    .addEventListener("click", () => {
+      document
+        .getElementById("add-product-choice-modal")
+        .classList.remove("visible");
+      openProductEditor();
+    });
+  document
+    .getElementById("add-product-link-btn")
+    .addEventListener("click", () => {
+      document
+        .getElementById("add-product-choice-modal")
+        .classList.remove("visible");
+      openAddFromLinkModal();
+    });
+  document
+    .getElementById("add-product-ai-btn")
+    .addEventListener("click", () => {
+      document
+        .getElementById("add-product-choice-modal")
+        .classList.remove("visible");
+      handleGenerateProductsAI();
+    });
+  document
+    .getElementById("cancel-add-choice-btn")
+    .addEventListener("click", () => {
+      document
+        .getElementById("add-product-choice-modal")
+        .classList.remove("visible");
+    });
+
+  // 6. 绑定手动添加/编辑弹窗的按钮
+  document
+    .getElementById("cancel-product-editor-btn")
+    .addEventListener("click", () => {
+      document
+        .getElementById("product-editor-modal")
+        .classList.remove("visible");
+    });
+
+  // 7. 绑定识别链接弹窗的按钮
+  document
+    .getElementById("cancel-link-paste-btn")
+    .addEventListener("click", () => {
+      document
+        .getElementById("add-from-link-modal")
+        .classList.remove("visible");
+    });
+  document
+    .getElementById("confirm-link-paste-btn")
+    .addEventListener("click", handleAddFromLink);
+
+  document
+    .getElementById("products-view")
+    .addEventListener("click", async (e) => {
+      const target = e.target;
+
+      // 把原来的购买逻辑，改成了打开详情页的逻辑
+      const productCard = target.closest(".product-card");
+      if (productCard && !target.classList.contains("add-cart-btn")) {
+        const productId = parseInt(productCard.dataset.productId);
+        if (!isNaN(productId)) {
+          await openProductDetail(productId); // <--- 就是修改了这里！
+        }
+        return;
+      }
+
+      // 下面这两部分逻辑保持不变
+      if (target.classList.contains("add-cart-btn")) {
+        const productId = parseInt(target.dataset.productId);
+        if (!isNaN(productId)) {
+          await handleAddToCart(productId);
+        }
+        return;
+      }
+      const categoryTab = target.closest(".category-tab-btn");
+      if (categoryTab) {
+        const category =
+          categoryTab.dataset.category === "all"
+            ? null
+            : categoryTab.dataset.category;
+        renderTaobaoProducts(category);
+        return;
+      }
+    });
+
+  // 饿了么功能的核心事件监听器
+  document.getElementById("eleme-view").addEventListener("click", async (e) => {
+    // AI生成按钮
+    if (e.target.closest("#eleme-generate-ai-btn")) {
+      handleGenerateFoodsAI();
+      return;
+    }
+    // 手动添加按钮
+    if (e.target.closest("#eleme-add-manual-btn")) {
+      openFoodEditor();
+      return;
+    }
+    // 搜索按钮
+    if (e.target.closest("#eleme-search-btn")) {
+      handleSearchFoodsAI();
+      return;
+    }
+    // ★★★ 核心修改：现在监听整个美食卡片的点击 ★★★
+    const foodCard = e.target.closest(".product-card");
+    if (foodCard) {
+      const foodId = parseInt(foodCard.dataset.foodId);
+      if (!isNaN(foodId)) {
+        // 点击卡片后，调用我们新写的函数打开详情页
+        await openFoodDetail(foodId);
+      }
+    }
+  });
+
+  // 绑定饿了么的“清空”按钮
+  document
+    .getElementById("eleme-clear-all-btn")
+    .addEventListener("click", clearElemeFoods);
+
+  /* --- “桃宝”App 搜索与AI结果弹窗事件监听器 --- */
+
+  // 1. 绑定搜索按钮
+  productSearchBtn.addEventListener("click", handleSearchProductsAI);
+  productSearchInput.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") {
+      handleSearchProductsAI();
+    }
+  });
+
+  // 2. 绑定AI结果弹窗的关闭按钮
+  document
+    .getElementById("close-ai-products-modal-btn")
+    .addEventListener("click", async () => {
+      aiGeneratedProductsModal.classList.remove("visible");
+      // 关闭后刷新主页，显示新添加的商品
+      await renderTaobaoProducts();
+    });
+
+  // 3. 使用事件委托，处理结果弹窗内所有“添加”按钮的点击
+  document
+    .getElementById("ai-product-results-grid")
+    .addEventListener("click", async (e) => {
+      if (e.target.classList.contains("add-to-my-page-btn")) {
+        const button = e.target;
+        const productData = JSON.parse(button.dataset.product);
+
+        // 1. 检查AI返回的商品数据里是否已经成功生成了图片URL
+        if (!productData.imageUrl) {
+          // 2. 如果【没有】图片URL（即生图失败了），
+          //    我们就手动将它的imageUrl设置为空字符串''。
+          productData.imageUrl = "";
+          console.log(
+            `AI生成的商品 "${productData.name}" 缺少图片，将添加到主页后继续尝试生成。`,
+          );
+        }
+        // 3. 如果已经有图片URL了，就什么也不做，直接使用现有的URL。
+        //    我们不再需要那个补充默认图的 else 分支了。
+        // ★★★★★ 修改结束 ★★★★★
+
+        // 检查商品是否已存在（这部分逻辑不变）
+        const existingProduct = await db.taobaoProducts
+          .where("name")
+          .equals(productData.name)
+          .first();
+        if (existingProduct) {
+          alert("这个商品已经存在于你的桃宝主页啦！");
+          button.textContent = "已添加";
+          button.disabled = true;
+          return;
+        }
+
+        // 添加到数据库（现在，生图失败的商品会以 imageUrl: '' 的形式被保存）
+        await db.taobaoProducts.add(productData);
+
+        // 禁用按钮并更新文本，给用户反馈
+        button.textContent = "✓ 已添加";
+        button.disabled = true;
+      }
+    });
+
+  /* --- 桃宝订单物流功能事件监听器 --- */
+
+  // 1. 使用事件委托，为“我的订单”列表中的所有订单项绑定点击事件
+  document.getElementById("orders-view").addEventListener("click", (e) => {
+    const item = e.target.closest(".order-item");
+    if (item && item.dataset.orderId) {
+      const orderId = parseInt(item.dataset.orderId);
+      if (!isNaN(orderId)) {
+        openLogisticsView(orderId);
+      }
+    }
+  });
+
+  // 2. 绑定物流页面的返回按钮
+  document
+    .getElementById("logistics-back-btn")
+    .addEventListener("click", () => {
+      // 返回时，直接显示“桃宝”主界面，并自动切换到“我的订单”页签
+      showScreen("taobao-screen");
+      switchTaobaoView("orders-view");
+    });
+
+  /* --- 事件监听结束 --- */
+
+  document
+    .getElementById("share-cart-to-char-btn")
+    .addEventListener("click", handleShareCartRequest);
+
+  document
+    .getElementById("buy-for-char-btn")
+    .addEventListener("click", handleBuyForChar);
+  // ... 其他绑定 ...
+
+  // 绑定娃娃机内部按钮
+  document
+    .getElementById("close-claw-machine")
+    .addEventListener("click", () => {
+      document.getElementById("claw-machine-modal").classList.remove("visible");
+    });
+
+  const grabBtn = document.getElementById("claw-grab-btn");
+  // 使用 cloneNode 移除旧的监听器，防止重复绑定 (可选，更安全)
+  const newGrabBtn = grabBtn.cloneNode(true);
+  grabBtn.parentNode.replaceChild(newGrabBtn, grabBtn);
+  newGrabBtn.addEventListener("click", handleGrab);
+
+  // ★★★ 绑定管理按钮 (Gear icon) ★★★
+  const manageBtn = document.getElementById("claw-manage-btn");
+  if (manageBtn) {
+    manageBtn.addEventListener("click", openDollManager);
+  }
+
+  // ★★★ 绑定刷新按钮 (Restart icon) ★★★
+  const restartBtn = document.getElementById("claw-restart-btn");
+  if (restartBtn) {
+    restartBtn.addEventListener("click", handleRestartClaw);
+  }
+
+  // 管理弹窗内的按钮
+  document
+    .getElementById("close-doll-manager-btn")
+    .addEventListener("click", () => {
+      document.getElementById("doll-manager-modal").classList.remove("visible");
+      // 关闭管理窗口时，自动刷新一下娃娃机，以便显示用户刚上传的图
+      resetClawMachine();
+    });
+  document
+    .getElementById("add-doll-btn")
+    .addEventListener("click", handleAddDoll);
+  document
+    .getElementById("reset-dolls-btn")
+    .addEventListener("click", resetDefaultDolls);
+  document
+    .getElementById("doll-upload-input")
+    .addEventListener("change", handleDollFileChange);
+}

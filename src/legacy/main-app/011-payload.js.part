@@ -1,0 +1,806 @@
+			                <p class="greeting" style="font-weight: bold; font-size: 16px;">${payload.foodName}</p>
+			                <p style="font-size: 13px; color: #888;">来自: ${payload.restaurant}</p>
+			            </div>
+			            <div class="waimai-remark">
+			                ${payload.greeting}
+			            </div>
+			        </div>
+			    `;
+          } else if (msg.type === "gift_notification") {
+            bubble.classList.add("is-gift-notification"); // 应用透明气泡样式
+            const payload = msg.payload;
+
+            // 在这里构建卡片的完整HTML内容
+            contentHtml = `
+			        <div class="gift-card">
+			            <div class="gift-card-header">
+			                <div class="icon">🎁</div>
+			                <!-- 1. 清晰指明是谁送的礼物 -->
+			                <div class="title">一份来自 ${payload.senderName} 的礼物</div>
+			            </div>
+			            <div class="gift-card-body">
+			                <p class="greeting">这是我为你挑选的礼物，希望你喜欢！</p>
+			                <!-- 2. 清晰列出有什么商品 -->
+			                <div class="gift-card-items">
+			                    <strong>商品列表:</strong><br>
+			                    ${payload.itemSummary.replace(/、/g, "<br>")} <!-- 将顿号替换为换行，让列表更清晰 -->
+			                </div>
+			                <!-- 3. 清晰标明总金额 -->
+			                <div class="gift-card-footer">
+			                    共 ${payload.itemCount} 件，合计: <span class="total-price">¥${payload.totalPrice.toFixed(2)}</span>
+			                </div>
+			            </div>
+			        </div>
+			    `;
+          } else if (msg.type === "location") {
+            bubble.classList.add("is-location");
+
+            const currentChat =
+              state.chats[state.activeChatId] ||
+              Object.values(state.chats).find((c) =>
+                c.history.some((h) => h.timestamp === msg.timestamp),
+              );
+            const myNickname = currentChat.settings.myNickname || "我";
+            const aiNickname = currentChat.name;
+
+            // --- SVG 动态生成 ---
+            const trajectoryPoints = msg.trajectoryPoints || [];
+            const hasTrajectory = trajectoryPoints.length > 0;
+
+            // 1. 定义SVG路径和坐标
+            const pathData = "M 20 45 Q 115 10 210 45"; // 一条预设的优美曲线
+            const startPoint = { x: 20, y: 45 };
+            const endPoint = { x: 210, y: 45 };
+
+            // 2. 生成起点和终点的SVG元素
+            let pinsSvg = "";
+            if (msg.userLocation) {
+              pinsSvg += `<circle class="svg-pin user-pin" cx="${startPoint.x}" cy="${startPoint.y}" r="6" />`;
+            }
+            if (msg.aiLocation) {
+              pinsSvg += `<circle class="svg-pin ai-pin" cx="${endPoint.x}" cy="${endPoint.y}" r="6" />`;
+            }
+
+            // 3. 如果有轨迹，生成途经点的SVG元素
+            let trajectorySvg = "";
+
+            if (hasTrajectory) {
+              // --- 使用浏览器API精确计算坐标 ---
+
+              // 1. 定义我们的S形曲线路径数据 (不变)
+              const s_curve_pathData = "M 20 45 C 80 70, 150 20, 210 45";
+              trajectorySvg += `<path class="svg-trajectory-path" d="${s_curve_pathData}" />`;
+
+              // 2. 在内存中创建一个真实的SVG路径元素，以便使用API
+              const path = document.createElementNS(
+                "http://www.w3.org/2000/svg",
+                "path",
+              );
+              path.setAttribute("d", s_curve_pathData);
+
+              // 3. 获取这条路径的总长度
+              const totalPathLength = path.getTotalLength();
+
+              const totalPoints = trajectoryPoints.length;
+              trajectoryPoints.forEach((point, index) => {
+                // 4. 计算每个点应该在路径总长度的哪个位置
+                const progress = (index + 1) / (totalPoints + 1);
+                const lengthOnPath = totalPathLength * progress;
+
+                // 5. 直接向浏览器查询这个位置的精确坐标
+                const pointOnPath = path.getPointAtLength(lengthOnPath);
+                const pointX = pointOnPath.x;
+                const pointY = pointOnPath.y;
+
+                // 6. 后续的“一上一下”布局逻辑保持不变
+                let yOffset;
+                if (index % 2 === 0) {
+                  // 第1, 3...个点
+                  yOffset = 18; // 向下
+                } else {
+                  // 第2, 4...个点
+                  yOffset = -10; // 向上
+                }
+
+                const footprintY = pointY + yOffset;
+                const labelY = footprintY + (yOffset > 0 ? 12 : -12);
+
+                // 7. 使用100%精确的坐标生成SVG
+                trajectorySvg += `
+			            <text class="svg-footprint" x="${pointX}" y="${footprintY}" text-anchor="middle">🐾</text>
+			            <text class="svg-location-label" x="${pointX}" y="${labelY}" text-anchor="middle">${point.name}</text>
+			        `;
+              });
+            }
+
+            // 4. 构建地点信息HTML
+            const userLocationHtml = `<p class="${
+              !msg.userLocation ? "hidden" : ""
+            }"><span class="name-tag">${myNickname}:</span> ${msg.userLocation}</p>`;
+            const aiLocationHtml = `<p class="${
+              !msg.aiLocation ? "hidden" : ""
+            }"><span class="name-tag">${aiNickname}:</span> ${msg.aiLocation}</p>`;
+
+            // 5. 拼接最终的 contentHtml
+            contentHtml = `
+			        <div class="location-card">
+			            <div class="location-map-area">
+			                <svg viewBox="0 0 230 90">
+			                    ${trajectorySvg}
+			                    ${pinsSvg}
+			                </svg>
+			            </div>
+			            <div class="location-info">
+			                <div class="location-address">
+			                    ${aiLocationHtml}
+			                    ${userLocationHtml}
+			                </div>
+			                <div class="location-distance">相距 ${msg.distance}</div>
+			            </div>
+			        </div>
+			    `;
+          }
+
+          // 后续的其他 else if 保持不变
+          else if (msg.type === "user_photo" || msg.type === "ai_image") {
+            bubble.classList.add("is-ai-image");
+            const altText =
+              msg.type === "user_photo" ? "用户描述的照片" : "AI生成的图片";
+            contentHtml = `<img src="https://i.postimg.cc/KYr2qRCK/1.jpg" class="ai-generated-image" alt="${altText}" data-description="${msg.content}">`;
+          } else if (msg.type === "voice_message") {
+            bubble.classList.add("is-voice-message");
+
+            // 将语音原文存储在父级气泡的 data-* 属性中，方便事件处理器获取
+            bubble.dataset.voiceText = msg.content;
+
+            const duration = Math.max(
+              1,
+              Math.round((msg.content || "").length / 5),
+            );
+            const durationFormatted = `0:${String(duration).padStart(2, "0")}''`;
+            const waveformHTML =
+              "<div></div><div></div><div></div><div></div><div></div>";
+
+            // 构建包含所有新元素的完整 HTML
+            contentHtml = `
+			        <div class="voice-message-body">
+			            <div class="voice-waveform">${waveformHTML}</div>
+			            <div class="loading-spinner"></div>
+			            <span class="voice-duration">${durationFormatted}</span>
+			        </div>
+			        <div class="voice-transcript"></div>
+			    `;
+          } else if (msg.type === "transfer") {
+            bubble.classList.add("is-transfer");
+
+            let titleText, noteText;
+            const myNickname = chat.isGroup
+              ? chat.settings.myNickname || "我"
+              : "我";
+
+            if (isUser) {
+              // 消息是用户发出的
+              if (msg.isRefund) {
+                // 用户发出的退款（即用户拒收了AI的转账）
+                titleText = `退款给 ${chat.name}`;
+                noteText = "已拒收对方转账";
+              } else {
+                // 用户主动发起的转账
+                titleText = `转账给 ${msg.receiverName || chat.name}`;
+                if (msg.status === "accepted") {
+                  noteText = "对方已收款";
+                } else if (msg.status === "declined") {
+                  noteText = "对方已拒收";
+                } else {
+                  noteText = msg.note || "等待对方处理...";
+                }
+              }
+            } else {
+              // 消息是 AI 发出的
+              if (msg.isRefund) {
+                // AI 的退款（AI 拒收了用户的转账）
+                titleText = `退款来自 ${msg.senderName}`;
+                noteText = "转账已被拒收";
+              } else if (msg.receiverName === myNickname) {
+                // AI 主动给用户的转账
+                titleText = `转账给 ${myNickname}`;
+                if (msg.status === "accepted") {
+                  noteText = "你已收款";
+                } else if (msg.status === "declined") {
+                  noteText = "你已拒收";
+                } else {
+                  // 用户需要处理的转账
+                  bubble.style.cursor = "pointer";
+                  bubble.dataset.status = "pending";
+                  noteText = msg.note || "点击处理";
+                }
+              } else {
+                // AI 发给群里其他人的转账，对当前用户来说只是一个通知
+                titleText = `转账: ${msg.senderName} → ${msg.receiverName}`;
+                noteText = msg.note || "群聊内转账";
+              }
+            }
+
+            const heartIcon = `<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="vertical-align: middle;"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path></svg>`;
+
+            contentHtml = `
+			        <div class="transfer-card">
+			            <div class="transfer-title">${heartIcon} ${titleText}</div>
+			            <div class="transfer-amount">¥ ${Number(msg.amount).toFixed(2)}</div>
+			            <div class.transfer-note">${noteText}</div>
+			        </div>
+			    `;
+          } else if (msg.type === "waimai_request") {
+            bubble.classList.add("is-waimai-request");
+            if (msg.status === "paid" || msg.status === "rejected") {
+              bubble.classList.add(`status-${msg.status}`);
+            }
+            let displayName;
+            // 如果是群聊
+            if (chat.isGroup) {
+              // 就执行原来的逻辑：在成员列表里查找昵称
+              const member = chat.members.find(
+                (m) => m.originalName === msg.senderName,
+              );
+              displayName = member ? member.groupNickname : msg.senderName;
+            } else {
+              // 否则（是单聊），直接使用聊天对象的名称
+              displayName = chat.name;
+            }
+
+            const requestTitle = `来自 ${displayName} 的代付请求`;
+            let actionButtonsHtml = "";
+            if (msg.status === "pending" && !isUser) {
+              actionButtonsHtml = `
+			                <div class="waimai-user-actions">
+			                    <button class="waimai-decline-btn" data-choice="rejected">残忍拒绝</button>
+			                    <button class="waimai-pay-btn" data-choice="paid">为Ta买单</button>
+			                </div>`;
+            }
+            contentHtml = `
+			            <div class="waimai-card">
+			                <div class="waimai-header">
+			                    <img src="https://files.catbox.moe/mq179k.png" class="icon" alt="Meituan Icon">
+			                    <div class="title-group">
+			                        <span class="brand">美团外卖</span><span class="separator">|</span><span>外卖美食</span>
+			                    </div>
+			                </div>
+			                <div class="waimai-catchphrase">Hi，你和我的距离只差一顿外卖～</div>
+			                <div class="waimai-main">
+			                    <div class="request-title">${requestTitle}</div>
+			                    <div class="payment-box">
+			                        <div class="payment-label">需付款</div>
+			                        <div class="amount">¥${Number(msg.amount).toFixed(2)}</div>
+			                        <div class="countdown-label">剩余支付时间
+			                            <div class="countdown-timer" id="waimai-timer-${msg.timestamp}"></div>
+			                        </div>
+			                    </div>
+			                    <button class="waimai-details-btn">查看详情</button>
+			                </div>
+			                ${actionButtonsHtml}
+			            </div>`;
+
+            setTimeout(() => {
+              const timerEl = document.getElementById(
+                `waimai-timer-${msg.timestamp}`,
+              );
+              if (timerEl && msg.countdownEndTime) {
+                if (waimaiTimers[msg.timestamp])
+                  clearInterval(waimaiTimers[msg.timestamp]);
+                if (msg.status === "pending") {
+                  waimaiTimers[msg.timestamp] = startWaimaiCountdown(
+                    timerEl,
+                    msg.countdownEndTime,
+                  );
+                } else {
+                  timerEl.innerHTML = `<span>已</span><span>处</span><span>理</span>`;
+                }
+              }
+              const detailsBtn = document.querySelector(
+                `.message-bubble[data-timestamp="${msg.timestamp}"] .waimai-details-btn`,
+              );
+              if (detailsBtn) {
+                detailsBtn.addEventListener("click", (e) => {
+                  e.stopPropagation();
+                  const paidByText = msg.paidBy
+                    ? `<br><br><b>状态：</b>由 ${msg.paidBy} 为您代付成功`
+                    : "";
+                  showCustomAlert(
+                    "订单详情",
+                    `<b>商品：</b>${msg.productInfo}<br><b>金额：</b>¥${Number(msg.amount).toFixed(2)}${paidByText}`,
+                  );
+                });
+              }
+              const actionButtons = document.querySelectorAll(
+                `.message-bubble[data-timestamp="${msg.timestamp}"] .waimai-user-actions button`,
+              );
+              actionButtons.forEach((btn) => {
+                btn.addEventListener("click", (e) => {
+                  e.stopPropagation();
+                  const choice = e.target.dataset.choice;
+                  handleWaimaiResponse(msg.timestamp, choice);
+                });
+              });
+            }, 0);
+          } else if (msg.type === "red_packet") {
+            bubble.classList.add("is-red-packet");
+            const myNickname = chat.settings.myNickname || "我";
+
+            // 从最新的 msg 对象中获取状态
+            const hasClaimed = msg.claimedBy && msg.claimedBy[myNickname];
+            const isFinished = msg.isFullyClaimed;
+
+            let cardClass = "";
+            let claimedInfoHtml = "";
+            let typeText = "拼手气红包";
+
+            // 1. 判断红包卡片的样式 (颜色)
+            if (isFinished) {
+              cardClass = "opened";
+            } else if (
+              msg.packetType === "direct" &&
+              Object.keys(msg.claimedBy || {}).length > 0
+            ) {
+              cardClass = "opened"; // 专属红包被领了也变灰
+            }
+
+            // 2. 判断红包下方的提示文字
+            if (msg.packetType === "direct") {
+              typeText = `专属红包: 给 ${msg.receiverName}`;
+            }
+
+            if (hasClaimed) {
+              claimedInfoHtml = `<div class="rp-claimed-info">你领取了红包，金额 ${msg.claimedBy[
+                myNickname
+              ].toFixed(2)} 元</div>`;
+            } else if (isFinished) {
+              claimedInfoHtml = `<div class="rp-claimed-info">红包已被领完</div>`;
+            } else if (
+              msg.packetType === "direct" &&
+              Object.keys(msg.claimedBy || {}).length > 0
+            ) {
+              claimedInfoHtml = `<div class="rp-claimed-info">已被 ${msg.receiverName} 领取</div>`;
+            }
+
+            // 3. 拼接最终的HTML，确保onclick调用的是我们注册到全局的函数
+            contentHtml = `
+			        <div class="red-packet-card ${cardClass}">
+			            <div class="rp-header">
+			                <img src="https://files.catbox.moe/lo9xhc.png" class="rp-icon">
+			                <span class="rp-greeting">${msg.greeting || "恭喜发财，大吉大利！"}</span>
+			            </div>
+			            <div class="rp-type">${typeText}</div>
+			            ${claimedInfoHtml}
+			        </div>
+			    `;
+          } else if (msg.type === "ls_diary_notification") {
+            bubble.classList.add("is-ls-diary-notification"); // 应用透明气泡样式
+            const cardData = msg.content;
+
+            contentHtml = `
+			        <div class="ls-diary-notification-card" onclick="openLoversSpaceFromCard('${chat.id}', 'ls-diary-view')">
+			            <div class="ls-diary-card-header">
+			                <span>${cardData.userEmoji || "💌"}</span>
+			                <span>一封来自心情日记的提醒</span>
+			            </div>
+			            <div class="ls-diary-card-body">
+			                <p>${cardData.text}</p>
+			            </div>
+			            <div class="ls-diary-card-footer">
+			                点击查看 →
+			            </div>
+			        </div>
+			    `;
+          } else if (msg.type === "lovers_space_invitation") {
+            bubble.classList.add("is-waimai-request"); // 复用外卖卡片的样式，很方便！
+            const isUserSender = msg.role === "user";
+            const senderName = isUserSender
+              ? chat.settings.myNickname || "我"
+              : chat.name;
+            const receiverName = isUserSender
+              ? chat.name
+              : chat.settings.myNickname || "我";
+
+            let cardContent = "";
+
+            switch (msg.status) {
+              case "pending":
+                if (isUserSender) {
+                  // 用户发出的，等待对方回应
+                  cardContent = `
+			                        <div class="waimai-main" style="background-color: #f0f8ff;">
+			                            <div class="request-title" style="color: #333;">已向 ${receiverName} 发出邀请</div>
+			                            <p style="font-size:14px; color:#555; margin:15px 0;">等待对方同意...</p>
+			                        </div>`;
+                } else {
+                  // 用户收到的，需要用户回应
+                  cardContent = `
+			                        <div class="waimai-main" style="background-color: #fff0f5;">
+			                            <div class="request-title" style="color: #d63384;">${senderName} 邀请你开启情侣空间</div>
+			                            <p style="font-size:14px; color:#555; margin:15px 0;">开启后可以记录你们的专属回忆哦~</p>
+			                        </div>
+			                        <div class="waimai-user-actions">
+			                            <button class="waimai-decline-btn" data-choice="rejected">残忍拒绝</button>
+			                            <button class="waimai-pay-btn" data-choice="accepted" style="background-color: #d63384; border-color: #b02a6e;">立即开启</button>
+			                        </div>`;
+                }
+                break;
+              case "accepted":
+                cardContent = `
+			                    <div class="waimai-main" style="background-color: #e6ffed;">
+			                        <div class="request-title" style="color: #198754;">✅ 邀请已同意</div>
+			                        <p style="font-size:14px; color:#555; margin:15px 0;">你们的情侣空间已成功开启！</p>
+			                    </div>`;
+                break;
+              case "rejected":
+                cardContent = `
+			                    <div class="waimai-main" style="background-color: #f8d7da;">
+			                        <div class="request-title" style="color: #842029;">❌ 邀请被拒绝</div>
+			                    </div>`;
+                break;
+            }
+
+            contentHtml = `
+			            <div class="waimai-card">
+			                <div class="waimai-header">
+			                    <span class="icon" style="font-size: 20px;">💌</span>
+			                    <div class="title-group"><span class="brand">情侣空间邀请</span></div>
+			                </div>
+			                ${cardContent}
+			            </div>`;
+          } else if (msg.type === "poll") {
+            bubble.classList.add("is-poll");
+
+            let totalVotes = 0;
+            const voteCounts = {};
+
+            // 计算总票数和每个选项的票数
+            for (const option in msg.votes) {
+              const count = msg.votes[option].length;
+              voteCounts[option] = count;
+              totalVotes += count;
+            }
+
+            const myNickname = chat.isGroup
+              ? chat.settings.myNickname || "我"
+              : "我";
+            let myVote = null;
+            for (const option in msg.votes) {
+              if (msg.votes[option].includes(myNickname)) {
+                myVote = option;
+                break;
+              }
+            }
+
+            let optionsHtml = '<div class="poll-options-list">';
+            msg.options.forEach((optionText) => {
+              const count = voteCounts[optionText] || 0;
+              const percentage =
+                totalVotes > 0 ? (count / totalVotes) * 100 : 0;
+              const isVotedByMe = myVote === optionText;
+
+              optionsHtml += `
+			            <div class="poll-option-item ${isVotedByMe ? "voted" : ""}" data-option="${optionText}">
+			                <div class="poll-option-bar" style="width: ${percentage}%;"></div>
+			                <div class="poll-option-content">
+			                    <span class="poll-option-text">${optionText}</span>
+			                    <span class="poll-option-votes">${count} 票</span>
+			                </div>
+			            </div>
+			        `;
+            });
+            optionsHtml += "</div>";
+
+            let footerHtml = "";
+            // 统一按钮的显示逻辑
+            if (msg.isClosed) {
+              // 如果投票已结束，总是显示“查看结果”
+              footerHtml = `<div class="poll-footer"><span class="poll-total-votes">共 ${totalVotes} 人投票</span><button class="poll-action-btn">查看结果</button></div>`;
+            } else {
+              // 如果投票未结束，总是显示“结束投票”
+              footerHtml = `<div class="poll-footer"><span class="poll-total-votes">共 ${totalVotes} 人投票</span><button class="poll-action-btn">结束投票</button></div>`;
+            }
+
+            contentHtml = `
+			        <div class="poll-card ${msg.isClosed ? "closed" : ""}" data-poll-timestamp="${msg.timestamp}">
+			            <div class="poll-question">${msg.question}</div>
+			            ${optionsHtml}
+			            ${footerHtml}
+			        </div>
+			    `;
+          } else if (msg.type === "tarot_reading") {
+            bubble.classList.add("is-tarot-reading");
+            const reading = msg.payload;
+            let cardsText = reading.cards
+              .map((card) => {
+                return `[${card.position}] ${card.name} ${card.isReversed ? "(逆位)" : ""}`;
+              })
+              .join("\n");
+
+            contentHtml = `
+			        <div class="tarot-reading-card">
+			            <div class="tarot-reading-header">
+			                <div class="question">${reading.question}</div>
+			                <div class="spread">${reading.spread.name}</div>
+			            </div>
+			            <div class="tarot-reading-body">
+			                ${cardsText}
+			            </div>
+			        </div>
+			    `;
+          } else if (msg.type === "lovers_space_disconnect") {
+            bubble.classList.add("is-ls-disconnect"); // 应用我们写的透明气泡CSS
+            contentHtml = `
+			        <div class="lovers-space-disconnect-card">
+			            <div class="icon">💔</div>
+			            <div class="text-content">
+			                <div class="title">情侣空间已解除</div>
+			            </div>
+			        </div>
+			    `;
+          } else if (msg.type === "sticker" && msg.content) {
+            bubble.classList.add("is-sticker");
+            // 直接从消息对象中获取 url 和 meaning
+            contentHtml = `<img src="${msg.content}" alt="${msg.meaning || "Sticker"}" class="sticker-image">`;
+          }
+
+          // 旧的逻辑保持不变，作为兼容
+          else if (
+            typeof msg.content === "string" &&
+            STICKER_REGEX.test(msg.content.trim())
+          ) {
+            bubble.classList.add("is-sticker");
+            contentHtml = `<img src="${msg.content}" alt="${msg.meaning || "Sticker"}" class="sticker-image">`;
+          } else if (
+            Array.isArray(msg.content) &&
+            msg.content[0]?.type === "image_url"
+          ) {
+            bubble.classList.add("has-image");
+            const imageUrl = msg.content[0].image_url.url;
+            contentHtml = `<img src="${imageUrl}" class="chat-image" alt="User uploaded image">`;
+          } else if (msg.type === "naiimag") {
+            // NovelAI图片渲染（复用realimag样式）
+            bubble.classList.add("is-realimag", "is-card-like");
+            contentHtml = `<img src="${
+              msg.imageUrl
+            }" class="realimag-image" alt="NovelAI图片分享" loading="lazy" onerror="this.src='https://i.postimg.cc/KYr2qRCK/1.jpg'; this.alt='图片加载失败';" title="${
+              msg.fullPrompt || msg.prompt || "NovelAI生成"
+            }">`;
+          } else {
+            contentHtml = String(msg.content || "").replace(/\n/g, "<br>");
+          }
+
+          // 1. 检查消息对象中是否存在引用信息 (msg.quote)
+          let quoteHtml = "";
+          // 无论是用户消息还是AI消息，只要它包含了 .quote 对象，就执行这段逻辑
+          if (msg.quote) {
+            // a. 直接获取完整的、未经截断的引用内容
+            const fullQuotedContent = String(msg.quote.content || "");
+
+            // b. 构建引用块的HTML
+            quoteHtml = `
+			        <div class="quoted-message">
+			            <div class="quoted-sender">回复 ${msg.quote.senderName}:</div>
+			            <div class="quoted-content">${fullQuotedContent}</div>
+			        </div>
+			    `;
+          }
+
+          // 2. 拼接最终的气泡内容
+          //    将构建好的 quoteHtml (如果存在) 和 contentHtml 组合起来
+          // --- 将头像和内容都放回气泡内部 ---
+          bubble.innerHTML = `
+			        ${avatarHtml}
+			        <div class="content">
+			            ${quoteHtml}
+			            ${contentHtml}
+			        </div>
+			    `;
+
+          // --- 将完整的“气泡”和“时间戳”放入容器 ---
+          wrapper.appendChild(bubble);
+          wrapper.appendChild(timestampEl);
+
+          addLongPressListener(wrapper, () =>
+            showMessageActions(msg.timestamp),
+          );
+          wrapper.addEventListener("click", () => {
+            if (isSelectionMode) toggleMessageSelection(msg.timestamp);
+          });
+
+          if (!isUser) {
+            const avatarEl = wrapper.querySelector(
+              ".avatar, .avatar-with-frame",
+            );
+            if (avatarEl) {
+              avatarEl.style.cursor = "pointer";
+              avatarEl.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const characterName = chat.isGroup ? msg.senderName : chat.name;
+                handleUserPat(chat.id, characterName);
+              });
+            }
+          }
+
+          return wrapper;
+        }
+
+        function prependMessage(msg, chat) {
+          const messagesContainer = document.getElementById("chat-messages");
+          const messageEl = createMessageElement(msg, chat);
+
+          if (!messageEl) return; // <--- 新增这行，同样的处理
+
+          const loadMoreBtn = document.getElementById("load-more-btn");
+          if (loadMoreBtn) {
+            messagesContainer.insertBefore(messageEl, loadMoreBtn.nextSibling);
+          } else {
+            messagesContainer.prepend(messageEl);
+          }
+        }
+
+        function appendMessage(msg, chat, isInitialLoad = false) {
+          const messagesContainer = document.getElementById("chat-messages");
+          const messageEl = createMessageElement(msg, chat);
+
+          if (!messageEl) return; // 如果消息是隐藏的，则不处理
+
+          // 只对新消息添加动画，不对初始加载的消息添加
+          if (!isInitialLoad) {
+            messageEl.classList.add("animate-in");
+          }
+
+          const typingIndicator = document.getElementById("typing-indicator");
+          messagesContainer.insertBefore(messageEl, typingIndicator);
+
+          if (!isInitialLoad) {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            currentRenderedCount++;
+          }
+        }
+
+        async function openChat(chatId) {
+          state.activeChatId = chatId;
+          const chat = state.chats[chatId];
+          if (!chat) return; // 安全检查
+
+          // 将未读数清零
+          if (chat.unreadCount > 0) {
+            chat.unreadCount = 0;
+            await db.chats.put(chat); // 别忘了把这个改变同步到数据库
+            // 我们稍后会在渲染列表时重新渲染，所以这里不需要立即重绘列表
+          }
+          // 把 openChat 函数挂载到全局 window 对象上
+          window.openChat = openChat;
+
+          renderChatInterface(chatId);
+          showScreen("chat-interface-screen");
+          window.updateListenTogetherIconProxy(state.activeChatId);
+          toggleCallButtons(chat.isGroup || false);
+          // 【心声功能】根据是否为单聊，显示或隐藏心形按钮
+          document.getElementById("char-heart-btn").style.display = chat.isGroup
+            ? "none"
+            : "inline-flex";
+
+          if (
+            !chat.isGroup &&
+            chat.relationship?.status === "pending_ai_approval"
+          ) {
+            console.log(
+              `检测到好友申请待处理状态，为角色 "${chat.name}" 自动触发AI响应...`,
+            );
+            triggerAiResponse();
+          }
+
+          // 根据是否为群聊，显示或隐藏投票按钮
+          document.getElementById("send-poll-btn").style.display = chat.isGroup
+            ? "flex"
+            : "none";
+          document.getElementById("pet-action-btn").style.display = chat.isGroup
+            ? "none"
+            : "flex";
+          startPetDecayTimer();
+        }
+
+        /**
+         * 格式化单条消息，用于记忆互通的上下文
+         * @param {object} msg - 消息对象
+         * @param {object} chat - 该消息所属的聊天对象
+         * @returns {string} - 格式化后的文本，例如 "张三: 你好"
+         */
+        function formatMessageForContext(msg, chat) {
+          let senderName = "";
+          if (msg.role === "user") {
+            senderName = chat.isGroup ? chat.settings.myNickname || "我" : "我";
+          } else {
+            // assistant
+            senderName = msg.senderName || chat.name;
+          }
+
+          let contentText = "";
+          if (
+            msg.type === "sticker" ||
+            (typeof msg.content === "string" && STICKER_REGEX.test(msg.content))
+          ) {
+            contentText = msg.meaning ? `[表情: ${msg.meaning}]` : "[表情]";
+          } else if (
+            msg.type === "ai_image" ||
+            msg.type === "user_photo" ||
+            Array.isArray(msg.content)
+          ) {
+            contentText = "[图片]";
+          } else if (msg.type === "voice_message") {
+            contentText = `[语音]: ${msg.content}`;
+          } else if (msg.type === "transfer") {
+            contentText = `[转账] 金额: ${msg.amount}, 备注: ${msg.note || "无"}`;
+          } else {
+            contentText = String(msg.content || "");
+          }
+
+          // added by lrq 251029 在每条消息记录前添加发送日期时间
+          const date = new Date(msg.timestamp);
+          const formattedDate = date.toLocaleString(); // 格式化为本地时间字符串
+          return `${formattedDate} ${senderName}: ${contentText}`;
+        }
+        window.formatMessageForContext = formatMessageForContext;
+
+        async function triggerAiResponse() {
+          if (!state.activeChatId) return;
+          const chatId = state.activeChatId;
+          const chat = state.chats[state.activeChatId];
+          const messagesContainer = document.getElementById("chat-messages");
+
+          let summaryContext = "";
+          const summaries = chat.history.filter(
+            (msg) => msg.type === "summary",
+          );
+          if (summaries.length > 0) {
+            summaryContext = `
+			# 对话记忆总结 (这是你和用户的长期记忆，必须严格遵守)
+			${summaries.map((summary, index) => `- 总结${index + 1}: ${summary.content}`).join("\n")}
+			`;
+          }
+          // 将世界书读取提到这里，确保线下模式也能生效
+          let worldBookContext = "";
+          if (
+            chat.settings.linkedWorldBookIds &&
+            chat.settings.linkedWorldBookIds.length > 0
+          ) {
+            const linkedContents = chat.settings.linkedWorldBookIds
+              .map((id) => {
+                const book = state.worldBooks.find((b) => b.id === id);
+                // 这里使用了 stripHtmlAndCode 清理函数，确保纯文本
+                return book && book.content
+                  ? `\n\n## 世界书条目: ${book.name}\n${stripHtmlAndCode(book.content)}`
+                  : "";
+              })
+              .filter(Boolean)
+              .join("");
+            if (linkedContents) {
+              worldBookContext = `\n\n# 核心世界观设定 (必须严格遵守以下所有设定)\n${linkedContents}\n`;
+            }
+          }
+          // --- 线下模式核心拦截逻辑 ---
+          if (
+            !chat.isGroup &&
+            chat.settings.offlineMode &&
+            chat.settings.offlineMode.enabled
+          ) {
+            console.log(`角色 "${chat.name}" 已开启线下模式...`);
+
+            const offlineSettings = chat.settings.offlineMode;
+            const wordCount = offlineSettings.wordCount || 300;
+            const enableNai = offlineSettings.enableNovelAI || false;
+
+            const defaultPrompt = `你正在和用户进行一次私密的线下约会，场景可以是一个安静的咖啡馆、温馨的家中、或是浪漫的海边。请根据你的人设和最近的对话内容，自然地延续互动。`;
+            const defaultStyle = `请以【${chat.name}】的第一人称视角进行回复。你的回复【必须】是一个完整的、连贯的叙事段落，其中要包含丰富的【动作】、【神态】、【心理活动】和【对话】。`;
+
+            const finalPrompt = offlineSettings.prompt || defaultPrompt;
+            const finalStyle = offlineSettings.style || defaultStyle;
+
+            // 1. 动态构建生图指令
+            let naiInstruction = "";
+            let naiExample = "";
+            if (enableNai) {
+              naiInstruction = `
+            6.  **【【【生图指令】】】**: 生图开关已开启。你【必须】在 "chatResponse" 数组中包含一个图片生成对象。

@@ -1,0 +1,1221 @@
+let activeKkCharId = null; // 用于追踪正在查看哪个角色的房屋
+
+/**
+ * 【总入口】打开“查岗”功能，显示角色选择列表
+ */
+async function openKkCheckin() {
+  const listEl = document.getElementById("kk-char-selection-list");
+  listEl.innerHTML = "";
+  const characters = Object.values(state.chats).filter((chat) => !chat.isGroup);
+
+  if (characters.length === 0) {
+    listEl.innerHTML =
+      '<p style="text-align:center; color: var(--text-secondary);">还没有可以查岗的角色</p>';
+  } else {
+    characters.forEach((char) => {
+      const item = document.createElement("div");
+      item.className = "character-select-item"; // 复用“查手机”的样式
+      item.dataset.chatId = char.id;
+      item.innerHTML = `
+                                <img src="${char.settings.aiAvatar || defaultAvatar}" alt="${char.name}">
+                                <span class="name">${char.name}</span>
+                            `;
+      listEl.appendChild(item);
+    });
+  }
+  showScreen("kk-char-selection-screen");
+}
+
+/**
+ * 选择一个角色后，打开他/她的房屋视图
+ * @param {string} charId - 被选择角色的ID
+ */
+async function openKkHouseView(charId) {
+  activeKkCharId = charId;
+  const chat = state.chats[charId];
+  if (!chat) return;
+
+  // 检查是否已经生成过房屋数据
+  if (!chat.houseData) {
+    // 【修改点】询问用户是否生成电脑
+    const includeComputer = await showCustomConfirm(
+      "生成选项",
+      "是否需要生成电脑内容？\n(包含浏览器历史、私人文件、Steam游戏等)",
+      { confirmText: "必须生成", cancelText: "不需要" },
+    );
+
+    // 将用户的选择传给生成函数
+    const generatedData = await generateHouseData(charId, includeComputer);
+
+    if (!generatedData) return; // 如果生成失败，则中止
+    chat.houseData = generatedData;
+    await db.chats.put(chat); // 保存到数据库
+  }
+
+  // 渲染房屋视图
+  renderKkHouseView(chat.houseData);
+  showScreen("kk-house-view-screen");
+}
+
+/**
+ * 【AI核心 V3】为指定角色一次性生成所有房屋、区域和物品数据
+ * @param {string} charId - 角色ID
+ * @param {boolean} includeComputer - 【新增】是否包含电脑数据
+ * @returns {Promise<object|null>} - 返回生成的房屋数据对象，或在失败时返回null
+ */
+async function generateHouseData(charId, includeComputer = true) {
+  // 默认为true兼容旧代码
+  const chat = state.chats[charId];
+  showGenerationOverlay("正在努力寻找中...");
+
+  try {
+    const { proxyUrl, apiKey, model } = state.apiConfig;
+    if (!proxyUrl || !apiKey || !model) throw new Error("API未配置");
+
+    let worldBookContext = "";
+    if (
+      chat.settings.linkedWorldBookIds &&
+      chat.settings.linkedWorldBookIds.length > 0
+    ) {
+      worldBookContext =
+        "--- 世界观设定 (必须严格遵守) ---\n" +
+        chat.settings.linkedWorldBookIds
+          .map((id) => {
+            const book = state.worldBooks.find((b) => b.id === id);
+            return book ? `[${book.name}]: ${book.content}` : "";
+          })
+          .join("\n\n");
+    }
+    const userNickname = chat.settings.myNickname || "我";
+
+    const recentHistory = chat.history
+      .slice(-chat.settings.maxMemory || 20)
+      .map((msg) => {
+        const sender = msg.role === "user" ? userNickname : chat.name;
+        return `${sender}: ${msg.content}`;
+      })
+      .join("\n");
+
+    let linkedMemoryContext = "";
+    if (
+      chat.settings.linkedMemories &&
+      chat.settings.linkedMemories.length > 0
+    ) {
+      // ... (保持原有的记忆互通逻辑不变) ...
+      const contextPromises = chat.settings.linkedMemories.map(async (link) => {
+        const linkedChat = state.chats[link.chatId];
+        if (!linkedChat) return "";
+        const freshLinkedChat = await db.chats.get(link.chatId);
+        if (!freshLinkedChat) return "";
+        const recentHistory = freshLinkedChat.history
+          .filter((msg) => !msg.isHidden)
+          .slice(-link.depth);
+        if (recentHistory.length === 0) return "";
+        const formattedMessages = recentHistory
+          .map((msg) => `  - ${formatMessageForContext(msg, freshLinkedChat)}`)
+          .join("\n");
+        return `\n## 附加上下文：来自与“${linkedChat.name}”的最近对话内容 (仅你可见)\n${formattedMessages}`;
+      });
+      const allContexts = await Promise.all(contextPromises);
+      linkedMemoryContext = allContexts.filter(Boolean).join("\n");
+    }
+
+    const npcLibrary = chat.npcLibrary || [];
+    let npcContext = "";
+    if (npcLibrary.length > 0) {
+      npcContext =
+        "# 你的专属NPC好友列表" +
+        npcLibrary.map((npc) => `- **${npc.name}**: ${npc.persona}`).join("\n");
+    }
+
+    let computerRulesPrompt = "";
+    let computerJsonExample = "";
+
+    if (includeComputer) {
+      computerRulesPrompt = `
+            4.  **【【【电脑生成双重铁律 (内容必须极其详细)】】】**:
+                -   **指令一 (数据层 - 拒绝敷衍)**: JSON中**必须**包含 "computer" 对象，且内容必须丰富：
+                    -   "browser_history": 生成3-5条**非常具体**的搜索记录。不要只写关键词，要写完整的搜索语句或网页标题。必须反映角色最近的烦恼、兴趣或秘密（例如：“如何挽回前任”、“xx游戏全收集攻略”、“治疗失眠的方法”、“深夜emo文案”）。
+                    -   "movies": 虚构2-3个在电脑D盘里的视频文件名。**必须带后缀**（.mp4, .mkv, .avi）。文件名要符合角色口味（如：里番、好莱坞大片、文艺片、偶像演唱会录屏）。
+                    -   "steam_games": 虚构3个Steam游戏。包含游戏名和游玩时长。时长要夸张一点，体现宅度或喜好。
+                    -   "local_files": 虚构2-4个本地文件。**必须包含 "content" 字段**。内容不能是简单的占位符，**必须是具体的**日记片段、未发送的信、工作草稿或代码片段，能体现角色当下的心理活动。
+                    -   "secret_folder": **必须包含**。这是角色的“潘多拉魔盒”。
+                        -   "fileName": 必须是一个伪装性很强的文件名（例如：“学习资料.zip”、“系统备份”、“新建文件夹(2)”）。
+                        -   "content": **核心重点**。根据角色人设（${chat.settings.aiPersona}）生成具体的私密内容描述。
+                            -   如果角色是普通人：可能是羞耻的中二病日记、暗恋对象的偷拍照片、写了一半的玛丽苏小说。
+                            -   如果角色是老司机/特定癖好：**必须生成具体的成人影片文件名（带番号）**、本子画师名或Galgame存档。
+                            -   如果角色是反派/特工：可能是犯罪计划、目标档案、机密数据。
+                            -   **要求：必须具体！不要只写“一些私密文件”！要写出文件名和大致内容！**
+                -   **指令二 (物理层)**: 为了让用户能找到这台电脑，你**必须**在【卧室】或【客厅】的 \`items\` 列表中，**显式添加**一个 \`name\` 为 **"电脑"** (或 "笔记本电脑") 的物品。
+        `;
+
+      computerJsonExample = `,
+          "computer": {
+            "browser_history": [ "搜索记录A", "搜索记录B" ],
+            "local_files": [
+              {"fileName": "日记.txt", "content": "..."}
+            ],
+            "movies": ["电影A.mkv"],
+            "secret_folder": { "fileName": "学习资料.zip", "content": "..." },
+            "steam_games": [ {"name": "Elden Ring", "playtime": "300 h"} ]
+          }`;
+    } else {
+      computerRulesPrompt = `4. **【指令】**: 本次**不需要**生成电脑数据，JSON中不要包含 "computer" 字段。`;
+    }
+
+    const systemPrompt = `
+            # 任务
+            你是一个顶级的、充满想象力的场景设计师。请根据角色的人设和最近的聊天记录，为角色“${chat.name}”设计一个充满细节、符合其身份的住所。你的任务是【一次性】生成所有数据。
+
+            # 角色信息
+            - 角色名: ${chat.name}
+            - 角色人设: ${chat.settings.aiPersona}
+            ${worldBookContext}
+            - 最近的聊天记录 (供你参考情景):
+            ${recentHistory}
+            ${linkedMemoryContext}
+            ${npcContext}
+
+            # 核心规则 (必须严格遵守)
+            1.  **情景一致性**: 住所的设计、找到的物品都必须严格符合角色的人设、世界观和最近的聊天情景。例如，一个贫穷的角色不应住在豪宅，一个刚失恋的角色可能会找到相关物品。
+            2.  **区域划分**: 住所必须至少包含【客厅】和【卧室】。你可以根据人设添加其他有趣的区域（如书房、厨房、阳台、地下室等）。
+            3.  **可翻找物品 (最重要!)**:
+                -   每个区域内必须包含3-5个符合该区域特点、且可以被“翻找”的具体地点。例如：客厅可以有“沙发底下”、“茶几抽屉”、“电视柜后面”、“垃圾桶”；卧室可以有“枕头底下”、“衣柜深处”、“床头柜抽屉”。
+                -   你【必须】为【每一个】可翻找的物品预设好翻找后能找到的内容("content")。
+                -   找到的内容必须充满细节和想象力，可以是普通的物品，也可以是触发剧情的关键线索。**不要总是“什么都没找到”**。
+            ${computerRulesPrompt}
+            5.  **图片Prompt**: 你必须为住所的【整体外观】以及【每个独立区域】都生成一个用于文生图的、纯英文的、详细的【纯风景或静物】描述。**绝对不能包含人物**。图片风格必须是【唯美的动漫风格 (beautiful anime style art, cinematic lighting, masterpiece)】。
+
+            # JSON输出格式 (必须严格遵守，不要添加任何额外说明)
+            {
+              "location": "【例如：市中心的高级公寓顶层】",
+              "description": "【对这个住所的整体氛围和风格的简短描述】",
+              "locationImagePrompt": "【整体住所外观的英文图片prompt】",
+              "areas": {
+                "客厅": {
+                  "description": "【对客厅的详细描述】",
+                  "imagePrompt": "【客厅的英文图片prompt】",
+                  "items": [
+                    {"name": "沙发底下", "content": "找到了一些零食碎屑和一枚遗落的硬币。"},
+                    {"name": "电脑", "content": "这是一台性能不错的笔记本电脑，屏幕还亮着。"}
+                  ]
+                },
+                "卧室": { ... }
+              }${computerJsonExample}
+            }
+            `;
+
+    // ... (后续的API调用请求代码保持不变) ...
+    const messagesForApi = [{ role: "user", content: systemPrompt }];
+    let isGemini = proxyUrl === GEMINI_API_URL;
+    let geminiConfig = toGeminiRequestData(
+      model,
+      apiKey,
+      systemPrompt,
+      messagesForApi,
+      isGemini,
+    );
+
+    const response = isGemini
+      ? await fetch(geminiConfig.url, geminiConfig.data)
+      : await fetch(`${proxyUrl}/v1/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: messagesForApi,
+            temperature: 0.8,
+          }),
+        });
+
+    if (!response.ok) throw new Error(await response.text());
+
+    const data = await response.json();
+    const rawContent = (
+      isGemini
+        ? data.candidates[0].content.parts[0].text
+        : data.choices[0].message.content
+    ).replace(/^```json\s*|```$/g, "");
+    const houseData = JSON.parse(rawContent);
+
+    // ▼▼▼ 逐张生成图片逻辑 (保持不变) ▼▼▼
+    (async () => {
+      // ... (这里保留你原本的图片生成逻辑，不用动) ...
+      const generateWithRetry = async (prompt, description) => {
+        let attempt = 1;
+        while (true) {
+          try {
+            console.log(`[${attempt}次尝试] 正在为“${description}”生成图片...`);
+            const url = await generateAndLoadImage(prompt);
+            if (url && url.length > 100) {
+              console.log(`✅ “${description}”生成成功！`);
+              return url;
+            } else {
+              throw new Error("生成的图片URL无效");
+            }
+          } catch (e) {
+            console.warn(
+              `❌ “${description}”生成失败: ${e.message}。3秒后自动重试...`,
+            );
+            await new Promise((resolve) => setTimeout(resolve, 3000));
+            attempt++;
+          }
+        }
+      };
+
+      try {
+        const currentChat = state.chats[charId];
+        console.log("🚀 开始队列式生成房屋图片...");
+
+        if (houseData.locationImagePrompt) {
+          const locationUrl = await generateWithRetry(
+            houseData.locationImagePrompt,
+            "住所整体外观",
+          );
+          const chatToUpdate = await db.chats.get(charId);
+          if (chatToUpdate && chatToUpdate.houseData) {
+            chatToUpdate.houseData.locationImageUrl = locationUrl;
+            await db.chats.put(chatToUpdate);
+          }
+          if (currentChat && currentChat.houseData) {
+            currentChat.houseData.locationImageUrl = locationUrl;
+          }
+          const houseScreen = document.getElementById("kk-house-view-screen");
+          if (
+            houseScreen &&
+            houseScreen.classList.contains("active") &&
+            activeKkCharId === charId
+          ) {
+            document.getElementById(
+              "kk-house-background",
+            ).style.backgroundImage = `url(${locationUrl})`;
+          }
+        }
+
+        const areaNames = Object.keys(houseData.areas);
+        for (const areaName of areaNames) {
+          const area = houseData.areas[areaName];
+          if (area.imagePrompt) {
+            const areaUrl = await generateWithRetry(
+              area.imagePrompt,
+              `区域：${areaName}`,
+            );
+            const chatToUpdate = await db.chats.get(charId);
+            if (
+              chatToUpdate &&
+              chatToUpdate.houseData &&
+              chatToUpdate.houseData.areas[areaName]
+            ) {
+              chatToUpdate.houseData.areas[areaName].imageUrl = areaUrl;
+              await db.chats.put(chatToUpdate);
+            }
+            if (
+              currentChat &&
+              currentChat.houseData &&
+              currentChat.houseData.areas[areaName]
+            ) {
+              currentChat.houseData.areas[areaName].imageUrl = areaUrl;
+            }
+            const areaScreen = document.getElementById("kk-area-view-screen");
+            const currentAreaNameTitle =
+              document.getElementById("kk-area-name").textContent;
+            if (
+              areaScreen &&
+              areaScreen.classList.contains("active") &&
+              activeKkCharId === charId &&
+              currentAreaNameTitle === areaName
+            ) {
+              document.getElementById(
+                "kk-area-background",
+              ).style.backgroundImage = `url(${areaUrl})`;
+            }
+          }
+        }
+      } catch (imgError) {
+        console.error("后台图片生成流程发生不可恢复的错误:", imgError);
+      }
+    })();
+    // ▲▲▲ 图片生成逻辑结束 ▲▲▲
+
+    return houseData;
+  } catch (error) {
+    console.error("生成房屋数据失败:", error);
+    await showCustomAlert("生成失败", `发生错误: ${error.message}`);
+    return null;
+  } finally {
+    document.getElementById("generation-overlay").classList.remove("visible");
+  }
+}
+
+/**
+ * 渲染房屋总览视图
+ * @param {object} houseData - 角色的房屋数据
+ */
+function renderKkHouseView(houseData) {
+  document.getElementById("kk-house-owner-name").textContent =
+    `${state.chats[activeKkCharId].name}的家`;
+  document.getElementById("kk-house-background").style.backgroundImage =
+    `url(${houseData.locationImageUrl})`;
+  document.getElementById("kk-house-location").textContent = houseData.location;
+  document.getElementById("kk-house-description").textContent =
+    houseData.description;
+
+  const areasContainer = document.getElementById("kk-house-areas");
+  areasContainer.innerHTML = "";
+  for (const areaName in houseData.areas) {
+    const areaBtn = document.createElement("button");
+    areaBtn.className = "kk-area-button";
+    areaBtn.textContent = areaName;
+    areaBtn.onclick = () => openKkAreaView(areaName);
+    areasContainer.appendChild(areaBtn);
+  }
+}
+
+// ▼▼▼ 用这块【修复后】的代码，完整替换旧的 openKkAreaView 函数 ▼▼▼
+/**
+ * 打开并渲染指定区域的探索视图
+ * @param {string} areaName - 区域名称, e.g., "客厅"
+ */
+function openKkAreaView(areaName) {
+  const chat = state.chats[activeKkCharId];
+  const areaData = chat.houseData.areas[areaName];
+  if (!areaData) return;
+
+  document.getElementById("kk-area-name").textContent = areaName;
+  document.getElementById("kk-area-background").style.backgroundImage =
+    `url(${areaData.imageUrl})`;
+  document.getElementById("kk-area-description").textContent =
+    areaData.description;
+
+  const itemsGrid = document.getElementById("kk-area-items-grid");
+  itemsGrid.innerHTML = "";
+
+  // ★★★★★ 核心修复在这里 ★★★★★
+  // 我们现在遍历的是对象数组，所以要使用 item.name
+  areaData.items.forEach((item) => {
+    const itemBtn = document.createElement("button");
+    itemBtn.className = "kk-item-button";
+    // 1. 修复：按钮上显示的文字应该是对象的 name 属性
+    itemBtn.textContent = item.name;
+
+    // 2. 修复：点击时传递给 handleRummage 的也应该是 name 字符串
+    itemBtn.onclick = () => handleRummage(areaName, item.name);
+
+    itemsGrid.appendChild(itemBtn);
+  });
+  // ★★★★★ 修复结束 ★★★★★
+
+  showScreen("kk-area-view-screen");
+}
+/**
+ * 处理“翻找”动作 (修复版：模糊匹配电脑，支持物品分享)
+ */
+function handleRummage(areaName, itemName) {
+  // 1. 【核心修复】电脑特殊处理
+  // 改用 includes，只要名字里包含“电脑”、“笔记本”或“computer”就打开电脑界面
+  const lowerName = itemName.toLowerCase();
+  if (
+    lowerName.includes("电脑") ||
+    lowerName.includes("computer") ||
+    lowerName.includes("笔记本")
+  ) {
+    openComputer();
+    return;
+  }
+
+  const chat = state.chats[activeKkCharId];
+  const area = chat.houseData.areas[areaName];
+  const item = area.items.find((i) => i.name === itemName);
+
+  if (item && item.content) {
+    // 2. 获取专用弹窗元素
+    const modal = document.getElementById("kk-item-share-modal");
+    const title = document.getElementById("kk-item-share-title");
+    const contentDiv = document.getElementById("kk-item-share-content");
+    const shareBtn = document.getElementById("kk-item-share-confirm-btn");
+
+    // 3. 填充数据
+    title.textContent = `在“${itemName}”里发现`;
+    contentDiv.textContent = item.content;
+
+    // 4. 清除旧监听器防止重复绑定
+    const newShareBtn = shareBtn.cloneNode(true);
+    shareBtn.parentNode.replaceChild(newShareBtn, shareBtn);
+
+    // 5. 绑定分享事件
+    newShareBtn.addEventListener("click", () => {
+      shareKkItemToChat(areaName, itemName, item.content);
+      modal.classList.remove("visible");
+    });
+
+    // 6. 显示弹窗
+    modal.classList.add("visible");
+  } else {
+    showCustomAlert(
+      `在“${itemName}”里`,
+      "仔细翻了翻，但什么特别的东西都没发现...",
+    );
+  }
+}
+
+/**
+ * 将翻找到的物品以卡片形式分享给当前角色
+ * (不触发AI自动回复)
+ */
+async function shareKkItemToChat(areaName, itemName, content) {
+  if (!activeKkCharId) return;
+  const chat = state.chats[activeKkCharId];
+  if (!chat) return;
+
+  const msg = {
+    role: "user", // 这是用户发出的
+    type: "kk_item_share",
+    timestamp: Date.now(),
+    payload: {
+      areaName: areaName,
+      itemName: itemName,
+      content: content,
+    },
+    content: `[在你的家里找到了] 在${areaName}的${itemName}里发现了：${content}`,
+  };
+
+  chat.history.push(msg);
+  await db.chats.put(chat);
+
+  showNotification(activeKkCharId, "线索已发送到聊天");
+}
+
+/**
+ * 【核心功能】处理“重新翻找”按钮的点击事件
+ * 这会清空旧数据，并调用AI重新生成一个全新的家。
+ */
+async function handleResetKkHouse() {
+  if (!activeKkCharId) return;
+
+  const confirmed = await showCustomConfirm(
+    "确认重新生成",
+    "你确定要重新生成这个家吗？所有现有的区域和物品都将被覆盖，此操作不可撤销。",
+    { confirmButtonClass: "btn-danger" },
+  );
+
+  if (confirmed) {
+    // 【修改点】询问用户是否生成电脑
+    const includeComputer = await showCustomConfirm(
+      "生成选项",
+      "这次生成需要包含电脑吗？",
+      {
+        confirmText: "必须生成",
+        cancelText: "不需要",
+      },
+    );
+
+    const chat = state.chats[activeKkCharId];
+    // 将用户的选择传给生成函数
+    const generatedData = await generateHouseData(
+      activeKkCharId,
+      includeComputer,
+    );
+
+    if (generatedData) {
+      chat.houseData = generatedData; // 用新数据覆盖旧数据
+      await db.chats.put(chat); // 保存到数据库
+      renderKkHouseView(chat.houseData); // 重新渲染界面
+      alert("一个全新的家已经生成！");
+    }
+  }
+}
+
+/**
+ * 【核心功能 V2 - 已支持B站】处理“继续翻找”按钮的点击事件
+ * 这会保留现有房屋结构，只让AI为每个区域或电脑添加新的可翻找物品/发现。
+ */
+async function handleContinueKkSearch() {
+  if (!activeKkCharId) return;
+  const chat = state.chats[activeKkCharId];
+  if (!chat || !chat.houseData) {
+    alert("还没有为这个角色生成家，请先“重新翻找”一次。");
+    return;
+  }
+
+  showGenerationOverlay("正在努力寻找中...");
+
+  try {
+    const { proxyUrl, apiKey, model } = state.apiConfig;
+    if (!proxyUrl || !apiKey || !model) throw new Error("API未配置");
+
+    // 准备一个只包含现有物品名的上下文，告诉AI不要重复
+    let existingItemsContext = "# 已有物品 (请生成与之不同的新物品或发现)\n";
+    for (const areaName in chat.houseData.areas) {
+      const area = chat.houseData.areas[areaName];
+      existingItemsContext += `## ${areaName}:\n`;
+      existingItemsContext +=
+        area.items.map((item) => `- ${item.name}`).join("\n") + "\n";
+    }
+
+    const systemPrompt = `
+			# 任务
+			你是一个场景补充设计师。用户正在对角色“${chat.name}”的住所进行【补充翻找】。
+			你的任务是在【不改变现有结构】的基础上，为【指定的区域】或【电脑】添加2-3个全新的、有趣的、符合人设的可翻找物品或新发现。
+
+			# 角色信息
+			- 人设: ${chat.settings.aiPersona}
+			- 已有房屋数据:
+			${JSON.stringify(chat.houseData, null, 2)}
+			${existingItemsContext}
+
+			# 核心规则
+			1.  **只添加，不修改**: 你只能添加新物品/发现，绝对不能修改或删除已有的数据。
+			2.  **内容丰富**: 新发现的物品/文件/记录的 "content" 必须充满细节和想象力，不要总是“什么都没找到”。
+			3.  **格式铁律**: 你的回复【必须且只能】是一个JSON对象，其结构与下方示例完全一致。键是区域名或"computer"，值是一个包含新物品/发现的数组或对象。
+
+			# JSON输出格式示例 (只返回【新增】的物品/发现)
+			{
+			  "客厅": [
+			    {"name": "书架顶层", "content": "发现一本被遗忘的旧相册。"}
+			  ],
+			  "computer": {
+			    "local_files": [{"fileName": "一封未发送的邮件.eml", "content": "邮件内容..."}],
+			    "browser_history": ["P站-插画欣赏"],
+			    "movies": ["经典电影C.rmvb"],
+			    "steam_games": [
+			      {"name": "赛博朋克 2077", "playtime": "150 小时"},
+			      {"name": "艾尔登法环", "playtime": "300 小时"},
+			      {"name": "博德之门3", "playtime": "200 小时"}
+			    ]
+			  }
+			}
+			`;
+    const messagesForApi = [{ role: "user", content: systemPrompt }];
+    let isGemini = proxyUrl === GEMINI_API_URL;
+    let geminiConfig = toGeminiRequestData(
+      model,
+      apiKey,
+      systemPrompt,
+      messagesForApi,
+      isGemini,
+    );
+
+    const response = isGemini
+      ? await fetch(geminiConfig.url, geminiConfig.data)
+      : await fetch(`${proxyUrl}/v1/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: messagesForApi,
+            temperature: 0.9,
+          }),
+        });
+
+    if (!response.ok) throw new Error(await response.text());
+
+    const data = await response.json();
+    const rawContent = (
+      isGemini
+        ? data.candidates[0].content.parts[0].text
+        : data.choices[0].message.content
+    ).replace(/^```json\s*|```$/g, "");
+    const newItemsData = JSON.parse(rawContent);
+
+    // 将AI返回的新物品/发现合并到旧数据中
+    for (const key in newItemsData) {
+      // 如果是电脑数据
+      if (key === "computer") {
+        const computerUpdates = newItemsData.computer;
+        for (const subKey in computerUpdates) {
+          // ★★★ 这里是核心合并逻辑 ★★★
+          // 确保原始数据里有这个数组，如果没有就创建一个
+          if (!chat.houseData.computer[subKey]) {
+            chat.houseData.computer[subKey] = [];
+          }
+          // 确保两个都是数组再合并
+          if (
+            Array.isArray(chat.houseData.computer[subKey]) &&
+            Array.isArray(computerUpdates[subKey])
+          ) {
+            chat.houseData.computer[subKey].push(...computerUpdates[subKey]);
+          }
+        }
+      }
+      // 如果是区域物品数据
+      else if (chat.houseData.areas[key] && Array.isArray(newItemsData[key])) {
+        chat.houseData.areas[key].items.push(...newItemsData[key]);
+      }
+    }
+
+    await db.chats.put(chat);
+    alert("翻找出了更多新东西！现在可以进入区域或电脑查看了。");
+  } catch (error) {
+    console.error("继续翻找失败:", error);
+    await showCustomAlert("操作失败", `发生错误: ${error.message}`);
+  } finally {
+    document.getElementById("generation-overlay").classList.remove("visible");
+  }
+}
+/**
+ * 【新增】打开电脑物品的分享确认弹窗
+ * @param {string} itemName - 物品名称（如“浏览器搜索记录”、“Elden Ring”）
+ * @param {string} content - 具体内容（如“搜索了xxx”、“游玩时长xxx”）
+ * @param {string} sourceCategory - 来源分类（如“电脑浏览器”、“Steam库”）
+ */
+function openComputerItemShareModal(itemName, content, sourceCategory) {
+  const modal = document.getElementById("kk-item-share-modal");
+  const title = document.getElementById("kk-item-share-title");
+  const contentDiv = document.getElementById("kk-item-share-content");
+  const shareBtn = document.getElementById("kk-item-share-confirm-btn");
+
+  // 1. 填充数据
+  title.textContent = `分享：${itemName}`;
+  contentDiv.textContent = content;
+
+  // 2. 清除旧监听器防止重复绑定（克隆节点法）
+  const newShareBtn = shareBtn.cloneNode(true);
+  shareBtn.parentNode.replaceChild(newShareBtn, shareBtn);
+
+  // 3. 绑定分享事件
+  newShareBtn.addEventListener("click", () => {
+    // 调用你已有的分享函数
+    shareKkItemToChat("电脑", `${sourceCategory} - ${itemName}`, content);
+    modal.classList.remove("visible");
+  });
+
+  // 4. 显示弹窗
+  modal.classList.add("visible");
+}
+
+/**
+ * 【新增】通用列表展示函数 (用于浏览器历史和电影)
+ * 复用 kk-file-explorer-modal 来显示列表
+ */
+function showComputerContentList(title, itemsArray, categoryName) {
+  const listEl = document.getElementById("kk-file-list");
+  const modal = document.getElementById("kk-file-explorer-modal");
+
+  // 修改弹窗标题（临时修改，关闭时没关系）
+  modal.querySelector(".modal-header span").textContent = title;
+
+  listEl.innerHTML = ""; // 清空列表
+
+  if (!itemsArray || itemsArray.length === 0) {
+    listEl.innerHTML =
+      '<p style="text-align:center; color: var(--text-secondary);">空空如也</p>';
+  } else {
+    itemsArray.forEach((itemStr) => {
+      const itemDiv = document.createElement("div");
+      itemDiv.className = "kk-file-item"; // 复用文件项样式
+      itemDiv.style.cursor = "pointer";
+      itemDiv.textContent = itemStr;
+
+      // 点击列表项，弹出分享框
+      itemDiv.addEventListener("click", () => {
+        // 对于纯字符串列表，物品名简略显示，内容显示完整
+        const shortName =
+          itemStr.length > 10 ? itemStr.substring(0, 10) + "..." : itemStr;
+        openComputerItemShareModal(shortName, itemStr, categoryName);
+      });
+
+      listEl.appendChild(itemDiv);
+    });
+  }
+
+  modal.classList.add("visible");
+}
+
+function openComputer() {
+  const chat = state.chats[activeKkCharId];
+  document
+    .getElementById("kk-computer-header")
+    .querySelector("span").textContent = `${chat.name}的电脑`;
+
+  const desktop = document.getElementById("kk-computer-desktop");
+  // 使用Flexbox布局来更好地排列图标
+  desktop.style.display = "flex";
+  desktop.style.flexWrap = "wrap";
+  desktop.style.gap = "20px";
+  desktop.style.padding = "20px";
+  desktop.style.alignContent = "flex-start";
+
+  // 获取电脑数据，用于动态显示文件名
+  const computerData = chat.houseData?.computer || {};
+  const secretFolderName = computerData.secret_folder?.fileName || "加密文件夹";
+
+  desktop.innerHTML = `
+			        <div class="kk-desktop-icon" id="kk-browser-icon" title="浏览器">
+			            <img src="https://i.postimg.cc/gc7tpbwp/浏览器图标.png" alt="Browser">
+			            <span>浏览器</span>
+			        </div>
+
+			        <div class="kk-desktop-icon" id="kk-movies-icon" title="电影">
+			            <img src="https://i.postimg.cc/gc7tpbwd/电影.png" alt="Movies">
+			            <span>电影</span>
+			        </div>
+			        <div class="kk-desktop-icon" id="kk-files-icon" title="私人文件">
+			            <img src="https://i.postimg.cc/9Xkg2H4h/48.png" alt="Files">
+			            <span>私人文件</span>
+			        </div>
+			        <div class="kk-desktop-icon" id="kk-secret-folder-icon" title="隐秘文件夹">
+			            <img src="https://i.postimg.cc/SQP14bXp/File_Dead_Big_Thumb.png" alt="Secret Folder">
+			            <span>${secretFolderName}</span>
+			        </div>
+			        <div class="kk-desktop-icon" id="kk-steam-icon" title="Steam">
+			            <img src="https://i.postimg.cc/xjZpQVkD/steam.png" alt="Steam">
+			            <span>Steam</span>
+			        </div>
+			    `;
+
+  document.getElementById("kk-computer-modal").classList.add("visible");
+}
+
+/**
+ * 【V3 - 最终修复版】打开文件浏览器，为每个文件项添加data-*属性以便后续点击处理。
+ */
+function openFileExplorer() {
+  const computerData = state.chats[activeKkCharId]?.houseData?.computer;
+  const files = computerData?.local_files || [];
+  const listEl = document.getElementById("kk-file-list");
+  listEl.innerHTML = "";
+
+  if (files.length === 0) {
+    listEl.innerHTML =
+      '<p style="text-align:center; color: var(--text-secondary);">这个文件夹是空的</p>';
+  } else {
+    files.forEach((file) => {
+      const item = document.createElement("div");
+      item.className = "kk-file-item";
+      item.textContent = file.fileName;
+
+      // --- ▼▼▼ 这就是本次修复的核心代码 ▼▼▼ ---
+
+      // 1. 让鼠标悬浮时显示为可点击的手指形状
+      item.style.cursor = "pointer";
+      // 2. 将文件名和文件内容存储到元素的 data-* 属性中，方便之后读取
+      item.dataset.fileName = file.fileName;
+      item.dataset.fileContent = encodeURIComponent(
+        file.content || "（文件内容为空）",
+      );
+
+      // --- ▲▲▲ 核心代码结束 ▲▲▲ ---
+
+      listEl.appendChild(item);
+    });
+  }
+
+  document.getElementById("kk-file-explorer-modal").classList.add("visible");
+}
+
+function openFileViewer(fileName, fileContent) {
+  // 1. 填充标题和内容
+  document.getElementById("kk-file-viewer-title").textContent = fileName;
+  const decodedContent = decodeURIComponent(fileContent);
+
+  const contentEl = document.getElementById("kk-file-viewer-content");
+  contentEl.textContent = decodedContent;
+
+  // ▼▼▼▼▼▼▼▼▼▼ 修改开始 ▼▼▼▼▼▼▼▼▼▼
+  // 强制设置字体颜色为深灰色 (解决看不见的问题)
+  contentEl.style.color = "#333333";
+  // 建议加上这个，保留文本的换行和空格格式
+  contentEl.style.whiteSpace = "pre-wrap";
+  // ▲▲▲▲▲▲▲▲▲▲ 修改结束 ▲▲▲▲▲▲▲▲▲▲
+
+  const modal = document.getElementById("kk-file-viewer-modal");
+  const modalContent = modal.querySelector(".modal-content");
+
+  // ★★★ 修复关键 1：强制弹窗容器使用 Flex 列布局 ★★★
+  modalContent.style.display = "flex";
+  modalContent.style.flexDirection = "column";
+  modalContent.style.overflow = "hidden"; // 防止外层出现滚动条
+
+  // 2. 检查是否已经有底部栏(footer)，如果没有就创建一个
+  let footer = modalContent.querySelector(".modal-footer");
+  if (!footer) {
+    footer = document.createElement("div");
+    footer.className = "modal-footer";
+
+    // ★★★ 修复关键 2：移除 absolute 定位，使用标准流布局 ★★★
+    // flex-shrink: 0 确保底部栏不会被压缩
+    footer.style.cssText =
+      "padding: 10px 15px; border-top: 1px solid #eee; display: flex; justify-content: flex-end; gap: 10px; background: #fff; flex-shrink: 0; border-radius: 0 0 12px 12px;";
+
+    // ★★★ 修复关键 3：调整内容区域样式 ★★★
+    const body = modalContent.querySelector(".modal-body");
+    if (body) {
+      // 移除旧的硬编码高度计算
+      body.style.height = "auto";
+      // 让内容区自动占据剩余空间
+      body.style.flex = "1";
+      // 确保内容区内部可以滚动
+      body.style.overflowY = "auto";
+      body.style.padding = "15px";
+    }
+
+    modalContent.appendChild(footer);
+  }
+
+  // 3. 清空旧按钮，重新生成
+  footer.innerHTML = "";
+
+  // -- 创建[关闭]按钮 --
+  const closeBtn = document.createElement("button");
+  closeBtn.textContent = "关闭";
+  closeBtn.className = "cancel";
+  closeBtn.onclick = closeFileViewer;
+
+  // -- 创建[分享]按钮 --
+  const shareBtn = document.createElement("button");
+  shareBtn.textContent = "分享给Ta";
+  shareBtn.className = "save";
+  shareBtn.onclick = () => {
+    openComputerItemShareModal(fileName, decodedContent, "电脑私人文件");
+  };
+
+  // 4. 添加到底部栏
+  footer.appendChild(closeBtn);
+  footer.appendChild(shareBtn);
+
+  modal.classList.add("visible");
+}
+
+/**
+ * 【全新】关闭文件内容查看器
+ */
+function closeFileViewer() {
+  document.getElementById("kk-file-viewer-modal").classList.remove("visible");
+}
+// ▼▼▼ 【全新】kk查岗-Steam功能核心函数 ▼▼▼
+
+/**
+ * 打开Steam游戏库弹窗并渲染内容
+ */
+function openSteamScreen() {
+  renderSteamScreen();
+  document.getElementById("kk-steam-modal").classList.add("visible");
+}
+
+/**
+ * 渲染Steam游戏库列表
+ */
+function renderSteamScreen() {
+  if (!activeKkCharId) return;
+  const computerData = state.chats[activeKkCharId]?.houseData?.computer;
+  const games = computerData?.steam_games || [];
+  const listEl = document.getElementById("kk-steam-games-list");
+  listEl.innerHTML = "";
+
+  if (games.length === 0) {
+    listEl.innerHTML =
+      '<p style="text-align:center; color: var(--text-secondary); padding: 50px 0;">游戏库是空的，试着点击右上角“+”生成一些游戏吧！</p>';
+  } else {
+    // 让游戏按时长倒序排列
+    games.sort((a, b) => {
+      const timeA = parseFloat(a.playtime) || 0;
+      const timeB = parseFloat(b.playtime) || 0;
+      return timeB - timeA;
+    });
+
+    // ... 前面的代码不变 ...
+    games.forEach((game, index) => {
+      const itemEl = document.createElement("div");
+      itemEl.className = "character-data-item";
+      // 增加点击手势
+      itemEl.style.cursor = "pointer";
+
+      itemEl.innerHTML = `
+                <div class="title">${game.name}</div>
+                <div class="content">总游玩时长: ${game.playtime}</div>
+                <button class="item-delete-btn" data-type="computer.steam_games" data-index="${index}" title="删除这个游戏记录">×</button>
+            `;
+
+      // 【新增】绑定点击事件：点击卡片本身触发分享
+      itemEl.addEventListener("click", (e) => {
+        // 如果点击的是删除按钮，不要触发分享
+        if (e.target.classList.contains("item-delete-btn")) return;
+
+        openComputerItemShareModal(
+          game.name,
+          `游玩时长: ${game.playtime}`,
+          "Steam游戏库",
+        );
+      });
+
+      listEl.appendChild(itemEl);
+    });
+  }
+}
+
+/**
+ * 【AI核心】为Steam游戏库生成更多游戏
+ */
+async function generateMoreSteamGames() {
+  if (!activeKkCharId) return;
+  const chat = state.chats[activeKkCharId];
+  if (!chat.houseData?.computer) {
+    alert("请先为角色生成一次完整的房屋数据。");
+    return;
+  }
+
+  document.getElementById("generation-overlay").classList.add("visible");
+
+  try {
+    const { proxyUrl, apiKey, model } = state.apiConfig;
+    if (!proxyUrl || !apiKey || !model) throw new Error("API未配置");
+
+    const existingGames = (chat.houseData.computer.steam_games || [])
+      .map((g) => g.name)
+      .join(", ");
+    const prompt = `
+			# 任务
+			你是一个游戏数据生成器。请根据角色“${chat.name}”的人设，为他/她的Steam游戏库生成2-3款【全新的】PC游戏记录。
+
+			# 角色人设
+			${chat.settings.aiPersona}
+
+			# 已有游戏 (请不要重复生成以下游戏)
+			${existingGames || "无"}
+
+			# JSON输出格式 (必须严格遵守)
+			{
+			  "steam_games": [
+			    {"name": "【新游戏名1】", "playtime": "【游玩时长，例如：50 小时】"},
+			    {"name": "【新游戏名2】", "playtime": "【游玩时长】"}
+			  ]
+			}
+			`;
+    const messagesForApi = [{ role: "user", content: prompt }];
+    let isGemini = proxyUrl === GEMINI_API_URL;
+    let geminiConfig = toGeminiRequestData(
+      model,
+      apiKey,
+      prompt,
+      messagesForApi,
+      isGemini,
+    );
+
+    const response = isGemini
+      ? await fetch(geminiConfig.url, geminiConfig.data)
+      : await fetch(`${proxyUrl}/v1/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: messagesForApi,
+            temperature: 0.9,
+          }),
+        });
+
+    if (!response.ok) throw new Error(await response.text());
+
+    const data = await response.json();
+    const rawContent = (
+      isGemini
+        ? data.candidates[0].content.parts[0].text
+        : data.choices[0].message.content
+    ).replace(/^```json\s*|```$/g, "");
+    const newData = JSON.parse(rawContent);
+
+    if (newData.steam_games && Array.isArray(newData.steam_games)) {
+      if (!chat.houseData.computer.steam_games) {
+        chat.houseData.computer.steam_games = [];
+      }
+      chat.houseData.computer.steam_games.push(...newData.steam_games);
+      await db.chats.put(chat);
+      renderSteamScreen();
+      alert("已添加新的游戏记录！");
+    } else {
+      throw new Error("AI返回的数据格式不正确。");
+    }
+  } catch (error) {
+    console.error("生成更多游戏失败:", error);
+    await showCustomAlert("生成失败", `发生错误: ${error.message}`);
+  } finally {
+    document.getElementById("generation-overlay").classList.remove("visible");
+  }
+}
+// ▲▲▲ 新增函数结束 ▲▲▲
+/**
+ * 【总入口 V2】打开监控视图，并处理数据获取和渲染
+ * @param {string} charId - 当前查看的角色ID
+ */
+async function openSurveillanceView(charId) {
+  if (!charId) return;
+  const chat = state.chats[charId];
+  if (!chat || !chat.houseData) {
+    alert("找不到角色的房屋数据，请先生成房屋。");
+    return;
+  }
+
+  document.getElementById("kk-monitor-title").textContent =
+    `${chat.name}的监控中心`;
+
+  const fiveMinutes = 5 * 60 * 1000;
+  const surveillance = chat.houseData.surveillanceData;
+
+  if (
+    !surveillance ||
+    !surveillance.feeds ||
+    Date.now() - (surveillance.timestamp || 0) > fiveMinutes
+  ) {
+    try {
+      const newSurveillanceData =
+        await generateInitialSurveillanceFeeds(charId);
+      if (newSurveillanceData) {
+        // ★★★ 核心修改：保存完整的对象，包含时间戳、位置和画面数据 ★★★
+        chat.houseData.surveillanceData = {
+          timestamp: Date.now(),
+          characterLocation: newSurveillanceData.characterLocation,
+          feeds: newSurveillanceData.feeds,
+        };
+        await db.chats.put(chat);
+        renderSurveillanceView(chat.houseData.surveillanceData); // 渲染新数据
+      } else {
+        document.getElementById("kk-monitor-grid").innerHTML =
+          '<p style="text-align:center; color: #8a8a8a;">无法生成监控画面。</p>';
+      }
+    } catch (error) {
+      await showCustomAlert("生成失败", `生成监控画面时出错: ${error.message}`);
+      return;
+    }
+  } else {
+    console.log("从缓存加载监控画面。");
+    // ★★★ 核心修改：直接将保存的完整对象传给渲染函数 ★★★
+    renderSurveillanceView(surveillance);
+  }
+
+  showScreen("kk-monitor-screen");
+}
+
+/**
+ * 【AI核心 V2 - 结构化数据】调用AI为指定角色生成所有区域的初次监控画面
+ * @param {string} charId - 角色ID
+ * @returns {Promise<object|null>} - 包含角色位置和各区域画面的对象，或在失败时返回null
+ */
+async function generateInitialSurveillanceFeeds(charId) {
+  const chat = state.chats[charId];
+  showGenerationOverlay("正在接入监控信号...");
+
+  try {
+    const { proxyUrl, apiKey, model } = state.apiConfig;
+    if (!proxyUrl || !apiKey || !model) throw new Error("API未配置");
+
+    // 提取世界书、聊天记录和用户人设作为上下文
+    const worldBookContext = (
+      await Promise.all(
+        (chat.settings.linkedWorldBookIds || []).map(async (id) => {
+          const book = await db.worldBooks.get(id);
+          return book ? `\n## 世界书: ${book.name}\n${book.content}` : "";
+        }),
+      )
+    ).join("");
+
+    const recentHistory = chat.history
+      .slice(-10)
+      .map((msg) => {
+        const sender =
+          msg.role === "user" ? chat.settings.myNickname || "我" : chat.name;
+        return `${sender}: ${msg.content}`;
+      })
+      .join("\n");
+
+    const userPersona =
+      state.chats[charId]?.settings?.myPersona || "一个普通的观察者。";
+
+    const areaNames = Object.keys(chat.houseData.areas);
+
+    const systemPrompt = `
+			# 任务
+			你是一个全知的监控系统AI。你的任务是根据角色的人设和近期活动，为他家中的【每一个区域】生成实时监控画面描述，并明确指出角色【当前所在】的区域。
+
+			# 角色与观察者信息
+			- 角色名: ${chat.name}
+			- 角色人设: ${chat.settings.aiPersona}
+			- 观察者(用户)人设: ${userPersona}
+			${worldBookContext || ""}
+			- 最近的聊天记录 (供你参考情景):
+			${recentHistory}
+
+			# 住所布局
+			角色当前的住所包含以下区域: ${areaNames.join("、 ")}
+
+			# 核心规则
+			1.  **视角**: 你的描述必须是【客观、冷静的第三人称视角】，就像一个真正的监控摄像头记录的画面。
+			2.  **内容**: 描述【此时此刻】角色可能正在每个区域做什么。如果角色不在某个区域，就描述该区域的静态环境。
+			3.  **实时性**: 描述必须体现“现在正在发生”的感觉。
+			4.  **【【【格式铁律】】】**: 你的回复【必须且只能】是一个严格的JSON对象。
+			    -   该JSON对象必须包含一个顶级键 \`characterLocation\`，其值必须是角色当前所在的区域名字符串 (例如: "卧室")。
+			    -   该JSON对象还必须包含一个顶级键 \`feeds\`，其值是一个JSON对象，其中每个键是区域名，每个值是**另一个**JSON对象，包含以下两个字段:
+			        -   \`"description"\`: (字符串) 该区域的监控画面描述。
+			        -   \`"isCharacterPresent"\`: (布尔值) 角色当前是否在该区域内（true 或 false）。
+
+			# JSON输出格式示例 (必须严格遵守):
+			{
+			  "characterLocation": "卧室",
+			  "feeds": {
+			    "客厅": {
+			      "description": "客厅里很安静，角色并不在这里。电视屏幕是黑的，沙发上随意搭着一件外套。",
+			      "isCharacterPresent": false
+			    },
+			    "卧室": {
+			      "description": "角色正坐在床边，低头看着手机，手指快速地在屏幕上滑动，嘴角似乎带着一丝微笑。",
+			      "isCharacterPresent": true
+			    }
+			  }
+			}
+			`;
+
+    const messagesForApi = [{ role: "user", content: systemPrompt }];
+    let isGemini = proxyUrl === GEMINI_API_URL;
+    let geminiConfig = toGeminiRequestData(
+      model,
+      apiKey,
+      systemPrompt,
+      messagesForApi,
+      isGemini,
+    );
+
+    const response = isGemini
+      ? await fetch(geminiConfig.url, geminiConfig.data)
+      : await fetch(`${proxyUrl}/v1/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: messagesForApi,
+            temperature: 0.8,
+          }),
+        });
+
+    if (!response.ok) throw new Error(`API请求失败: ${await response.text()}`);
+
+    const data = await response.json();
+    const rawContent = (
+      isGemini
+        ? data.candidates[0].content.parts[0].text
+        : data.choices[0].message.content
+    ).replace(/^```json\s*|```$/g, "");
+    const surveillanceData = JSON.parse(rawContent);
+
+    return surveillanceData;
+  } catch (error) {
+    console.error("生成监控画面失败:", error);
+    throw error;
+  } finally {
+    document.getElementById("generation-overlay").classList.remove("visible");
+  }
+}
+
+/**
+ * 【渲染函数 V2 - 全功能交互版】将监控数据渲染到屏幕上
+ * @param {object} surveillanceData - 包含角色位置和画面的完整对象
+ */

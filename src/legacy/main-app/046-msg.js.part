@@ -1,0 +1,861 @@
+                          commentText: commentText,
+                        };
+                      })
+                      .filter((c) => c.commentText);
+                  }
+
+                  await db.weiboPosts.add(newPost);
+
+                  // 刷新“关注的人”列表，新微博就会出现了！
+                  await renderFollowingWeiboFeed();
+
+                  await showCustomAlert(
+                    "操作成功",
+                    `已为 “${chat.name}” 发布了一条新微博！`,
+                  );
+
+                  chatInput.value = ""; // 清空输入框
+                  return; // 结束函数，不再执行后面的代码
+                }
+              } catch (e) {
+                // 如果解析JSON失败，说明它不是指令，只是普通文本，就让代码继续往下走
+              }
+
+              // 1. 如果是群聊，并且你被禁言了
+              if (chat && chat.isGroup && chat.settings.isUserMuted) {
+                alert("你已被禁言，无法发言！");
+                return; // 阻止发送
+              }
+
+              const msg = {
+                role: "user",
+                content,
+                timestamp: Date.now(),
+              };
+
+              // 检查当前是否处于引用回复模式
+              if (currentReplyContext) {
+                msg.quote = currentReplyContext; // 将引用信息附加到消息对象上
+              }
+
+              chat.history.push(msg);
+              await incrementMessageCount(state.activeChatId);
+              await db.chats.put(chat);
+              appendMessage(msg, chat);
+              renderChatList();
+              chatInput.value = "";
+              chatInput.style.height = "auto";
+              chatInput.focus();
+
+              cancelReplyMode();
+            });
+          document
+            .getElementById("wait-reply-btn")
+            .addEventListener("click", triggerAiResponse);
+          chatInput.addEventListener("keypress", (e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              document.getElementById("send-btn").click();
+            }
+          });
+          chatInput.addEventListener("input", () => {
+            chatInput.style.height = "auto";
+            chatInput.style.height = chatInput.scrollHeight + "px";
+          });
+
+          document
+            .getElementById("wallpaper-upload-input")
+            .addEventListener("change", async (event) => {
+              const file = event.target.files[0];
+              if (file) {
+                const dataUrl = await new Promise((res, rej) => {
+                  const reader = new FileReader();
+                  reader.onload = () => res(reader.result);
+                  reader.onerror = () => rej(reader.error);
+                  reader.readAsDataURL(file);
+                });
+                newWallpaperBase64 = dataUrl;
+                renderWallpaperScreen();
+              }
+            });
+
+          document
+            .getElementById("save-wallpaper-btn")
+            .addEventListener("click", async () => {
+              let changesMade = false;
+
+              // 保存壁纸
+              if (newWallpaperBase64) {
+                state.globalSettings.wallpaper = newWallpaperBase64;
+                changesMade = true;
+              }
+
+              // 保存锁屏壁纸
+              if (newLockscreenWallpaperBase64) {
+                state.globalSettings.lockscreenWallpaper =
+                  newLockscreenWallpaperBase64;
+                changesMade = true;
+              }
+
+              // 保存全局聊天背景
+              if (newGlobalBgBase64 === "REMOVED") {
+                state.globalSettings.globalChatBackground = "";
+                changesMade = true;
+              } else if (newGlobalBgBase64) {
+                state.globalSettings.globalChatBackground = newGlobalBgBase64;
+                changesMade = true;
+              }
+
+              // 我们将CSS代码保存到一个新属性 activeCustomCss 中
+              state.globalSettings.activeCustomCss =
+                document.getElementById("theme-css-editor").value;
+              // 同时，保存当前选择的【主题ID】，如果用户没选，就保存null
+              const activeThemeSelector =
+                document.getElementById("theme-selector");
+              state.globalSettings.activeThemeId = activeThemeSelector.value
+                ? parseInt(activeThemeSelector.value)
+                : null;
+              changesMade = true; // 只要点击保存，就认为CSS有变动
+
+              // 保存密码
+              const newPassword =
+                document.getElementById("password-set-input").value;
+              state.globalSettings.password = newPassword;
+
+              // 保存铃声和提示音
+              state.globalSettings.ringtoneUrl = document
+                .getElementById("ringtone-url-input")
+                .value.trim();
+              state.globalSettings.notificationSoundUrl = document
+                .getElementById("notification-sound-url-input")
+                .value.trim();
+
+              // 保存锁屏和状态栏开关状态
+              const isLockEnabled = document.getElementById(
+                "enable-lock-screen-toggle",
+              ).checked;
+              state.globalSettings.enableLockScreen = isLockEnabled;
+              localStorage.setItem("lockScreenEnabled", isLockEnabled);
+
+              // 保存主屏幕字体颜色 (现在我们可以从任意一个输入框取值，因为它们是同步的)
+              // 这里优先取文本框的值，因为它更直观
+              const colorInputVal = document.getElementById(
+                "home-icon-widget-text-color-input",
+              ).value;
+              // 做个最后校验，如果文本框里的不对，就用选色盘的
+              const hexRegex = /^#([0-9A-F]{3}){1,2}$/i;
+              if (hexRegex.test(colorInputVal)) {
+                state.globalSettings.homeIconWidgetTextColor = colorInputVal;
+              } else {
+                state.globalSettings.homeIconWidgetTextColor =
+                  document.getElementById(
+                    "home-icon-widget-text-color-picker",
+                  ).value;
+              }
+              state.globalSettings.removeHomeFontShadow =
+                document.getElementById(
+                  "remove-home-font-shadow-toggle",
+                ).checked;
+
+              // 保存App名称
+              saveAppLabels();
+
+              // 将所有设置一次性写入数据库
+              await db.globalSettings.put(state.globalSettings);
+
+              // 应用所有更改
+              if (changesMade) {
+                applyGlobalWallpaper();
+                applyLockscreenWallpaper();
+                applyThemeCss(state.globalSettings.activeCustomCss); // 应用刚刚保存的CSS
+                newWallpaperBase64 = null;
+                newLockscreenWallpaperBase64 = null;
+                newGlobalBgBase64 = null;
+              }
+              applyAppIcons();
+              applyAppLabels();
+
+              alert("所有外观设置已保存并应用！");
+              showScreen("home-screen");
+            });
+
+          document
+            .getElementById("save-api-settings-btn")
+            .addEventListener("click", async () => {
+              const proxyUrl = document
+                .getElementById("proxy-url")
+                .value.trim();
+              const apiKey = document.getElementById("api-key").value.trim();
+              const isBlocked = BLOCKED_API_SITES.some((blockedDomain) =>
+                proxyUrl.includes(blockedDomain),
+              );
+
+              if (isBlocked) {
+                alert("错误：该 API 站点已被禁用，无法使用。");
+                return; // 阻止保存
+              }
+
+              state.apiConfig.proxyUrl = document
+                .getElementById("proxy-url")
+                .value.trim();
+              state.apiConfig.apiKey = document
+                .getElementById("api-key")
+                .value.trim();
+              state.apiConfig.model =
+                document.getElementById("model-select").value;
+              state.apiConfig.temperature = parseFloat(
+                document.getElementById("temperature-slider").value,
+              );
+              // 保存 Minimax 设置
+              state.apiConfig.minimaxGroupId = document
+                .getElementById("minimax-group-id")
+                .value.trim();
+              state.apiConfig.minimaxApiKey = document
+                .getElementById("minimax-api-key")
+                .value.trim();
+              state.apiConfig.minimaxProvider = document.getElementById(
+                "minimax-provider-select",
+              ).value;
+              state.apiConfig.minimaxSpeechModel = document.getElementById(
+                "minimax-speech-model-select",
+              ).value;
+              // --- 保存 GitHub 备份设置 ---
+              state.apiConfig.githubToken = document
+                .getElementById("github-token")
+                .value.trim();
+              state.apiConfig.githubUsername = document
+                .getElementById("github-username")
+                .value.trim();
+              state.apiConfig.githubRepo = document
+                .getElementById("github-repo")
+                .value.trim();
+              state.apiConfig.githubPath =
+                document.getElementById("github-path").value.trim() ||
+                "ephone_backup.json";
+              state.apiConfig.githubAutoBackup = document.getElementById(
+                "github-auto-backup-switch",
+              ).checked;
+              // ★★★ 新增：保存模式和时间 ★★★
+              state.apiConfig.githubBackupMode =
+                document.getElementById("github-backup-mode").value;
+              state.apiConfig.githubBackupInterval =
+                parseInt(
+                  document.getElementById("github-backup-interval").value,
+                ) || 30;
+              state.apiConfig.pollinationsApiKey = document
+                .getElementById("pollinations-api-key")
+                .value.trim();
+
+              // 如果开启了自动备份，立即重启定时器
+              handleAutoBackupTimer();
+              await db.apiConfig.put(state.apiConfig);
+              state.globalSettings.enableSystemNotifications =
+                document.getElementById("system-notification-switch").checked;
+              console.log(
+                "保存系统通知开关状态:",
+                state.globalSettings.enableSystemNotifications,
+              );
+              state.globalSettings.imageCompressionQuality = parseFloat(
+                document.getElementById("image-quality-slider").value,
+              );
+              state.globalSettings.enableSystemNotifications =
+                document.getElementById("system-notification-switch").checked;
+              const backgroundSwitch = document.getElementById(
+                "background-activity-switch",
+              );
+              const intervalInput = document.getElementById(
+                "background-interval-input",
+              );
+              const newEnableState = backgroundSwitch.checked;
+              const oldEnableState =
+                state.globalSettings.enableBackgroundActivity || false;
+
+              // 只有在用户“从关到开”时，才弹出警告
+              if (newEnableState && !oldEnableState) {
+                const userConfirmed = confirm(
+                  "【高费用警告】\n\n" +
+                    "您正在启用“后台角色活动”功能。\n\n" +
+                    "这会使您的AI角色们在您不和他们聊天时，也能“独立思考”并主动给您发消息或进行社交互动，极大地增强沉浸感。\n\n" +
+                    "但请注意：\n" +
+                    "这会【在后台自动、定期地调用API】，即使您不进行任何操作。根据您的角色数量和检测间隔，这可能会导致您的API费用显著增加。\n\n" +
+                    "您确定要开启吗？",
+                );
+
+                if (!userConfirmed) {
+                  backgroundSwitch.checked = false; // 用户取消，把开关拨回去
+                  return; // 阻止后续逻辑
+                }
+              }
+
+              state.globalSettings.enableBackgroundActivity = newEnableState;
+              state.globalSettings.backgroundActivityInterval =
+                parseInt(intervalInput.value) || 60;
+              state.globalSettings.blockCooldownHours =
+                parseFloat(
+                  document.getElementById("block-cooldown-input").value,
+                ) || 1;
+              await db.globalSettings.put(state.globalSettings);
+
+              // 动态启动或停止模拟器
+              stopBackgroundSimulation();
+              if (state.globalSettings.enableBackgroundActivity) {
+                startBackgroundSimulation();
+                console.log(
+                  `后台活动模拟已启动，间隔: ${state.globalSettings.backgroundActivityInterval}秒`,
+                );
+              } else {
+                console.log("后台活动模拟已停止。");
+              }
+              const novelaiSwitch = document.getElementById("novelai-switch");
+              const novelaiModelInput =
+                document.getElementById("novelai-model");
+              const novelaiKeyInput =
+                document.getElementById("novelai-api-key");
+
+              if (novelaiSwitch) {
+                localStorage.setItem("novelai-enabled", novelaiSwitch.checked);
+              }
+              if (novelaiModelInput) {
+                localStorage.setItem("novelai-model", novelaiModelInput.value);
+              }
+              if (novelaiKeyInput) {
+                localStorage.setItem(
+                  "novelai-api-key",
+                  novelaiKeyInput.value.trim(),
+                );
+              }
+              alert("API设置已保存!");
+            });
+
+          // gemini 密钥聚焦的时候显示明文
+          const ApiKeyInput = document.getElementById("api-key");
+          ApiKeyInput.addEventListener("focus", (e) => {
+            e.target.setAttribute("type", "text");
+          });
+          ApiKeyInput.addEventListener("blur", (e) => {
+            e.target.setAttribute("type", "password");
+          });
+
+          document
+            .getElementById("fetch-models-btn")
+            .addEventListener("click", async () => {
+              const url = document.getElementById("proxy-url").value.trim();
+              const key = document.getElementById("api-key").value.trim();
+              if (!url || !key) return alert("请先填写反代地址和密钥");
+              try {
+                let isGemini = url === GEMINI_API_URL;
+                const response = await fetch(
+                  isGemini
+                    ? `${GEMINI_API_URL}?key=${getRandomValue(key)}`
+                    : `${url}/v1/models`,
+                  isGemini
+                    ? undefined
+                    : { headers: { Authorization: `Bearer ${key}` } },
+                );
+                if (!response.ok) throw new Error("无法获取模型列表");
+                const data = await response.json();
+                let models = isGemini ? data.models : data.data;
+                if (isGemini) {
+                  models = models.map((model) => {
+                    const parts = model.name.split("/");
+                    return {
+                      id: parts.length > 1 ? parts[1] : model.name,
+                    };
+                  });
+                }
+                // 获取我们的辅助下拉框
+                const picker = document.getElementById("fetched-model-list");
+                picker.innerHTML =
+                  '<option value="">▼ 请选择模型 (点击自动填入上方)</option>';
+
+                // 填充下拉框
+                models.forEach((model) => {
+                  const option = document.createElement("option");
+                  option.value = model.id;
+                  option.textContent = model.id;
+                  picker.appendChild(option);
+                });
+
+                // 显示下拉框
+                picker.style.display = "block";
+
+                alert(
+                  `成功拉取 ${models.length} 个模型！\n请点击下方的下拉框选择，选择后会自动填入输入框。`,
+                );
+              } catch (error) {
+                alert(`拉取模型失败: ${error.message}`);
+              }
+            });
+          document
+            .getElementById("fetch-minimax-speech-models-btn")
+            .addEventListener("click", fetchMinimaxSpeechModels);
+
+          // NovelAI系统的JavaScript事件监听器
+          document
+            .getElementById("novelai-switch")
+            .addEventListener("change", (e) => {
+              const detailsDiv = document.getElementById("novelai-details");
+              detailsDiv.style.display = e.target.checked ? "block" : "none";
+            });
+
+          // NovelAI API Key显示/隐藏切换
+          document
+            .getElementById("novelai-key-toggle")
+            .addEventListener("click", function () {
+              const input = document.getElementById("novelai-api-key");
+              if (input.type === "password") {
+                input.type = "text";
+                this.textContent = "😌";
+              } else {
+                input.type = "password";
+                this.textContent = "🧐";
+              }
+            });
+
+          // 打开NovelAI设置弹窗
+          document
+            .getElementById("novelai-settings-btn")
+            .addEventListener("click", () => {
+              loadNovelAISettings();
+              document.getElementById("novelai-settings-modal").style.display =
+                "flex";
+            });
+
+          // CORS代理选择器变化事件
+          document
+            .getElementById("nai-cors-proxy")
+            .addEventListener("change", (e) => {
+              const customProxyGroup = document.getElementById(
+                "nai-custom-proxy-group",
+              );
+              if (e.target.value === "custom") {
+                customProxyGroup.style.display = "block";
+              } else {
+                customProxyGroup.style.display = "none";
+              }
+            });
+
+          // 关闭NovelAI设置弹窗
+          document
+            .getElementById("close-novelai-settings")
+            .addEventListener("click", () => {
+              document.getElementById("novelai-settings-modal").style.display =
+                "none";
+            });
+
+          // 保存NovelAI设置
+          document
+            .getElementById("save-nai-settings-btn")
+            .addEventListener("click", () => {
+              saveNovelAISettings();
+              document.getElementById("novelai-settings-modal").style.display =
+                "none";
+              alert("NovelAI设置已保存！");
+            });
+
+          // 恢复默认设置
+          document
+            .getElementById("reset-nai-settings-btn")
+            .addEventListener("click", () => {
+              if (confirm("确定要恢复默认设置吗？")) {
+                resetNovelAISettings();
+              }
+            });
+
+          // 打开NovelAI测试弹窗
+          document
+            .getElementById("novelai-test-btn")
+            .addEventListener("click", () => {
+              const apiKey = document
+                .getElementById("novelai-api-key")
+                .value.trim();
+              if (!apiKey) {
+                alert("请先填写NovelAI API Key！");
+                return;
+              }
+              document.getElementById("novelai-test-modal").style.display =
+                "flex";
+              document.getElementById("nai-test-result").style.display = "none";
+              document.getElementById("nai-test-error").style.display = "none";
+            });
+
+          // 关闭NovelAI测试弹窗
+          document
+            .getElementById("close-novelai-test")
+            .addEventListener("click", () => {
+              document.getElementById("novelai-test-modal").style.display =
+                "none";
+            });
+
+          document
+            .getElementById("close-nai-test-btn")
+            .addEventListener("click", () => {
+              document.getElementById("novelai-test-modal").style.display =
+                "none";
+            });
+
+          // NovelAI生成图像按钮
+          document
+            .getElementById("nai-generate-btn")
+            .addEventListener("click", async () => {
+              await generateNovelAIImage();
+            });
+
+          // NovelAI下载图像按钮
+          document
+            .getElementById("nai-download-btn")
+            .addEventListener("click", () => {
+              const img = document.getElementById("nai-result-image");
+              const link = document.createElement("a");
+              link.href = img.src;
+              link.download = "novelai-generated-" + Date.now() + ".png";
+              link.click();
+            });
+
+          // 角色专属NAI提示词弹窗事件监听器
+
+          // 打开角色专属NAI提示词配置弹窗
+          document
+            .getElementById("character-nai-prompts-btn")
+            .addEventListener("click", () => {
+              if (!state.activeChatId) return;
+              const chat = state.chats[state.activeChatId];
+
+              // 加载当前角色的NAI提示词配置
+              const naiSettings = chat.settings.naiSettings || {
+                promptSource: "system",
+                characterPositivePrompt: "",
+                characterNegativePrompt: "",
+              };
+
+              // 严格加载角色配置，不与系统配置混淆
+              // 填了就有，没填就为空，绝不使用系统配置填充
+              document.getElementById("character-nai-positive").value =
+                naiSettings.characterPositivePrompt || "";
+              document.getElementById("character-nai-negative").value =
+                naiSettings.characterNegativePrompt || "";
+
+              document.getElementById(
+                "character-nai-prompts-modal",
+              ).style.display = "flex";
+            });
+
+          // 关闭角色专属NAI提示词弹窗
+          document
+            .getElementById("close-character-nai-prompts")
+            .addEventListener("click", () => {
+              document.getElementById(
+                "character-nai-prompts-modal",
+              ).style.display = "none";
+            });
+
+          // 保存角色专属NAI提示词
+          document
+            .getElementById("save-character-nai-prompts-btn")
+            .addEventListener("click", async () => {
+              if (!state.activeChatId) return;
+              const chat = state.chats[state.activeChatId];
+
+              if (!chat.settings.naiSettings) {
+                chat.settings.naiSettings = {
+                  promptSource: "system",
+                };
+              }
+
+              chat.settings.naiSettings.characterPositivePrompt = document
+                .getElementById("character-nai-positive")
+                .value.trim();
+              chat.settings.naiSettings.characterNegativePrompt = document
+                .getElementById("character-nai-negative")
+                .value.trim();
+
+              console.log("💾 [专属弹窗] 保存角色NAI提示词");
+              console.log(
+                "   characterPositivePrompt:",
+                chat.settings.naiSettings.characterPositivePrompt,
+              );
+              console.log(
+                "   characterNegativePrompt:",
+                chat.settings.naiSettings.characterNegativePrompt,
+              );
+              console.log(
+                "   promptSource:",
+                chat.settings.naiSettings.promptSource,
+              );
+
+              // 保存到数据库
+              await db.chats.put(chat);
+
+              document.getElementById(
+                "character-nai-prompts-modal",
+              ).style.display = "none";
+              alert("角色专属NAI提示词已保存！");
+            });
+
+          // 清空角色专属NAI提示词配置
+          document
+            .getElementById("reset-character-nai-prompts-btn")
+            .addEventListener("click", () => {
+              if (confirm("确定要清空当前角色的NAI提示词配置吗？")) {
+                document.getElementById("character-nai-positive").value = "";
+                document.getElementById("character-nai-negative").value = "";
+              }
+            });
+
+          // 群聊角色专属NAI提示词弹窗事件监听器
+          document
+            .getElementById("group-character-nai-prompts-btn")
+            .addEventListener("click", () => {
+              if (!state.activeChatId) return;
+              const chat = state.chats[state.activeChatId];
+
+              // 加载当前角色的NAI提示词配置
+              const naiSettings = chat.settings.naiSettings || {
+                promptSource: "system",
+                characterPositivePrompt: "",
+                characterNegativePrompt: "",
+              };
+
+              // 严格加载角色配置，不与系统配置混淆
+              // 填了就有，没填就为空，绝不使用系统配置填充
+              document.getElementById("character-nai-positive").value =
+                naiSettings.characterPositivePrompt || "";
+              document.getElementById("character-nai-negative").value =
+                naiSettings.characterNegativePrompt || "";
+
+              document.getElementById(
+                "character-nai-prompts-modal",
+              ).style.display = "flex";
+            });
+
+          document
+            .getElementById("import-world-book-btn")
+            .addEventListener("click", async () => {
+              const unlockKey = "isCharacterImportUnlocked";
+
+              // 1. 检查是否已经解锁 (和角色卡导入共用一个解锁状态)
+              if (localStorage.getItem(unlockKey) === "true") {
+                document.getElementById("world-book-import-input").click(); // 直接打开文件选择器
+                return;
+              }
+
+              // 2. 如果未解锁，获取设备码
+              const deviceCode = getDeviceCode();
+
+              // 3. 构建一个包含设备码和输入框的HTML内容 (和角色卡导入的弹窗一样)
+              const modalHtmlContent = `
+			        <p style="margin-bottom: 15px;">请前往取PIN网站，使用下面的设备码获取PIN。</p>
+			        <div style="background: #eee; padding: 10px; border-radius: 6px; margin-bottom: 15px; user-select: all; cursor: copy;" title="点击复制设备码">
+			            <strong>设备码:</strong> <span id="device-code-to-copy">${deviceCode}</span>
+			        </div>
+			        <p id="copy-device-code-feedback" style="height: 15px; font-size: 12px; color: green;"></p>
+			    `;
+
+              // 4. 使用 showCustomPrompt 弹出增强版模态框，让用户输入PIN
+              const userPin = await window.showCustomPrompt(
+                "功能解锁",
+                "请在此输入获取到的PIN码...",
+                "",
+                "text",
+                modalHtmlContent,
+              );
+
+              // 5. 如果用户点击了取消，则直接返回
+              if (userPin === null) return;
+
+              // 6. 验证PIN码
+              const correctPin = generatePinFromDeviceCode(deviceCode);
+              if (userPin.trim().toUpperCase() === correctPin) {
+                localStorage.setItem(unlockKey, "true");
+                await showCustomAlert(
+                  "解锁成功！",
+                  "导入功能已解锁，此设备无需再次输入PIN码。",
+                );
+                // 触发世界书的文件选择器
+                document.getElementById("world-book-import-input").click();
+              } else {
+                await showCustomAlert(
+                  "解锁失败",
+                  "PIN码错误，请重新获取或输入。",
+                );
+              }
+            });
+
+          document
+            .getElementById("world-book-import-input")
+            .addEventListener("change", (e) => {
+              const file = e.target.files[0];
+              if (file) {
+                // 当用户选择了文件后，调用我们的核心处理函数
+                handleImportSillyTavernWorldBook(file);
+              }
+              // 每次用完后清空，这样用户下次还能选择同一个文件
+              e.target.value = null;
+            });
+
+          // 绑定“编辑模式”按钮
+          document
+            .getElementById("toggle-world-book-edit-mode-btn")
+            .addEventListener("click", toggleWorldBookEditMode);
+
+          // 将“管理分类”的功能绑定到新按钮上
+          // 原来的 manage-world-book-categories-btn 按钮现在是编辑模式的切换按钮了
+          document
+            .getElementById("manage-categories-in-edit-mode-btn")
+            .addEventListener("click", openCategoryManager);
+
+          // 为世界书列表添加统一的点击事件处理器
+          document
+            .getElementById("world-book-list")
+            .addEventListener("click", handleWorldBookListClick);
+
+          // 为底部的“删除已选”按钮绑定事件
+          document
+            .getElementById("world-book-delete-selected-btn")
+            .addEventListener("click", handleBulkDeleteWorldBooks);
+
+          document
+            .getElementById("add-world-book-btn")
+            .addEventListener("click", async () => {
+              const name = await showCustomPrompt("创建世界书", "请输入书名");
+              if (name && name.trim()) {
+                const newBook = {
+                  id: "wb_" + Date.now(),
+                  name: name.trim(),
+                  content: "",
+                };
+                await db.worldBooks.add(newBook);
+                state.worldBooks.push(newBook);
+                renderWorldBookScreen();
+                openWorldBookEditor(newBook.id);
+              }
+            });
+          document
+            .getElementById("save-world-book-btn")
+            .addEventListener("click", async () => {
+              if (!editingWorldBookId) return;
+              const book = state.worldBooks.find(
+                (wb) => wb.id === editingWorldBookId,
+              );
+              if (book) {
+                const newName = document
+                  .getElementById("world-book-name-input")
+                  .value.trim();
+                if (!newName) {
+                  alert("书名不能为空！");
+                  return;
+                }
+                book.name = newName;
+                book.content = document.getElementById(
+                  "world-book-content-input",
+                ).value;
+
+                // 【核心修改】在这里保存分类ID
+                const categoryId = document.getElementById(
+                  "world-book-category-select",
+                ).value;
+                // 如果选择了“未分类”，存入 null；否则存入数字ID
+                book.categoryId = categoryId ? parseInt(categoryId) : null;
+
+                await db.worldBooks.put(book);
+                document.getElementById("world-book-editor-title").textContent =
+                  newName;
+                editingWorldBookId = null;
+                renderWorldBookScreen();
+                showScreen("world-book-screen");
+              }
+            });
+
+          document
+            .getElementById("chat-messages")
+            .addEventListener("click", async (e) => {
+              const voiceBody = e.target.closest(".voice-message-body");
+              if (voiceBody) {
+                const bubble = voiceBody.closest(".message-bubble");
+                if (!bubble) return;
+
+                // 如果是用户自己的语音，只切换文字显示，不播放
+                if (bubble.classList.contains("user")) {
+                  toggleVoiceTranscript(bubble);
+                  return;
+                }
+
+                // 如果是AI的语音消息
+                const chat = state.chats[state.activeChatId];
+                if (!chat) return;
+
+                // --- 核心逻辑开始 ---
+
+                // 1. 检查是否点击了正在播放的语音条
+                if (isTtsPlaying && currentTtsAudioBubble === bubble) {
+                  // 如果是，则停止播放并收起所有关联的文字
+                  stopMinimaxAudio();
+                }
+                // 2. 检查点击的是否是已经展开了文字但没有播放的语音条
+                else if (bubble.dataset.state === "expanded") {
+                  // 如果是，则只收起文字，不影响其他
+                  toggleVoiceTranscript(bubble);
+                }
+                // 3. 如果以上都不是，说明是想开始播放或只展开文字
+                else {
+                  const clickedTimestamp = parseInt(bubble.dataset.timestamp);
+                  const startIndex = chat.history.findIndex(
+                    (m) => m.timestamp === clickedTimestamp,
+                  );
+                  if (startIndex === -1) return;
+
+                  // 查找连续的语音消息
+                  const messagesToPlay = findConsecutiveAiVoiceMessages(
+                    chat.history,
+                    startIndex,
+                  );
+                  if (messagesToPlay.length > 0) {
+                    const bubblesToAnimate = messagesToPlay
+                      .map((m) =>
+                        document.querySelector(
+                          `.message-bubble[data-timestamp="${m.timestamp}"]`,
+                        ),
+                      )
+                      .filter(Boolean);
+
+                    // 检查配置，决定是播放还是只显示文字
+                    const groupId = state.apiConfig.minimaxGroupId;
+                    const apiKey = state.apiConfig.minimaxApiKey;
+                    const voiceId = chat.settings.minimaxVoiceId;
+
+                    if (groupId && apiKey && voiceId) {
+                      // 【播放分支】
+                      // 先展开所有文字
+                      bubblesToAnimate.forEach((b) => {
+                        if (b.dataset.state !== "expanded") {
+                          toggleVoiceTranscript(b);
+                        }
+                      });
+                      // 然后调用播放器
+                      const combinedText = messagesToPlay
+                        .map((m) => m.content.trim())
+                        .join("，");
+                      playMinimaxAudio(combinedText, voiceId, bubblesToAnimate);
+                    } else {
+                      // 【只显示文字分支】
+                      // 只展开当前点击的这一个语音条的文字
+                      toggleVoiceTranscript(bubble);
+                    }
+                  }
+                }
+
+                return; // 处理完语音后退出
+              }
+
+              // --- 你原来的其他点击事件逻辑 ---
+              const aiImage = e.target.closest(".ai-generated-image");
+              if (aiImage) {
+                const description = aiImage.dataset.description;
+                if (description) showCustomAlert("照片描述", description);
+                return;
+              }
+              const linkCard = e.target.closest(".link-share-card");
+              if (
+                linkCard &&
+                linkCard.closest(".message-bubble.is-link-share")
+              ) {

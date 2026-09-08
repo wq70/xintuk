@@ -1,0 +1,894 @@
+// =======================================================================
+// ===               EPhone 游戏大厅 (Game Hall) 脚本                  ===
+// =======================================================================
+// 此文件包含了所有与游戏大厅及其内部游戏相关的功能，
+// 与主聊天、动态、设置等功能完全分离。
+
+document.addEventListener('DOMContentLoaded', () => {
+  const LUDO_BOARD_SIZE = 42; // 总格子数，可以根据你的棋盘布局调整
+
+  // ▼▼▼ 游戏状态管理器 ▼▼▼
+  // ▼▼▼ 【全新】这是狼人杀游戏的状态管理器 ▼▼▼
+  let werewolfGameState = {
+    isActive: false, // 游戏是否正在进行
+    players: [], // 玩家列表 { id, name, avatar, role, isAlive, persona }
+    roles: {}, // 角色配置 { wolf: 2, villager: 2, ... }
+    gamePhase: 'setup', // 游戏阶段: setup, night, day_discussion, day_vote, etc.
+    dayNumber: 0, // 天数
+    gameLog: [], // 游戏日志
+    turnIndex: 0, // 当前发言/行动的玩家索引
+    votes: {}, // 投票记录
+    seerLastNightResult: null, // 预言家昨晚查验结果
+    witchPotions: { save: 1, poison: 1 }, // 女巫药剂
+    hunterTarget: null, // 猎人目标
+    lastNightKilled: [], // 昨晚被杀的玩家ID
+    waitingFor: null, // 当前等待谁的行动: 'seer', 'witch_save', 'witch_poison', 'hunter', 'user_vote'
+    gameConfig: {}, // 游戏配置
+  };
+  // ▲▲▲ 新增变量结束 ▲▲▲
+  // ▼▼▼ 【全局修复】获取所有通用模态框的DOM元素，并声明一个全局的Promise解决器 ▼▼▼
+  // （请将此代码块粘贴到所有 gameState 变量定义的正下方）
+  let modalOverlay,
+    modalConfirmBtn,
+    modalCancelBtn,
+    modalResolve = null;
+  // 假设你的通用模态框ID是 'custom-modal-overlay'
+  // 如果不是，请修改成你HTML里正确的ID
+  modalOverlay = document.getElementById('custom-modal-overlay');
+  modalConfirmBtn = document.getElementById('custom-modal-confirm');
+  modalCancelBtn = document.getElementById('custom-modal-cancel');
+
+  // ▲▲▲ 全局修复代码结束 ▲▲▲
+
+  // ▼▼▼ 【全新】这是海龟汤游戏的状态管理器 ▼▼▼
+  let seaTurtleSoupState = {
+    isActive: false, // 游戏是否正在进行
+    phase: 'setup', // 游戏阶段: setup, guessing, reveal
+    players: [], // 玩家列表 { id, name, avatar, persona, isUser, isProvider }
+    riddleProvider: null, // 出题人对象
+    riddle: '', // 谜面
+    answer: '', // 谜底
+    gameLog: [], // 游戏日志
+    currentTurnIndex: 0, // 当前轮到谁行动的索引
+  };
+  // ▲▲▲ 新增变量结束 ▲▲▲
+  // ▼▼▼ 【全新】这是剧本杀游戏的状态管理器 ▼▼▼
+  let scriptKillGameState = {
+    isActive: false, // 游戏是否正在进行
+    script: null, // 当前加载的剧本对象
+    players: [], // 玩家列表 { id, name, avatar, role, isUser, evidence, persona }
+    gamePhase: 'setup', // 游戏阶段: setup, introduction, evidence, discussion, voting, end
+    turnIndex: 0, // 当前行动的玩家索引
+    gameLog: [], // 游戏日志
+    evidenceCounts: {}, // 记录每个玩家已搜证次数
+    votes: {}, // 投票记录
+    is自由选择: false, // 是否为自由选择角色模式
+  };
+  // ▲▲▲ 新增变量结束 ▲▲▲
+  // ▼▼▼ 在这里粘贴下面的新代码 ▼▼▼
+  let guessWhatGameState = {
+    isActive: false, // 游戏是否正在进行
+    mode: 'ai_guesses', // 游戏模式: 'ai_guesses' 或 'user_guesses'
+    opponent: null, // 对手玩家对象 { id, name, avatar, persona }
+    secretWord: '', // 谜底词语
+    gameLog: [], // 游戏日志
+    currentTurn: 'user', // 当前轮到谁: 'user' 或 'ai'
+  };
+  // ▲▲▲ 新代码粘贴结束 ▲▲▲
+
+  // ▼▼▼ 在这里粘贴下面这一整块新代码 ▼▼▼
+
+  let ludoGameState = {
+    isActive: false,
+    opponent: null,
+    players: [], // { id, name, avatar, piecePosition: -1 (at home), isUser }
+    currentTurnIndex: 0,
+    gameLog: [],
+    boardLayout: [],
+    isDiceRolling: false,
+  };
+  // ▼▼▼ 用这块【功能增强版】的代码，替换旧的 undercoverGameState ▼▼▼
+  let undercoverGameState = {
+    isActive: false,
+    players: [],
+    civilianWord: '',
+    undercoverWord: '',
+    gamePhase: 'setup',
+    dayNumber: 1, // 【核心修改1】将初始轮次改为 1，更符合游戏逻辑
+    gameLog: [],
+    turnIndex: 0,
+    votes: {},
+    votedOutPlayers: [], // 【核心修改2】新增此行，用于记录每轮被投出去的玩家
+    tiedPlayers: [],
+  };
+  // ▲▲▲ 替换结束 ▲▲▲
+  // ...（上面是 undercoverGameState 的定义）...
+
+  // ▲▲▲ 替换结束 ▲▲▲
+  // ▼▼▼ 【全新】万能Markdown渲染函数 (带安全过滤和遮挡效果) ▼▼▼
+  function addLongPressListener(element, callback) {
+    let pressTimer;
+    const startPress = e => {
+      if (isSelectionMode) return;
+      e.preventDefault();
+      pressTimer = window.setTimeout(() => callback(e), 500);
+    };
+    const cancelPress = () => clearTimeout(pressTimer);
+    element.addEventListener('mousedown', startPress);
+    element.addEventListener('mouseup', cancelPress);
+    element.addEventListener('mouseleave', cancelPress);
+    element.addEventListener('touchstart', startPress, { passive: true });
+    element.addEventListener('touchend', cancelPress);
+    element.addEventListener('touchmove', cancelPress);
+  }
+
+  /**
+   * 将Markdown文本安全地渲染为HTML
+   * @param {string} markdownText - 原始的Markdown文本
+   * @returns {string} - 处理和净化后的安全HTML字符串
+   */
+  function renderMarkdown(markdownText) {
+    if (!markdownText) return '';
+
+    // 1. 【预处理】支持自定义的“遮挡/剧透”语法 ||spoiler||
+    // 我们在 marked.js 处理之前，手动把 ||text|| 替换成带特定class的HTML标签
+    let processedText = markdownText.replace(/\|\|(.*?)\|\|/g, '<span class="spoiler">$1</span>');
+
+    // 2. 【核心】使用 marked.js 将Markdown转换为HTML
+    // gfm: true 开启GitHub风格的Markdown，支持删除线等
+    // breaks: true 让回车符也能变成<br>，更符合聊天习惯
+    let rawHtml = marked.parse(processedText, { gfm: true, breaks: true });
+
+    // 3. 【安全】使用 DOMPurify 清洗HTML，防止XSS攻击
+    let sanitizedHtml = DOMPurify.sanitize(rawHtml);
+
+    return sanitizedHtml;
+  }
+
+  // ▲▲▲ 新函数粘贴结束 ▲▲▲
+
+  let tempGeneratedScriptData = null;
+
+  // ▼▼▼ 游戏功能函数 ▼▼▼
+
+  // --- 狼人杀 Werewolf ---
+  // ...（后面的代码）...
+
+  // ▼▼▼ 游戏功能函数 ▼▼▼
+
+  // --- 狼人杀 Werewolf ---
+  // ▼▼▼ 【全新】这里是狼人杀游戏的所有核心功能函数 ▼▼▼
+
+  /**
+   * 【狼人杀】打开游戏设置界面
+   */
+  async function openWerewolfSetup() {
+    showScreen('werewolf-setup-screen');
+    const selectionEl = document.getElementById('werewolf-player-selection');
+    selectionEl.innerHTML = '<p>正在加载角色列表...</p>';
+
+    const singleChats = Object.values(state.chats).filter(chat => !chat.isGroup);
+    const allNpcs = Object.values(state.chats).flatMap(chat =>
+      (chat.npcLibrary || []).map(npc => ({ ...npc, owner: chat.name })),
+    );
+
+    let playerOptions = [
+      ...singleChats.map(c => ({ id: c.id, name: c.name, avatar: c.settings.aiAvatar, type: '角色' })),
+      ...allNpcs.map(n => ({ id: n.id, name: n.name, avatar: n.avatar, type: `NPC (${n.owner})` })),
+    ];
+
+    selectionEl.innerHTML = '';
+    playerOptions.forEach(player => {
+      const item = document.createElement('div');
+      item.className = 'player-selection-item';
+      item.innerHTML = `
+            <input type="checkbox" class="werewolf-player-checkbox" value="${player.id}">
+            <img src="${player.avatar || defaultAvatar}" alt="${player.name}">
+            <span class="name">${player.name}</span>
+            <span class="type-tag">${player.type}</span>
+        `;
+      selectionEl.appendChild(item);
+    });
+    // ▼▼▼ 在这里粘贴下面这块新代码 ▼▼▼
+    const inviteModeRadios = document.querySelectorAll('input[name="undercover_invite_mode"]');
+    const manualOptions = document.getElementById('undercover-manual-invite-options');
+    const randomOptions = document.getElementById('undercover-random-invite-options');
+
+    inviteModeRadios.forEach(radio => {
+      radio.addEventListener('change', () => {
+        if (radio.value === 'manual') {
+          manualOptions.style.display = 'block';
+          randomOptions.style.display = 'none';
+        } else {
+          // random mode
+          manualOptions.style.display = 'none'; // 隐藏手动列表
+          randomOptions.style.display = 'block'; // 显示随机选项
+        }
+      });
+    });
+
+    // 默认触发一次，以确保初始状态正确
+    document.querySelector('input[name="undercover_invite_mode"]:checked').dispatchEvent(new Event('change'));
+    // ▲▲▲ 粘贴结束 ▲▲▲
+  }
+
+  /**
+   * 【狼人杀】开始游戏的核心逻辑
+   */
+  async function startWerewolfGame() {
+    const countSelect = document.getElementById('werewolf-player-count');
+    const totalPlayers = parseInt(countSelect.value);
+
+    const selectedCheckboxes = document.querySelectorAll('.werewolf-player-checkbox:checked');
+    // 邀请的AI/NPC数量必须是总人数-1（因为User是必须加入的）
+    if (selectedCheckboxes.length !== totalPlayers - 1) {
+      alert(`请选择 ${totalPlayers - 1} 位AI或NPC玩家！`);
+      return;
+    }
+
+    // --- 1. 重置并初始化游戏状态 ---
+    werewolfGameState = {
+      isActive: true,
+      players: [],
+      roles: {},
+      gamePhase: 'start',
+      dayNumber: 0,
+      gameLog: [],
+      turnIndex: 0,
+      votes: {},
+      seerLastNightResult: null,
+      witchPotions: { save: 1, poison: 1 },
+      hunterTarget: null,
+      lastNightKilled: [],
+      waitingFor: null,
+      gameConfig: { totalPlayers },
+    };
+
+    // --- 2. 收集玩家信息 ---
+    // 添加User
+    werewolfGameState.players.push({
+      id: 'user',
+      name: state.qzoneSettings.nickname || '我',
+      avatar: state.qzoneSettings.avatar || defaultAvatar,
+      isAlive: true,
+      isUser: true, // 标记为真实用户
+    });
+
+    // 添加被邀请的AI和NPC
+    selectedCheckboxes.forEach(checkbox => {
+      const playerId = checkbox.value;
+      const chat = Object.values(state.chats).find(c => c.id === playerId);
+      if (chat) {
+        // 是主要角色
+        werewolfGameState.players.push({
+          id: chat.id,
+          name: chat.name,
+          avatar: chat.settings.aiAvatar,
+          persona: chat.settings.aiPersona,
+          isAlive: true,
+          isUser: false,
+        });
+      } else {
+        // 是NPC
+        for (const c of Object.values(state.chats)) {
+          const npc = (c.npcLibrary || []).find(n => n.id === playerId);
+          if (npc) {
+            werewolfGameState.players.push({
+              id: npc.id,
+              name: npc.name,
+              avatar: npc.avatar,
+              persona: npc.persona,
+              isAlive: true,
+              isUser: false,
+            });
+            break;
+          }
+        }
+      }
+    });
+
+    // 打乱玩家顺序（座位顺序）
+    werewolfGameState.players.sort(() => Math.random() - 0.5);
+
+    // --- 3. 根据人数分配角色 ---
+    const roleConfigs = {
+      6: { wolf: 2, villager: 2, seer: 1, guard: 1 },
+      9: { wolf: 3, villager: 3, seer: 1, witch: 1, hunter: 1 },
+      12: { wolf: 4, villager: 4, seer: 1, witch: 1, hunter: 1, idiot: 1 },
+    };
+    // ▼▼▼ 【核心Bug修复】用这块代码替换上面的错误代码 ▼▼▼
+    const rolesToAssign = [];
+    const config = roleConfigs[totalPlayers];
+    werewolfGameState.roles = config; // 将角色配置存入游戏状态
+    for (const role in config) {
+      for (let i = 0; i < config[role]; i++) {
+        // 修正：config[i] -> config[role]
+        rolesToAssign.push(role);
+      }
+    }
+    // ▲▲▲ 修复结束 ▲▲▲
+    rolesToAssign.sort(() => Math.random() - 0.5); // 打乱角色
+
+    werewolfGameState.players.forEach((player, index) => {
+      player.role = rolesToAssign[index];
+    });
+    // ▼▼▼ 在这里添加下面的新代码 ▼▼▼
+    // ▼▼▼ 第1处修改（添加翻译）▼▼▼
+    const roleNameMap = {
+      wolf: '狼人',
+      villager: '平民',
+      seer: '预言家',
+      witch: '女巫',
+      hunter: '猎人',
+      guard: '守卫',
+      idiot: '白痴',
+    };
+
+    // 弹窗告知用户身份
+    const userPlayer = werewolfGameState.players.find(p => p.isUser);
+    if (userPlayer) {
+      const myRoleName = roleNameMap[userPlayer.role] || userPlayer.role;
+      await showCustomAlert('你的身份', `你在本局游戏中的身份是：【${myRoleName}】`);
+    }
+    // ▲▲▲ 修改结束 ▲▲▲
+    // --- 4. 切换到游戏界面并开始游戏循环 ---
+    showScreen('werewolf-game-screen');
+    await processGameTurn();
+  }
+
+  // ▼▼▼ 用这【一整块】全新的游戏引擎代码，替换旧的 processGameTurn 函数 ▼▼▼
+  /**
+   * 【狼人杀 V2】游戏主循环/引擎
+   */
+  async function processGameTurn() {
+    if (!werewolfGameState.isActive) return;
+
+    renderWerewolfGameScreen();
+
+    switch (werewolfGameState.gamePhase) {
+      case 'start':
+        logToWerewolfGame('游戏开始，正在分配身份...');
+        const roleNameMapForLog = {
+          wolf: '狼人',
+          villager: '平民',
+          seer: '预言家',
+          witch: '女巫',
+          hunter: '猎人',
+          guard: '守卫',
+          idiot: '白痴',
+        };
+        const configText = Object.entries(werewolfGameState.roles)
+          .map(([role, count]) => `${roleNameMapForLog[role] || role}x${count}`)
+          .join(', ');
+        logToWerewolfGame(`本局配置: ${configText}`);
+        werewolfGameState.gamePhase = 'night_start';
+        await sleep(3000);
+        await processGameTurn();
+        break;
+
+      case 'night_start':
+        werewolfGameState.dayNumber++;
+        werewolfGameState.lastNightKilled = [];
+        werewolfGameState.votes = {};
+        logToWerewolfGame(`第 ${werewolfGameState.dayNumber} 天，天黑请闭眼。`);
+        werewolfGameState.gamePhase = 'guard_action'; // 从守卫开始
+        await sleep(2000);
+        await processGameTurn();
+        break;
+
+      // 【守卫行动阶段】
+      case 'guard_action':
+        const guard = werewolfGameState.players.find(p => p.role === 'guard' && p.isAlive);
+        if (guard) {
+          logToWerewolfGame('守卫请睁眼，请选择你要守护的玩家。');
+          let protectedId;
+          // ★★★ 核心检查点1：判断守卫是不是User ★★★
+          if (guard.isUser) {
+            // 如果是，就调用waitForUserAction，这会弹出操作框
+            protectedId = await waitForUserAction('请选择你要守护的玩家', 'guard_protect');
+          } else {
+            // 如果不是，就让AI自己决策
+            protectedId = await triggerWerewolfAiAction(guard.id, 'guard_protect');
+          }
+          werewolfGameState.guardLastNightProtected = protectedId;
+          logToWerewolfGame(`守卫请闭眼。`);
+        }
+        werewolfGameState.gamePhase = 'wolf_action';
+        await sleep(2000);
+        await processGameTurn();
+        break;
+
+      // ▼▼▼ 用这块【狼人频道增强+平票处理版】的代码替换旧的 'wolf_action' case ▼▼▼
+      case 'wolf_action':
+        logToWerewolfGame('狼人请睁眼，请选择一个目标。');
+        const wolves = werewolfGameState.players.filter(p => p.role === 'wolf' && p.isAlive);
+        const userPlayer = wolves.find(w => w.isUser);
+        let allWolfVotes = [];
+
+        // 场景1: 用户是狼人
+        if (userPlayer) {
+          const aiWolves = wolves.filter(w => !w.isUser);
+          let suggestionsText = '🐺 狼人频道 (秘密):\n';
+
+          if (aiWolves.length > 0) {
+            // 从AI队友获取建议
+            const aiVotePromises = aiWolves.map(wolf =>
+              triggerWerewolfAiAction(wolf.id, 'wolf_kill', { isUserWolfAlly: true }),
+            );
+            const aiVotes = (await Promise.all(aiVotePromises)).filter(Boolean);
+            allWolfVotes.push(...aiVotes);
+
+            // 格式化建议给用户看
+            aiVotes.forEach((targetId, index) => {
+              const votingWolf = aiWolves[index];
+              const targetPlayer = werewolfGameState.players.find(p => p.id === targetId);
+              if (votingWolf && targetPlayer) {
+                suggestionsText += `- ${votingWolf.name} 提议击杀: ${targetPlayer.name}\n`;
+              }
+            });
+            suggestionsText += '\n请参考队友意见后进行投票。';
+
+            await showCustomAlert('狼人请沟通', suggestionsText);
+          } else {
+            await showCustomAlert('你是唯一的狼', '请独自决定今晚的目标。');
+          }
+
+          // 获取用户的最终投票
+          const userVote = await waitForUserAction('请选择最终攻击目标', 'wolf_kill');
+          if (userVote) {
+            allWolfVotes.push(userVote);
+          }
+        } else {
+          // 场景2: 用户不是狼人，AI狼人自行决定
+          const wolfPromises = wolves.map(wolf => triggerWerewolfAiAction(wolf.id, 'wolf_kill'));
+          const wolfVotes = (await Promise.all(wolfPromises)).filter(Boolean);
+          allWolfVotes.push(...wolfVotes);
+        }
+
+        // 统计所有狼人的投票
+        const voteCounts = {};
+        allWolfVotes.forEach(vote => {
+          voteCounts[vote] = (voteCounts[vote] || 0) + 1;
+        });
+
+        let maxVotes = 0;
+        let targetId = null;
+        let tied = false;
+        for (const id in voteCounts) {
+          if (voteCounts[id] > maxVotes) {
+            maxVotes = voteCounts[id];
+            targetId = id;
+            tied = false;
+          } else if (voteCounts[id] === maxVotes) {
+            tied = true;
+          }
+        }
+
+        // ★★★ 这就是我们新增的平票处理逻辑！★★★
+        if (tied && maxVotes > 0) {
+          // 如果出现平票，就从所有平票的目标中随机选择一个
+          const tiedTargets = Object.keys(voteCounts).filter(id => voteCounts[id] === maxVotes);
+          targetId = tiedTargets[Math.floor(Math.random() * tiedTargets.length)];
+          logToWerewolfGame(
+            `(狼人内部经过一番激烈讨论，最终决定目标为 ${werewolfGameState.players.find(p => p.id === targetId).name})`,
+          );
+        }
+
+        if (targetId) {
+          // 只要有目标（无论是统一意见还是随机决定），就执行击杀
+          werewolfGameState.lastNightKilled = [targetId];
+          logToWerewolfGame(`狼人请闭眼。`);
+        } else {
+          // 只有在所有狼人都没投票的情况下，才会是平安夜
+          logToWerewolfGame(`狼人放弃了行动，今晚无人被袭击。`);
+          werewolfGameState.lastNightKilled = [];
+        }
+
+        // 进入下一个游戏阶段
+        werewolfGameState.gamePhase = 'seer_action';
+        await sleep(2000);
+        await processGameTurn();
+        break;
+      // ▲▲▲ 替换结束 ▲▲▲
+
+      // 【预言家行动阶段】
+      case 'seer_action':
+        const seer = werewolfGameState.players.find(p => p.role === 'seer' && p.isAlive);
+        if (seer) {
+          logToWerewolfGame('预言家请睁眼，请选择你要查验的玩家。');
+          let targetId;
+          // ★★★ 核心检查点3：判断预言家是不是User ★★★
+          if (seer.isUser) {
+            targetId = await waitForUserAction('请选择你要查验的玩家', 'seer_check');
+          } else {
+            targetId = await triggerWerewolfAiAction(seer.id, 'seer_check');
+          }
+          const targetPlayer = werewolfGameState.players.find(p => p.id === targetId);
+          const isWolf = targetPlayer.role === 'wolf';
+          werewolfGameState.seerLastNightResult = { targetName: targetPlayer.name, isWolf: isWolf };
+          logToWerewolfGame(`预言家请闭眼。`);
+          if (seer.isUser) {
+            await showCustomAlert('查验结果', `${targetPlayer.name} 的身份是：${isWolf ? '狼人' : '好人'}`);
+          }
+        }
+        werewolfGameState.gamePhase = 'witch_action';
+        await sleep(2000);
+        await processGameTurn();
+        break;
+
+      // 【女巫行动阶段】
+      case 'witch_action':
+        const witch = werewolfGameState.players.find(p => p.role === 'witch' && p.isAlive);
+        if (witch) {
+          logToWerewolfGame('女巫请睁眼。');
+          const killedId = werewolfGameState.lastNightKilled[0];
+          let killedPlayerName = null;
+          if (killedId) {
+            killedPlayerName = werewolfGameState.players.find(p => p.id === killedId).name;
+            logToWerewolfGame(`今晚 ${killedPlayerName} 被袭击了。`);
+          }
+
+          let witchAction;
+          // ★★★ 核心检查点4：判断女巫是不是User ★★★
+          if (witch.isUser) {
+            witchAction = await waitForUserAction('女巫请行动', 'witch_action', { killedId, killedPlayerName });
+          } else {
+            witchAction = await triggerWerewolfAiAction(witch.id, 'witch_action', { killedId });
+          }
+
+          if (witchAction?.action === 'save' && killedId) {
+            werewolfGameState.lastNightKilled = [];
+            werewolfGameState.witchPotions.save = 0;
+          } else if (witchAction?.action === 'poison' && witchAction.targetId) {
+            werewolfGameState.lastNightKilled.push(witchAction.targetId);
+            werewolfGameState.witchPotions.poison = 0;
+          }
+        }
+        logToWerewolfGame(`女巫请闭眼。`);
+        werewolfGameState.gamePhase = 'day_start';
+        await sleep(2000);
+        await processGameTurn();
+        break;
+
+      case 'day_start':
+        logToWerewolfGame('天亮了。');
+        let deathAnnouncements = [];
+        const deathsThisNight = new Set();
+
+        werewolfGameState.lastNightKilled.forEach(killedId => {
+          if (killedId === werewolfGameState.guardLastNightProtected) {
+            logToWerewolfGame(
+              `昨晚 ${werewolfGameState.players.find(p => p.id === killedId).name} 被袭击但同时也被守护了。`,
+            );
+          } else {
+            deathsThisNight.add(killedId);
+          }
+        });
+
+        if (deathsThisNight.size === 0) {
+          logToWerewolfGame('昨晚是一个平安夜。');
+        } else {
+          deathsThisNight.forEach(deadId => {
+            const deadPlayer = werewolfGameState.players.find(p => p.id === deadId);
+            if (deadPlayer.isAlive) {
+              deadPlayer.isAlive = false;
+              deathAnnouncements.push(`${deadPlayer.name} 昨晚被淘汰了。`);
+            }
+          });
+          deathAnnouncements.forEach(announcement => logToWerewolfGame(announcement));
+        }
+
+        renderWerewolfGameScreen();
+        if (checkGameOver()) return;
+
+        let hunterDied = null;
+        deathsThisNight.forEach(deadId => {
+          const deadPlayer = werewolfGameState.players.find(p => p.id === deadId);
+          if (deadPlayer.role === 'hunter') hunterDied = deadPlayer;
+        });
+
+        if (hunterDied) {
+          logToWerewolfGame(`${hunterDied.name} 是猎人，可以选择一名玩家带走。`);
+          let targetId;
+          // ★★★ 核心检查点5：判断猎人是不是User ★★★
+          if (hunterDied.isUser) {
+            targetId = await waitForUserAction('请选择你要带走的玩家', 'hunter_shoot');
+          } else {
+            targetId = await triggerWerewolfAiAction(hunterDied.id, 'hunter_shoot');
+          }
+          if (targetId) {
+            const targetPlayer = werewolfGameState.players.find(p => p.id === targetId);
+            targetPlayer.isAlive = false;
+            logToWerewolfGame(`猎人开枪带走了 ${targetPlayer.name}。`);
+            renderWerewolfGameScreen();
+            if (checkGameOver()) return;
+          }
+        }
+
+        werewolfGameState.gamePhase = 'day_discussion';
+        await sleep(2000);
+        await processGameTurn();
+        break;
+
+      case 'day_discussion':
+        logToWerewolfGame('现在开始依次发言。');
+        const alivePlayersForSpeech = werewolfGameState.players.filter(p => p.isAlive);
+        for (const player of alivePlayersForSpeech) {
+          renderWerewolfGameScreen({ speakingPlayerId: player.id });
+          let speech;
+          if (player.isUser) {
+            speech = await waitForUserAction('轮到你发言', 'speak');
+          } else {
+            speech = await triggerWerewolfAiAction(player.id, 'speak');
+          }
+          logToWerewolfGame({ player: player, speech: speech }, 'speech');
+          await sleep(1000);
+        }
+        renderWerewolfGameScreen();
+        werewolfGameState.gamePhase = 'day_vote';
+        await processGameTurn();
+        break;
+
+      case 'day_vote':
+        logToWerewolfGame('请投票选出你认为是狼人的玩家。');
+        const voterPromises = werewolfGameState.players
+          .filter(p => p.isAlive)
+          .map(player => {
+            if (player.isUser) {
+              return waitForUserAction('请投票', 'vote');
+            } else {
+              return triggerWerewolfAiAction(player.id, 'vote');
+            }
+          });
+        const allVotesResult = (await Promise.all(voterPromises)).filter(Boolean);
+
+        const voteTallyResult = {};
+        allVotesResult.forEach(vote => {
+          voteTallyResult[vote] = (voteTallyResult[vote] || 0) + 1;
+        });
+
+        let maxVotesResult = 0,
+          playersToEliminate = [];
+        for (const playerId in voteTallyResult) {
+          if (voteTallyResult[playerId] > maxVotesResult) {
+            maxVotesResult = voteTallyResult[playerId];
+            playersToEliminate = [playerId];
+          } else if (voteTallyResult[playerId] === maxVotesResult) {
+            playersToEliminate.push(playerId);
+          }
+        }
+
+        if (playersToEliminate.length === 1) {
+          const eliminatedPlayer = werewolfGameState.players.find(p => p.id === playersToEliminate[0]);
+          eliminatedPlayer.isAlive = false;
+          logToWerewolfGame(`投票结果：${eliminatedPlayer.name} 被淘汰。`);
+          renderWerewolfGameScreen();
+          if (checkGameOver()) return;
+          if (eliminatedPlayer.role === 'hunter') {
+            logToWerewolfGame(`${eliminatedPlayer.name} 是猎人，可以选择一名玩家带走。`);
+            let targetId;
+            if (eliminatedPlayer.isUser) {
+              targetId = await waitForUserAction('请选择你要带走的玩家', 'hunter_shoot');
+            } else {
+              targetId = await triggerWerewolfAiAction(eliminatedPlayer.id, 'hunter_shoot');
+            }
+            if (targetId) {
+              const targetPlayer = werewolfGameState.players.find(p => p.id === targetId);
+              targetPlayer.isAlive = false;
+              logToWerewolfGame(`猎人开枪带走了 ${targetPlayer.name}。`);
+              renderWerewolfGameScreen();
+              if (checkGameOver()) return;
+            }
+          }
+        } else {
+          logToWerewolfGame('投票平票，无人出局。');
+        }
+
+        werewolfGameState.gamePhase = 'night_start';
+        await sleep(3000);
+        await processGameTurn();
+        break;
+    }
+  }
+  // ▲▲▲ 新引擎代码结束 ▲▲▲
+  // ▼▼▼ 【全新】这是狼人杀的重roll功能核心函数 ▼▼▼
+  /**
+   * 【狼人杀】处理AI发言的重roll请求
+   * @param {number} logIndex - 要重roll的发言在gameLog中的索引
+   */
+  async function handleWerewolfReroll(logIndex) {
+    const logEntry = werewolfGameState.gameLog[logIndex];
+    if (!logEntry || logEntry.type !== 'speech' || logEntry.message.player.isUser) {
+      return; // 安全检查，确保我们操作的是AI的发言
+    }
+
+    const playerToReroll = logEntry.message.player;
+
+    // 给用户一个即时反馈
+    const speechTextElement = document
+      .querySelector(`button[data-log-index="${logIndex}"]`)
+      .closest('.speech-content')
+      .querySelector('.speech-text');
+    if (speechTextElement) {
+      speechTextElement.innerHTML = '<i>正在重新思考...</i>';
+    }
+
+    try {
+      // 重新调用AI生成新的发言
+      const newSpeech = await triggerWerewolfAiAction(playerToReroll.id, 'speak');
+
+      // 用新的发言内容替换掉旧的
+      werewolfGameState.gameLog[logIndex].message.speech = newSpeech;
+
+      // 重新渲染整个游戏界面以显示更新
+      renderWerewolfGameScreen();
+    } catch (error) {
+      console.error('狼人杀发言重roll失败:', error);
+      if (speechTextElement) {
+        speechTextElement.innerHTML = `<i style="color:red;">重新生成失败，请检查网络或API设置。</i>`;
+      }
+    }
+  }
+  // ▲▲▲ 新增函数结束 ▲▲▲
+
+  // ▼▼▼ 请用这块【已添加重roll按钮】的代码，完整替换旧的 renderWerewolfGameScreen 函数 ▼▼▼
+  /**
+   * 【狼人杀】渲染游戏主界面
+   */
+  function renderWerewolfGameScreen(options = {}) {
+    const playersGrid = document.getElementById('werewolf-players-grid');
+    const logContainer = document.getElementById('werewolf-game-log');
+
+    // 渲染玩家座位
+    playersGrid.innerHTML = '';
+    werewolfGameState.players.forEach(player => {
+      const seat = document.createElement('div');
+      seat.className = 'player-seat';
+      const avatarClass = `player-avatar ${!player.isAlive ? 'dead' : ''} ${
+        options.speakingPlayerId === player.id ? 'speaking' : ''
+      } ${options.activePlayerId === player.id ? 'active-turn' : ''}`;
+
+      let roleIndicator = '';
+      const user = werewolfGameState.players.find(p => p.isUser);
+      // 如果我是狼人，显示所有狼人队友
+      if (user.role === 'wolf' && player.role === 'wolf') {
+        roleIndicator = '<div class="player-role-indicator" style="display: flex;">W</div>';
+      }
+
+      seat.innerHTML = `
+            ${roleIndicator}
+            <img src="${player.avatar}" class="${avatarClass}">
+            <span class="player-name">${player.name} (${player.isAlive ? '存活' : '淘汰'})</span>
+        `;
+      playersGrid.appendChild(seat);
+    });
+
+    // 渲染游戏日志
+    logContainer.innerHTML = werewolfGameState.gameLog
+      .map((log, index) => {
+        // ★ 核心修改1：增加了index参数
+        // 判断是否为AI的发言
+        if (log.type === 'speech' && typeof log.message === 'object' && !log.message.player.isUser) {
+          const { player, speech } = log.message;
+          // ★ 核心修改2：在AI发言的DOM结构中，加入一个带有特殊data属性的重roll按钮
+          return `
+            <div class="log-entry speech">
+                <img src="${player.avatar}" class="speech-avatar">
+                <div class="speech-content">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="speaker">${player.name}</span>
+                        <button class="werewolf-reroll-btn" data-log-index="${index}" title="重新生成发言" style="background:none; border:none; cursor:pointer; padding:0; color:var(--text-secondary);">
+                            <svg class="reroll-btn-icon" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                        </button>
+                    </div>
+                    <span class="speech-text">${speech.replace(/\n/g, '<br>')}</span>
+                </div>
+            </div>
+        `;
+        }
+        // 用户发言或其他系统消息保持原样
+        else if (log.type === 'speech' && typeof log.message === 'object') {
+          const { player, speech } = log.message;
+          return `
+            <div class="log-entry speech">
+                <img src="${player.avatar}" class="speech-avatar">
+                <div class="speech-content">
+                    <span class="speaker">${player.name}</span>
+                    <span class="speech-text">${speech.replace(/\n/g, '<br>')}</span>
+                </div>
+            </div>
+        `;
+        } else {
+          return `<div class="log-entry ${log.type}">${String(log.message).replace(/\n/g, '<br>')}</div>`;
+        }
+      })
+      .join('');
+    logContainer.scrollTop = logContainer.scrollHeight;
+  }
+  // ▲▲▲ 替换结束 ▲▲▲
+
+  /**
+   * 【狼人杀】等待用户投票
+   */
+  function waitForUserVote() {
+    return new Promise(resolve => {
+      const actionArea = document.getElementById('werewolf-action-area');
+      const alivePlayers = werewolfGameState.players.filter(p => p.isAlive && !p.isUser);
+
+      actionArea.innerHTML = '<h5>请投票:</h5>';
+      const grid = document.createElement('div');
+      grid.className = 'vote-target-grid';
+
+      alivePlayers.forEach(player => {
+        const btn = document.createElement('button');
+        btn.className = 'form-button-secondary vote-target-btn';
+        btn.textContent = player.name;
+        btn.onclick = () => {
+          actionArea.innerHTML = '';
+          resolve(player.id);
+        };
+        grid.appendChild(btn);
+      });
+      actionArea.appendChild(grid);
+    });
+  }
+
+  /**
+   * 【狼人杀】添加一条游戏日志
+   */
+  function logToWerewolfGame(message, type = 'system') {
+    werewolfGameState.gameLog.push({ message, type });
+    renderWerewolfGameScreen();
+  }
+  /**
+   * 【狼人杀-AI核心】调用AI为整局游戏生成复盘摘要
+   * @returns {Promise<string>} - AI生成的摘要文本
+   */
+  async function generateAiGameSummary() {
+    const { proxyUrl, apiKey, model } = state.apiConfig;
+    if (!proxyUrl || !apiKey || !model) {
+      return '（AI摘要生成失败：API未配置）';
+    }
+
+    // 格式化完整的游戏日志，让AI能够理解
+    const formattedLog = werewolfGameState.gameLog
+      .map(log => {
+        if (log.type === 'speech') {
+          return `${log.message.player.name}: ${log.message.speech}`;
+        }
+        return log.message;
+      })
+      .join('\n');
+
+    const prompt = `
+# 任务
+你是一位专业的狼人杀复盘分析师。请根据以下完整的游戏日志，用100-150字，客观、精炼地总结本局游戏的【关键事件】和【转折点】。
+
+# 核心要求
+- 你的总结需要有逻辑、有条理。
+- 指出关键玩家的行为，例如预言家的查验、女巫的操作、猎人的开枪等。
+- 分析狼人阵营和好人阵营的博弈过程。
+- 你的输出【必须且只能】是复盘摘要的纯文本内容，不要包含任何额外的对话或标题。
+
+# 游戏日志
+${formattedLog}
+`;
+
+    try {
+      const messagesForApi = [{ role: 'user', content: prompt }];
+      let isGemini = proxyUrl === GEMINI_API_URL;
+      let geminiConfig = toGeminiRequestData(model, apiKey, prompt, messagesForApi, isGemini);
+
+      const response = isGemini
+        ? await fetch(geminiConfig.url, geminiConfig.data)
+        : await fetch(`${proxyUrl}/v1/chat/completions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+            body: JSON.stringify({
+              model: model,
+              messages: messagesForApi,
+              temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+            }),
+          });
+
+      if (!response.ok) throw new Error(await response.text());

@@ -1,0 +1,857 @@
+async function renderTukeyRecordsList() {
+  const listEl = document.getElementById("tukey-records-list");
+  listEl.innerHTML = ""; // 清空
+  if (!activeTukeyGroup) return;
+
+  // 获取所有记录并按时间升序排列（旧的在前，新的在后）
+  const records = await db.tukeyAccountingRecords
+    .where("groupId")
+    .equals(activeTukeyGroup.id)
+    .sortBy("timestamp");
+
+  if (records.length === 0) {
+    listEl.innerHTML =
+      '<div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:300px; color:#ccc;">' +
+      '<span style="font-size:40px; margin-bottom:10px;">📝</span>' +
+      "<span>还没记账呢，点右下角开始吧~</span>" +
+      "</div>";
+    return;
+  }
+
+  for (const record of records) {
+    const recordTime = new Date(record.timestamp);
+    const timeString = `${recordTime.getMonth() + 1}/${recordTime.getDate()} ${String(recordTime.getHours()).padStart(2, "0")}:${String(recordTime.getMinutes()).padStart(2, "0")}`;
+
+    // 找到对应分类的图标
+    let categoryIcon = "";
+    // 尝试在支出和收入里找
+    const expenseCat = ACCOUNTING_CATEGORIES["expense"]?.find(
+      (c) => c.name === record.category,
+    );
+    const incomeCat = ACCOUNTING_CATEGORIES["income"]?.find(
+      (c) => c.name === record.category,
+    );
+    const customCat = (ACCOUNTING_CATEGORIES["expense"] || [])
+      .concat(ACCOUNTING_CATEGORIES["income"] || [])
+      .find((c) => c.name === record.category);
+
+    if (expenseCat) categoryIcon = expenseCat.icon;
+    else if (incomeCat) categoryIcon = incomeCat.icon;
+    else if (customCat) categoryIcon = customCat.icon;
+    else categoryIcon = "https://i.postimg.cc/y88P16yW/default-icon.png"; // 默认图标
+
+    // --- 创建用户记账气泡 (右侧) ---
+    const userRecordWrapper = document.createElement("div");
+    userRecordWrapper.className = "tukey-record-wrapper user-record";
+
+    // 创建记账气泡本身
+    // 添加删除按钮 logic
+    const recordBubble = document.createElement("div");
+    recordBubble.className = `tukey-record-bubble ${record.type}`;
+    recordBubble.innerHTML = `
+            <div class="record-header">
+                <img src="${categoryIcon}" class="record-category-icon" alt="${record.category}">
+                <span class="record-category-name">${record.category}</span>
+                <span class="record-amount" style="margin-left:auto;">${record.type === "expense" ? "-" : "+"} ${record.amount.toFixed(2)}</span>
+            </div>
+            <div class="record-body" style="margin-bottom:0;">
+                <span class="record-remarks">${record.remarks || "无备注"}</span>
+            </div>
+            <div class="record-footer">
+                <span>${record.accountName || "账户"}</span> · <span>${timeString}</span>
+            </div>
+            <!-- 删除按钮 (绝对定位在气泡左侧外面一点，或者做成悬浮显示，这里简单处理放气泡内角落) -->
+            <div class="delete-record-btn" data-id="${record.id}" style="position:absolute; top:-5px; left:-10px; background:#fff; border-radius:50%; width:20px; height:20px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 5px rgba(0,0,0,0.1); cursor:pointer; color:#ff3b30; font-size:14px; opacity:0; transition:opacity 0.2s;">×</div>
+        `;
+
+    // 鼠标悬停显示删除按钮
+    recordBubble.addEventListener("mouseenter", () => {
+      recordBubble.querySelector(".delete-record-btn").style.opacity = "1";
+    });
+    recordBubble.addEventListener("mouseleave", () => {
+      recordBubble.querySelector(".delete-record-btn").style.opacity = "0";
+    });
+
+    // 绑定删除事件
+    recordBubble
+      .querySelector(".delete-record-btn")
+      .addEventListener("click", (e) => {
+        e.stopPropagation();
+        deleteTukeyAccountingRecord(record.id);
+      });
+
+    // 创建头像
+    const userAvatarImg = document.createElement("img");
+    userAvatarImg.src =
+      tukeyUserSettings.avatar || "https://i.postimg.cc/PxZrFFFL/o-o-1.jpg";
+    userAvatarImg.className = "record-user-avatar";
+
+    // 组装用户消息
+    userRecordWrapper.appendChild(recordBubble);
+    userRecordWrapper.appendChild(userAvatarImg);
+    listEl.appendChild(userRecordWrapper);
+
+    // --- 查询并渲染对应的 AI 回复 (左侧) ---
+    const replies = await db.tukeyAccountingReplies
+      .where("recordId")
+      .equals(record.id)
+      .toArray();
+
+    if (replies.length > 0) {
+      const repliesContainer = document.createElement("div");
+      repliesContainer.className = "tukey-replies-container"; // 这个容器是列布局
+
+      for (const reply of replies) {
+        const member = activeTukeyGroup.members.find(
+          (m) => m.id === reply.charId,
+        );
+        if (member) {
+          const replyEl = document.createElement("div");
+          replyEl.className = "tukey-reply-item"; // flex row
+          replyEl.innerHTML = `
+                <img src="${member.avatar}" class="reply-avatar" alt="${member.name}">
+                <div class="reply-content">
+                    <div class="reply-sender-name">${member.groupNickname || member.name}</div>
+                    <div class="reply-bubble">${reply.content}</div>
+                </div>
+            `;
+          repliesContainer.appendChild(replyEl);
+        }
+      }
+
+      // ★★★ 新增：添加重Roll按钮 ★★★
+      const rerollBtn = document.createElement("div");
+      rerollBtn.className = "tukey-reroll-btn";
+      rerollBtn.dataset.recordId = record.id; // 绑定账单ID
+      rerollBtn.innerHTML = `
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+        </svg>
+        <span>重生成</span>
+      `;
+      repliesContainer.appendChild(rerollBtn);
+      // ★★★ 新增结束 ★★★
+
+      listEl.appendChild(repliesContainer);
+    }
+  }
+
+  // 滚动到底部
+  setTimeout(() => {
+    listEl.scrollTop = listEl.scrollHeight;
+  }, 100);
+}
+
+// ▼▼▼ 【兔k记账】这是全新的AI回复核心逻辑，请完整粘贴 ▼▼▼
+
+/**
+ * 检查是否达到阈值，并触发AI回复
+ */
+async function checkAndTriggerAiReply() {
+  if (!activeTukeyGroup) return;
+
+  const settings = activeTukeyGroup.replySettings;
+  // ▼▼▼ 【核心修复】使用 .filter() 来正确查找未回复的记录 ▼▼▼
+  const unrepliedRecords = await db.tukeyAccountingRecords
+    .where("groupId")
+    .equals(activeTukeyGroup.id)
+    .filter((record) => !record.isRepliedTo) // 这会匹配 isRepliedTo 为 false, undefined 或 null 的所有情况
+    .toArray();
+  // ▲▲▲ 修复结束 ▲▲▲
+
+  console.log(
+    `[记账AI检查] 未回复记录数: ${unrepliedRecords.length}, 阈值: ${settings.threshold}`,
+  );
+
+  // 如果未回复的记录数达到了阈值
+  if (unrepliedRecords.length >= settings.threshold) {
+    console.log(`[记账AI触发] 达到阈值，准备生成回复...`);
+    await triggerAccountingAiResponse(unrepliedRecords);
+  }
+}
+/**
+ * 【全局函数】处理单条账单的AI回复重生成
+ * 放在代码的最外层，不要放在其他函数里面！
+ */
+window.handleTukeyReroll = async function (recordId) {
+  console.log("正在重Roll账单 ID:", recordId); // 调试日志
+
+  // 1. 检查是否有激活的群组
+  if (!window.activeTukeyGroup && window.state.chats) {
+    // 尝试自动修复 activeTukeyGroup (防止刷新后丢失)
+    // 这里假设群组ID固定为 main_group，如果你的逻辑不同请调整
+    window.activeTukeyGroup =
+      await window.db.tukeyAccountingGroups.get("main_group");
+  }
+
+  if (!window.activeTukeyGroup) {
+    alert("无法获取当前群聊信息，请刷新页面重试。");
+    return;
+  }
+
+  // 2. 获取账单记录
+  const record = await window.db.tukeyAccountingRecords.get(recordId);
+  if (!record) {
+    alert("找不到该账单记录！");
+    return;
+  }
+
+  // 3. 视觉反馈：将按钮变成“生成中...”
+  const listEl = document.getElementById("tukey-records-list");
+  // 使用更精确的选择器找到那个被点击的按钮
+  const btn = listEl.querySelector(
+    `.tukey-reroll-btn[data-record-id="${recordId}"]`,
+  );
+  if (btn) {
+    btn.innerHTML = "<span>⏳ 生成中...</span>";
+    btn.style.pointerEvents = "none";
+    btn.style.opacity = "0.7";
+  }
+
+  try {
+    // 4. 删除旧的回复
+    const oldReplies = await window.db.tukeyAccountingReplies
+      .where("recordId")
+      .equals(recordId)
+      .toArray();
+
+    if (oldReplies.length > 0) {
+      const replyIds = oldReplies.map((r) => r.id);
+      await window.db.tukeyAccountingReplies.bulkDelete(replyIds);
+      console.log(`已删除 ${replyIds.length} 条旧回复`);
+    }
+
+    // 5. 重新调用生成函数 (注意：传入数组)
+    // 确保 triggerAccountingAiResponse 也是全局可访问的，或者在同一作用域
+    if (typeof triggerAccountingAiResponse === "function") {
+      await triggerAccountingAiResponse([record]);
+    } else if (typeof window.triggerAccountingAiResponse === "function") {
+      await window.triggerAccountingAiResponse([record]);
+    } else {
+      alert("错误：找不到生成函数 triggerAccountingAiResponse");
+    }
+  } catch (error) {
+    console.error("重Roll失败:", error);
+    alert("重生成失败: " + error.message);
+    // 如果失败，尝试恢复界面
+    if (typeof renderTukeyRecordsList === "function") {
+      await renderTukeyRecordsList();
+    }
+  }
+};
+
+/**
+ * 【AI核心】触发记账群聊的AI回复
+ * @param {Array} recordsToReply - 需要AI进行评论的账单记录数组
+ */
+async function triggerAccountingAiResponse(recordsToReply) {
+  if (!activeTukeyGroup) return;
+
+  // 显示一个加载提示
+  const listEl = document.getElementById("tukey-records-list");
+  const loadingEl = document.createElement("div");
+  loadingEl.className = "tukey-reply-item";
+  loadingEl.innerHTML = `<div class="reply-bubble">成员们正在赶来的路上...</div>`;
+  listEl.appendChild(loadingEl);
+  listEl.scrollTop = listEl.scrollHeight;
+
+  const { proxyUrl, apiKey, model, temperature } = state.apiConfig;
+  if (!proxyUrl || !apiKey || !model) {
+    loadingEl.remove();
+    alert("请先在API设置中配置好才能触发AI回复哦！");
+    return;
+  }
+
+  const settings = activeTukeyGroup.replySettings;
+  let membersToReply = [];
+
+  // 根据设置决定哪些成员需要回复
+  switch (settings.mode) {
+    case "all":
+      membersToReply = activeTukeyGroup.members;
+      break;
+    case "random":
+      const shuffled = [...activeTukeyGroup.members].sort(
+        () => 0.5 - Math.random(),
+      );
+      membersToReply = shuffled.slice(0, settings.randomCount || 1);
+      break;
+    case "specific":
+      membersToReply = activeTukeyGroup.members.filter((m) =>
+        settings.specificMemberIds.includes(m.id),
+      );
+      break;
+  }
+
+  if (membersToReply.length === 0) {
+    loadingEl.remove();
+    console.warn("[记账AI] 没有找到需要回复的成员。");
+    return;
+  }
+
+  // 构建给AI的指令 (Prompt)
+  const recordsText = recordsToReply
+    .map(
+      (r) =>
+        `- [${new Date(r.timestamp).toLocaleString()}] ${r.type === "expense" ? "支出" : "收入"} ${r.amount.toFixed(
+          2,
+        )}元, 分类: ${r.category}, 备注: ${r.remarks || "无"}`,
+    )
+    .join("\n");
+
+  // ... 在 triggerAccountingAiResponse 函数内部 ...
+
+  const membersText = membersToReply
+    .map((m) => `- ${m.name} (人设: ${m.persona})`)
+    .join("\n");
+
+  // ▼▼▼ 用这整块新代码替换旧的 systemPrompt ▼▼▼
+  const systemPrompt = `
+# 角色
+你是一个多角色扮演AI，在一个记账群聊中。
+
+# 用户信息 (这是账单的记录者)
+- 用户名: ${tukeyUserSettings.username}
+- 职业: ${tukeyUserSettings.profession || "未设定"}
+
+# 任务
+群里的用户刚刚记录了以下几笔账单。请你根据下方指定的角色列表及其人设，以及用户的职业信息，为他们每个人生成对这些账单的评论。
+
+# 待评论的账单
+${recordsText}
+
+# 你需要扮演的角色 (及人设)
+${membersText}
+
+# 回复规则
+1.  你的回复【必须严格符合】每个角色的人设。
+2.  你的回复可以结合用户的【职业】进行评论，让对话更真实。例如，如果用户是学生，可以说“学生党花钱真大方呀”；如果是白领，可以说“看来这个月工资不错嘛”。
+3.  你的回复【必须】是一个JSON数组，每个对象代表一个角色的评论。
+4.  【格式铁律】: \`[{"charName": "角色A的名字", "comment": "角色A的评论内容"}, {"charName": "角色B的名字", "comment": "角色B的评论内容"}]\`
+5.  评论内容要简短、口语化，像真实的群聊一样。
+
+现在，请开始生成评论。
+`;
+
+  try {
+    const messagesForApi = [{ role: "user", content: systemPrompt }];
+    let isGemini = proxyUrl === GEMINI_API_URL;
+    let geminiConfig = toGeminiRequestData(
+      model,
+      apiKey,
+      systemPrompt,
+      messagesForApi,
+      isGemini,
+      temperature,
+    );
+
+    const response = isGemini
+      ? await fetch(geminiConfig.url, geminiConfig.data)
+      : await fetch(`${proxyUrl}/v1/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: messagesForApi,
+            temperature: parseFloat(temperature) || 0.8,
+            response_format: { type: "json_object" },
+          }),
+        });
+
+    if (!response.ok) throw new Error(await response.text());
+
+    const data = await response.json();
+    const rawContent = (
+      isGemini
+        ? data.candidates[0].content.parts[0].text
+        : data.choices[0].message.content
+    )
+      .replace(/^```json\s*|```$/g, "")
+      .trim();
+    const replies = JSON.parse(rawContent);
+
+    if (Array.isArray(replies)) {
+      // 为所有被评论的账单都添加这些回复
+      for (const record of recordsToReply) {
+        for (const reply of replies) {
+          const member = activeTukeyGroup.members.find(
+            (m) => m.name === reply.charName,
+          );
+          if (member && reply.comment) {
+            await db.tukeyAccountingReplies.add({
+              recordId: record.id,
+              charId: member.id,
+              charName: member.name,
+              content: reply.comment,
+              timestamp: Date.now(),
+            });
+          }
+        }
+      }
+
+      // 【关键】将所有已回复的记录标记为 isRepliedTo: true
+      const recordIdsToUpdate = recordsToReply.map((r) => r.id);
+      await db.tukeyAccountingRecords
+        .where("id")
+        .anyOf(recordIdsToUpdate)
+        .modify({ isRepliedTo: true });
+
+      await renderTukeyRecordsList(); // 重新渲染，显示新回复
+    }
+  } catch (error) {
+    console.error("生成记账回复失败:", error);
+    await showCustomAlert("回复生成失败", `发生错误: ${error.message}`);
+  } finally {
+    // 无论成功失败，都移除加载提示
+    loadingEl.remove();
+  }
+}
+// ▲▲▲ 新增AI回复逻辑结束 ▲▲▲
+// ▼▼▼ 在你的JS功能区添加下面这些全新的报表功能函数 ▼▼▼
+
+/**
+ * 【报表总入口】渲染报表主视图，填充筛选器并显示默认报表
+ */
+async function renderTukeyReportsView() {
+  await populateReportFilters();
+  // 默认显示“每日明细”
+  document.getElementById("report-type-filter").value = "daily_details";
+  handleReportFilterChange(); // 触发一次渲染
+}
+
+/**
+ * 【辅助】填充报表的筛选器（账户、月份）
+ */
+async function populateReportFilters() {
+  // 填充账户筛选器
+  const accountSelect = document.getElementById("report-account-filter");
+  const accounts = await db.tukeyAccounts.toArray();
+  accountSelect.innerHTML = '<option value="all">所有账户</option>';
+  accounts.forEach((acc) => {
+    accountSelect.innerHTML += `<option value="${acc.id}">${acc.name}</option>`;
+  });
+
+  // 填充月份筛选器
+  const monthSelect = document.getElementById("report-month-filter");
+  const records = await db.tukeyAccountingRecords
+    .orderBy("timestamp")
+    .reverse()
+    .toArray();
+  const months = new Set();
+  records.forEach((rec) => {
+    const date = new Date(rec.timestamp);
+    months.add(
+      `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`,
+    );
+  });
+
+  monthSelect.innerHTML = "";
+  months.forEach((month) => {
+    monthSelect.innerHTML += `<option value="${month}">${month}</option>`;
+  });
+  // 如果没有记录，给一个默认当前月份
+  if (months.size === 0) {
+    const now = new Date();
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    monthSelect.innerHTML = `<option value="${currentMonth}">${currentMonth}</option>`;
+  }
+}
+
+/**
+ * 【核心】处理筛选条件变化，并调用相应的报表渲染函数
+ */
+function handleReportFilterChange() {
+  const reportType = document.getElementById("report-type-filter").value;
+  const accountId = document.getElementById("report-account-filter").value;
+  const monthValue = document.getElementById("report-month-filter").value;
+
+  const dailyView = document.getElementById("daily-report-view");
+  const monthlyView = document.getElementById("monthly-report-view");
+
+  if (reportType === "daily_details") {
+    dailyView.style.display = "block";
+    monthlyView.style.display = "none";
+    renderDailyDetailView(accountId === "all" ? null : parseInt(accountId));
+  } else if (reportType === "monthly_summary") {
+    dailyView.style.display = "none";
+    monthlyView.style.display = "block";
+    if (monthValue) {
+      const [year, month] = monthValue.split("-");
+      renderMonthlySummaryView(
+        parseInt(year),
+        parseInt(month),
+        accountId === "all" ? null : parseInt(accountId),
+      );
+    }
+  }
+}
+
+/**
+ * 【渲染 - 美化版】每日明细视图 (精致的删除按钮)
+ */
+async function renderDailyDetailView(accountId) {
+  const view = document.getElementById("daily-report-view");
+  view.innerHTML = '<p class="report-placeholder">正在加载每日明细...</p>';
+
+  let records;
+  if (accountId) {
+    records = await db.tukeyAccountingRecords
+      .where({ accountId: accountId })
+      .reverse()
+      .sortBy("timestamp");
+  } else {
+    records = await db.tukeyAccountingRecords.reverse().sortBy("timestamp");
+  }
+
+  if (records.length === 0) {
+    view.innerHTML = '<p class="report-placeholder">没有找到任何记账记录。</p>';
+    return;
+  }
+
+  const recordsByDay = records.reduce((acc, rec) => {
+    const day = new Date(rec.timestamp).toISOString().split("T")[0];
+    if (!acc[day]) acc[day] = [];
+    acc[day].push(rec);
+    return acc;
+  }, {});
+
+  view.innerHTML = "";
+
+  for (const day in recordsByDay) {
+    const dayRecords = recordsByDay[day];
+    let dailyIncome = 0;
+    let dailyExpense = 0;
+
+    let transactionsHtml = "";
+    dayRecords.forEach((rec) => {
+      if (rec.type === "income") dailyIncome += rec.amount;
+      else dailyExpense += rec.amount;
+
+      const categoryData = ACCOUNTING_CATEGORIES[rec.type].find(
+        (c) => c.name === rec.category,
+      );
+      const categoryIcon = categoryData ? categoryData.icon : "";
+      const recordTime = new Date(rec.timestamp);
+      const timeString = `${String(recordTime.getHours()).padStart(2, "0")}:${String(
+        recordTime.getMinutes(),
+      ).padStart(2, "0")}`;
+
+      // ▼▼▼ 找到 renderDailyDetailView 函数内的 forEach 循环，替换 transactionsHtml 生成部分 ▼▼▼
+
+      transactionsHtml += `
+    <div class="report-record-item">
+        <!-- 气泡主体 -->
+        <div class="tukey-record-bubble ${rec.type}"> 
+            <div class="record-main-row">
+                <!-- 左侧：图标和分类 -->
+                <div class="record-icon-wrapper">
+                    <img src="${categoryIcon}" class="record-category-icon" alt="${rec.category}">
+                </div>
+                
+                <!-- 中间：分类名和备注 -->
+                <div class="record-info-col">
+                    <div class="record-category-name">${rec.category}</div>
+                    ${rec.remarks ? `<div class="record-remarks">${rec.remarks}</div>` : ""}
+                    <div class="record-meta">
+                        <span>${rec.accountName}</span> · <span>${timeString}</span>
+                    </div>
+                </div>
+
+                <!-- 右侧：金额 -->
+                <div class="record-amount-col">
+                    <span class="record-amount">${rec.type === "expense" ? "-" : "+"}</span>
+                    <span class="record-amount-num">${rec.amount.toFixed(2)}</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 删除按钮 (悬浮显示) -->
+        <button class="delete-record-btn" data-id="${rec.id}" title="删除">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+        </button>
+    </div>
+`;
+      // ▲▲▲ 替换结束 ▲▲▲
+    });
+
+    const dayGroup = document.createElement("div");
+    dayGroup.className = "report-day-group";
+    dayGroup.innerHTML = `
+            <div class="day-header">
+                <span class="date">${day}</span>
+                <span class="day-summary">
+                    <span class="expense">支出: ${dailyExpense.toFixed(2)}</span>
+                    <span class="income">收入: ${dailyIncome.toFixed(2)}</span>
+                </span>
+            </div>
+            <div class="transaction-list">${transactionsHtml}</div>
+        `;
+    view.appendChild(dayGroup);
+  }
+}
+
+/**
+ * 【全新】删除一条记账记录并回滚账户余额
+ * @param {number} recordId - 要删除的记录ID
+ */
+async function deleteTukeyAccountingRecord(recordId) {
+  // 1. 获取记录详情
+  const record = await db.tukeyAccountingRecords.get(recordId);
+  if (!record) {
+    alert("找不到该记录，可能已被删除。");
+    return;
+  }
+
+  // 2. 弹出确认框
+  const confirmed = await showCustomConfirm(
+    "确认删除",
+    `确定要删除这笔 ${record.type === "expense" ? "支出" : "收入"} (¥${
+      record.amount
+    }) 吗？\n删除后，关联账户的余额将自动回滚。`,
+    { confirmButtonClass: "btn-danger" },
+  );
+  if (!confirmed) return;
+
+  try {
+    // 3. 回滚账户余额
+    const account = await db.tukeyAccounts.get(record.accountId);
+    if (account) {
+      let currentBalance = parseFloat(account.balance);
+
+      // 核心回滚逻辑：
+      // 如果删的是支出(expense)，余额应该加回去 (+ amount)
+      // 如果删的是收入(income)，余额应该减出来 (- amount)
+      if (record.type === "expense") {
+        // 特殊处理：如果是借入/信用账户，支出意味着欠款增加，删除支出意味着欠款减少（数值逻辑取决于您是如何存储的）
+        // 根据您之前的 saveTukeyRecordFromCard 逻辑：
+        // 资产账户：余额 = 余额 - 支出。 回滚：余额 + 支出
+        // 信用账户：余额 = 余额 + 支出 (欠款变多)。 回滚：余额 - 支出
+
+        const categoryInfo = ACCOUNT_STRUCTURE[account.category];
+        // 检查是否是信用账户(isAsset === false) 或 借入账户
+        if (
+          (categoryInfo && categoryInfo.isAsset === false) ||
+          account.type === "借入"
+        ) {
+          // 信用账户之前是加了金额，现在要减去
+          account.balance = currentBalance - record.amount;
+        } else {
+          // 普通资产账户之前是减了金额，现在要加回
+          account.balance = currentBalance + record.amount;
+        }
+      } else {
+        // 如果删的是收入/还款
+        // 资产账户：余额 = 余额 + 收入。 回滚：余额 - 收入
+        // 信用账户：余额 = 余额 - 收入 (还款)。 回滚：余额 + 收入
+        const categoryInfo = ACCOUNT_STRUCTURE[account.category];
+        if (
+          (categoryInfo && categoryInfo.isAsset === false) ||
+          account.type === "借入"
+        ) {
+          account.balance = currentBalance + record.amount;
+        } else {
+          account.balance = currentBalance - record.amount;
+        }
+      }
+
+      // 保存账户余额更新
+      await db.tukeyAccounts.put(account);
+    }
+
+    // 4. 如果开启了桃宝同步，也要回滚桃宝余额
+    if (tukeyUserSettings.syncWithTaobao) {
+      // 逻辑取反：删支出=加钱，删收入=扣钱
+      const reverseAmount =
+        record.type === "expense" ? record.amount : -record.amount;
+      await updateUserBalanceAndLogTransaction(
+        reverseAmount,
+        `[撤销记账] ${record.category}`,
+      );
+    }
+
+    // 5. 删除记录本身
+    await db.tukeyAccountingRecords.delete(recordId);
+
+    // 6. 删除关联的AI回复 (如果有)
+    const replies = await db.tukeyAccountingReplies
+      .where("recordId")
+      .equals(recordId)
+      .toArray();
+    if (replies.length > 0) {
+      const replyIds = replies.map((r) => r.id);
+      await db.tukeyAccountingReplies.bulkDelete(replyIds);
+    }
+
+    // 7. 刷新界面
+    await renderTukeyReportsView(); // 刷新报表
+    // 如果记账群聊界面也在后台，可能需要标记刷新，这里暂只刷新当前报表
+
+    alert("记录已删除，余额已回滚。");
+  } catch (error) {
+    console.error("删除账单失败:", error);
+    alert(`删除失败: ${error.message}`);
+  }
+}
+
+/**
+ * 【渲染】月度统计视图
+ */
+async function renderMonthlySummaryView(year, month, accountId) {
+  const startDate = new Date(year, month - 1, 1);
+  const endDate = new Date(year, month, 0, 23, 59, 59);
+
+  let query = db.tukeyAccountingRecords
+    .where("timestamp")
+    .between(startDate.getTime(), endDate.getTime());
+  if (accountId) {
+    query = query.and((record) => record.accountId === accountId);
+  }
+  const records = await query.toArray();
+
+  // 1. 计算月度总收支
+  let totalIncome = 0;
+  let totalExpense = 0;
+  const expenseByCategory = {};
+  const expenseByDay = {};
+
+  records.forEach((rec) => {
+    if (rec.type === "income") {
+      totalIncome += rec.amount;
+    } else {
+      totalExpense += rec.amount;
+      // 为饼图准备数据
+      expenseByCategory[rec.category] =
+        (expenseByCategory[rec.category] || 0) + rec.amount;
+      // 为折线图准备数据
+      const day = new Date(rec.timestamp).getDate();
+      expenseByDay[day] = (expenseByDay[day] || 0) + rec.amount;
+    }
+  });
+
+  document.getElementById("monthly-summary-card").innerHTML = `
+        <div class="summary-item">
+            <span class="label">总支出</span>
+            <span class="value expense">¥ ${totalExpense.toFixed(2)}</span>
+        </div>
+        <div class="summary-item">
+            <span class="label">总收入</span>
+            <span class="value income">¥ ${totalIncome.toFixed(2)}</span>
+        </div>
+        <div class="summary-item">
+            <span class="label">结余</span>
+            <span class="value">¥ ${(totalIncome - totalExpense).toFixed(2)}</span>
+        </div>
+    `;
+
+  // 2. 渲染饼图
+  createCategoryPieChart(expenseByCategory);
+
+  // 3. 渲染折线图
+  createExpenditureLineChart(expenseByDay, endDate.getDate());
+}
+
+/**
+ * 【图表】创建支出分类饼图
+ */
+function createCategoryPieChart(data) {
+  const ctx = document.getElementById("category-pie-chart").getContext("2d");
+  if (pieChartInstance) {
+    pieChartInstance.destroy(); // 销毁旧图表实例
+  }
+  pieChartInstance = new Chart(ctx, {
+    type: "pie",
+    data: {
+      labels: Object.keys(data),
+      datasets: [
+        {
+          data: Object.values(data),
+          backgroundColor: [
+            "#FF6384",
+            "#36A2EB",
+            "#FFCE56",
+            "#4BC0C0",
+            "#9966FF",
+            "#FF9F40",
+            "#C9CBCF",
+          ],
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {
+          position: "top",
+        },
+        tooltip: {
+          callbacks: {
+            label: function (context) {
+              let label = context.label || "";
+              if (label) {
+                label += ": ";
+              }
+              if (context.parsed !== null) {
+                label += new Intl.NumberFormat("zh-CN", {
+                  style: "currency",
+                  currency: "CNY",
+                }).format(context.parsed);
+              }
+              return label;
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
+/**
+ * 【图表】创建月度支出折线图
+ */
+function createExpenditureLineChart(data, daysInMonth) {
+  const ctx = document
+    .getElementById("expenditure-line-chart")
+    .getContext("2d");
+  const labels = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  const chartData = labels.map((day) => data[day] || 0);
+
+  if (lineChartInstance) {
+    lineChartInstance.destroy();
+  }
+  lineChartInstance = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: "每日支出",
+          data: chartData,
+          borderColor: "#F44336",
+          backgroundColor: "rgba(244, 67, 54, 0.2)",
+          fill: true,
+          tension: 0.1,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            callback: function (value) {
+              return "¥" + value;
+            },
+          },
+        },
+      },
+    },
+  });
+}

@@ -1,0 +1,929 @@
+            if (!response.ok)
+              throw new Error(`API请求失败: ${response.status}`);
+
+            const data = await response.json();
+            const aiResponseContent = (
+              isGemini
+                ? data.candidates[0].content.parts[0].text
+                : data.choices[0].message.content
+            ).replace(/^```json\s*|```$/g, "");
+
+            const messagesArray = JSON.parse(aiResponseContent);
+
+            if (Array.isArray(messagesArray) && messagesArray.length > 0) {
+              let messageTimestamp = Date.now();
+              let firstMessageContent = "";
+
+              messagesArray.forEach((msgData, index) => {
+                if (msgData.name && msgData.message) {
+                  const aiMessage = {
+                    role: "assistant",
+                    senderName: msgData.name,
+                    content: String(msgData.message),
+                    timestamp: messageTimestamp++,
+                  };
+                  chat.history.push(aiMessage);
+                  if (index === 0) {
+                    firstMessageContent = `${msgData.name}: ${msgData.message}`;
+                  }
+                }
+              });
+
+              // 更新此群聊的最后活动时间戳
+              chat.settings.backgroundActivity.lastActivityTimestamp =
+                Date.now();
+
+              // 给用户发通知
+              chat.unreadCount = (chat.unreadCount || 0) + messagesArray.length;
+              // 获取该条消息发送者的头像
+              let bgSenderAvatar = null;
+              if (chat.isGroup) {
+                // 假设第一条消息包含了 senderName (在 messagesArray[0] 里可能是 name 字段)
+                // 注意：triggerInactiveAiAction 里的逻辑比较复杂，这里 messagesArray 的元素是 {name:..., message:...}
+                const senderName = messagesArray[0].name;
+                const member = chat.members.find(
+                  (m) => m.originalName === senderName,
+                );
+                if (member) bgSenderAvatar = member.avatar;
+              } else {
+                bgSenderAvatar = chat.settings.aiAvatar;
+              }
+
+              showNotification(chatId, firstMessageContent, bgSenderAvatar);
+
+              // 保存并刷新UI
+              await db.chats.put(chat);
+              renderChatList();
+
+              console.log(
+                `群聊 "${chat.name}" 后台互动成功，生成了 ${messagesArray.length} 条新消息。`,
+              );
+            }
+          } catch (error) {
+            console.error(`群聊 "${chat.name}" 的后台活动失败:`, error);
+          }
+        }
+
+        async function handleEditImage(element) {
+          const elementId = element.id;
+
+          // 移除按钮文字中的图标
+          const choice = await showChoiceModal("修改图片", [
+            { text: "从本地上传", value: "local" },
+            { text: "使用网络URL", value: "url" },
+          ]);
+
+          let newValue = null;
+
+          if (choice === "local") {
+            newValue = await uploadImageLocally();
+          } else if (choice === "url") {
+            newValue = await showCustomPrompt(
+              "修改图片",
+              "请输入新的图片URL：",
+              element.src,
+              "url",
+            );
+          }
+
+          if (newValue && newValue.trim()) {
+            const trimmedValue = newValue.trim();
+            element.src = trimmedValue;
+            state.globalSettings.widgetData[elementId] = trimmedValue;
+            await db.globalSettings.put(state.globalSettings);
+          } else if (choice === "url" && newValue !== null) {
+            alert("请输入一个有效的图片URL！");
+          }
+        }
+
+        let groupSimulationIntervalId = null; // 用于存储群聊主时钟的ID
+        /**
+         * 启动群聊的后台“主时钟”。这个时钟会一直运行，定期检查所有群聊。
+         */
+        function startGroupSimulation() {
+          if (groupSimulationIntervalId) return; // 如果已经启动，则不重复启动
+
+          // 我们设置一个相对较短的间隔（比如30秒）来作为“主时钟”的频率
+          // 它不是具体某个群聊的活动间隔，而是检查所有群聊的频率
+
+          // updated by lrq 251028
+          // 加长检查间隔，防止已经触发自动回复但api未返回时重复触发导致多次回复。60秒间隔大于一般API返回数据时间的平均值，且不会过长影响使用体验。
+          groupSimulationIntervalId = setInterval(
+            runGroupSimulationTick,
+            60000,
+          ); // 60秒检查一次
+          console.log("群聊后台活动主时钟已启动，每60秒检查一次所有群聊。");
+        }
+
+        /**
+         * 停止群聊的后台“主时钟”。
+         */
+        function stopGroupSimulation() {
+          if (groupSimulationIntervalId) {
+            clearInterval(groupSimulationIntervalId);
+            groupSimulationIntervalId = null;
+            console.log("群聊后台活动主时钟已停止。");
+          }
+        }
+
+        /**
+         * 群聊“主时钟”的每一次心跳执行的函数
+         */
+        function runGroupSimulationTick() {
+          const allGroupChats = Object.values(state.chats).filter(
+            (chat) => chat.isGroup,
+          );
+
+          allGroupChats.forEach((chat) => {
+            const bgSettings = chat.settings.backgroundActivity;
+            // 检查1：该群聊自己的开关是否开启
+            if (bgSettings && bgSettings.enabled) {
+              const now = Date.now();
+
+              // 检查2：使用该群聊自己设置的间隔期
+              const intervalMs = (bgSettings.interval || 120) * 1000;
+              //const lastActivity = bgSettings.lastActivityTimestamp || 0;
+
+              // updated by lrq 251028
+              // 使用当前群聊最后一条消息时间作为最后活动时间
+              const lastMessage = chat.history.slice(-1)[0];
+              const lastActivity = lastMessage ? lastMessage.timestamp : 0;
+
+              // 检查3：是否到达了该群聊的行动时间
+              if (now - lastActivity > intervalMs) {
+                console.log(
+                  `群聊 "${chat.name}" 到达行动时间 (间隔: ${bgSettings.interval}秒)，准备触发后台互动...`,
+                );
+                // 触发群聊专属的后台行动函数
+                triggerGroupAiAction(chat.id);
+              }
+            }
+          });
+        }
+
+        /**
+         * 将保存的图标URL应用到主屏幕的App图标上
+         */
+        function applyAppIcons() {
+          if (!state.globalSettings.appIcons) return;
+
+          for (const iconId in state.globalSettings.appIcons) {
+            const imgElement = document.getElementById(`icon-img-${iconId}`);
+            if (imgElement) {
+              imgElement.src = state.globalSettings.appIcons[iconId];
+            }
+          }
+        }
+
+        /**
+         * 在外观设置页面渲染出所有App图标的设置项
+         */
+        function renderIconSettings() {
+          const grid = document.getElementById("icon-settings-grid");
+          if (!grid) return;
+          grid.innerHTML = "";
+
+          const appLabels = {
+            "world-book": "世界书",
+            qq: "QQ",
+            "api-settings": "API设置",
+            wallpaper: "壁纸",
+            font: "字体",
+            "check-phone": "查手机",
+            weibo: "微博",
+            forum: "圈子",
+            "lovers-space": "情侣空间",
+            "game-hall": "游戏大厅",
+            "x-social": "X社交",
+            taobao: "桃宝",
+            "date-a-live": "约会大作战",
+            "tukey-accounting": "兔兔记账",
+            "kk-checkin": "kk查岗",
+            studio: "lrq小剧场",
+          };
+
+          for (const iconId in state.globalSettings.appIcons) {
+            const iconUrl = state.globalSettings.appIcons[iconId];
+            const labelText = appLabels[iconId] || "未知App";
+
+            const item = document.createElement("div");
+            item.className = "icon-setting-item";
+
+            item.dataset.iconId = iconId;
+
+            item.innerHTML = `
+			            <img class="icon-preview" src="${iconUrl}" alt="${labelText}">
+			            <button class="change-icon-btn">更换</button>
+			        `;
+            grid.appendChild(item);
+          }
+        }
+
+        /**
+         * 当用户点击链接卡片时，打开伪浏览器
+         * @param {number} timestamp - 被点击消息的时间戳
+         */
+        function openBrowser(timestamp) {
+          if (!state.activeChatId) return;
+
+          const chat = state.chats[state.activeChatId];
+          // 安全检查，确保 chat 和 history 都存在
+          if (!chat || !chat.history) return;
+
+          const message = chat.history.find((m) => m.timestamp === timestamp);
+          if (!message || message.type !== "share_link") {
+            console.error("无法找到或消息类型不匹配的分享链接:", timestamp);
+            return; // 如果找不到消息，就直接退出
+          }
+
+          // 填充浏览器内容
+          document.getElementById("browser-title").textContent =
+            message.source_name || "文章详情";
+          const browserContent = document.getElementById("browser-content");
+          browserContent.innerHTML = `
+			        <h1 class="article-title">${message.title || "无标题"}</h1>
+			        <div class="article-meta">
+			            <span>来源: ${message.source_name || "未知"}</span>
+			        </div>
+			        <div class="article-body">
+			            <p>${(message.content || "内容为空。").replace(/\n/g, "</p><p>")}</p>
+			        </div>
+			    `;
+
+          // 显示浏览器屏幕
+          showScreen("browser-screen");
+        }
+
+        /**
+         * 关闭伪浏览器，返回聊天界面
+         * (这个函数现在由 init() 中的事件监听器调用)
+         */
+        function closeBrowser() {
+          showScreen("chat-interface-screen");
+        }
+
+        /**
+         * 打开让用户填写链接信息的模态框
+         */
+        function openShareLinkModal() {
+          if (!state.activeChatId) return;
+
+          // 清空上次输入的内容
+          document.getElementById("link-title-input").value = "";
+          document.getElementById("link-description-input").value = "";
+          document.getElementById("link-source-input").value = "";
+          document.getElementById("link-content-input").value = "";
+
+          // 显示模态框
+          document.getElementById("share-link-modal").classList.add("visible");
+        }
+
+        /**
+         * 用户确认分享，创建并发送链接卡片消息
+         */
+        async function sendUserLinkShare() {
+          if (!state.activeChatId) return;
+
+          const title = document
+            .getElementById("link-title-input")
+            .value.trim();
+          if (!title) {
+            alert("标题是必填项哦！");
+            return;
+          }
+
+          const description = document
+            .getElementById("link-description-input")
+            .value.trim();
+          const sourceName = document
+            .getElementById("link-source-input")
+            .value.trim();
+          const content = document
+            .getElementById("link-content-input")
+            .value.trim();
+
+          const chat = state.chats[state.activeChatId];
+
+          // 创建消息对象
+          const linkMessage = {
+            role: "user", // 角色是 'user'
+            type: "share_link",
+            timestamp: Date.now(),
+            title: title,
+            description: description,
+            source_name: sourceName,
+            content: content,
+            // 用户分享的链接，我们不提供图片，让它总是显示占位图
+            thumbnail_url: null,
+          };
+
+          // 将消息添加到历史记录
+          chat.history.push(linkMessage);
+          await db.chats.put(chat);
+
+          // 渲染新消息并更新列表
+          appendMessage(linkMessage, chat);
+          renderChatList();
+
+          // 关闭模态框
+          document
+            .getElementById("share-link-modal")
+            .classList.remove("visible");
+        }
+
+        /**
+         * 根据AI视角和动态设置，构建给AI看的评论区上下文
+         * @param {object} post - 正在处理的动态对象
+         * @param {object} viewerChat - 正在“看”动态的AI角色
+         * @param {string} userNickname - 用户的昵称
+         * @returns {{contextString: string, visibilityFlag: string}} - 返回包含上下文文本和可见性标志的对象
+         */
+        function buildCommentsContextForAI(post, viewerChat, userNickname) {
+          // 1. 安全检查，如果post.comments不存在或不是数组，直接返回空
+          if (
+            !post.comments ||
+            !Array.isArray(post.comments) ||
+            post.comments.length === 0
+          ) {
+            return { contextString: "", visibilityFlag: "[评论区可见]" };
+          }
+
+          const viewerName = viewerChat.name;
+          let commentsForAI;
+          let visibilityFlag;
+
+          // 2. 根据帖子的评论可见性设置，决定AI能看到哪些评论
+          if (post.areCommentsVisible !== false) {
+            commentsForAI = post.comments; // 如果可见性为true或未设置，则AI能看到所有评论
+            visibilityFlag = "[评论区可见]";
+          } else {
+            // 如果设置为“部分可见”，则AI只能看到自己、用户以及回复自己的评论
+            commentsForAI = post.comments.filter((comment) => {
+              return (
+                comment.commenterName === viewerName || // AI自己的评论
+                comment.commenterName === userNickname || // 用户的评论
+                comment.replyTo === viewerName
+              ); // 回复AI的评论
+            });
+            visibilityFlag = "[评论区部分可见]";
+          }
+
+          if (commentsForAI.length === 0) {
+            return { contextString: "", visibilityFlag: visibilityFlag };
+          }
+
+          // 3. 构建对AI清晰易懂的评论字符串
+          let context = `  └ 评论区:\n`;
+          commentsForAI.slice(-5).forEach((c) => {
+            // 只展示最近的5条评论以节省token
+            // a. 确定评论者的身份标签
+            const commenterLabel =
+              c.commenterName === viewerName
+                ? "你" // 如果是AI自己，直接标记为“你”
+                : c.commenterName === userNickname
+                  ? "用户"
+                  : c.commenterName;
+
+            // b. 如果是回复，同样确定被回复者的身份标签
+            let replyPart = "";
+            if (c.replyTo) {
+              const replyToLabel =
+                c.replyTo === viewerName
+                  ? "你"
+                  : c.replyTo === userNickname
+                    ? "用户"
+                    : c.replyTo;
+              replyPart = ` 回复 ${replyToLabel}`;
+            }
+
+            // c. 拼接成最终的、无歧义的字符串
+            context += `    - ${commenterLabel}${replyPart}: ${c.text}\n`;
+          });
+
+          return { contextString: context, visibilityFlag: visibilityFlag };
+        }
+
+        /**
+         * 根据AI的视角，过滤出它能看到的动态
+         * @param {Array} allPosts - 所有待检查的动态帖子
+         * @param {object} viewerChat - 正在“看”动态的那个AI的chat对象
+         * @returns {Array} - 过滤后该AI可见的动态帖子
+         */
+        function filterVisiblePostsForAI(allPosts, viewerChat) {
+          if (!viewerChat || !viewerChat.id) return []; // 安全检查
+
+          const viewerGroupId = viewerChat.groupId; // 查看者所在的分组ID
+
+          return allPosts.filter((post) => {
+            // 规则1：如果是用户发的动态
+            if (post.authorId === "user") {
+              // 如果用户设置了“部分可见”
+              if (post.visibleGroupIds && post.visibleGroupIds.length > 0) {
+                // 只有当查看者AI的分组ID在用户的可见列表里时，才可见
+                return (
+                  viewerGroupId && post.visibleGroupIds.includes(viewerGroupId)
+                );
+              }
+              // 如果用户没设置，说明是公开的，所有AI都可见
+              return true;
+            }
+
+            // 规则2：如果是其他AI发的动态
+            const authorGroupId = post.authorGroupId; // 发帖AI所在的分组ID
+
+            // 如果发帖的AI没有分组，那它的动态就是公开的
+            if (!authorGroupId) {
+              return true;
+            }
+
+            // 如果发帖的AI有分组，那么只有在同一个分组的AI才能看到
+            return authorGroupId === viewerGroupId;
+          });
+        }
+
+        /**
+         * 应用指定的主题（'light' 或 'dark'）
+         * @param {string} theme - 要应用的主题名称
+         */
+        function applyTheme(theme) {
+          const phoneScreen = document.getElementById("phone-screen");
+          const toggleSwitch = document.getElementById("theme-toggle-switch");
+
+          const isDark = theme === "dark";
+
+          phoneScreen.classList.toggle("dark-mode", isDark);
+
+          // 如果开关存在，就同步它的状态
+          if (toggleSwitch) {
+            toggleSwitch.checked = isDark;
+          }
+
+          localStorage.setItem("ephone-theme", theme);
+        }
+
+        /**
+         * 切换当前的主题
+         */
+        function toggleTheme() {
+          const toggleSwitch = document.getElementById("theme-toggle-switch");
+          // 直接根据开关的选中状态来决定新主题
+          const newTheme = toggleSwitch.checked ? "dark" : "light";
+          applyTheme(newTheme);
+        }
+
+        function startReplyToMessage() {
+          if (!activeMessageTimestamp) return;
+
+          const chat = state.chats[state.activeChatId];
+          const message = chat.history.find(
+            (m) => m.timestamp === activeMessageTimestamp,
+          );
+          if (!message) return;
+
+          // 1. 同时获取“完整内容”和“预览片段”
+          const fullContent = String(message.content || "");
+          let previewSnippet = "";
+
+          if (
+            typeof message.content === "string" &&
+            STICKER_REGEX.test(message.content)
+          ) {
+            previewSnippet = "[表情]";
+          } else if (
+            message.type === "ai_image" ||
+            message.type === "user_photo"
+          ) {
+            previewSnippet = "[图片]";
+          } else if (message.type === "voice_message") {
+            previewSnippet = "[语音]";
+          } else {
+            // 预览片段依然截断，但只用于UI显示
+            previewSnippet =
+              fullContent.substring(0, 50) +
+              (fullContent.length > 50 ? "..." : "");
+          }
+
+          // 2. 将“完整内容”存入上下文，以备发送时使用
+          currentReplyContext = {
+            timestamp: message.timestamp,
+            senderName:
+              message.senderName ||
+              (message.role === "user"
+                ? chat.settings.myNickname || "我"
+                : chat.name),
+            content: fullContent, // <--- 这里存的是完整的原文！
+          };
+
+          // 3. 仅在更新“回复预览栏”时，才使用“预览片段”
+          const previewBar = document.getElementById("reply-preview-bar");
+          previewBar.querySelector(".sender").textContent =
+            `回复 ${currentReplyContext.senderName}:`;
+          previewBar.querySelector(".text").textContent = previewSnippet; // <--- 这里用的是缩略版！
+          previewBar.style.display = "block";
+
+          // 4. 后续操作保持不变
+          hideMessageActions();
+          document.getElementById("chat-input").focus();
+        }
+
+        /**
+         * 取消引用模式
+         */
+        function cancelReplyMode() {
+          currentReplyContext = null;
+          document.getElementById("reply-preview-bar").style.display = "none";
+        }
+
+        let activeTransferTimestamp = null; // 用于暂存被点击的转账消息的时间戳
+
+        /**
+         * 显示处理转账的操作菜单
+         * @param {number} timestamp - 被点击的转账消息的时间戳
+         */
+        function showTransferActionModal(timestamp) {
+          activeTransferTimestamp = timestamp;
+
+          const chat = state.chats[state.activeChatId];
+          const message = chat.history.find((m) => m.timestamp === timestamp);
+          if (message) {
+            // 将AI的名字填入弹窗
+            document.getElementById("transfer-sender-name").textContent =
+              message.senderName;
+          }
+          document
+            .getElementById("transfer-actions-modal")
+            .classList.add("visible");
+        }
+
+        /**
+         * 隐藏处理转账的操作菜单
+         */
+        function hideTransferActionModal() {
+          document
+            .getElementById("transfer-actions-modal")
+            .classList.remove("visible");
+          activeTransferTimestamp = null;
+        }
+
+        /**
+         * 处理用户接受或拒绝转账的逻辑
+         * @param {string} choice - 用户的选择, 'accepted' 或 'declined'
+         */
+        async function handleUserTransferResponse(choice) {
+          if (!activeTransferTimestamp) return;
+
+          const timestamp = activeTransferTimestamp;
+          const chat = state.chats[state.activeChatId];
+          const messageIndex = chat.history.findIndex(
+            (m) => m.timestamp === timestamp,
+          );
+          if (messageIndex === -1) return;
+
+          // 1. 更新原始转账消息的状态
+          const originalMessage = chat.history[messageIndex];
+          originalMessage.status = choice;
+
+          let systemContent;
+
+          // 2. 如果用户选择“拒绝”
+          if (choice === "declined") {
+            // 立刻在前端生成一个“退款”卡片，让用户看到
+            const refundMessage = {
+              role: "user",
+              type: "transfer",
+              isRefund: true, // 这是一个关键标记，用于UI显示这是退款
+              amount: originalMessage.amount,
+              note: "已拒收对方转账",
+              timestamp: Date.now(),
+            };
+            chat.history.push(refundMessage);
+
+            // 准备一条对AI可见的隐藏消息，告诉它发生了什么
+            systemContent = `[系统提示：你拒绝并退还了“${originalMessage.senderName}”的转账。]`;
+          } else {
+            // 如果用户选择“接受”
+            // 只需准备隐藏消息通知AI即可
+            systemContent = `[系统提示：你接受了“${originalMessage.senderName}”的转账。]`;
+            await updateUserBalanceAndLogTransaction(
+              originalMessage.amount,
+              `收到来自 ${originalMessage.senderName} 的转账`,
+            );
+          }
+
+          // 3. 创建这条对用户隐藏、但对AI可见的系统消息
+          const hiddenMessage = {
+            role: "system",
+            content: systemContent,
+            timestamp: Date.now() + 1, // 保证时间戳在退款消息之后
+            isHidden: true, // 这个标记会让它不在聊天界面显示
+          };
+          chat.history.push(hiddenMessage);
+
+          // 4. 保存所有更改到数据库，并刷新界面
+          await db.chats.put(chat);
+          hideTransferActionModal();
+          renderChatInterface(state.activeChatId);
+          renderChatList();
+        }
+
+        // 通话记录功能核心函数
+
+        async function renderCallHistoryScreen() {
+          showScreen("call-history-screen");
+
+          const listEl = document.getElementById("call-history-list");
+          const titleEl = document.getElementById("call-history-title");
+          listEl.innerHTML = "";
+          titleEl.textContent = "所有通话记录";
+
+          const records = await db.callRecords
+            .orderBy("timestamp")
+            .reverse()
+            .toArray();
+
+          if (records.length === 0) {
+            listEl.innerHTML =
+              '<p style="text-align:center; color: var(--text-secondary); padding: 50px 0;">这里还没有通话记录哦~</p>';
+            return; // 现在的 return 就没问题了，因为它只跳过了后续的渲染逻辑
+          }
+
+          records.forEach((record) => {
+            const card = createCallRecordCard(record);
+
+            addLongPressListener(card, async () => {
+              // 1. 弹出输入框，并将旧名称作为默认值，方便修改
+              const newName = await showCustomPrompt(
+                "自定义通话名称",
+                "请输入新的名称（留空则恢复默认）",
+                record.customName || "", // 如果已有自定义名称，就显示它
+              );
+
+              // 2. 如果用户点击了“取消”，则什么都不做
+              if (newName === null) return;
+
+              // 3. 更新数据库中的这条记录
+              await db.callRecords.update(record.id, {
+                customName: newName.trim(),
+              });
+
+              // 4. 刷新整个列表，让更改立刻显示出来
+              await renderCallHistoryScreen();
+
+              // 5. 给用户一个成功的提示
+              await showCustomAlert("成功", "通话名称已更新！");
+            });
+            listEl.appendChild(card);
+          });
+        }
+
+        /**
+         * 根据单条记录数据，创建一张能显示聊天对象的通话卡片
+         * @param {object} record - 一条通话记录对象
+         * @returns {HTMLElement} - 创建好的卡片div
+         */
+        function createCallRecordCard(record) {
+          const card = document.createElement("div");
+          card.className = "call-record-card";
+          card.dataset.recordId = record.id;
+
+          // 获取通话对象的名字
+          const chatInfo = state.chats[record.chatId];
+          const chatName = chatInfo ? chatInfo.name : "未知会话";
+
+          const callDate = new Date(record.timestamp);
+          const dateString = `${callDate.getFullYear()}-${String(callDate.getMonth() + 1).padStart(2, "0")}-${String(
+            callDate.getDate(),
+          ).padStart(
+            2,
+            "0",
+          )} ${String(callDate.getHours()).padStart(2, "0")}:${String(
+            callDate.getMinutes(),
+          ).padStart(2, "0")}`;
+          const durationText = `${Math.floor(record.duration / 60)}分${record.duration % 60}秒`;
+
+          const avatarsHtml = record.participants
+            .map(
+              (p) =>
+                `<img src="${p.avatar}" alt="${p.name}" class="participant-avatar" title="${p.name}">`,
+            )
+            .join("");
+
+          card.innerHTML = `
+			        <div class="card-header">
+			            <span class="date">${dateString}</span>
+			            <span class="duration">${durationText}</span>
+			        </div>
+			        <div class="card-body">
+			            
+			            ${record.customName ? `<div class="custom-title">${record.customName}</div>` : ""}
+
+			            <div class="participants-info"> <!-- 新增一个容器方便布局 -->
+			                <div class="participants-avatars">${avatarsHtml}</div>
+			                <span class="participants-names">与 ${chatName}</span>
+			            </div>
+			        </div>
+			    `;
+          return card;
+        }
+
+        /**
+         * 显示指定通话记录的完整文字稿
+         * @param {number} recordId - 通话记录的ID
+         */
+        async function showCallTranscript(recordId) {
+          const record = await db.callRecords.get(recordId);
+          if (!record) return;
+
+          const modal = document.getElementById("call-transcript-modal");
+          const titleEl = document.getElementById("transcript-modal-title");
+          const bodyEl = document.getElementById("transcript-modal-body");
+
+          titleEl.textContent = `通话于 ${new Date(
+            record.timestamp,
+          ).toLocaleString()} (时长: ${Math.floor(record.duration / 60)}分${record.duration % 60}秒)`;
+          bodyEl.innerHTML = "";
+
+          if (!record.transcript || record.transcript.length === 0) {
+            bodyEl.innerHTML =
+              '<p style="text-align:center; color: #8a8a8a;">这次通话没有留下文字记录。</p>';
+          } else {
+            record.transcript.forEach((entry) => {
+              const bubble = document.createElement("div");
+              // 根据角色添加不同的class，应用不同的样式
+              bubble.className = `transcript-entry ${entry.role}`;
+              bubble.textContent = entry.content;
+              bodyEl.appendChild(bubble);
+            });
+          }
+
+          const deleteBtn = document.getElementById("delete-transcript-btn");
+
+          // 使用克隆节点技巧，防止事件重复绑定
+          const newDeleteBtn = deleteBtn.cloneNode(true);
+          deleteBtn.parentNode.replaceChild(newDeleteBtn, deleteBtn);
+
+          // 为新的、干净的按钮绑定事件
+          newDeleteBtn.addEventListener("click", async () => {
+            const confirmed = await showCustomConfirm(
+              "确认删除",
+              "确定要永久删除这条通话记录吗？此操作不可恢复。",
+              {
+                confirmButtonClass: "btn-danger",
+              },
+            );
+
+            if (confirmed) {
+              // 1. 关闭当前的详情弹窗
+              modal.classList.remove("visible");
+
+              // 2. 从数据库删除
+              await db.callRecords.delete(recordId);
+
+              // 3. 刷新通话记录列表
+              await renderCallHistoryScreen();
+
+              // 4. (可选) 给出成功提示
+              alert("通话记录已删除。");
+            }
+          });
+          modal.classList.add("visible");
+        }
+
+        /**
+         * 处理用户点击状态栏，弹出编辑框让用户修改AI的当前状态
+         */
+        async function handleEditStatusClick() {
+          // 1. 安全检查，确保在单聊界面
+          if (!state.activeChatId || state.chats[state.activeChatId].isGroup) {
+            return;
+          }
+          const chat = state.chats[state.activeChatId];
+
+          // 2. 弹出输入框，让用户输入新的状态，并将当前状态作为默认值
+          const newStatusText = await showCustomPrompt(
+            "编辑对方状态",
+            "请输入对方现在的新状态：",
+            chat.status.text, // 将当前状态作为输入框的默认内容
+          );
+
+          // 3. 如果用户输入了内容并点击了“确定”
+          if (newStatusText !== null) {
+            // 4. 更新内存和数据库中的状态数据
+            chat.status.text = newStatusText.trim() || "在线"; // 如果用户清空了，就默认为“在线”
+            chat.status.isBusy = false; // 每次手动编辑都默认其不处于“忙碌”状态
+            chat.status.lastUpdate = Date.now();
+            await db.chats.put(chat);
+
+            // 5. 立刻刷新UI，让用户看到修改后的状态
+            renderChatInterface(state.activeChatId);
+            renderChatList();
+
+            // 6. 给出一个无伤大雅的成功提示
+            await showCustomAlert(
+              "状态已更新",
+              `“${chat.name}”的当前状态已更新为：${chat.status.text}`,
+            );
+          }
+        }
+
+        // 放在你的JS功能函数定义区
+        async function openShareTargetPicker() {
+          const modal = document.getElementById("share-target-modal");
+          const listEl = document.getElementById("share-target-list");
+          listEl.innerHTML = "";
+
+          // 获取所有聊天作为分享目标
+          const chats = Object.values(state.chats);
+
+          chats.forEach((chat) => {
+            // 复用联系人选择器的样式
+            const item = document.createElement("div");
+            item.className = "contact-picker-item";
+            item.innerHTML = `
+			            <input type="checkbox" class="share-target-checkbox" data-chat-id="${chat.id}" style="margin-right: 15px;">
+			            <img src="${
+                    chat.isGroup
+                      ? chat.settings.groupAvatar
+                      : chat.settings.aiAvatar || defaultAvatar
+                  }" class="avatar">
+			            <span class="name">${chat.name}</span>
+			        `;
+            listEl.appendChild(item);
+          });
+
+          modal.classList.add("visible");
+        }
+
+        function closeMusicPlayerWithAnimation(callback) {
+          const overlay = document.getElementById("music-player-overlay");
+          if (!overlay.classList.contains("visible")) {
+            if (callback) callback();
+            return;
+          }
+          overlay.classList.remove("visible");
+          setTimeout(() => {
+            document
+              .getElementById("music-playlist-panel")
+              .classList.remove("visible");
+            if (callback) callback();
+          }, 400);
+        }
+
+        function parseLRC(lrcContent) {
+          if (!lrcContent) return [];
+          const lines = lrcContent.split("\n");
+          const lyrics = [];
+          const timeRegex = /\[(\d{2}):(\d{2})[.:](\d{2,3})\]/g;
+
+          for (const line of lines) {
+            const text = line.replace(timeRegex, "").trim();
+            if (!text) continue;
+            timeRegex.lastIndex = 0;
+            let match;
+            while ((match = timeRegex.exec(line)) !== null) {
+              const minutes = parseInt(match[1], 10);
+              const seconds = parseInt(match[2], 10);
+              const milliseconds = parseInt(match[3].padEnd(3, "0"), 10);
+              const time = minutes * 60 + seconds + milliseconds / 1000;
+              lyrics.push({ time, text });
+            }
+          }
+          return lyrics.sort((a, b) => a.time - b.time);
+        }
+
+        function renderLyrics() {
+          const lyricsList = document.getElementById("music-lyrics-list");
+          lyricsList.innerHTML = "";
+          if (
+            !state.musicState.parsedLyrics ||
+            state.musicState.parsedLyrics.length === 0
+          ) {
+            lyricsList.innerHTML = '<div class="lyric-line">♪ 暂无歌词 ♪</div>';
+            return;
+          }
+          state.musicState.parsedLyrics.forEach((line, index) => {
+            const lineEl = document.createElement("div");
+            lineEl.className = "lyric-line";
+            lineEl.textContent = line.text;
+            lineEl.dataset.index = index;
+            lyricsList.appendChild(lineEl);
+          });
+          lyricsList.style.transform = `translateY(0px)`;
+        }
+
+        function updateActiveLyric(currentTime) {
+          if (state.musicState.parsedLyrics.length === 0) return;
+          let newLyricIndex = -1;
+          for (let i = 0; i < state.musicState.parsedLyrics.length; i++) {
+            if (currentTime >= state.musicState.parsedLyrics[i].time) {
+              newLyricIndex = i;
+            } else {
+              break;
+            }
+          }
+          if (newLyricIndex === state.musicState.currentLyricIndex) return;
+          state.musicState.currentLyricIndex = newLyricIndex;
+          updateLyricsUI();
+        }
+
+        function updateLyricsUI() {

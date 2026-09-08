@@ -1,0 +1,1388 @@
+
+
+/* 小组描述 (小) */
+.forum-group-desc {
+  font-size: 12px !important;
+  color: #999 !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: normal !important;
+}
+
+/* 分类标签 */
+.category-tag-container {
+  margin-top: 6px !important;
+  gap: 4px !important;
+}
+.category-tag {
+  font-size: 10px !important;
+  padding: 2px 6px !important;
+  border-radius: 6px !important;
+  background-color: rgba(0, 0, 0, 0.03) !important;
+  color: #666 !important;
+  border: none !important;
+}
+
+/* 5. 右侧箭头 */
+.forum-group-arrow {
+  font-size: 20px;
+  color: #ccc;
+  font-weight: 300;
+  margin-left: 10px;
+}
+
+/* 夜间模式适配 */
+#phone-screen.dark-mode .forum-group-item {
+  background-color: rgba(40, 40, 40, 0.6) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+#phone-screen.dark-mode .forum-group-name {
+  color: #fff !important;
+}
+#phone-screen.dark-mode .forum-group-desc {
+  color: #aaa !important;
+}
+#phone-screen.dark-mode .category-tag {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  color: #ccc !important;
+}
+
+/* === 2. 帖子列表页：悬浮气泡式布局 === */
+
+/* 列表容器 */
+#group-post-list {
+  padding: 15px !important;
+  display: flex;
+  flex-direction: column;
+  gap: 12px; /* 帖子之间的间距 */
+}
+
+/* 单个帖子卡片 */
+.forum-post-item {
+  /* 彻底移除底部分割线 */
+  border-bottom: none !important;
+
+  /* 变成独立卡片 */
+  background-color: rgba(255, 255, 255, 0.7) !important;
+  backdrop-filter: blur(10px);
+  border-radius: 18px !important;
+  padding: 18px !important;
+  margin-bottom: 0 !important; /* 由gap控制间距 */
+
+  /* 精致边框 */
+  border: 1px solid rgba(255, 255, 255, 0.5) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03) !important;
+
+  transition:
+    transform 0.2s ease,
+    background-color 0.2s !important;
+  position: relative;
+}
+
+.forum-post-item:hover {
+  transform: scale(1.01);
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* 帖子标题 */
+.post-item-title {
+  font-size: 16px !important;
+  font-weight: 700 !important; /* 加粗 */
+  color: #2c3e50 !important;
+  margin-bottom: 8px !important;
+  line-height: 1.4;
+}
+
+/* 帖子分类标签美化 */
+.category-tag {
+  border-radius: 8px !important; /* 更圆 */
+  padding: 4px 10px !important;
+  font-size: 11px !important;
+  /* 渐变背景 */
+  background: linear-gradient(135deg, #e3f2fd, #f1f8ff) !important;
+  color: #4a90e2 !important;
+  border: 1px solid rgba(74, 144, 226, 0.1);
+}
+
+/* 帖子底部信息 (作者、评论数) */
+.post-item-meta {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(0, 0, 0, 0.05); /* 虚线分割 */
+  font-size: 12px !important;
+  color: #999 !important;
+}
+
+/* 夜间模式适配 */
+#phone-screen.dark-mode .forum-post-item {
+  background-color: rgba(35, 35, 35, 0.7) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+#phone-screen.dark-mode .post-item-title {
+  color: #e0e0e0 !important;
+}
+#phone-screen.dark-mode .category-tag {
+  background: linear-gradient(135deg, #2c3e50, #1a252f) !important;
+  color: #85c1e9 !important;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+/* === 3. 帖子详情页：信纸与对话流 === */
+
+/* 详情页容器 */
+#post-detail-content {
+  background-color: #f8f9fa !important; /* 浅灰底色 */
+  padding: 15px !important;
+  gap: 15px;
+}
+
+/* 1. 楼主的内容 (模拟信纸效果) */
+.post-detail-header,
+.post-detail-body {
+  background-color: #fff;
+  padding: 20px;
+  /* 让它们连在一起看起来像一张长纸，或者你可以把它们分开 */
+}
+
+/* 把头部和内容包在一起的视觉效果 */
+#post-detail-content > .post-detail-header {
+  border-radius: 20px 20px 0 0;
+  border-bottom: 1px dashed #eee !important; /* 虚线 */
+  margin-bottom: 0 !important;
+  box-shadow: 0 2px 15px rgba(0, 0, 0, 0.03);
+}
+
+#post-detail-content > .post-detail-body {
+  border-radius: 0 0 20px 20px;
+  margin-top: 0;
+  margin-bottom: 20px; /* 和评论区拉开距离 */
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.03);
+  line-height: 1.8 !important;
+  color: #444;
+  font-size: 16px !important;
+}
+
+/* 楼主信息栏 */
+/* 2. 评论区容器 */
+.post-comments-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px; /* 评论之间的间距 */
+}
+
+.post-comments-section h3 {
+  font-size: 14px;
+  color: #888;
+  margin-left: 10px;
+  border-left: none !important; /* 去掉旧的竖线 */
+}
+
+/* 3. 单个评论 (气泡化) */
+.post-comment-item {
+  background-color: #fff !important;
+  border-radius: 16px !important;
+  padding: 15px !important;
+  border-bottom: none !important; /* 去掉旧的底线 */
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.02);
+  position: relative;
+}
+
+/* 楼层号美化 */
+.comment-floor {
+  background-color: #f0f2f5;
+  color: #999;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 10px !important;
+}
+
+/* 评论内容 */
+.comment-text {
+  color: #555;
+  line-height: 1.6;
+}
+
+/* 夜间模式适配 */
+#phone-screen.dark-mode #post-detail-content {
+  background-color: #000 !important;
+}
+#phone-screen.dark-mode .post-detail-header,
+#phone-screen.dark-mode .post-detail-body,
+#phone-screen.dark-mode .post-comment-item {
+  background-color: #1c1c1e !important;
+  color: #ddd;
+}
+#phone-screen.dark-mode .post-detail-header h1,
+#phone-screen.dark-mode .comment-content {
+  color: #fff !important;
+}
+/* === 4. 底部评论输入栏美化 === */
+
+#post-comment-input-area {
+  background-color: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(20px) !important;
+  border-top: 1px solid rgba(0, 0, 0, 0.05) !important;
+  box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.02);
+}
+
+#post-comment-input-area #post-comment-input {
+  background-color: #f2f2f7 !important; /* iOS 风格浅灰 */
+  border-radius: 20px !important;
+  color: #000 !important;
+  height: 40px !important;
+  padding-left: 15px !important;
+}
+
+#post-comment-input-area #send-post-comment-btn {
+  background: var(--accent-color) !important; /* 保持主题色 */
+  border-radius: 50% !important; /* 圆形发送按钮 */
+  width: 40px !important;
+  height: 40px !important;
+  padding: 0 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px !important;
+  box-shadow: 0 4px 10px rgba(0, 123, 255, 0.3);
+}
+
+/* 夜间模式 */
+#phone-screen.dark-mode #post-comment-input-area {
+  background-color: rgba(30, 30, 30, 0.85) !important;
+  border-top-color: rgba(255, 255, 255, 0.1) !important;
+}
+#phone-screen.dark-mode #post-comment-input-area #post-comment-input {
+  background-color: #2c2c2e !important;
+  color: #fff !important;
+}
+/* ==================================================== */
+/* === 全新：高级清透版论坛样式 (小组/帖子/评论) v2.0 === */
+/* ==================================================== */
+
+/* --- 1. 小组列表项 (主页) --- */
+
+/* 容器 */
+#forum-group-list {
+  padding: 20px 15px !important;
+  background-color: var(--secondary-bg);
+  gap: 15px !important;
+}
+
+/* 小组卡片 */
+.forum-group-item {
+  display: flex !important;
+  align-items: center !important;
+  padding: 15px !important;
+  margin-bottom: 0 !important;
+
+  /* 视觉核心：清透毛玻璃 + 大圆角 */
+  background-color: rgba(255, 255, 255, 0.7) !important;
+  backdrop-filter: blur(15px) saturate(120%);
+  -webkit-backdrop-filter: blur(15px) saturate(120%);
+  border-radius: 20px !important;
+  border: 1px solid rgba(255, 255, 255, 0.6) !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04) !important;
+
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+
+.forum-group-item:hover {
+  transform: scale(1.02) translateY(-2px);
+  background-color: rgba(255, 255, 255, 0.9) !important;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* 内置SVG图标容器 (不同颜色) */
+.forum-group-icon-wrapper {
+  width: 50px;
+  height: 50px;
+  border-radius: 16px; /* 方圆形 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-right: 15px;
+  color: white;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+}
+
+/* 为不同小组定义渐变色 */
+.forum-group-icon-wrapper.style-pink {
+  background: linear-gradient(135deg, #ff9a9e, #fecfef);
+}
+.forum-group-icon-wrapper.style-purple {
+  background: linear-gradient(135deg, #a18cd1, #fbc2eb);
+}
+.forum-group-icon-wrapper.style-red {
+  background: linear-gradient(135deg, #ff758c, #ff7eb3);
+}
+.forum-group-icon-wrapper.style-blue {
+  background: linear-gradient(135deg, #8fd3f4, #84fab0);
+}
+.forum-group-icon-wrapper.style-orange {
+  background: linear-gradient(135deg, #f6d365, #fda085);
+}
+.forum-group-icon-wrapper.style-default {
+  background: linear-gradient(135deg, #e0c3fc, #8ec5fc);
+}
+
+/* 用户自定义图片样式 */
+.forum-group-custom-img {
+  width: 50px;
+  height: 50px;
+  border-radius: 16px;
+  object-fit: cover;
+  flex-shrink: 0;
+  margin-right: 15px;
+  border: 2px solid white;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* 文字排版 */
+.forum-group-name {
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  color: #333 !important;
+  margin-bottom: 4px !important;
+}
+.forum-group-desc {
+  font-size: 12px !important;
+  color: #999 !important;
+}
+
+/* --- 2. 帖子列表 (小组内) --- */
+
+/* 帖子卡片 */
+.forum-post-item {
+  /* 去线 */
+  border-bottom: none !important;
+
+  /* 高级悬浮卡片风 */
+  background-color: rgba(255, 255, 255, 0.8) !important;
+  border-radius: 18px !important;
+  padding: 18px !important;
+  margin-bottom: 12px !important;
+
+  border: 1px solid rgba(255, 255, 255, 0.8) !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03) !important;
+  position: relative;
+}
+
+/* 帖子标题 */
+.post-item-title {
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  color: #222 !important;
+  line-height: 1.5;
+  margin-bottom: 8px !important;
+}
+
+/* 帖子底部信息 */
+.post-item-meta {
+  font-size: 11px !important;
+  color: #aaa !important;
+  background-color: rgba(0, 0, 0, 0.03);
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 10px;
+  margin-top: 10px;
+}
+
+/* 删除按钮 (小巧精致) */
+.forum-post-delete-btn {
+  top: 15px !important;
+  right: 15px !important;
+  background: rgba(0, 0, 0, 0.05) !important;
+  color: #999 !important;
+  width: 24px !important;
+  height: 24px !important;
+  font-size: 16px !important;
+}
+.forum-post-delete-btn:hover {
+  background: #ff4757 !important;
+  color: white !important;
+}
+
+/* --- 3. 帖子详情与评论 (最重要的高级感来源) --- */
+
+/* 详情页背景 */
+#post-screen {
+  background-color: #f7f8fa !important;
+}
+
+/* 主贴区域 (模拟信纸) */
+#post-detail-content {
+  padding: 20px !important;
+  gap: 20px;
+}
+
+.post-detail-header {
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+  border: none !important;
+}
+
+.post-detail-header h1 {
+  font-size: 20px !important;
+  color: #333;
+  line-height: 1.4;
+  margin-top: 10px !important;
+}
+
+/* 楼主内容 */
+.post-detail-body {
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+  font-size: 15px !important;
+  color: #444;
+  line-height: 1.8 !important;
+  border: none !important;
+}
+
+/* 评论区容器 */
+.post-comments-section h3 {
+  font-size: 14px;
+  color: #999;
+  margin-bottom: 15px;
+  border: none !important;
+  text-align: center; /* 标题居中，更像分割线 */
+}
+
+/* 单条评论 (对话气泡风) */
+.post-comment-item {
+  background-color: white !important;
+  border-radius: 16px !important;
+  padding: 15px !important;
+  margin-bottom: 10px;
+  border: none !important; /* 去掉旧的分割线 */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+}
+
+/* 评论者信息 */
+.comment-header-line {
+  margin-bottom: 6px;
+}
+.comment-author {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: #555 !important;
+}
+.comment-floor {
+  background: #f0f2f5;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 10px !important;
+  color: #aaa !important;
+}
+
+/* 评论内容 */
+.comment-text {
+  font-size: 14px !important;
+  color: #333;
+  line-height: 1.6;
+}
+
+/* 夜间模式适配 */
+#phone-screen.dark-mode .forum-group-item,
+#phone-screen.dark-mode .forum-post-item,
+#phone-screen.dark-mode .post-detail-header,
+#phone-screen.dark-mode .post-detail-body,
+#phone-screen.dark-mode .post-comment-item {
+  background-color: rgba(35, 35, 35, 0.8) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: #e0e0e0 !important;
+}
+#phone-screen.dark-mode .forum-group-name,
+#phone-screen.dark-mode .post-item-title,
+#phone-screen.dark-mode .post-detail-header h1,
+#phone-screen.dark-mode .comment-text {
+  color: #fff !important;
+}
+/* === 弹窗输入框高级美化 === */
+#forum-group-editor-modal input[type="text"],
+#forum-group-editor-modal textarea,
+#create-post-modal input[type="text"],
+#create-post-modal textarea {
+  background-color: #f7f9fc;
+  border: 1px solid #eef2f7;
+  border-radius: 12px; /* 圆润 */
+  padding: 12px;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.02);
+}
+
+/* 输入框聚焦效果 */
+#forum-group-editor-modal input:focus,
+#forum-group-editor-modal textarea:focus,
+#create-post-modal input:focus,
+#create-post-modal textarea:focus {
+  background-color: #fff;
+  border-color: var(--accent-color);
+  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.15);
+  outline: none;
+}
+
+/* 弹窗背景美化 */
+.modal-content {
+  border-radius: 24px !important; /* 更大的圆角 */
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2) !important;
+}
+/* ================================================================= */
+/* === ✨ 圈子 UI 终极美化包 v2.0：清透·可爱·高级·全覆盖 ✨ === */
+/* ================================================================= */
+
+/* --- 1. 全局背景优化 (让透视效果更明显) --- */
+#group-screen,
+#post-screen {
+  /* 使用一个极淡的渐变背景，衬托玻璃效果 */
+  background: linear-gradient(135deg, #f6f9fc 0%, #eef2f3 100%) !important;
+}
+#phone-screen.dark-mode #group-screen,
+#phone-screen.dark-mode #post-screen {
+  background: #111 !important;
+}
+
+/* --- 3. 帖子列表 (Group Post List) - 清透卡片 --- */
+
+/* 列表容器 */
+#group-post-list {
+  padding: 0 15px 20px 15px !important;
+  gap: 15px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  background: transparent !important;
+}
+
+/* 单个帖子卡片 */
+.forum-post-item {
+  /* 玻璃背景 */
+  background: rgba(255, 255, 255, 0.7) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+
+  border: 1px solid rgba(255, 255, 255, 0.8) !important;
+  border-radius: 20px !important;
+  padding: 18px !important;
+
+  /* 柔和的彩色阴影 */
+  box-shadow: 0 8px 20px -5px rgba(100, 100, 200, 0.06) !important;
+
+  margin-bottom: 0 !important;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s !important;
+}
+
+.forum-post-item:hover {
+  transform: translateY(-3px);
+  background: rgba(255, 255, 255, 0.9) !important;
+  box-shadow: 0 12px 25px -5px rgba(100, 100, 200, 0.1) !important;
+}
+
+/* 标题 */
+.post-item-title {
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  color: #32325d !important;
+  line-height: 1.5;
+  margin-bottom: 10px !important;
+}
+
+/* 分类标签 */
+.category-tag {
+  background: linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%) !important;
+  color: white !important;
+  padding: 3px 10px !important;
+  border-radius: 12px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  border: none !important;
+  box-shadow: 0 2px 5px rgba(142, 197, 252, 0.3) !important;
+}
+
+/* 底部信息 */
+.post-item-meta {
+  margin-top: 12px !important;
+  padding-top: 10px !important;
+  border-top: 1px dashed rgba(0, 0, 0, 0.05) !important;
+  color: #8898aa !important;
+  font-size: 12px !important;
+}
+
+/* 删除按钮：隐藏式设计 */
+.forum-post-delete-btn {
+  top: 15px !important;
+  right: 15px !important;
+  background: rgba(0, 0, 0, 0.03) !important;
+  color: #adb5bd !important;
+  width: 24px !important;
+  height: 24px !important;
+  font-size: 14px !important;
+}
+.forum-post-delete-btn:hover {
+  background: #fff0f3 !important;
+  color: #ff6b6b !important;
+}
+
+/* --- 4. 帖子详情页 (Post Detail) - 沉浸式阅读 --- */
+
+#post-detail-content {
+  padding: 20px !important;
+  background: transparent !important; /* 透出大背景 */
+  gap: 20px !important;
+}
+
+/* 楼主区域：像一张精美的信纸 */
+.post-detail-header,
+.post-detail-body {
+  background: #fff !important;
+  border: none !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03) !important;
+}
+
+/* 头部圆角 */
+.post-detail-header {
+  border-radius: 20px 20px 0 0 !important;
+  padding: 25px 25px 15px 25px !important;
+  border-bottom: 1px solid #f5f5f5 !important;
+  margin-bottom: 0 !important;
+}
+
+/* 内容圆角 */
+.post-detail-body {
+  border-radius: 0 0 20px 20px !important;
+  padding: 10px 25px 30px 25px !important;
+  margin-top: 0 !important;
+  color: #525f7f !important;
+  font-size: 16px !important;
+  line-height: 1.8 !important;
+}
+
+.post-detail-header h1 {
+  font-size: 20px !important;
+  color: #32325d !important;
+  margin-top: 5px !important;
+}
+
+/* 评论区容器 */
+.post-comments-section {
+  margin-top: 10px !important;
+  padding-top: 0 !important;
+}
+.post-comments-section h3 {
+  font-size: 14px !important;
+  color: #8898aa !important;
+  text-align: center !important;
+  margin-bottom: 20px !important;
+  border: none !important;
+  position: relative;
+}
+/* 评论区分割线装饰 */
+.post-comments-section h3::before,
+.post-comments-section h3::after {
+  content: "";
+  display: inline-block;
+  width: 30px;
+  height: 1px;
+  background: #e0e0e0;
+  vertical-align: middle;
+  margin: 0 10px;
+}
+
+/* 单条评论：气泡对话风格 */
+.post-comment-item {
+  background: #fff !important;
+  border-radius: 16px !important;
+  padding: 15px 18px !important;
+  margin-bottom: 12px !important;
+  border: 1px solid rgba(0, 0, 0, 0.02) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02) !important;
+  position: relative;
+}
+
+/* 楼层号：小胶囊 */
+.comment-floor {
+  background: #f6f9fc !important;
+  color: #8898aa !important;
+  padding: 2px 8px !important;
+  border-radius: 10px !important;
+  font-size: 10px !important;
+}
+
+/* 作者名 */
+.comment-author {
+  color: #32325d !important;
+  font-size: 13px !important;
+}
+
+/* AI生成评论按钮 */
+#generate-forum-comments-btn {
+  background-color: #fff !important;
+  border: 1px dashed var(--accent-color) !important;
+  color: var(--accent-color) !important;
+  border-radius: 20px !important;
+  padding: 12px !important;
+  margin-bottom: 20px !important;
+  box-shadow: none !important;
+  transition: all 0.2s;
+}
+#generate-forum-comments-btn:hover {
+  background-color: #f0f9ff !important;
+  transform: translateY(-1px);
+}
+
+/* --- 5. 底部评论输入栏 (清透悬浮版) --- */
+#post-comment-input-area {
+  background: rgba(255, 255, 255, 0.8) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(255, 255, 255, 0.5) !important;
+  box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.03) !important;
+  padding: 10px 15px !important;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom)) !important;
+}
+
+#post-comment-input-area #post-comment-input {
+  background: #f6f9fc !important;
+  border: 1px solid transparent !important;
+  transition: all 0.2s;
+}
+#post-comment-input-area #post-comment-input:focus {
+  background: #fff !important;
+  border-color: var(--accent-color) !important;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+#post-comment-input-area #send-post-comment-btn {
+  background: var(--accent-color) !important;
+  box-shadow: 0 4px 10px rgba(0, 123, 255, 0.3) !important;
+}
+
+/* --- 6. 夜间模式终极适配 --- */
+#phone-screen.dark-mode #fanfic-preference-bar,
+#phone-screen.dark-mode .forum-post-item,
+#phone-screen.dark-mode .post-detail-header,
+#phone-screen.dark-mode .post-detail-body,
+#phone-screen.dark-mode .post-comment-item {
+  background-color: rgba(30, 30, 30, 0.8) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  box-shadow: none !important;
+}
+
+#phone-screen.dark-mode .post-item-title,
+#phone-screen.dark-mode .post-detail-header h1,
+#phone-screen.dark-mode .comment-author {
+  color: #e0e0e0 !important;
+}
+
+#phone-screen.dark-mode #fanfic-preference-bar select,
+#phone-screen.dark-mode #fanfic-preference-bar input {
+  background: rgba(50, 50, 50, 0.8) !important;
+  color: white !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+#phone-screen.dark-mode #post-comment-input-area {
+  background: rgba(30, 30, 30, 0.9) !important;
+  border-top-color: rgba(255, 255, 255, 0.1) !important;
+}
+#phone-screen.dark-mode #post-comment-input-area #post-comment-input {
+  background: #222 !important;
+  color: white !important;
+}
+/* --- 同人文控制台增强样式 --- */
+
+/* 1. 预设管理区的按钮美化 */
+#fanfic-preference-bar .form-button-secondary {
+  border-radius: 8px !important;
+  background: rgba(255, 255, 255, 0.8) !important;
+  border: 1px solid #e0e0e0 !important;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+#fanfic-preference-bar .form-button-secondary:hover {
+  background: #fff !important;
+  transform: translateY(-1px);
+}
+
+/* 2. 折叠动画 */
+#fanfic-bar-content {
+  transition:
+    max-height 0.3s ease-in-out,
+    opacity 0.3s ease-in-out;
+  overflow: hidden;
+  max-height: 1000px; /* 展开时的最大高度 */
+  opacity: 1;
+}
+
+#fanfic-bar-content.collapsed {
+  max-height: 0;
+  opacity: 0;
+  margin: 0;
+  padding: 0;
+}
+
+/* 3. 旋转箭头 */
+#fanfic-bar-toggle-icon {
+  transition: transform 0.3s ease;
+}
+#fanfic-bar-toggle-icon.collapsed {
+  transform: rotate(-90deg);
+}
+
+/* 4. 输入框样式统一 */
+#fanfic-preference-bar textarea:focus,
+#fanfic-preference-bar input:focus,
+#fanfic-preference-bar select:focus {
+  background: #fff !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
+  outline: none;
+}
+/* ========================================================= */
+/* === ✨ 帖子详情页美化 V3 (合并头部与正文) ✨ === */
+/* ========================================================= */
+
+/* 1. 详情页背景：保持干净 */
+#post-screen {
+  background-color: #f5f7fa !important;
+}
+
+/* 2. 将原来的头部和身体的间距消除，并统一背景色 */
+#post-detail-content {
+  padding: 15px !important;
+  gap: 0 !important; /* 关键：移除元素间距 */
+}
+
+/* 3. 头部 (Header) 美化 */
+.post-detail-header {
+  background-color: #fff !important;
+  /* 只设置上方的圆角 */
+  border-radius: 16px 16px 0 0 !important;
+  border-bottom: 1px solid #f0f0f0 !important; /* 使用极淡的分割线 */
+  padding: 25px 20px 15px 20px !important;
+  margin-bottom: 0 !important;
+  box-shadow: none !important; /* 移除独立阴影 */
+}
+
+.post-detail-header h1 {
+  font-size: 19px !important;
+  color: #333 !important;
+  font-weight: 700 !important;
+  line-height: 1.4 !important;
+}
+
+/* 4. 正文 (Body) 美化 */
+.post-detail-body {
+  background-color: #fff !important;
+  /* 只设置下方的圆角 */
+  border-radius: 0 0 16px 16px !important;
+  padding: 10px 20px 30px 20px !important;
+  margin-top: 0 !important;
+  font-size: 16px !important;
+  line-height: 1.8 !important;
+  color: #2c3e50 !important;
+
+  /* 给整体添加一个统一的阴影，看起来像一张完整的纸 */
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* ========================================================= */
+/* === ✨ 同人控制台美化 V3 (精致面板) ✨ === */
+/* ========================================================= */
+
+#fanfic-preference-bar {
+  background: #fff !important;
+  border-radius: 16px !important;
+  padding: 0 !important; /* 让头部贴边 */
+  margin: 15px !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.06) !important;
+  border: 1px solid #fff !important;
+  overflow: hidden; /* 保证圆角不被内容撑破 */
+}
+
+/* 头部 */
+#fanfic-bar-header {
+  padding: 15px !important;
+  margin: 0 !important;
+  border-bottom: 1px solid #f5f5f5 !important;
+  background-color: #fafafa !important; /* 稍微深一点的头部背景 */
+  transition: background-color 0.2s;
+}
+#fanfic-bar-header:hover {
+  background-color: #f0f0f0 !important;
+}
+.bar-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #333;
+}
+
+/* 内容区 */
+#fanfic-bar-content {
+  padding: 15px !important;
+  background-color: #fff !important;
+}
+
+/* 输入框通用样式 */
+#fanfic-preference-bar select,
+#fanfic-preference-bar input[type="text"],
+#fanfic-preference-bar textarea {
+  width: 100%;
+  background: #f7f9fc !important;
+  border: 1px solid #edf2f7 !important;
+  border-radius: 8px !important;
+  padding: 8px 10px !important;
+  font-size: 13px !important;
+  color: #333 !important;
+  box-shadow: none !important;
+  box-sizing: border-box;
+  transition: all 0.2s;
+}
+#fanfic-preference-bar input:focus,
+#fanfic-preference-bar textarea:focus {
+  background: #fff !important;
+  border-color: #a1c4fd !important;
+  box-shadow: 0 0 0 3px rgba(161, 196, 253, 0.1) !important;
+}
+
+.mini-btn {
+  padding: 0 12px !important;
+  font-size: 12px !important;
+  background: #fff !important;
+  border: 1px solid #e0e0e0 !important;
+  border-radius: 8px !important;
+  color: #666 !important;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.mini-btn.danger {
+  color: #ff4d4f !important;
+  border-color: #ffccc7 !important;
+  background: #fff2f0 !important;
+}
+.mini-btn.primary {
+  background: var(--accent-color) !important;
+  color: #fff !important;
+  border-color: var(--accent-color) !important;
+}
+.mini-btn.disabled {
+  background: #f2f2f2 !important;
+  color: #999 !important;
+  border-color: #e0e0e0 !important;
+  cursor: not-allowed !important;
+}
+
+.post-series-bar {
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin: 10px 0 14px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+}
+.post-series-bar .series-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.post-series-bar .series-title {
+  font-weight: 700;
+  color: #333;
+}
+.post-series-bar .series-status {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.post-series-bar .series-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.forum-bookshelf-list,
+.forum-series-chapter-list {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.forum-bookshelf-card,
+.forum-series-card,
+.forum-chapter-item {
+  background: #fff;
+  border: 1px solid rgba(76, 51, 31, 0.12);
+  border-radius: 12px;
+  padding: 12px 14px;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.05);
+  position: relative;
+  overflow: hidden;
+}
+
+.forum-bookshelf-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.08),
+    rgba(76, 51, 31, 0.08)
+  );
+  pointer-events: none;
+}
+
+.forum-bookshelf-card::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 6px;
+  height: 100%;
+  background: linear-gradient(180deg, #c69c6d 0%, #a67c52 100%);
+  box-shadow: 3px 0 8px rgba(0, 0, 0, 0.1) inset;
+}
+
+.forum-bookshelf-list {
+  background: linear-gradient(135deg, #f7f2ec, #efe4d8);
+  border-radius: 18px;
+  border: 1px solid rgba(124, 85, 52, 0.16);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.08);
+  position: relative;
+  overflow: hidden;
+}
+
+.forum-bookshelf-list .forum-bookshelf-card {
+  background: #fff9f3;
+}
+.forum-bookshelf-list .forum-bookshelf-card:nth-child(2n) {
+  background: #fff4e8;
+}
+
+.series-card-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.series-card-title {
+  font-weight: 800;
+  font-size: 16px;
+  color: #333;
+}
+.series-card-meta {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.series-card-actions,
+.chapter-actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.forum-chapter-item .chapter-title {
+  font-weight: 700;
+  color: #333;
+}
+.forum-chapter-item .chapter-summary {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+#forum-bookshelf-screen {
+  background:
+    radial-gradient(
+      circle at 20% 20%,
+      rgba(255, 255, 255, 0.25),
+      transparent 35%
+    ),
+    radial-gradient(
+      circle at 80% 10%,
+      rgba(255, 255, 255, 0.18),
+      transparent 32%
+    ),
+    linear-gradient(135deg, #e7d9c8, #d5bea3);
+}
+
+#forum-series-detail-screen {
+  background: linear-gradient(160deg, #f4ede5, #e3d3c2);
+}
+
+#phone-screen.dark-mode .forum-bookshelf-card,
+#phone-screen.dark-mode .forum-series-card,
+#phone-screen.dark-mode .forum-chapter-item,
+#phone-screen.dark-mode .post-series-bar {
+  background: rgba(30, 30, 30, 0.85);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: none;
+}
+#phone-screen.dark-mode .series-card-title,
+#phone-screen.dark-mode .post-series-bar .series-title {
+  color: #f3f3f3;
+}
+#phone-screen.dark-mode .series-card-meta,
+#phone-screen.dark-mode .post-series-bar .series-status,
+#phone-screen.dark-mode .forum-chapter-item .chapter-summary {
+  color: #b3b3b3;
+}
+
+#phone-screen.dark-mode .forum-bookshelf-list {
+  background: rgba(20, 20, 20, 0.85);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: none;
+}
+#phone-screen.dark-mode .forum-bookshelf-card::before {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.04),
+    rgba(0, 0, 0, 0.08)
+  );
+}
+#phone-screen.dark-mode .forum-bookshelf-card {
+  background: rgba(30, 30, 30, 0.9);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+#phone-screen.dark-mode .forum-bookshelf-card:nth-child(2n) {
+  background: rgba(34, 34, 34, 0.9);
+}
+
+/* ================================================= */
+/* === ✨ 圈子 UI 终极美化包 v3.0 (合并修复版) ✨ === */
+/* ================================================= */
+
+/* --- 1. 帖子详情页 (合并头部和身体) --- */
+
+/* 详情页大背景 */
+#post-detail-content {
+  padding: 20px !important;
+  gap: 0 !important; /* 关键：移除中间的间隙 */
+  background-color: #f2f3f5 !important;
+}
+
+/* 头部 (作者信息) */
+.post-detail-header {
+  background-color: #fff !important;
+  padding: 25px 25px 10px 25px !important;
+  border-radius: 16px 16px 0 0 !important; /* 只圆上面 */
+  border-bottom: 1px dashed #eee !important; /* 中间用虚线连接 */
+  margin-bottom: 0 !important;
+  box-shadow: none !important; /* 移除单独阴影 */
+  position: relative;
+  z-index: 2;
+}
+
+/* 正文 (内容) */
+.post-detail-body {
+  background-color: #fff !important;
+  padding: 10px 25px 30px 25px !important;
+  border-radius: 0 0 16px 16px !important; /* 只圆下面 */
+  margin-top: 0 !important;
+  border-top: none !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05) !important; /* 统一加在下面 */
+  position: relative;
+  z-index: 1;
+
+  font-size: 16px !important;
+  line-height: 1.8 !important;
+  color: #333 !important;
+}
+
+/* 为了让它们看起来像一张纸，我们在外层加个伪阴影（可选，这里简化处理） */
+
+/* 评论区标题美化 */
+.post-comments-section h3 {
+  margin: 30px 0 15px 10px !important;
+  font-size: 15px !important;
+  color: #888 !important;
+  font-weight: 600 !important;
+  text-align: left !important;
+  border-left: 4px solid var(--accent-color) !important;
+  padding-left: 10px !important;
+}
+
+/* 夜间模式适配 */
+#phone-screen.dark-mode .post-detail-header,
+#phone-screen.dark-mode .post-detail-body {
+  background-color: #1e1e1e !important;
+  border-color: #333 !important;
+  color: #ccc !important;
+}
+
+/* --- 2. 同人控制台 (Fanfic Bar) 美化 --- */
+
+#fanfic-preference-bar {
+  background: #fff !important;
+  border-radius: 16px;
+  margin: 15px !important;
+  padding: 15px !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+  border: 1px solid #eef0f2;
+}
+
+#fanfic-bar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  padding-bottom: 5px;
+}
+
+.bar-title {
+  font-weight: 700;
+  color: #4a4a4a;
+  font-size: 15px;
+}
+
+#fanfic-bar-content {
+  margin-top: 15px;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+#fanfic-bar-content.collapsed {
+  display: none; /* 简单隐藏 */
+}
+#fanfic-bar-toggle-icon.collapsed {
+  transform: rotate(-90deg);
+}
+
+/* 预设行 */
+.presets-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 15px;
+}
+.presets-row select {
+  flex-grow: 1;
+  background: #f7f8fa !important;
+  border: none !important;
+  border-radius: 8px !important;
+  padding: 8px !important;
+  font-size: 13px;
+}
+.btn-icon {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f0f2f5;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+}
+.btn-icon:hover {
+  background: #e1e4e8;
+}
+.btn-icon.danger {
+  color: #ff4d4f;
+  background: #fff1f0;
+}
+
+/* CP行 */
+.cp-row {
+  display: flex;
+  align-items: flex-end; /* 底部对齐 */
+  gap: 8px;
+  margin-bottom: 12px;
+}
+/* 参数行 (字数/类型/文风) */
+.params-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+/* 世界观 */
+#fanfic-worldview-input {
+  background: #f7f8fa !important;
+  border: none !important;
+  border-radius: 10px !important;
+  padding: 10px !important;
+  font-size: 13px;
+  resize: none;
+}
+
+/* 夜间模式适配 */
+#phone-screen.dark-mode #fanfic-preference-bar {
+  background: #252525 !important;
+  border-color: #333;
+}
+#phone-screen.dark-mode .bar-title {
+  color: #ddd;
+}
+#phone-screen.dark-mode .presets-row select,
+#phone-screen.dark-mode #fanfic-worldview-input {
+  background: #333 !important;
+  color: #fff;
+}
+#phone-screen.dark-mode .btn-icon {
+  background: #333;
+}
+/* ========================================= */
+/* === 同人控制台手机适配修复 (无按钮版) === */
+/* ========================================= */
+
+#fanfic-preference-bar {
+  /* 核心修复：宽度自适应，防止溢出屏幕 */
+  width: auto !important;
+  margin: 10px 15px !important; /* 左右留出间隙 */
+  padding: 15px !important;
+  box-sizing: border-box !important; /* 确保padding包含在宽度内 */
+
+  /* 样式美化 */
+  background: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(20px);
+  border-radius: 16px !important;
+  border: 1px solid rgba(255, 255, 255, 0.5) !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05) !important;
+
+  /* 布局属性 */
+  flex-shrink: 0 !important; /* 防止被挤压 */
+  position: relative;
+  z-index: 10;
+}
+
+/* 强制输入框不超出容器 */
+#fanfic-preference-bar input,
+#fanfic-preference-bar select,
+#fanfic-preference-bar textarea {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important; /* flex布局下防止溢出的关键 */
+  box-sizing: border-box !important;
+}
+
+/* 调整行布局，防止手机上挤在一起 */
+.fanfic-row.params-row {
+  gap: 10px !important;
+}
+
+/* 适配 CP 选择行 */
+.fanfic-row.cp-row {
+  gap: 8px !important;
+}
+.fanfic-row.cp-row select {
+  width: 45% !important; /* 让两个下拉框平分宽度 */
+}
+
+/* 预设行按钮防溢出 */
+.fanfic-row.presets-row button {
+  padding: 0 8px !important;
+  font-size: 12px !important;
+}
+
+/* 夜间模式适配 */

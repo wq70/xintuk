@@ -1,0 +1,32 @@
+{
+  "elementIdCount": 2021,
+  "elementIdOrderHash": "84ef13bbfae5ebc52fb2876f38efe2a56da676a10cd406e4d81db0f312372e4e",
+  "screenCount": 62,
+  "screenIdOrderHash": "30113b8d494e9cf2e9cf13e5bfcbf1a29758a2fed60e1d5899d71705ab7beaf5",
+  "inlineHandlerCount": 54,
+  "scriptReferences": [
+    "https://unpkg.com/dexie/dist/dexie.js",
+    "https://cdn.jsdelivr.net/npm/marked/marked.min.js",
+    "https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js",
+    "https://phoebeboo.github.io/mewoooo/pp.js",
+    "main-app.js",
+    "game-hall.js",
+    "forum.js",
+    "lovers-space.js",
+    "taobao.js",
+    "weibo.js",
+    "date.js",
+    "studio.js",
+    "sw.js",
+    "https://cdn.jsdelivr.net/npm/darkreader@4.9.84/darkreader.min.js",
+    "https://cdn.jsdelivr.net/npm/chart.js",
+    "https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js",
+    "tukey-accounting.js",
+    "kk-checkin.js",
+    "https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js",
+    "https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js",
+    "https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js",
+    "avatar-frames.js"
+  ],
+  "databaseSchemaHash": "7f0f2fa75d6a8e098857faa895d79f1913fab77683c3e2a6f0427743d1be6e42"
+}

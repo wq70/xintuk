@@ -1,0 +1,851 @@
+      alert('还没有你的发言记录，无法重roll。');
+      return;
+    }
+
+    // 2. 移除那之后的所有日志（也就是所有AI的行动记录）
+    const removedLogs = seaTurtleSoupState.gameLog.splice(lastUserActionIndex + 1);
+
+    if (removedLogs.length === 0) {
+      alert('AI还没有行动，无需重roll。');
+      return;
+    }
+
+    console.log(`海龟汤：移除了 ${removedLogs.length} 条AI行动日志，准备重roll。`);
+
+    // 3. 重新渲染UI，界面会立刻回滚
+    renderSeaTurtleGameScreen();
+
+    // 4. 给用户一个提示
+    await showCustomAlert('请稍候...', '正在让AI们重新组织语言...');
+
+    // 5. 重新调用游戏主循环，它会自动执行AI的回合
+    await processStsTurn();
+  }
+
+  /**
+   * 辅助函数：从后往前查找数组中满足条件的第一个元素的索引
+   */
+  function findLastIndex(array, predicate) {
+    for (let i = array.length - 1; i >= 0; i--) {
+      if (predicate(array[i], i, array)) {
+        return i;
+      }
+    }
+    return -1;
+  }
+  // ▲▲▲ 新增函数结束 ▲▲▲
+
+  /**
+   * 【海龟汤】游戏主循环/引擎
+   */
+  async function processStsTurn(userQuestion = null, userObj = null) {
+    if (!seaTurtleSoupState.isActive || seaTurtleSoupState.phase !== 'guessing') return;
+
+    // 1. 如果有用户提问，出题人先回答
+    if (userQuestion && userObj) {
+      const provider = seaTurtleSoupState.riddleProvider;
+      let providerAnswerResponse;
+      if (provider.isUser) {
+        const choice = await showChoiceModal(`回答 ${userObj.name} 的问题: "${userQuestion}"`, [
+          { text: '是', value: '是' },
+          { text: '否', value: '否' },
+          { text: '无关', value: '无关' },
+        ]);
+        providerAnswerResponse = { judgement: choice || '无关', remark: '' };
+      } else {
+        providerAnswerResponse = await triggerStsAiTurn(provider, 'answer', {
+          question: userQuestion,
+          askerName: userObj.name,
+        });
+      }
+
+      logToStsGame(providerAnswerResponse.judgement, 'answer', provider);
+      if (providerAnswerResponse.remark) {
+        await sleep(500);
+        logToStsGame(providerAnswerResponse.remark, 'question', provider);
+      }
+    }
+
+    // 2. 轮到AI玩家行动 (提问或猜测)
+    const guessers = seaTurtleSoupState.players.filter(p => !p.isProvider);
+    if (guessers.length === 0) return;
+
+    for (const guesser of guessers) {
+      if (guesser.isUser) continue;
+
+      await sleep(2000 + Math.random() * 2000);
+
+      renderSeaTurtleGameScreen({ activePlayerId: guesser.id });
+      const aiAction = await triggerStsAiTurn(guesser, 'guess');
+
+      if (aiAction.type === 'question') {
+        logToStsGame(aiAction.content, 'question', guesser);
+        await sleep(6000);
+
+        const provider = seaTurtleSoupState.riddleProvider;
+        let providerAnswerResponse;
+        if (provider.isUser) {
+          const choice = await showChoiceModal(`回答 ${guesser.name} 的问题: "${aiAction.content}"`, [
+            { text: '是', value: '是' },
+            { text: '否', value: '否' },
+            { text: '无关', value: '无关' },
+          ]);
+          providerAnswerResponse = { judgement: choice || '无关', remark: '' };
+        } else {
+          providerAnswerResponse = await triggerStsAiTurn(provider, 'answer', {
+            question: aiAction.content,
+            askerName: guesser.name,
+          });
+        }
+
+        logToStsGame(providerAnswerResponse.judgement, 'answer', provider);
+        if (providerAnswerResponse.remark) {
+          await sleep(500);
+          logToStsGame(providerAnswerResponse.remark, 'question', provider);
+        }
+      } else if (aiAction.type === 'guess') {
+        logToStsGame(aiAction.content, 'guess', guesser);
+
+        let isCorrect = false;
+        if (seaTurtleSoupState.riddleProvider.isUser) {
+          isCorrect = await showCustomConfirm(
+            '判断猜测',
+            `玩家 ${guesser.name} 猜测的答案是：\n\n"${aiAction.content}"\n\n这个猜测是否正确？`,
+          );
+        } else {
+          const aiEvaluation = await triggerStsAiTurn(
+            seaTurtleSoupState.riddleProvider,
+            'evaluate_guess',
+            aiAction.content,
+          );
+          isCorrect = aiEvaluation.isCorrect;
+        }
+
+        if (isCorrect) {
+          logToStsGame(`${guesser.name} 猜对了！游戏结束！`, 'system', guesser);
+          await revealStsAnswer();
+          return;
+        } else {
+          logToStsGame('不对哦。', 'answer', seaTurtleSoupState.riddleProvider);
+        }
+      }
+    }
+
+    renderSeaTurtleGameScreen({ activePlayerId: 'user' });
+    // ▼▼▼ 在这里粘贴下面的新代码 ▼▼▼
+    // ★ 核心修改：AI回合结束后，在操作区添加重roll按钮
+    const actionArea = document.getElementById('sts-action-area');
+    const mainRow = actionArea.querySelector('.chat-input-main-row');
+    if (mainRow) {
+      // 先检查是否已经存在，避免重复添加
+      if (!document.getElementById('sts-reroll-ai-turn-btn')) {
+        const rerollBtn = document.createElement('button');
+        rerollBtn.id = 'sts-reroll-ai-turn-btn';
+        rerollBtn.className = 'action-button';
+        rerollBtn.title = '让AI们重新提问或猜测';
+        rerollBtn.style.backgroundColor = '#ff9800'; // 给它一个醒目的橙色
+        rerollBtn.style.width = '40px';
+        rerollBtn.style.height = '40px';
+        rerollBtn.innerHTML = `<svg class="reroll-btn-icon" viewBox="0 0 24 24" style="stroke:white;"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>`;
+
+        // 将按钮插入到“提问”按钮的前面
+        mainRow.insertBefore(rerollBtn, document.getElementById('send-sts-question-btn'));
+      }
+    }
+    // ▲▲▲ 新增代码结束 ▲▲▲
+  }
+
+  /**
+   * 【海龟汤-AI核心 V2】触发AI行动（回答、提问、判断或猜测）
+   */
+  async function triggerStsAiTurn(player, actionType, contextPayload = {}) {
+    const { proxyUrl, apiKey, model } = state.apiConfig;
+    if (!proxyUrl || !apiKey || !model) return { type: 'question', content: '我不知道该问什么了。' };
+
+    let systemPrompt = '';
+    const gameLogText = seaTurtleSoupState.gameLog
+      .map(log => `${log.speaker}: ${log.message}`)
+      .slice(-15)
+      .join('\n');
+
+    if (actionType === 'answer') {
+      // 人设加强版 V3 Prompt
+      systemPrompt = `
+# 任务: 海龟汤出题人 (高级人格版)
+你现在【就是】角色“${player.name}”，你的人设是：“${player.persona}”。
+你是海龟汤的出题人，你的谜底是：“${seaTurtleSoupState.answer}”。
+现在，玩家“${contextPayload.askerName}”向你提问：“${contextPayload.question}”。
+
+你的任务是先给出判断，然后用【完全符合你人设的口吻】，给出一句精妙的补充说明(remark)。
+
+# 你的行为准则 (必须严格遵守)
+
+## 1. 关于判断 (Judgement)
+你的 "judgement" 字段必须从以下【四个】选项中选择一个：\`是\`, \`否\`, \`无关\`, \`部分是\`。
+
+## 2. 关于补充说明 (Remark)
+-   **【【【人格铁律】】】**: 你的每一句补充说明，都【必须】是你作为角色“${player.name}”会说的话。思考一下，一个“${player.persona}”性格的人，在面对这个问题时会如何回答？是会调侃、会鼓励、会故作高深，还是会不耐烦？
+-   **配合判断**: 当判断为 "部分是" 时，你的补充说明要巧妙地指出他们猜对的部分。
+-   **给予提示 (仅在玩家卡关时)**:
+    -   **判断瓶颈**: 当你观察到最近的5-8条提问大多是“无关”时，意味着玩家可能陷入了思维僵局。
+    -   **执行操作**: 在这种情况下，你的补充说明【必须包含一个方向性的提示】，并用你的人设口吻自然地说出来。
+
+# 格式铁律
+1.  你的回复【必须且只能】是一个严格的JSON对象，包含 "judgement" 和 "remark" 两个字段。
+2.  【绝对禁止】在你的任何回复中使用Emoji表情符号或出戏的词语。
+
+# JSON输出格式示例:
+{
+  "judgement": "",
+  "remark": ""
+}
+现在，请直接输出你的JSON判断。`;
+    } else if (actionType === 'evaluate_guess') {
+      systemPrompt = `
+# 任务: 海龟汤出题人 - 判断猜测
+你正在扮演角色“${player.name}”，人设是：“${player.persona}”。
+你是海龟汤的出题人。你的谜底是：“${seaTurtleSoupState.answer}”。
+现在，有玩家直接猜测了谜底，内容是：“${contextPayload}”。
+你的任务是判断这个猜测是否与你的谜底【核心意思一致】，只要70%的正确率即可。
+
+# 核心规则
+1.  **格式铁律**: 你的回复【必须且只能】是一个严格的JSON对象，格式为: \`{"isCorrect": true}\` 或 \`{"isCorrect": false}\`。
+2.  **判断标准**: 只要猜测的核心情节、人物关系、关键道具和最终结果与谜底一致即可，不需要逐字匹配。
+
+现在，请直接输出你的判断。`;
+    } else {
+      // 'guess'
+      systemPrompt = `
+# 任务: 海龟汤猜测者
+你正在扮演角色“${player.name}”，人设是：“${player.persona}”。
+你正在玩海龟汤游戏，需要根据已知信息提问或猜测谜底。
+
+# 游戏信息
+- 谜面: ${seaTurtleSoupState.riddle}
+- 已有线索 (完整的对话记录):
+${gameLogText}
+
+# 核心规则
+1.  **【【【逻辑推理铁律】】】**: 你【必须】仔细分析上方的“已有线索”，避免提出重复或与已知线索矛盾的问题。你的提问或猜测应该建立在已有信息之上，展现出逻辑推理能力。
+2.  **【【【人格扮演铁律】】】**: 你的提问和猜测都【必须】符合你的人设和口吻，就像真人在玩游戏一样。你可以适当加入一些自己的思考过程或情绪表达，让对话更生动。例如，你可以说：“让我想想... 既然和地点无关，那是不是和时间有关？”，尽可能发言字数多点。
+3.  **决策**: 根据线索，决定是提出一个关键的“是/否”问题来缩小范围，还是直接猜测谜底。当线索足够时，大胆地使用 "guess" 指令来猜测完整的故事。
+4.  **【【【加速规则】】】**: 如果“已有线索”的对话记录已经超过了30条，这说明游戏时间过长。在这种情况下，你【应该更倾向于直接猜测谜底】，而不是继续提出细节问题。
+5.  **格式铁律**: 你的回复【必须且只能】是一个严格的JSON对象。
+   - 如果提问, 格式: \`{"type": "question", "content": "你的问题..."}\`
+   - 如果猜测, 格式: \`{"type": "guess", "content": "你猜测的完整故事..."}\`
+6.  **禁止Emoji**: 【绝对禁止】在你的任何回复中使用Emoji表情符号。
+
+现在，请根据你的人设和判断，生成你的行动。`;
+    }
+    const maxRetries = 3; // 最多重试3次
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const messagesForApi = [{ role: 'user', content: '请根据你在系统指令中读到的规则，立即开始你的行动。' }];
+        let isGemini = proxyUrl === GEMINI_API_URL;
+        let geminiConfig = toGeminiRequestData(
+          model,
+          apiKey,
+          systemPrompt,
+          messagesForApi,
+          isGemini,
+          state.apiConfig.temperature,
+        );
+
+        const response = isGemini
+          ? await fetch(geminiConfig.url, geminiConfig.data)
+          : await fetch(`${proxyUrl}/v1/chat/completions`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+              body: JSON.stringify({
+                model: model,
+                messages: [{ role: 'system', content: systemPrompt }, ...messagesForApi],
+                temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+                response_format: { type: 'json_object' },
+              }),
+            });
+
+        // 【重要】如果响应状态码是429，也主动抛出错误，进入catch块进行重试
+        if (response.status === 429) {
+          const errorData = await response.json();
+          // 构造一个和之前日志里一样的错误信息，方便我们解析
+          throw new Error(JSON.stringify({ error: errorData.error }));
+        }
+        if (!response.ok) {
+          // 对于其他错误，直接抛出
+          throw new Error(`API请求失败: ${response.status} - ${await response.text()}`);
+        }
+
+        const data = await response.json();
+        const content = (isGemini ? data.candidates[0].content.parts[0].text : data.choices[0].message.content).replace(
+          /^```json\s*|```$/g,
+          '',
+        );
+
+        // 如果成功，解析并返回结果，结束函数
+        return JSON.parse(content);
+      } catch (error) {
+        console.error(`海龟汤AI行动失败 (第 ${attempt} 次尝试):`, error.message);
+
+        // 如果是最后一次尝试，就彻底失败，并把错误抛出去
+        if (attempt === maxRetries) {
+          // 将原始错误重新包装后抛出，以便外部能捕获
+          throw new Error(`AI action failed after ${maxRetries} attempts: ${error.message}`);
+        }
+
+        let delay = 2000 * attempt; // 默认的指数退避延迟
+
+        // 智能解析API建议的等待时间
+        try {
+          // 错误信息本身可能是一个JSON字符串，先解析它
+          const errorJson = JSON.parse(error.message);
+          const errorMessage = errorJson.error.message;
+
+          // 正则表达式匹配 "retry in X.XXXXs"
+          const retryMatch = errorMessage.match(/retry in (\d+\.?\d*)s/);
+          if (retryMatch && retryMatch[1]) {
+            // 找到了建议时间，就用它，并额外加一点点缓冲
+            delay = parseFloat(retryMatch[1]) * 1000 + 500;
+            console.log(`API请求过于频繁，将根据建议在 ${Math.round(delay / 1000)} 秒后重试...`);
+          }
+        } catch (e) {
+          // 如果解析失败，说明错误信息格式不符合预期，就使用默认延迟
+          console.log(`API请求失败，将在 ${Math.round(delay / 1000)} 秒后进行第 ${attempt + 1} 次重试...`);
+        }
+
+        // 等待计算出的延迟时间
+        await sleep(delay);
+      }
+    }
+    // ==========================================================
+    // --- ▲▲▲ 【核心修改】到这里结束 ▲▲▲ ---
+    // ==========================================================
+
+    // 如果循环结束都没成功，返回一个备用结果，防止游戏卡死
+    console.error('所有重试均失败，返回备用行动。');
+    if (actionType === 'answer') return { judgement: '无关', remark: '（AI思考短路了...）' };
+    if (actionType === 'evaluate_guess') return { isCorrect: false };
+    return { type: 'question', content: '他/她是人类吗？' };
+  }
+  /**
+   * 【海龟汤 V2 - 结算增强版】揭晓答案并显示结算界面
+   */
+  async function revealStsAnswer() {
+    if (!seaTurtleSoupState.isActive) return;
+
+    // 1. 标记游戏结束
+    seaTurtleSoupState.isActive = false; // 确保游戏状态变为非激活
+    seaTurtleSoupState.phase = 'reveal';
+
+    // 2. 隐藏游戏中的操作区域
+    document.getElementById('sts-action-area').style.visibility = 'hidden';
+
+    // 3. 准备复盘内容
+    const summaryText = generateStsSummary();
+
+    // 4. 显示结算弹窗
+    showStsSummaryModal(summaryText);
+  }
+  // ▼▼▼ 【全新】海龟汤结算与分享功能函数 ▼▼▼
+
+  /**
+   * 生成海龟汤的复盘文本
+   * @returns {string} 格式化后的复盘Markdown文本
+   */
+  function generateStsSummary() {
+    let summaryText = `**海龟汤 - 游戏复盘**\n\n`;
+    summaryText += `**出题人:** ${seaTurtleSoupState.riddleProvider.name}\n\n`;
+    summaryText += `**谜面:**\n${seaTurtleSoupState.riddle}\n\n`;
+    summaryText += `**谜底:**\n${seaTurtleSoupState.answer}`;
+    return summaryText;
+  }
+
+  /**
+   * 显示游戏结算卡片模态框
+   * @param {string} summaryText - 复盘文本
+   */
+  function showStsSummaryModal(summaryText) {
+    const modal = document.getElementById('sts-summary-modal');
+    const contentEl = document.getElementById('sts-summary-content');
+
+    // 使用你已有的Markdown渲染函数，让复盘更好看
+    contentEl.innerHTML = renderMarkdown(summaryText);
+
+    // 为按钮绑定事件 (使用克隆节点防止重复绑定)
+    const shareBtn = document.getElementById('share-sts-summary-btn');
+    const newShareBtn = shareBtn.cloneNode(true);
+    shareBtn.parentNode.replaceChild(newShareBtn, shareBtn);
+    newShareBtn.onclick = () => openStsShareTargetPicker(summaryText);
+
+    const backBtn = document.getElementById('back-to-hall-from-sts-btn');
+    const newBackBtn = backBtn.cloneNode(true);
+    backBtn.parentNode.replaceChild(newBackBtn, backBtn);
+    newBackBtn.onclick = () => {
+      modal.classList.remove('visible');
+      showScreen('game-hall-screen');
+    };
+
+    modal.classList.add('visible');
+  }
+
+  /**
+   * 打开复盘分享目标选择器
+   * @param {string} summaryText - 要分享的复盘文本
+   */
+  function openStsShareTargetPicker(summaryText) {
+    const modal = document.getElementById('sts-share-target-modal');
+    const listEl = document.getElementById('sts-share-target-list');
+    listEl.innerHTML = '';
+
+    // 从游戏状态中获取所有非出题人的AI玩家
+    const aiPlayers = seaTurtleSoupState.players.filter(p => !p.isUser && !p.isProvider);
+
+    if (aiPlayers.length === 0) {
+      alert('没有可以分享的AI玩家。');
+      return;
+    }
+
+    // 渲染可选的AI玩家列表
+    aiPlayers.forEach(player => {
+      const item = document.createElement('div');
+      item.className = 'player-selection-item'; // 复用样式
+      item.innerHTML = `
+            <input type="checkbox" class="sts-target-checkbox" value="${player.id}" checked>
+            <img src="${player.avatar || defaultAvatar}" alt="${player.name}">
+            <span class="name">${player.name}</span>
+        `;
+      listEl.appendChild(item);
+    });
+
+    // 绑定按钮事件
+    const confirmBtn = document.getElementById('sts-confirm-share-btn');
+    const newConfirmBtn = confirmBtn.cloneNode(true);
+    confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+    newConfirmBtn.onclick = () => {
+      const selectedIds = Array.from(document.querySelectorAll('.sts-target-checkbox:checked')).map(cb => cb.value);
+      if (selectedIds.length > 0) {
+        sendStsSummaryToSelectedPlayers(summaryText, selectedIds);
+      } else {
+        alert('请至少选择一个分享对象！');
+      }
+    };
+
+    document.getElementById('sts-cancel-share-btn').onclick = () => modal.classList.remove('visible');
+    document.getElementById('sts-select-all-btn').onclick = () => {
+      document.querySelectorAll('.sts-target-checkbox').forEach(cb => (cb.checked = true));
+    };
+    document.getElementById('sts-deselect-all-btn').onclick = () => {
+      document.querySelectorAll('.sts-target-checkbox').forEach(cb => (cb.checked = false));
+    };
+
+    modal.classList.add('visible');
+  }
+
+  /**
+   * 将游戏复盘发送到【选定】的AI角色的聊天中
+   * @param {string} summaryText - 复盘文本
+   * @param {string[]} targetIds - 目标AI角色的ID数组
+   */
+  async function sendStsSummaryToSelectedPlayers(summaryText, targetIds) {
+    // 关闭所有可能打开的弹窗
+    document.getElementById('sts-summary-modal').classList.remove('visible');
+    document.getElementById('sts-share-target-modal').classList.remove('visible');
+
+    let sentCount = 0;
+    const aiContext = `[系统指令：刚刚结束了一局海龟汤，这是游戏复盘。请根据这个复盘内容，以你的角色人设，和用户聊聊刚才的游戏。]\n\n${summaryText}`;
+
+    for (const chatId of targetIds) {
+      const chat = state.chats[chatId];
+      if (chat) {
+        // 创建对用户可见的复盘卡片消息
+        const visibleMessage = {
+          role: 'user',
+          type: 'share_link',
+          timestamp: Date.now(),
+          title: '海龟汤 - 游戏复盘',
+          description: '点击查看详细复盘记录',
+          source_name: '游戏中心',
+          content: summaryText,
+        };
+
+        // 创建对AI可见的隐藏指令
+        const hiddenInstruction = {
+          role: 'system',
+          content: aiContext,
+          timestamp: Date.now() + 1,
+          isHidden: true,
+        };
+
+        chat.history.push(visibleMessage, hiddenInstruction);
+        await db.chats.put(chat);
+        sentCount++;
+      }
+    }
+
+    await showCustomAlert('分享成功', `游戏复盘已分享至 ${sentCount} 位AI玩家的聊天中！`);
+    showScreen('game-hall-screen');
+  }
+
+  // ▲▲▲ 新增函数结束 ▲▲▲
+
+  /**
+   * 【辅助函数】计算两个字符串的简单相似度
+   */
+  function simpleSimilarity(str1, str2) {
+    const set1 = new Set(str1.split(''));
+    const set2 = new Set(str2.split(''));
+    const intersection = new Set([...set1].filter(x => set2.has(x)));
+    return intersection.size / Math.max(set1.size, set2.size);
+  }
+
+  // ▲▲▲ 海龟汤功能函数结束 ▲▲▲
+
+  // ▼▼▼ 【全新】这里是剧本杀游戏的所有核心功能函数 ▼▼▼
+
+  /**
+   * 【剧本杀】打开游戏设置界面
+   */
+  async function openScriptKillSetup() {
+    showScreen('script-kill-setup-screen');
+
+    const scriptSelect = document.getElementById('script-kill-script-select');
+    scriptSelect.innerHTML = '<option value="">-- 请选择剧本 --</option>';
+
+    // --- ▼▼▼ 核心修改在这里 ▼▼▼ ---
+
+    // 1. 遍历我们创建的内置剧本库
+    BUILT_IN_SCRIPTS.forEach(script => {
+      const option = document.createElement('option');
+      option.value = script.id; // value 是剧本的唯一ID
+      option.textContent = `【内置】${script.name}`; // 显示的文本
+      scriptSelect.appendChild(option);
+    });
+
+    // 2. 加载并显示自定义剧本
+    const customScripts = await db.scriptKillScripts.toArray();
+    customScripts.forEach(script => {
+      const option = document.createElement('option');
+      option.value = script.id;
+      option.textContent = `【自定义】${script.name}`;
+      scriptSelect.appendChild(option);
+    });
+
+    // --- ▲▲▲ 修改结束 ▲▲▲ ---
+    // 渲染玩家选择列表
+    const selectionEl = document.getElementById('script-kill-player-selection');
+    selectionEl.innerHTML = '<p>正在加载角色列表...</p>';
+
+    const singleChats = Object.values(state.chats).filter(chat => !chat.isGroup);
+    const allNpcs = Object.values(state.chats).flatMap(chat =>
+      (chat.npcLibrary || []).map(npc => ({ ...npc, owner: chat.name })),
+    );
+
+    let playerOptions = [
+      ...singleChats.map(c => ({ id: c.id, name: c.name, avatar: c.settings.aiAvatar, type: '角色' })),
+      ...allNpcs.map(n => ({ id: n.id, name: n.name, avatar: n.avatar, type: `NPC (${n.owner})` })),
+    ];
+
+    selectionEl.innerHTML = '';
+    playerOptions.forEach(player => {
+      const item = document.createElement('div');
+      item.className = 'player-selection-item'; // 复用样式
+      item.innerHTML = `
+            <input type="checkbox" class="script-kill-player-checkbox" value="${player.id}">
+            <img src="${player.avatar || defaultAvatar}" alt="${player.name}">
+            <span class="name">${player.name}</span>
+            <span class="type-tag">${player.type}</span>
+        `;
+      selectionEl.appendChild(item);
+    });
+  }
+  // ▼▼▼ 在这里开始粘贴 ▼▼▼
+
+  /**
+   * 【剧本杀】显示角色选择弹窗，让用户选择角色
+   * @param {string} title - 弹窗标题
+   * @param {Array<object>} options - 角色选项数组 [{text, value}]
+   * @returns {Promise<number|null>} - 返回用户选择的角色的索引，如果取消则返回null
+   */
+  async function showRoleSelectionModal(title, options) {
+    return new Promise(resolve => {
+      const modal = document.getElementById('custom-modal-overlay');
+      const modalTitle = document.getElementById('custom-modal-title');
+      const modalBody = document.getElementById('custom-modal-body');
+      const modalConfirmBtn = document.getElementById('custom-modal-confirm');
+      const modalCancelBtn = document.getElementById('custom-modal-cancel');
+
+      modalTitle.textContent = title;
+
+      let optionsHtml = '<div style="text-align: left; max-height: 400px; overflow-y: auto;">';
+      options.forEach((option, index) => {
+        optionsHtml += `
+                <label style="display: block; padding: 10px; border-bottom: 1px solid #eee; cursor: pointer;">
+                    <input type="radio" name="role_selection" value="${option.value}" ${index === 0 ? 'checked' : ''}>
+                    ${option.text}
+                </label>
+            `;
+      });
+      optionsHtml += '</div>';
+
+      modalBody.innerHTML = optionsHtml;
+      modalConfirmBtn.textContent = '确认选择';
+      modalCancelBtn.style.display = 'block';
+
+      modal.classList.add('visible');
+
+      modalConfirmBtn.onclick = () => {
+        const selectedRadio = document.querySelector('input[name="role_selection"]:checked');
+        if (selectedRadio) {
+          modal.classList.remove('visible');
+          resolve(parseInt(selectedRadio.value));
+        } else {
+          alert('请选择一个角色！');
+        }
+      };
+
+      modalCancelBtn.onclick = () => {
+        modal.classList.remove('visible');
+        resolve(null);
+      };
+    });
+  }
+
+  /**
+   * 【剧本杀】开始游戏的核心逻辑 (V3 - 玩家自选，AI随机版)
+   */
+  async function startScriptKillGame() {
+    const scriptId = document.getElementById('script-kill-script-select').value;
+    if (!scriptId) {
+      alert('请先选择一个剧本！');
+      return;
+    }
+    // ▼▼▼ 用这块【已修复】的代码替换旧的 if/else 逻辑 ▼▼▼
+    let script;
+    // 【核心修改】我们不再只检查 'built_in_1'，而是检查 scriptId 是否以 'built_in_' 开头
+    if (scriptId.startsWith('built_in_')) {
+      // 如果是，就调用 getBuiltInScript 函数，并将正确的ID传进去
+      script = getBuiltInScript(scriptId);
+    } else {
+      // 否则，说明是自定义剧本，才去数据库里查找
+      script = await db.scriptKillScripts.get(parseInt(scriptId));
+    }
+    // ▲▲▲ 替换结束 ▲▲▲
+    if (!script) {
+      alert('加载剧本失败！');
+      return;
+    }
+
+    const selectedCheckboxes = document.querySelectorAll('.script-kill-player-checkbox:checked');
+    const requiredPlayers = script.roles.length - 1;
+    if (selectedCheckboxes.length !== requiredPlayers) {
+      alert(`此剧本需要您邀请 ${requiredPlayers} 位AI或NPC玩家！`);
+      return;
+    }
+
+    await showCustomAlert('请稍候...', '正在分配角色，请耐心等待...');
+
+    // 1. 初始化游戏状态
+    scriptKillGameState = {
+      isActive: true,
+      script: script,
+      players: [],
+      gamePhase: 'start',
+      turnIndex: 0,
+      gameLog: [],
+      evidenceCounts: {},
+      votes: {},
+      isFreeChoice: document.getElementById('script-kill-free-choice-toggle').checked,
+      discussionRound: 1, // <--- ★★★ 在这里添加这一行 ★★★
+      collectedClueIds: new Set(),
+    };
+    // 2. 收集玩家信息 (这部分不变)
+    let invitedPlayers = [];
+    selectedCheckboxes.forEach(checkbox => {
+      const playerId = checkbox.value;
+      const chat = Object.values(state.chats).find(c => c.id === playerId);
+      if (chat) {
+        invitedPlayers.push({
+          id: chat.id,
+          name: chat.name,
+          avatar: chat.settings.aiAvatar,
+          persona: chat.settings.aiPersona,
+          isUser: false,
+        });
+      } else {
+        for (const c of Object.values(state.chats)) {
+          const npc = (c.npcLibrary || []).find(n => n.id === playerId);
+          if (npc) {
+            invitedPlayers.push({
+              id: npc.id,
+              name: npc.name,
+              avatar: npc.avatar,
+              persona: npc.persona,
+              isUser: false,
+            });
+            break;
+          }
+        }
+      }
+    });
+    const userPlayer = {
+      id: 'user',
+      name: state.qzoneSettings.nickname || '我',
+      avatar: state.qzoneSettings.avatar || defaultAvatar,
+      isUser: true,
+      persona: '一个喜欢探案的普通人',
+    };
+
+    // --- 3. 【核心改造】根据开关状态，执行不同的分配逻辑 ---
+    const assignedRoles = new Map(); // 使用Map存储 {playerId -> roleObject}
+    let remainingRoles = [...script.roles]; // 创建一个可修改的角色列表副本
+
+    if (scriptKillGameState.isFreeChoice) {
+      // --- 自由选择模式 (玩家自选，AI随机) ---
+
+      // 3a. 用户先从所有角色中选择一个
+      const roleOptions = remainingRoles.map((role, index) => ({
+        text: `【${role.name}】: ${role.description.substring(0, 40)}...`,
+        value: index,
+      }));
+      const userChoiceIndex = await showRoleSelectionModal('请选择你的角色', roleOptions);
+      if (userChoiceIndex === null) {
+        hideCustomModal();
+        alert('你取消了角色选择，游戏未开始。');
+        return;
+      }
+      // 从角色池中移除用户选择的角色，并分配给用户
+      const userChosenRole = remainingRoles.splice(userChoiceIndex, 1)[0];
+      assignedRoles.set(userPlayer.id, userChosenRole);
+
+      // 3b. 【【【这就是本次的核心修改！】】】
+      // 将剩余的角色【随机打乱】
+      remainingRoles.sort(() => Math.random() - 0.5);
+      // 然后【按顺序】分配给AI们
+      invitedPlayers.forEach((aiPlayer, index) => {
+        assignedRoles.set(aiPlayer.id, remainingRoles[index]);
+      });
+    } else {
+      // --- 随机分配模式 (旧逻辑保持不变) ---
+      const allGamePlayers = [userPlayer, ...invitedPlayers];
+      allGamePlayers.sort(() => Math.random() - 0.5);
+      const shuffledRoles = [...script.roles].sort(() => Math.random() - 0.5);
+      allGamePlayers.forEach((player, index) => {
+        assignedRoles.set(player.id, shuffledRoles[index]);
+      });
+    }
+
+    // 4. 组合最终的玩家列表 (这部分不变)
+    const allPlayersWithRoles = [userPlayer, ...invitedPlayers].map(player => ({
+      ...player,
+      role: assignedRoles.get(player.id),
+      evidence: [],
+    }));
+    scriptKillGameState.players = allPlayersWithRoles;
+
+    // 5. 显示身份给用户 (这部分不变)
+    const myPlayer = scriptKillGameState.players.find(p => p.isUser);
+    hideCustomModal();
+    await showCustomAlert(
+      `你的角色是：【${myPlayer.role.name}】`,
+      `**角色介绍:**\n${myPlayer.role.description}\n\n**你的任务:**\n${myPlayer.role.tasks}`,
+    );
+
+    // 6. 切换到游戏界面并开始 (这部分不变)
+    showScreen('script-kill-game-screen');
+    await processScriptKillTurn();
+  }
+
+  // ▲▲▲ 替换结束 ▲▲▲
+
+  // ▼▼▼ 【最终流程版】请用这整块代码，完整替换旧的 processScriptKillTurn 函数 ▼▼▼
+  /**
+   * 【剧本杀 V4 - 最终流程引擎】游戏主循环/引擎
+   */
+  async function processScriptKillTurn() {
+    if (!scriptKillGameState.isActive) return;
+    renderScriptKillGameScreen();
+
+    switch (scriptKillGameState.gamePhase) {
+      case 'start':
+        logToScriptKillGame(`游戏开始！剧本：【${scriptKillGameState.script.name}】`, 'system');
+        await sleep(1000);
+        logToScriptKillGame(`【故事背景】\n${scriptKillGameState.script.storyBackground}`, 'system');
+        await sleep(3000);
+        logToScriptKillGame('请各位玩家查看自己的角色信息，准备进行自我介绍。', 'system');
+        scriptKillGameState.gamePhase = 'introduction';
+        await sleep(2000);
+        await processScriptKillTurn();
+        break;
+
+      case 'introduction':
+        logToScriptKillGame('现在开始轮流进行自我介绍。', 'system');
+        for (const player of scriptKillGameState.players) {
+          renderScriptKillGameScreen({ speakingPlayerId: player.id });
+          let introduction = player.isUser
+            ? await waitForUserActionSK('轮到你自我介绍了', 'speak', '简单介绍一下你自己和你所扮演的角色...')
+            : await triggerScriptKillAiAction(player.id, 'introduce');
+          logToScriptKillGame({ player: player, speech: introduction }, 'speech');
+          await sleep(1000);
+        }
+        renderScriptKillGameScreen();
+        logToScriptKillGame('自我介绍结束，现在请各位玩家分享自己的时间线。', 'system');
+        scriptKillGameState.gamePhase = 'timeline_discussion';
+        await sleep(2000);
+        await processScriptKillTurn();
+        break;
+
+      case 'timeline_discussion':
+        logToScriptKillGame('请各位玩家轮流发言，梳理并公开自己的时间线。', 'system');
+        await sleep(1500);
+        for (const player of scriptKillGameState.players) {
+          renderScriptKillGameScreen({ speakingPlayerId: player.id });
+          let timelineSpeech = player.isUser
+            ? await waitForUserActionSK('轮到你陈述时间线了', 'speak', '请根据你的剧本，详细说明你的行动轨迹...')
+            : await triggerScriptKillAiAction(player.id, 'discuss_timeline');
+          logToScriptKillGame({ player: player, speech: timelineSpeech }, 'speech');
+          await sleep(1000);
+        }
+        renderScriptKillGameScreen();
+        logToScriptKillGame('时间线陈述结束，现在进入【第一轮搜证环节】。', 'system');
+        scriptKillGameState.gamePhase = 'evidence_round_1';
+        await processScriptKillTurn();
+        break;
+
+      case 'evidence_round_1':
+        updateActionAreaSK();
+        logToScriptKillGame('进入第一轮搜证，每位玩家有【2次】搜证机会。', 'system');
+        await sleep(2000);
+
+        // 【核心修改】AI 进行第一轮的第1次搜证
+        for (const player of scriptKillGameState.players) {
+          if (player.isUser) continue;
+          logToScriptKillGame(`轮到 ${player.role.name} (${player.name}) 进行第1次搜证...`);
+          await sleep(2000);
+          await handleAiSearch(player);
+        }
+        // 【核心修改】AI 进行第一轮的第2次搜证
+        for (const player of scriptKillGameState.players) {
+          if (player.isUser) continue;
+          logToScriptKillGame(`轮到 ${player.role.name} (${player.name}) 进行第2次搜证...`);
+          await sleep(2000);
+          await handleAiSearch(player);
+        }
+        logToScriptKillGame('所有AI搜证完毕，玩家可以继续搜证或结束本环节进入讨论。', 'system');
+        break;
+
+      case 'discussion_round_1':
+        logToScriptKillGame('第一轮搜证结束，现在进入【第一轮讨论环节】。', 'system');
+        updateActionAreaSK();
+        break;
+
+      case 'evidence_round_2':
+        updateActionAreaSK();
+        logToScriptKillGame('第一轮讨论结束，现在进入【第二轮搜证环节】。', 'system');
+        logToScriptKillGame('根据刚才的讨论，各位玩家现在还有【1次】搜证机会。', 'system');
+        await sleep(2000);
+
+        // 【核心修改】AI 进行第二轮的唯一次搜证
+        for (const player of scriptKillGameState.players) {
+          if (player.isUser) continue;
+          const searchCount = scriptKillGameState.evidenceCounts[player.id] || 0;
+          if (searchCount < 3) {
+            // 确保AI也有次数限制

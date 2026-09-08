@@ -1,0 +1,277 @@
+          <div class="form-group">
+            <label for="dating-bgm-volume-slider"
+              >音量: <span id="dating-bgm-volume-value">100%</span></label
+            >
+            <input
+              type="range"
+              id="dating-bgm-volume-slider"
+              min="0"
+              max="1"
+              step="0.05"
+              value="1"
+              style="width: 100%"
+            />
+          </div>
+          <hr style="opacity: 0.2" />
+          <!-- 歌曲列表 -->
+          <div
+            id="dating-bgm-playlist"
+            class="list-container"
+            style="padding: 0; height: calc(100% - 130px)"
+          >
+            <!-- 曲库将由JS动态生成在这里 -->
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="save" id="dating-bgm-close-btn" style="width: 100%">
+            关闭
+          </button>
+        </div>
+      </div>
+    </div>
+    <!-- ▲▲▲ 新增结束 ▲▲▲ -->
+
+    <!-- 借钱对象选择弹窗（带滚动和头像） -->
+    <div id="borrow-money-modal" class="modal">
+      <div class="modal-content" style="height: 60%">
+        <div class="modal-header">
+          <span>向谁借钱？</span>
+        </div>
+        <div
+          class="modal-body"
+          id="borrow-money-char-list"
+          style="padding: 0; overflow-y: auto"
+        >
+          <!-- 借钱对象列表将由JS动态生成在这里 -->
+        </div>
+        <div class="modal-footer">
+          <button
+            class="cancel"
+            id="borrow-money-cancel-btn"
+            style="width: 100%"
+          >
+            取消
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="dating-game-settings-modal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <span>约会场景设置</span>
+        </div>
+        <div class="modal-body">
+          <!-- 预设管理 (保持不变) -->
+          <div class="form-group">
+            <label>预设方案</label>
+            <div class="bubble-preset-manager">
+              <select
+                id="dating-preset-select"
+                class="form-group select"
+              ></select>
+              <button id="manage-dating-presets-btn" class="action-btn">
+                管理
+              </button>
+            </div>
+          </div>
+
+          <hr style="opacity: 0.2" />
+
+          <!-- 立绘组选择器-->
+          <div class="form-group">
+            <label>选择角色立绘组</label>
+            <div class="bubble-preset-manager">
+              <select id="dating-sprite-group-select" class="form-group select">
+                <option value="">-- 不使用立绘 --</option>
+                <!-- 立绘组将由JS动态填充 -->
+              </select>
+              <button id="manage-sprite-groups-btn" class="action-btn">
+                管理立绘组
+              </button>
+            </div>
+          </div>
+
+          <hr style="opacity: 0.2" />
+
+          <!-- 核心设置 (保持不变) -->
+          <div class="form-group">
+            <label for="dating-prompt-input">场景/角色提示词 (Prompt)</label>
+            <textarea
+              id="dating-prompt-input"
+              rows="4"
+              placeholder="例如：你是一个傲娇但内心温柔的少女，在海边对用户的表白感到不知所措..."
+            ></textarea>
+          </div>
+          <div class="form-group">
+            <label for="dating-style-input">文风 (Style)</label>
+            <textarea
+              id="dating-style-input"
+              rows="3"
+              placeholder="例如：请使用细腻的心理描写和优美的风景描写..."
+            ></textarea>
+          </div>
+          <div class="form-group">
+            <label>约会背景图</label>
+            <div class="bg-upload-container">
+              <button
+                class="form-button-secondary"
+                onclick="
+                  document.getElementById('dating-bg-upload-input').click()
+                "
+                style="margin-top: 0"
+              >
+                上传图片
+              </button>
+              <input
+                type="text"
+                id="dating-bg-url-input"
+                placeholder="或粘贴网络图片URL"
+                style="flex-grow: 1"
+              />
+            </div>
+            <input
+              type="file"
+              id="dating-bg-upload-input"
+              accept="image/*"
+              hidden
+            />
+          </div>
+          <hr style="opacity: 0.2; margin: 15px 0" />
+
+          <div class="form-group">
+            <label>额外挂载世界书 (本次约会)</label>
+            <!-- 复用主设置的样式，非常方便 -->
+            <div class="custom-multiselect" id="dating-wb-multiselect">
+              <div class="select-box moe-input">
+                <span class="selected-options-text"
+                  >-- 点击选择额外世界观 --</span
+                >
+                <span class="arrow-down">▼</span>
+              </div>
+              <!-- 注意这个容器的 ID 是新的，防止冲突 -->
+              <div
+                id="dating-wb-checkboxes-container"
+                class="checkboxes-container"
+              >
+                <!-- 选项将由JS动态生成 -->
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="cancel-dating-settings-btn">取消</button>
+          <button class="save" id="save-dating-settings-btn">应用并保存</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1. 立绘组管理弹窗 -->
+    <div id="sprite-group-manager-modal" class="modal">
+      <div class="modal-content" style="height: 60%">
+        <div class="modal-header">
+          <span>管理立绘组</span>
+          <span
+            class="action-btn"
+            id="create-new-sprite-group-btn"
+            style="font-size: 16px"
+            >新建</span
+          >
+        </div>
+        <div
+          class="modal-body"
+          id="sprite-group-list-container"
+          style="padding: 0"
+        >
+          <!-- 立绘组列表将由JS动态生成 -->
+        </div>
+        <div class="modal-footer">
+          <button
+            class="save"
+            id="close-sprite-group-manager-btn"
+            style="width: 100%"
+          >
+            完成
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. 立绘组编辑器弹窗 -->
+    <div id="sprite-editor-modal" class="modal">
+      <div class="modal-content" style="height: 90%">
+        <div class="modal-header">
+          <span id="sprite-editor-title">编辑立绘组</span>
+        </div>
+        <div class="modal-body" id="sprite-editor-body">
+          <div class="form-group">
+            <label for="sprite-group-name-input">立绘组名称</label>
+            <input
+              type="text"
+              id="sprite-group-name-input"
+              placeholder="例如：日常、战斗、害羞..."
+            />
+          </div>
+          <hr style="opacity: 0.2" />
+          <label>立绘列表</label>
+          <div
+            id="sprite-list-editor"
+            style="
+              display: flex;
+              flex-direction: column;
+              gap: 15px;
+              margin-top: 10px;
+            "
+          >
+            <!-- 单个立绘的编辑卡片将由JS动态生成 -->
+          </div>
+          <button
+            id="add-new-sprite-btn"
+            class="form-button form-button-secondary"
+            style="margin-top: 20px"
+          >
+            + 添加一个新立绘
+          </button>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="cancel-sprite-editor-btn">取消</button>
+          <button class="save" id="save-sprite-editor-btn">保存立绘组</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 约会结算卡片 -->
+    <div id="dating-summary-overlay" class="modal">
+      <div class="dating-summary-card">
+        <div class="dating-summary-card-inner">
+          <!-- 卡片正面 -->
+          <div class="card-front">
+            <img id="summary-card-avatar" src="" alt="角色头像" />
+            <h2 id="summary-card-rating"></h2>
+            <p class="summary-card-tip">点击卡片查看完整约会记录</p>
+            <div class="summary-card-actions">
+              <button id="summary-share-btn">分享给Ta</button>
+              <button id="summary-close-btn">关闭</button>
+            </div>
+          </div>
+          <!-- 卡片背面 -->
+          <div class="card-back">
+            <div class="card-back-header">
+              <span>完整约会记录</span>
+              <button id="summary-flip-back-btn">返回</button>
+            </div>
+            <div id="summary-card-history" class="card-back-content">
+              <!-- 约会历史记录将由JS动态生成在这里 -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <input
+      type="file"
+      id="dating-summary-image-upload"
+      accept="image/*"
+      hidden
+    />
+

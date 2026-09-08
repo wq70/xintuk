@@ -1,0 +1,858 @@
+              newStickers.push({
+                id: "sticker_" + (Date.now() + index),
+                url: url,
+                name: name,
+              });
+              successCount++;
+            } else {
+              errorLines.push(index + 1);
+            }
+          });
+
+          if (newStickers.length > 0) {
+            await db.userStickers.bulkAdd(newStickers);
+            state.userStickers.push(...newStickers);
+            renderStickerPanel();
+          }
+
+          let reportMessage = `批量导入完成！\n\n成功导入：${successCount} 个表情。`;
+          if (errorLines.length > 0) {
+            reportMessage += `\n失败行号：${errorLines.join(", ")}。\n\n请检查这些行的格式是否正确。`;
+          }
+          await showCustomAlert("导入报告", reportMessage);
+        }
+
+        /**
+         * 根据距离文本，计算CSS宽度百分比
+         * @param {string} distanceText - 距离描述，例如 "500m", "10km", "很近"
+         * @returns {number} - 10到90之间的百分比
+         */
+        function calculatePinDistancePercentage(distanceText) {
+          if (!distanceText) return 50; // 默认值
+
+          const text = distanceText.toLowerCase();
+          // 提取数字部分
+          const matches = text.match(/(\d+(\.\d+)?)/);
+          const num = matches ? parseFloat(matches[1]) : 0;
+
+          // 根据单位或关键词判断
+          if (text.includes("km") || text.includes("公里")) {
+            if (num > 1000) return 90;
+            if (num > 100) return 80;
+            if (num > 10) return 70;
+            if (num > 1) return 60;
+            return 50;
+          } else if (text.includes("m") || text.includes("米")) {
+            if (num > 500) return 40;
+            if (num > 100) return 30;
+            return 20;
+          } else if (text.includes("远") || text.includes("不同城市")) {
+            return 90;
+          } else if (text.includes("附近") || text.includes("隔壁")) {
+            return 20;
+          } else if (text.includes("近")) {
+            return 30;
+          }
+
+          return 15; // 如果无法识别，给一个最小的距离
+        }
+
+        /**
+         * 在定位模态框中添加一个途经点输入框
+         */
+        function addTrajectoryPointInput(name = "") {
+          const container = document.getElementById(
+            "trajectory-points-container",
+          );
+          const div = document.createElement("div");
+          div.style.display = "flex";
+          div.style.gap = "8px";
+          div.innerHTML = `
+			        <input type="text" class="trajectory-point-input" placeholder="途经点${
+                container.children.length + 1
+              }" value="${name}" style="flex-grow: 1;">
+			        <button class="remove-option-btn">-</button>
+			    `;
+          div
+            .querySelector(".remove-option-btn")
+            .addEventListener("click", () => div.remove());
+          container.appendChild(div);
+        }
+
+        async function sendUserLocation() {
+          if (!state.activeChatId) return;
+
+          const userLocation = document
+            .getElementById("user-location-input")
+            .value.trim();
+          const aiLocation = document
+            .getElementById("ai-location-input")
+            .value.trim();
+          const distance = document
+            .getElementById("distance-input")
+            .value.trim();
+
+          if (!distance || (!userLocation && !aiLocation)) {
+            alert("“我的位置”和“Ta的位置”至少要填写一个，且“相距”为必填项！");
+            return;
+          }
+
+          const trajectoryPoints = Array.from(
+            document.querySelectorAll(".trajectory-point-input"),
+          )
+            .map((input) => ({ name: input.value.trim() }))
+            .filter((point) => point.name);
+
+          const chat = state.chats[state.activeChatId];
+
+          // 1. 根据用户输入，构建一条AI能看懂的文本内容
+          //    这个格式和AI自己发定位时用的格式保持一致，非常完美！
+          let contentString = "[SEND_LOCATION]";
+          if (userLocation) contentString += ` 我的位置: ${userLocation}`;
+          if (aiLocation) contentString += ` | 你的位置: ${aiLocation}`;
+          contentString += ` | 相距: ${distance}`;
+          if (trajectoryPoints.length > 0) {
+            const trajectoryText = trajectoryPoints
+              .map((p) => p.name)
+              .join(", ");
+            contentString += ` | 途经点: ${trajectoryText}`;
+          }
+
+          // 2. 创建消息对象，这次我们把刚刚创建的 contentString 也放了进去
+          const locationMessage = {
+            role: "user",
+            type: "location",
+            timestamp: Date.now(),
+            userLocation: userLocation,
+            aiLocation: aiLocation,
+            distance: distance,
+            trajectoryPoints: trajectoryPoints,
+            content: contentString, // <-- 这就是最关键的新增属性！
+          };
+
+          // 后续的保存和渲染逻辑保持不变
+          chat.history.push(locationMessage);
+          await db.chats.put(chat);
+          appendMessage(locationMessage, chat);
+          renderChatList();
+
+          document
+            .getElementById("send-location-modal")
+            .classList.remove("visible");
+        }
+
+        // “一键重roll”功能核心代码
+
+        /**
+         * 智能查找AI上一轮回复的所有消息
+         * @param {Array} history - 完整的聊天历史记录
+         * @returns {Array} - 一个包含了上一轮AI所有消息对象的数组
+         */
+        function findLastAiTurnMessages(history) {
+          const turnMessages = [];
+          let lastMessageIndex = history.length - 1;
+
+          // 从最后一条消息开始，向前查找
+          for (let i = lastMessageIndex; i >= 0; i--) {
+            const message = history[i];
+
+            // 如果是AI的消息，就把它加入我们的“待删除列表”
+            if (message.role === "assistant") {
+              turnMessages.unshift(message); // 使用 unshift 保持原始顺序
+            }
+            // 一旦遇到非AI的消息（用户的或系统的），说明AI的这一轮回复已经结束了，立刻停止查找
+            else {
+              break;
+            }
+          }
+          return turnMessages;
+        }
+
+        /**
+         * “重roll”按钮被点击时的主处理函数
+         */
+        async function handleRerollClick() {
+          if (!state.activeChatId) return;
+          const chat = state.chats[state.activeChatId];
+
+          // 1. 调用我们的智能查找函数，找出需要删除的消息
+          const messagesToReroll = findLastAiTurnMessages(chat.history);
+
+          // 2. 如果没找到（比如最后一条是用户发的），就提示并退出
+          if (messagesToReroll.length === 0) {
+            alert("请在AI回复后使用此功能。");
+            return;
+          }
+
+          // 3. 从聊天记录中过滤掉这些旧消息
+          const timestampsToReroll = new Set(
+            messagesToReroll.map((m) => m.timestamp),
+          );
+          chat.history = chat.history.filter(
+            (msg) => !timestampsToReroll.has(msg.timestamp),
+          );
+
+          // 4. 保存更新后的聊天记录到数据库
+          await db.chats.put(chat);
+
+          // 5. 刷新聊天界面，让旧消息瞬间消失
+          renderChatInterface(state.activeChatId);
+
+          // 6. 触发一次新的AI响应，就像用户点击了“等待回复”一样
+          triggerAiResponse();
+        }
+
+        function initDraggableLyricsBar() {
+          const bar = document.getElementById("floating-lyrics-bar");
+          const phoneScreen = document.getElementById("phone-screen");
+
+          let isDragging = false;
+          let offsetX, offsetY;
+
+          const onDragStart = (e) => {
+            // 检查点击的是否是按钮，如果是，则不开始拖动
+            if (
+              e.target.closest("#lyrics-settings-btn") ||
+              e.target.closest(".close-btn")
+            ) {
+              return;
+            }
+
+            isDragging = true;
+            bar.classList.add("dragging");
+
+            const rect = bar.getBoundingClientRect();
+            const coords = getEventCoords(e);
+
+            offsetX = coords.x - rect.left;
+            offsetY = coords.y - rect.top;
+
+            document.addEventListener("mousemove", onDragMove);
+            document.addEventListener("mouseup", onDragEnd);
+            document.addEventListener("touchmove", onDragMove, {
+              passive: false,
+            });
+            document.addEventListener("touchend", onDragEnd);
+          };
+
+          const onDragMove = (e) => {
+            if (!isDragging) return;
+
+            e.preventDefault();
+
+            const phoneRect = phoneScreen.getBoundingClientRect();
+            const coords = getEventCoords(e);
+
+            let newLeft = coords.x - offsetX - phoneRect.left;
+            let newTop = coords.y - offsetY - phoneRect.top;
+
+            const maxLeft = phoneScreen.clientWidth - bar.offsetWidth;
+            const maxTop = phoneScreen.clientHeight - bar.offsetHeight;
+
+            newLeft = Math.max(0, Math.min(newLeft, maxLeft));
+            newTop = Math.max(0, Math.min(newTop, maxTop));
+
+            // 在拖动时，同时设置left, top并清除transform
+            bar.style.left = `${newLeft}px`;
+            bar.style.top = `${newTop}px`;
+            bar.style.transform = "none";
+          };
+
+          const onDragEnd = () => {
+            if (!isDragging) return;
+            isDragging = false;
+            bar.classList.remove("dragging");
+
+            document.removeEventListener("mousemove", onDragMove);
+            document.removeEventListener("mouseup", onDragEnd);
+            document.removeEventListener("touchmove", onDragMove);
+            document.removeEventListener("touchend", onDragEnd);
+          };
+
+          bar.addEventListener("mousedown", onDragStart);
+          bar.addEventListener("touchstart", onDragStart, { passive: true });
+        }
+
+        function applyLyricsSettings() {
+          const bar = document.getElementById("floating-lyrics-bar");
+          const toggleBtn = document.getElementById("toggle-lyrics-bar-btn");
+
+          // 应用样式
+          bar.style.fontSize = `${lyricsBarSettings.fontSize}px`;
+          bar.style.color = lyricsBarSettings.fontColor;
+          bar.style.backgroundColor = `rgba(0, 0, 0, ${lyricsBarSettings.bgOpacity / 100})`;
+
+          // 更新设置模态框里的控件值
+          document.getElementById("lyrics-font-size-slider").value =
+            lyricsBarSettings.fontSize;
+          document.getElementById("lyrics-font-size-value").textContent =
+            `${lyricsBarSettings.fontSize}px`;
+          document.getElementById("lyrics-bg-opacity-slider").value =
+            lyricsBarSettings.bgOpacity;
+          document.getElementById("lyrics-bg-opacity-value").textContent =
+            `${lyricsBarSettings.bgOpacity}%`;
+          document.getElementById("lyrics-font-color-picker").value =
+            lyricsBarSettings.fontColor;
+
+          // 更新播放器里的开关按钮状态
+          if (toggleBtn) {
+            toggleBtn.textContent = lyricsBarSettings.showOnClose
+              ? "悬浮"
+              : "隐藏";
+            toggleBtn.style.opacity = lyricsBarSettings.showOnClose
+              ? "1"
+              : "0.5";
+          }
+        }
+
+        /**
+         * 获取并格式化【与当前聊天相关】的约定，生成给AI看的上下文
+         * @param {string} chatId - 当前正在聊天的角色ID
+         * @returns {Promise<string>} 格式化后的约定信息字符串
+         */
+        async function getCountdownContext(chatId) {
+          // 1. 从数据库中找出所有“约定”类型，并且目标日期还没到的记录
+          const activeCountdowns = await db.memories
+            .where("type")
+            .equals("countdown")
+            .filter(
+              (item) =>
+                item.targetDate > Date.now() &&
+                // 它现在只会查找两种约定：
+                // 1. chatId 和当前聊天角色ID匹配的 (AI自己创建的)
+                // 2. chatId 为空的 (你，也就是用户创建的全局约定)
+                (item.chatId === chatId || item.chatId === null),
+            )
+            .toArray();
+
+          // 如果没有与当前角色相关的约定，就告诉AI“目前没有”
+          if (activeCountdowns.length === 0) {
+            return "\n- **近期约定**: 目前没有特别的约定。";
+          }
+
+          // 2. 后续的整理报告逻辑保持不变
+          let context = "\n# 近期约定与倒计时 (重要参考信息)\n";
+          const now = Date.now();
+
+          activeCountdowns.forEach((item) => {
+            const diff = item.targetDate - now;
+            const diffDays = Math.floor(diff / (1000 * 60 * 60 * 24));
+            const diffHours = Math.floor(diff / (1000 * 60 * 60));
+
+            let timeText;
+            if (diffDays > 1) {
+              timeText = `还有 ${diffDays} 天`;
+            } else if (diffHours > 0) {
+              timeText = `还有 ${diffHours} 小时`;
+            } else {
+              timeText = "就是现在！";
+            }
+
+            context += `- **${item.description}**: ${timeText} (目标: ${new Date(item.targetDate).toLocaleString()})\n`;
+          });
+
+          return context;
+        }
+
+        // “查角色手机”功能的所有核心函数
+
+        /**
+         * 入口：打开角色选择界面
+         */
+        async function openCharacterSelectionScreen() {
+          await renderCharacterSelectionScreen();
+          showScreen("character-selection-screen");
+        }
+
+        /**
+         * 渲染角色选择列表
+         */
+        async function renderCharacterSelectionScreen() {
+          const listEl = document.getElementById("character-selection-list");
+          listEl.innerHTML = "";
+          const characters = Object.values(state.chats).filter(
+            (chat) => !chat.isGroup,
+          );
+
+          if (characters.length === 0) {
+            listEl.innerHTML =
+              '<p style="text-align:center; color: #8a8a8a; margin-top: 50px;">还没有可以查看的角色</p>';
+            return;
+          }
+
+          characters.forEach((char) => {
+            const item = document.createElement("div");
+            item.className = "character-select-item";
+            item.dataset.chatId = char.id;
+            item.innerHTML = `
+			            <img src="${char.settings.aiAvatar || defaultAvatar}" alt="${char.name}">
+			            <span class="name">${char.name}</span>
+			        `;
+            listEl.appendChild(item);
+          });
+        }
+        /**
+         * 将指定的App内壁纸应用到角色手机屏幕
+         */
+        function applyCharPhoneAppWallpaper() {
+          if (!activeCharacterPhoneId) return;
+          const chat = state.chats[activeCharacterPhoneId];
+          const innerScreen = document.querySelector(
+            ".character-phone-inner-screen",
+          );
+          if (!innerScreen || !chat) return;
+
+          const appWallpaperUrl = chat.characterPhoneData.appWallpaper;
+
+          if (appWallpaperUrl) {
+            innerScreen.style.backgroundImage = `url(${appWallpaperUrl})`;
+            innerScreen.classList.add("has-app-wallpaper");
+          } else {
+            innerScreen.style.backgroundImage = "none";
+            innerScreen.classList.remove("has-app-wallpaper");
+          }
+        }
+
+        /**
+         * 处理角色手机App内壁纸的更换和移除
+         * @param {string} newUrl - 新的壁纸URL，如果为空字符串则表示移除
+         */
+        async function handleCharPhoneAppWallpaperChange(newUrl) {
+          if (!activeCharacterPhoneId) return;
+          const chat = state.chats[activeCharacterPhoneId];
+          if (!chat) return;
+
+          chat.characterPhoneData.appWallpaper = newUrl;
+          await db.chats.put(chat);
+
+          // 立即应用壁纸
+          applyCharPhoneAppWallpaper();
+
+          // 刷新设置页面的预览
+          renderCharPhoneAppearanceScreen();
+
+          alert(newUrl ? "App 内壁纸已更新！" : "App 内壁纸已移除！");
+        }
+
+        function openCharacterPhone(chatId) {
+          activeCharacterPhoneId = chatId;
+          const chat = state.chats[chatId];
+          if (!chat) return;
+
+          document.getElementById("character-phone-owner-name").textContent =
+            `${chat.name}的手机`;
+
+          const phoneHomeScreen = document.getElementById(
+            "character-phone-screen",
+          );
+          const wallpaperUrl = chat.characterPhoneData.wallpaper;
+          const isDarkMode = document
+            .getElementById("phone-screen")
+            .classList.contains("dark-mode");
+
+          if (wallpaperUrl) {
+            phoneHomeScreen.style.backgroundImage = `url(${wallpaperUrl})`;
+            phoneHomeScreen.style.backgroundColor = "transparent";
+            phoneHomeScreen.style.backgroundSize = "cover";
+            phoneHomeScreen.style.backgroundPosition = "center";
+          } else {
+            phoneHomeScreen.style.backgroundImage = "none";
+            phoneHomeScreen.style.backgroundColor = isDarkMode
+              ? "#000000"
+              : "#f0f2f5";
+          }
+
+          // --- 渲染小组件图片 ---
+          const widgets = chat.characterPhoneData.widgets || {};
+          document.getElementById("char-phone-widget-img-1").src =
+            widgets.widget1_url || "";
+          document.getElementById("char-phone-widget-img-2").src =
+            widgets.widget2_url || "";
+
+          renderCharacterAppGrid();
+
+          showScreen("character-phone-container");
+          showCharacterPhonePage("character-phone-screen");
+          applyCharPhoneAppWallpaper();
+        }
+
+        function renderCharacterAppGrid() {
+          const gridEl = document.getElementById("character-app-grid");
+          gridEl.innerHTML = "";
+          if (!activeCharacterPhoneId) return;
+
+          const chat = state.chats[activeCharacterPhoneId];
+          const customIcons = chat.characterPhoneData.appIcons || {};
+
+          CHAR_PHONE_APPS.forEach((app) => {
+            const iconEl = document.createElement("div");
+            iconEl.className = "app-icon";
+
+            const customIconUrl = customIcons[app.id];
+
+            let iconBgStyle =
+              "display: flex; justify-content: center; align-items: center; padding: 12px;";
+            let iconHtml;
+
+            if (customIconUrl) {
+              // 如果有自定义图标URL...
+              // 1. 覆盖掉 .icon-bg 的样式，移除内边距和背景色
+              iconBgStyle = "padding: 0; background-color: transparent;";
+              // 2. iconHtml 直接变成一个带有圆角的图片
+              iconHtml = `<img src="${customIconUrl}" style="width:100%; height:100%; object-fit:cover; border-radius: 18px;">`;
+            } else {
+              // 否则，使用默认的SVG
+              iconHtml = app.svg;
+            }
+
+            // --- 修改结束 ---
+
+            iconEl.innerHTML = `
+			            <div class="icon-bg" style="${iconBgStyle}">
+			                ${iconHtml}
+			            </div>
+			            <span class="label">${app.name}</span>
+			        `;
+
+            // 后续的事件监听代码保持不变
+            iconEl.addEventListener("click", () => {
+              if (app.id === "appearance") {
+                openCharPhoneAppearanceSettings();
+              } else {
+                switch (app.id) {
+                  case "chat":
+                    renderCharacterChatList();
+                    break;
+                  case "cart":
+                    renderCharacterShoppingCart();
+                    break;
+                  case "memos":
+                    renderCharacterMemos();
+                    break;
+                  case "browser":
+                    renderCharacterBrowser();
+                    break;
+                  case "album":
+                    renderCharacterPhotoAlbum();
+                    break;
+                  case "bank":
+                    renderCharacterBank();
+                    break;
+                  case "trajectory":
+                    renderCharacterTrajectory();
+                    break;
+                  case "app_usage":
+                    renderCharacterAppUsage();
+                    break;
+                  case "diary":
+                    renderCharacterDiary();
+                    break;
+                }
+                showCharacterPhonePage(app.screen);
+              }
+            });
+            gridEl.appendChild(iconEl);
+          });
+        }
+
+        /**
+         * 打开生成聊天对象的选择弹窗
+         */
+        function openChatGenerationModal() {
+          const listEl = document.getElementById("chat-gen-list");
+          listEl.innerHTML = "";
+
+          if (!activeCharacterPhoneId) return;
+          const currentChat = state.chats[activeCharacterPhoneId];
+
+          // 1. 重置 UI 状态
+          const randomCheckbox = document.getElementById(
+            "chat-gen-random-checkbox",
+          );
+          randomCheckbox.checked = true; // 默认随机
+          listEl.style.opacity = "0.5";
+          listEl.style.pointerEvents = "none";
+
+          // 2. 收集所有可选项 (NPC + 其他主角)
+          const options = [];
+
+          // A. 当前角色的 NPC 库
+          if (currentChat.npcLibrary) {
+            currentChat.npcLibrary.forEach((npc) => {
+              options.push({
+                type: "NPC",
+                name: npc.name,
+                persona: npc.persona,
+                avatar: npc.avatar || defaultGroupMemberAvatar,
+              });
+            });
+          }
+
+          // B. 其他主角 (state.chats 里的单聊角色，排除自己)
+          Object.values(state.chats).forEach((otherChat) => {
+            if (!otherChat.isGroup && otherChat.id !== currentChat.id) {
+              options.push({
+                type: "角色",
+                name: otherChat.name,
+                persona: otherChat.settings.aiPersona,
+                avatar: otherChat.settings.aiAvatar || defaultAvatar,
+              });
+            }
+          });
+
+          if (options.length === 0) {
+            listEl.innerHTML =
+              '<p style="text-align:center; padding:20px; color:#888;">暂无可选角色/NPC，请使用随机模式。</p>';
+          } else {
+            options.forEach((opt) => {
+              const item = document.createElement("div");
+              item.className = "contact-picker-item"; // 复用现有的样式
+              // 将人设经过简单处理存入 dataset (避免太长或有特殊字符)
+              const safePersona = (opt.persona || "").replace(/"/g, "&quot;");
+
+              item.innerHTML = `
+			                                <input type="checkbox" data-name="${opt.name}" data-persona="${safePersona}" style="margin-right: 10px;">
+			                                <img src="${opt.avatar}" class="avatar">
+			                                <div style="display:flex; flex-direction:column;">
+			                                    <span class="name">${opt.name}</span>
+			                                    <span style="font-size:12px; color:#888;">${opt.type}</span>
+			                                </div>
+			                            `;
+
+              // 点击整行触发 checkbox
+              item.addEventListener("click", (e) => {
+                if (e.target.tagName !== "INPUT") {
+                  const cb = item.querySelector("input");
+                  cb.checked = !cb.checked;
+                }
+              });
+
+              listEl.appendChild(item);
+            });
+          }
+
+          document
+            .getElementById("chat-gen-selector-modal")
+            .classList.add("visible");
+        }
+
+        /**
+         * 为“查手机”功能单独生成某一项数据的通用函数
+         * @param {string} dataType - 要生成的数据类型 (例如: 'diary', 'chats', 'shoppingCart')
+         */
+        async function generateCharacterPhoneDataSegment(
+          dataType,
+          specificTargets = null,
+        ) {
+          if (!activeCharacterPhoneId) return;
+          const chat = state.chats[activeCharacterPhoneId];
+          if (!chat) return;
+
+          const dataTypeMap = {
+            chats: {
+              description: `2到5段你与【不同的】NPC朋友们的【全新的或接续上文的】聊天记录。`,
+              jsonStructure: `"chats": [\n    {\n      "contactName": "【NPC朋友A的名字】",\n      "messages": [\n        {"sender": "【联系人名A】", "content": "消息内容1..."},\n        {"sender": "${chat.name}", "content": "你的回复1..."}\n      ]\n    },\n    {\n      "contactName": "【NPC朋友B的名字】",\n      "messages": [\n        {"sender": "【联系人名B】", "content": "消息内容1..."},\n        {"sender": "${chat.name}", "content": "你的回复1..."}\n      ]\n    }\n  ]`,
+            },
+            shoppingCart: {
+              description: "3到5件你最近加入购物车的新商品。",
+              jsonStructure: `"shoppingCart": [\n    {"name": "商品名1", "price": 123.45, "store": "店铺名"},\n    {"name": "商品名2", "price": 67.89, "store": "店铺名"}\n  ]`,
+            },
+            memos: {
+              description: "2到3篇你新写的简短备忘录。",
+              jsonStructure: `"memos": [\n    {"title": "备忘录标题1", "content": "备忘录详细内容1..."},\n    {"title": "备忘录标题2", "content": "备忘录详细内容2..."}\n  ]`,
+            },
+            browserHistory: {
+              description: "2到3条你最近的浏览器搜索记录或浏览的文章。",
+              jsonStructure: `"browserHistory": [\n    {"query": "搜索标题1", "result": "模拟文章内容1..."},\n    {"query": "搜索标题2", "result": "模拟文章内容2..."}\n  ]`,
+            },
+            photoAlbum: {
+              description: "2到3张你“拍摄”的新照片的文字描述（用于文字生图）。",
+              jsonStructure: `"photoAlbum": [\n    {"hiddenContent": "对新照片画面1的详细文字描述..."},\n    {"hiddenContent": "对新照片画面2的详细文字描述..."}\n  ]`,
+            },
+            bank: {
+              description: "3到5条你最近的银行交易记录（收入或支出）。",
+              jsonStructure: `"bank": {\n    "transactions": [\n      {"type": "收入或支出", "amount": 123.45, "description": "交易描述1"},\n      {"type": "收入或支出", "amount": 67.89, "description": "交易描述2"}\n    ]\n  }`,
+            },
+            trajectory: {
+              description: "2到3条你最近的行动轨迹记录。",
+              jsonStructure: `"trajectory": [\n    {"time": "时间段1", "location": "地点1", "activity": "干了什么事1"},\n    {"time": "时间段2", "location": "地点2", "activity": "干了什么事2"}\n  ]`,
+            },
+            appUsage: {
+              description: "3到5条你最近的应用使用记录。",
+              jsonStructure: `"appUsage": [\n    {"appName": "应用名1", "duration": "使用时长1"},\n    {"appName": "应用名2", "duration": "使用时长2"}\n  ]`,
+            },
+            diary: {
+              description: `一篇全新的日记。`,
+              jsonStructure: `"diary": [\n    {"timestamp": ${Date.now()}, "content": "【用Markdown语法写一篇符合人设和情景的新日记】"}\n  ]`,
+            },
+          };
+
+          const dataTypeInfo = dataTypeMap[dataType];
+          if (!dataTypeInfo) {
+            console.error("请求了无效的数据生成类型:", dataType);
+            return;
+          }
+
+          // 动态修改dataTypeInfo，以适应不同情况
+          let finalDataTypeInfo = { ...dataTypeInfo };
+
+          // --- 特殊处理：指定了聊天对象 ---
+          // 只有当 dataType 是 'chats' 且 specificTargets 存在时才触发
+          let specificPromptInject = "";
+
+          if (
+            dataType === "chats" &&
+            specificTargets &&
+            specificTargets.length > 0
+          ) {
+            // 1. 修改任务描述
+            const targetNames = specificTargets.map((t) => t.name).join("、");
+            finalDataTypeInfo.description = `你与指定联系人【${targetNames}】的聊天记录。`;
+
+            // 2. 构建强制性 Prompt 上下文
+            specificPromptInject = `
+                            # 【【【指定生成指令】】】
+                            用户指定了你必须生成与以下角色的对话。你【必须】为列表中的**每一位**角色生成一段独立的对话，不能遗漏，也不能编造列表以外的人。
+
+                            # 指定角色列表
+                            ${specificTargets.map((t) => `- **${t.name}**: ${t.persona}`).join("\n")}
+
+                            # 格式要求
+                            请在返回的 JSON "chats" 数组中，严格按照上述指定的 "contactName" 生成对应的聊天记录。
+                        `;
+            // 3. 修改 JSON 结构提示，引导AI生成正确的数量
+            finalDataTypeInfo.jsonStructure =
+              `"chats": [\n` +
+              specificTargets
+                .map(
+                  (t) =>
+                    `    { "contactName": "${t.name}", "messages": [\n        {"sender": "${t.name}", "content": "消息内容1..."},\n        {"sender": "${chat.name}", "content": "你的回复1..."}\n] }`,
+                )
+                .join(",\n") +
+              `\n  ]`;
+          }
+
+          if (dataType === "bank") {
+            const hasExistingTransactions =
+              chat.characterPhoneData?.bank?.transactions?.length > 0;
+
+            if (!hasExistingTransactions) {
+              // 如果是第一次生成，就修改指令，要求AI提供初始余额
+              finalDataTypeInfo.description =
+                "一个符合你人设的【初始银行余额】，以及3到5条初始交易记录。";
+              finalDataTypeInfo.jsonStructure = `"bank": {\n    "balance": 12345.67,\n    "transactions": [\n      {"type": "收入或支出", "amount": 123.45, "description": "交易描述1"}\n    ]\n  }`;
+            } else {
+              // 如果是后续生成，就告诉AI当前余额，只要求新交易
+              const currentBalance = (
+                chat.characterPhoneData.bank.balance || 0
+              ).toFixed(2);
+              finalDataTypeInfo.description = `3到5条【全新的】银行交易记录（收入或支出）。【提示：你当前的余额是 ${currentBalance} 元，请在此基础上生成合理的交易】`;
+              // 此时的JSON结构不需要balance字段
+              finalDataTypeInfo.jsonStructure = `"bank": {\n    "transactions": [\n      {"type": "收入或支出", "amount": 123.45, "description": "交易描述1"}\n    ]\n  }`;
+            }
+          }
+
+          showGenerationOverlay("正在同步Ta的手机数据...");
+
+          try {
+            const userNickname = state.qzoneSettings.nickname || "我";
+            const persona = (chat.settings.aiPersona || "").substring(0, 4000);
+            // updated by lrq 251028 修改最大记忆条数
+            const maxMemory = chat.settings.maxMemory || 20;
+            const recentHistory = chat.history
+              .slice(-maxMemory)
+              .map((msg) => {
+                const sender = msg.role === "user" ? userNickname : chat.name;
+                return `${sender}: ${msg.content}`;
+              })
+              .join("\n");
+
+            // added by lrq 251028 添加记忆互通的聊天记录作为参考
+            let linkedMemoryContext = "";
+            if (
+              chat.settings.linkedMemories &&
+              chat.settings.linkedMemories.length > 0
+            ) {
+              const contextPromises = chat.settings.linkedMemories.map(
+                async (link) => {
+                  const linkedChat = state.chats[link.chatId];
+                  if (!linkedChat) return "";
+
+                  const freshLinkedChat = await db.chats.get(link.chatId);
+                  if (!freshLinkedChat) return "";
+
+                  const recentHistory = freshLinkedChat.history
+                    .filter((msg) => !msg.isHidden)
+                    .slice(-link.depth);
+
+                  if (recentHistory.length === 0) return "";
+
+                  const formattedMessages = recentHistory
+                    .map(
+                      (msg) =>
+                        `  - ${formatMessageForContext(msg, freshLinkedChat)}`,
+                    )
+                    .join("\n");
+
+                  return `\n## 附加上下文：来自与“${linkedChat.name}”的最近对话内容 (仅你可见)\n${formattedMessages}`;
+                },
+              );
+
+              const allContexts = await Promise.all(contextPromises);
+              linkedMemoryContext = allContexts.filter(Boolean).join("\n");
+            }
+
+            let worldBookContext = "";
+            if (
+              chat.settings.linkedWorldBookIds &&
+              chat.settings.linkedWorldBookIds.length > 0
+            ) {
+              worldBookContext =
+                "--- 世界观设定 (必须严格遵守) ---\n" +
+                chat.settings.linkedWorldBookIds
+                  .map((id) => {
+                    const book = state.worldBooks.find((b) => b.id === id);
+                    return book ? `[${book.name}]: ${book.content}` : "";
+                  })
+                  .join("\n\n");
+            }
+
+            const npcLibrary = chat.npcLibrary || [];
+            let npcContext = "";
+            // 如果有指定对象，就【不使用】默认的 NPC 随机列表，避免混淆
+            if (!specificPromptInject) {
+              // 只有在随机模式（specificPromptInject 为空）时，才提供默认 NPC 列表供 AI 随机选
+              if (npcLibrary.length > 0) {
+                npcContext =
+                  "# 你的专属NPC好友列表 (你必须从中随机选择2-3位朋友进行对话)\n" +
+                  npcLibrary
+                    .map((npc) => `- **${npc.name}**: ${npc.persona}`)
+                    .join("\n");
+              } else {
+                npcContext =
+                  "# 你的专属NPC好友列表\n(你当前没有专属NPC，请虚构2-3个普通朋友并生成对话)";
+              }
+            }
+
+            let npcChatHistoryContext = "";
+            const existingNpcChats = Object.entries(
+              chat.characterPhoneData.chats || {},
+            ).filter(
+              ([name, chatData]) =>
+                chatData.history && chatData.history.length > 0,
+            );
+            if (existingNpcChats.length > 0) {
+              npcChatHistoryContext +=
+                "\n\n# 已有的聊天记录摘要 (请在此基础上继续对话)\n";
+              existingNpcChats.forEach(([contactName, chatData]) => {
+                const recentMessages = chatData.history
+                  .slice(-5)
+                  .map((msg) => `  - ${msg.sender}: ${msg.content}`)
+                  .join("\n");
+                npcChatHistoryContext += `\n## 你和“${contactName}”的最近对话:\n${recentMessages}\n`;
+              });
+            }
+
+            // 使用修改后的 finalDataTypeInfo 来构建Prompt
+            const prompt = `
+                            # 任务

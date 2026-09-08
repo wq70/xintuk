@@ -1,0 +1,956 @@
+    <!-- 聊天设置弹窗 (萌系布局 - 功能整合版) -->
+    <div id="chat-settings-modal" class="modal">
+      <div class="modal-content moe-settings-content">
+        <div class="modal-header moe-modal-header">
+          <span>✨ 聊天设置 ✨</span>
+        </div>
+
+        <div class="modal-body moe-settings-body">
+          <!-- ============================== -->
+          <!-- 1. 基础资料卡片 -->
+          <!-- ============================== -->
+          <div class="settings-group-card moe-card">
+            <div class="settings-section-title">📝 基础资料</div>
+            <div class="form-group" id="chat-name-group">
+              <label>角色真名 /群聊名称(AI只认这个，修改会影响记忆)</label>
+              <input type="text" id="chat-name-input" class="moe-input" />
+            </div>
+            <!-- 新增的备注名输入框，默认隐藏，JS里控制显示 -->
+            <div
+              class="form-group"
+              id="chat-remark-group"
+              style="display: none"
+            >
+              <label>备注名 (仅显示用，AI不知道)</label>
+              <input
+                type="text"
+                id="chat-remark-input"
+                class="moe-input"
+                placeholder="设置一个备注..."
+              />
+            </div>
+
+            <div
+              class="form-group"
+              id="assign-group-section"
+              style="display: none"
+            >
+              <label for="assign-group-select">好友分组</label>
+              <div class="input-with-btn-row">
+                <select id="assign-group-select" class="moe-input"></select>
+                <button id="manage-groups-btn" class="moe-btn-small">
+                  管理
+                </button>
+              </div>
+            </div>
+
+            <div class="form-group" id="my-group-nickname-group">
+              <label for="my-group-nickname-input">我的群昵称</label>
+              <input
+                type="text"
+                id="my-group-nickname-input"
+                class="moe-input"
+              />
+            </div>
+
+            <!-- 头像区域 (并排布局) -->
+            <div class="moe-grid-row">
+              <!-- 对方/群头像 -->
+              <div class="form-group" id="ai-avatar-group">
+                <label>对方头像</label>
+                <div class="avatar-upload-column">
+                  <img id="ai-avatar-preview" class="preview-img" />
+                  <div class="btn-stack">
+                    <button
+                      onclick="
+                        document.getElementById('ai-avatar-input').click()
+                      "
+                      class="moe-btn-mini"
+                    >
+                      上传
+                    </button>
+                    <button
+                      class="change-frame-btn moe-btn-mini"
+                      data-type="ai"
+                    >
+                      相框
+                    </button>
+                    <button
+                      id="manage-ai-avatar-library-btn"
+                      class="moe-btn-mini"
+                    >
+                      图库
+                    </button>
+                  </div>
+                  <input
+                    type="file"
+                    id="ai-avatar-input"
+                    accept="image/*"
+                    hidden
+                  />
+                </div>
+              </div>
+
+              <div
+                class="form-group"
+                id="group-avatar-group"
+                style="display: none"
+              >
+                <label>群头像</label>
+                <div class="avatar-upload-column">
+                  <img id="group-avatar-preview" class="preview-img" />
+                  <div class="btn-stack">
+                    <button
+                      onclick="
+                        document.getElementById('group-avatar-input').click()
+                      "
+                      class="moe-btn-mini"
+                    >
+                      上传
+                    </button>
+                  </div>
+                  <input
+                    type="file"
+                    id="group-avatar-input"
+                    accept="image/*"
+                    hidden
+                  />
+                </div>
+              </div>
+
+              <!-- 我的头像 -->
+              <div class="form-group" id="my-avatar-group">
+                <label>我的头像</label>
+                <div class="avatar-upload-column">
+                  <img id="my-avatar-preview" class="preview-img" />
+                  <div class="btn-stack">
+                    <button
+                      onclick="
+                        document.getElementById('my-avatar-input').click()
+                      "
+                      class="moe-btn-mini"
+                    >
+                      上传
+                    </button>
+                    <button
+                      class="change-frame-btn moe-btn-mini"
+                      data-type="my"
+                    >
+                      相框
+                    </button>
+                    <button id="open-persona-library-btn" class="moe-btn-mini">
+                      预设
+                    </button>
+                  </div>
+                  <input
+                    type="file"
+                    id="my-avatar-input"
+                    accept="image/*"
+                    hidden
+                  />
+                </div>
+              </div>
+            </div>
+
+            <!-- 替换原来的 id="couple-avatar-group" -->
+            <div class="form-group" id="couple-avatar-group">
+              <div class="moe-divider"></div>
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  margin-bottom: 8px;
+                "
+              >
+                <label class="toggle-switch-label" style="margin: 0">
+                  <span
+                    class="toggle-switch-text"
+                    style="font-weight: 600; color: #ff6b81"
+                    >❤️ 情侣头像模式</span
+                  >
+                  <input type="checkbox" id="couple-avatar-toggle" />
+                  <span class="toggle-switch-slider"></span>
+                </label>
+
+                <!-- 修改后的按钮样式 -->
+                <button
+                  id="manage-couple-avatar-library-btn"
+                  class="moe-btn-secondary"
+                  style="
+                    margin: 0;
+                    padding: 4px 12px;
+                    font-size: 12px;
+                    background-color: #fff0f3;
+                    color: #ff6b81;
+                    border: 1px solid #ffc2d1;
+                    border-radius: 15px;
+                  "
+                >
+                  📂 管理情头库
+                </button>
+              </div>
+
+              <div
+                id="couple-avatar-desc-container"
+                style="
+                  display: none;
+                  margin-top: 10px;
+                  background: #fff0f3;
+                  padding: 8px;
+                  border-radius: 8px;
+                "
+              >
+                <label
+                  style="
+                    font-size: 12px;
+                    color: #ff8fa3;
+                    display: block;
+                    margin-bottom: 4px;
+                  "
+                  >当前情头描述 (AI依据)</label
+                >
+                <input
+                  type="text"
+                  id="couple-avatar-description"
+                  class="moe-input"
+                  style="background: #fff; border-color: #ffc2d1"
+                  placeholder="例如：一只小猫在看月亮"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- ============================== -->
+          <!-- 2. 人设与记忆卡片 -->
+          <!-- ============================== -->
+          <div class="settings-group-card moe-card">
+            <div class="settings-section-title">🧠 AI大脑与设定</div>
+
+            <div class="form-group" id="ai-persona-group">
+              <label for="ai-persona">对方人设 (Persona)</label>
+              <textarea id="ai-persona" rows="3" class="moe-input"></textarea>
+            </div>
+            <div class="form-group" id="my-persona-group">
+              <label for="my-persona">我的人设 (My Persona)</label>
+              <textarea id="my-persona" rows="3" class="moe-input"></textarea>
+            </div>
+
+            <div class="form-group" id="group-members-group">
+              <label>群成员设定</label>
+              <div
+                id="group-members-settings"
+                class="moe-list-box"
+                style="margin-bottom: 10px"
+              ></div>
+              <button id="manage-members-btn" class="moe-btn-secondary">
+                👥 管理群成员
+              </button>
+            </div>
+
+            <!-- ★★★ 修改点：将NPC库和表情包并排放在这里 ★★★ -->
+            <div style="display: flex; gap: 10px; margin-top: 15px">
+              <!-- NPC库按钮 -->
+              <div id="npc-library-group" style="flex: 1">
+                <button
+                  id="manage-npcs-btn"
+                  class="moe-btn-secondary"
+                  style="margin-top: 0; width: 100%"
+                >
+                  🤖 NPC库
+                </button>
+              </div>
+              <!-- 表情包按钮 -->
+              <div id="char-sticker-group" style="flex: 1">
+                <button
+                  id="manage-char-stickers-btn"
+                  class="moe-btn-secondary"
+                  style="margin-top: 0; width: 100%"
+                >
+                  😶 表情包
+                </button>
+              </div>
+            </div>
+
+            <!-- 微博设定 -->
+            <div class="form-group" id="weibo-profession-group">
+              <div class="moe-divider"></div>
+              <label>微博职业</label>
+              <input
+                type="text"
+                id="weibo-profession-input"
+                class="moe-input"
+                placeholder="例如：电竞选手"
+              />
+            </div>
+            <div class="form-group" id="weibo-instruction-group">
+              <label>微博指令 (AI发微博时的行为准则)</label>
+              <textarea
+                id="weibo-instruction-input"
+                rows="2"
+                class="moe-input"
+                placeholder="例如：性格高冷，少与粉丝互动"
+              ></textarea>
+            </div>
+
+            <!-- 关联设定 -->
+            <div class="moe-divider"></div>
+            <div class="form-group" id="world-book-link-group">
+              <label>关联世界书 (多选)</label>
+              <div class="custom-multiselect">
+                <div class="select-box moe-input">
+                  <span class="selected-options-text">-- 点击选择 --</span>
+                  <span class="arrow-down">▼</span>
+                </div>
+                <div
+                  id="world-book-checkboxes-container"
+                  class="checkboxes-container"
+                ></div>
+              </div>
+            </div>
+
+            <div class="form-group" id="memory-link-group">
+              <label>记忆互通 (选择要链接的聊天)</label>
+              <div class="custom-multiselect" id="memory-link-multiselect">
+                <div class="select-box moe-input">
+                  <span class="selected-options-text">-- 点击选择 --</span>
+                  <span class="arrow-down">▼</span>
+                </div>
+                <div
+                  id="memory-link-checkboxes-container"
+                  class="checkboxes-container"
+                ></div>
+              </div>
+              <div
+                style="
+                  margin-top: 8px;
+                  display: flex;
+                  align-items: center;
+                  gap: 10px;
+                  background: #f9f9f9;
+                  padding: 8px;
+                  border-radius: 8px;
+                "
+              >
+                <label style="margin: 0; font-size: 13px; color: #666"
+                  >互通条数:</label
+                >
+                <input
+                  type="number"
+                  id="link-memory-depth-input"
+                  value="5"
+                  min="1"
+                  max="20"
+                  class="moe-input"
+                  style="width: 80px; text-align: center"
+                />
+              </div>
+            </div>
+
+            <!-- 原有代码 -->
+            <div class="form-group">
+              <label for="max-memory">上下文记忆条数</label>
+              <input
+                type="number"
+                id="max-memory"
+                value="10"
+                class="moe-input"
+              />
+            </div>
+
+            <div class="form-group">
+              <label>回复条数区间 (Min - Max)</label>
+              <div style="display: flex; gap: 10px; align-items: center">
+                <input
+                  type="number"
+                  id="min-reply-count-input"
+                  class="moe-input"
+                  min="1"
+                  placeholder="最小"
+                  style="text-align: center"
+                />
+                <span>至</span>
+                <input
+                  type="number"
+                  id="max-reply-count-input"
+                  class="moe-input"
+                  min="1"
+                  placeholder="最大"
+                  style="text-align: center"
+                />
+                <span>条</span>
+              </div>
+              <p style="font-size: 12px; color: #999; margin-top: 5px">
+                建议设置: 单聊 2-5，群聊 3-8。
+              </p>
+            </div>
+
+            <div class="info-tags">
+              <span class="tag"
+                >总消息:
+                <span id="total-message-count-display">-- 条</span></span
+              >
+              <span class="tag"
+                >token:
+                <span id="context-token-count-display">-- Tokens</span></span
+              >
+            </div>
+          </div>
+
+          <!-- ============================== -->
+          <!-- 3. 玩法模式卡片 -->
+          <!-- ============================== -->
+          <div class="settings-group-card moe-card">
+            <div class="settings-section-title">🎮 玩法与模式</div>
+
+            <!-- 线下模式 -->
+            <div class="form-group" id="offline-mode-section">
+              <label class="toggle-switch-label">
+                <span class="toggle-switch-text">线下模式 (Online Dating)</span>
+                <input type="checkbox" id="offline-mode-toggle" />
+                <span class="toggle-switch-slider"></span>
+              </label>
+            </div>
+            <div
+              id="offline-mode-details"
+              class="moe-details-box"
+              style="display: none"
+            >
+              <div class="form-group">
+                <label>预设管理</label>
+                <div class="input-with-btn-row">
+                  <select id="offline-preset-select" class="moe-input"></select>
+                  <button id="manage-offline-presets-btn" class="moe-btn-small">
+                    管理
+                  </button>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>场景提示词 (Prompt)</label>
+                <textarea
+                  id="offline-prompt-input"
+                  rows="3"
+                  class="moe-input"
+                  placeholder="例如：你正在一家安静的咖啡馆..."
+                ></textarea>
+              </div>
+              <div class="form-group">
+                <label>文风要求 (Style)</label>
+                <textarea
+                  id="offline-style-input"
+                  rows="2"
+                  class="moe-input"
+                  placeholder="例如：详细描写动作神态..."
+                ></textarea>
+              </div>
+              <div class="form-group">
+                <label>期望字数</label>
+                <input
+                  type="number"
+                  id="offline-word-count-input"
+                  value="300"
+                  class="moe-input"
+                />
+              </div>
+              <div
+                class="form-group"
+                style="border-top: 1px dashed #ddd; padding-top: 10px"
+              >
+                <label class="toggle-switch-label" style="margin: 0">
+                  <span class="toggle-switch-text" style="font-size: 13px"
+                    >每轮自动生图 (NovelAI)</span
+                  >
+                  <input type="checkbox" id="offline-novelai-toggle" />
+                  <span
+                    class="toggle-switch-slider"
+                    style="transform: scale(0.8)"
+                  ></span>
+                </label>
+              </div>
+            </div>
+
+            <!-- 聊天总结 -->
+            <div class="form-group">
+              <label class="toggle-switch-label">
+                <span class="toggle-switch-text">长期记忆总结</span>
+                <input type="checkbox" id="summary-toggle" />
+                <span class="toggle-switch-slider"></span>
+              </label>
+            </div>
+            <div
+              id="summary-details-container"
+              class="moe-details-box"
+              style="display: none"
+            >
+              <div class="form-group">
+                <label>总结模式</label>
+                <div style="display: flex; gap: 20px; margin-top: 5px">
+                  <label
+                    ><input
+                      type="radio"
+                      name="summary-mode"
+                      value="auto"
+                      checked
+                    />
+                    自动总结</label
+                  >
+                  <label
+                    ><input type="radio" name="summary-mode" value="manual" />
+                    手动总结</label
+                  >
+                </div>
+              </div>
+              <div class="form-group">
+                <label>触发条数</label>
+                <input
+                  type="number"
+                  id="summary-count-input"
+                  value="20"
+                  min="5"
+                  class="moe-input"
+                />
+              </div>
+              <div class="form-group">
+                <label>总结提示词</label>
+                <textarea
+                  id="summary-prompt-input"
+                  rows="3"
+                  class="moe-input"
+                ></textarea>
+              </div>
+              <div class="moe-btn-group">
+                <button id="view-summaries-btn" class="moe-btn-secondary">
+                  查看/管理总结
+                </button>
+                <button id="manual-summary-btn" class="moe-btn-secondary">
+                  立即手动总结
+                </button>
+              </div>
+            </div>
+
+            <!-- 续火花 -->
+            <div class="form-group" id="streak-settings-section">
+              <label class="toggle-switch-label">
+                <span class="toggle-switch-text">续火花系统</span>
+                <input type="checkbox" id="streak-enabled-toggle" />
+                <span class="toggle-switch-slider"></span>
+              </label>
+              <button
+                id="open-intimacy-panel-btn"
+                class="moe-btn-secondary"
+                style="display: none; margin-bottom: 10px"
+              >
+                🏅 查看亲密关系面板
+              </button>
+
+              <div
+                id="streak-details-container"
+                class="moe-details-box"
+                style="display: none"
+              >
+                <div class="moe-grid-row">
+                  <div class="form-group">
+                    <label>初始天数</label>
+                    <input
+                      type="number"
+                      id="streak-initial-days-input"
+                      class="moe-input"
+                    />
+                  </div>
+                  <div class="form-group">
+                    <label>熄灭规则</label>
+                    <select
+                      id="streak-extinguish-threshold-select"
+                      class="moe-input"
+                    >
+                      <option value="1">1天不聊熄灭</option>
+                      <option value="3">3天不聊熄灭</option>
+                      <option value="7">7天不聊熄灭</option>
+                      <option value="-1">永不熄灭</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>点亮图标 URL (可选)</label>
+                  <input
+                    type="text"
+                    id="streak-lit-icon-url"
+                    class="moe-input"
+                    placeholder="默认: 🔥"
+                  />
+                </div>
+                <div class="form-group">
+                  <label>熄灭图标 URL (可选)</label>
+                  <input
+                    type="text"
+                    id="streak-extinguished-icon-url"
+                    class="moe-input"
+                    placeholder="默认: 🧊"
+                  />
+                </div>
+                <div class="form-group">
+                  <label>字体颜色</label>
+                  <input
+                    type="color"
+                    id="streak-font-color-picker"
+                    class="moe-input"
+                    style="height: 40px; padding: 2px"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <!-- 群聊后台 -->
+            <div
+              class="form-group"
+              id="group-background-activity-group"
+              style="display: none"
+            >
+              <label class="toggle-switch-label">
+                <span class="toggle-switch-text">群聊后台实时活动</span>
+                <input type="checkbox" id="group-background-activity-switch" />
+                <span class="toggle-switch-slider"></span>
+              </label>
+              <div
+                id="group-background-interval-settings"
+                class="moe-details-box"
+                style="display: none"
+              >
+                <label>活动间隔 (秒)</label>
+                <input
+                  type="number"
+                  id="group-background-interval-input"
+                  min="60"
+                  value="120"
+                  class="moe-input"
+                />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="toggle-switch-label">
+                <span class="toggle-switch-text">实时时间感知</span>
+                <input type="checkbox" id="time-perception-toggle" checked />
+                <span class="toggle-switch-slider"></span>
+              </label>
+              <div
+                id="custom-time-container"
+                style="display: none; margin-top: 5px"
+              >
+                <label>自定义时间</label>
+                <input
+                  type="datetime-local"
+                  id="custom-time-input"
+                  class="moe-input"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- ============================== -->
+          <!-- 4. 语音与视频卡片 -->
+          <!-- ============================== -->
+          <div class="settings-group-card moe-card">
+            <div class="settings-section-title">📞 语音与视频</div>
+
+            <div class="form-group" id="minimax-voice-id-group">
+              <label>Minimax 语音ID</label>
+              <input
+                type="text"
+                id="minimax-voice-id-input"
+                class="moe-input"
+                placeholder="例如：male-01"
+              />
+            </div>
+
+            <div class="form-group" id="minimax-language-boost-group">
+              <label for="minimax-language-boost-select"
+                >Minimax 语言增强</label
+              >
+              <p
+                style="
+                  font-size: 12px;
+                  font-weight: normal;
+                  color: #999;
+                  margin-top: 5px;
+                  margin-bottom: 10px;
+                "
+              >
+                增强对特定语言或方言的识别能力。通常选择“自动判断”即可。
+              </p>
+              <select id="minimax-language-boost-select">
+                <option value="">无 (默认)</option>
+                <option value="auto">自动判断</option>
+                <option value="Chinese">中文普通话</option>
+                <option value="Chinese,Yue">粤语</option>
+                <option value="English">英语</option>
+                <option value="Japanese">日语</option>
+                <option value="Korean">韩语</option>
+                <option value="French">法语</option>
+                <option value="Spanish">西班牙语</option>
+                <option value="Arabic">阿拉伯语</option>
+                <option value="Russian">俄语</option>
+                <option value="Portuguese">葡萄牙语</option>
+                <option value="German">德语</option>
+                <option value="Turkish">土耳其语</option>
+                <option value="Dutch">荷兰语</option>
+                <option value="Ukrainian">乌克兰语</option>
+                <option value="Vietnamese">越南语</option>
+                <option value="Indonesian">印尼语</option>
+                <option value="Italian">意大利语</option>
+                <option value="Thai">泰语</option>
+                <option value="Polish">波兰语</option>
+                <option value="Romanian">罗马尼亚语</option>
+                <option value="Greek">希腊语</option>
+                <option value_="">--- 其他 ---</option>
+                <option value="Czech">捷克语</option>
+                <option value="Finnish">芬兰语</option>
+                <option value="Hindi">印地语</option>
+                <option value="Bulgarian">保加利亚语</option>
+                <option value="Danish">丹麦语</option>
+                <option value="Hebrew">希伯来语</option>
+                <option value="Malay">马来语</option>
+                <option value="Persian">波斯语</option>
+                <option value="Slovak">斯洛伐克语</option>
+                <option value="Swedish">瑞典语</option>
+                <option value="Croatian">克罗地亚语</option>
+                <option value="Filipino">菲律宾语</option>
+                <option value="Hungarian">匈牙利语</option>
+                <option value="Norwegian">挪威语</option>
+                <option value="Slovenian">斯洛文尼亚语</option>
+                <option value="Catalan">加泰罗尼亚语</option>
+                <option value="Nynorsk">新挪威语</option>
+                <option value="Tamil">泰米尔语</option>
+                <option value="Afrikaans">南非语</option>
+              </select>
+            </div>
+
+            <div class="form-group" id="minimax-speed-group">
+              <label>语音语速: <span id="minimax-speed-value">1.0</span></label>
+              <input
+                type="range"
+                id="minimax-speed-slider"
+                min="0.5"
+                max="2"
+                step="0.1"
+                value="1.0"
+                class="moe-slider"
+              />
+            </div>
+
+            <div class="form-group" id="video-call-settings-group">
+              <div class="moe-divider"></div>
+              <label class="toggle-switch-label">
+                <span class="toggle-switch-text">可视化视频通话界面</span>
+                <input type="checkbox" id="visual-video-call-switch" />
+                <span class="toggle-switch-slider"></span>
+              </label>
+
+              <div
+                id="video-call-image-uploads"
+                class="moe-details-box"
+                style="display: none"
+              >
+                <div class="moe-grid-row">
+                  <div class="center-text">
+                    <label>对方画面</label>
+                    <div
+                      class="video-preview-box"
+                      onclick="
+                        document
+                          .getElementById('char-video-image-input')
+                          .click()
+                      "
+                    >
+                      <img
+                        id="char-video-image-preview"
+                        src="https://i.postimg.cc/pT2xKzPz/album-cover-placeholder.png"
+                      />
+                      <span>点击上传</span>
+                    </div>
+                    <input
+                      type="file"
+                      id="char-video-image-input"
+                      accept="image/*"
+                      hidden
+                    />
+                  </div>
+                  <div class="center-text">
+                    <label>我的画面</label>
+                    <div
+                      class="video-preview-box"
+                      onclick="
+                        document
+                          .getElementById('user-video-image-input')
+                          .click()
+                      "
+                    >
+                      <img
+                        id="user-video-image-preview"
+                        src="https://i.postimg.cc/pT2xKzPz/album-cover-placeholder.png"
+                      />
+                      <span>点击上传</span>
+                    </div>
+                    <input
+                      type="file"
+                      id="user-video-image-input"
+                      accept="image/*"
+                      hidden
+                    />
+                  </div>
+                </div>
+              </div>
+              <label
+                class="toggle-switch-label"
+                style="
+                  margin-top: 10px;
+                  border-top: 1px dashed #eee;
+                  padding-top: 10px;
+                "
+              >
+                <span class="toggle-switch-text">我的画面使用真实摄像头</span>
+                <input type="checkbox" id="user-real-camera-switch" />
+                <span class="toggle-switch-slider"></span>
+              </label>
+
+              <label class="toggle-switch-label" style="margin-top: 10px">
+                <span class="toggle-switch-text">开启语音接入</span>
+                <input type="checkbox" id="video-call-voice-access-switch" />
+                <span class="toggle-switch-slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <!-- ============================== -->
+          <!-- 5. 视觉美化卡片 -->
+          <!-- ============================== -->
+          <div class="settings-group-card moe-card">
+            <div class="settings-section-title">🎨 视觉美化</div>
+
+            <div class="form-group">
+              <label>聊天背景</label>
+              <div class="bg-upload-container">
+                <div class="bg-preview-wrapper">
+                  <img
+                    id="bg-preview"
+                    class="bg-preview-img"
+                    style="width: 100px; height: 150px; border-radius: 10px"
+                  />
+                  <button
+                    id="remove-bg-btn"
+                    style="
+                      position: absolute;
+                      top: -5px;
+                      right: -5px;
+                      width: 20px;
+                      height: 20px;
+                      border-radius: 50%;
+                      background: red;
+                      color: white;
+                      border: none;
+                      cursor: pointer;
+                    "
+                  >
+                    ×
+                  </button>
+                </div>
+                <button
+                  onclick="document.getElementById('bg-input').click()"
+                  class="moe-btn-small"
+                  style="width: auto"
+                >
+                  上传
+                </button>
+                <input type="file" id="bg-input" accept="image/*" hidden />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>气泡主题</label>
+              <div
+                class="theme-selector"
+                style="display: flex; flex-wrap: wrap; gap: 10px"
+              >
+                <!-- 原生单选按钮，JS会填充或保持原样 -->
+                <label
+                  ><input
+                    type="radio"
+                    name="theme-select"
+                    value="default"
+                    id="theme-default"
+                  />
+                  默认</label
+                >
+                <label
+                  ><input type="radio" name="theme-select" value="pink_blue" />
+                  粉蓝</label
+                >
+                <label
+                  ><input type="radio" name="theme-select" value="blue_white" />
+                  蓝白</label
+                >
+                <label
+                  ><input
+                    type="radio"
+                    name="theme-select"
+                    value="purple_yellow"
+                  />
+                  紫黄</label
+                >
+                <label
+                  ><input
+                    type="radio"
+                    name="theme-select"
+                    value="black_white"
+                  />
+                  黑白</label
+                >
+                <label
+                  ><input
+                    type="radio"
+                    name="theme-select"
+                    value="yellow_white"
+                  />
+                  黄白</label
+                >
+                <label
+                  ><input type="radio" name="theme-select" value="red_black" />
+                  红黑</label
+                >
+                <label
+                  ><input
+                    type="radio"
+                    name="theme-select"
+                    value="blue_yellow"
+                  />
+                  蓝黄</label
+                >
+                <label
+                  ><input
+                    type="radio"
+                    name="theme-select"
+                    value="pink_yellow"
+                  />
+                  粉黄</label
+                >
+                <label
+                  ><input
+                    type="radio"
+                    name="theme-select"
+                    value="pink_purple"
+                  />
+                  粉紫</label
+                >
+                <label
+                  ><input type="radio" name="theme-select" value="gray_white" />
+                  灰白</label
+                >
+                <label
+                  ><input type="radio" name="theme-select" value="blue_green" />
+                  蓝绿</label
+                >
+                <label
+                  ><input type="radio" name="theme-select" value="pink_white" />
+                  粉白</label
+                >
+                <label

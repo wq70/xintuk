@@ -1,0 +1,1338 @@
+function renderSurveillanceView(surveillanceData) {
+  const gridEl = document.getElementById("kk-monitor-grid");
+  gridEl.innerHTML = "";
+  const chat = state.chats[activeKkCharId];
+  if (!chat) return;
+
+  const { characterLocation, feeds } = surveillanceData;
+
+  if (!feeds || Object.keys(feeds).length === 0) {
+    gridEl.innerHTML =
+      '<p style="text-align:center; color: #8a8a8a;">无法加载监控画面。</p>';
+    return;
+  }
+
+  for (const areaName in feeds) {
+    const feedData = feeds[areaName];
+    const area = chat.houseData.areas[areaName];
+    const isCharacterPresent = feedData.isCharacterPresent;
+
+    const feedEl = document.createElement("div");
+    feedEl.className = "kk-monitor-item";
+    // 将区域名存到 data-* 属性中，方便事件委托时获取
+    feedEl.dataset.areaName = areaName;
+
+    if (area && area.imageUrl) {
+      feedEl.style.backgroundImage = `url(${area.imageUrl})`;
+    } else {
+      feedEl.style.backgroundColor = "#333";
+    }
+
+    if (areaName === characterLocation) {
+      feedEl.classList.add("active-character-location");
+    }
+
+    // 只有当角色在该区域时，才显示互动按钮
+    const interactionControlsHtml = isCharacterPresent
+      ? `
+			            <div class="monitor-interaction-controls">
+			                <button class="monitor-btn" data-action="reroll" title="重Roll">🔄</button>
+			                <button class="monitor-btn" data-action="continue" title="继续监控">➡️</button>
+			                <button class="monitor-btn" data-action="speak" title="对话">🎤</button>
+			            </div>`
+      : "";
+
+    feedEl.innerHTML = `
+			            <div class="monitor-header">
+			                <span>${areaName}</span>
+			                <div class="rec-dot"></div>
+			            </div>
+			            <div class="frosted-glass-panel">
+			                <div class="monitor-content-text">${feedData.description}</div>
+			                ${interactionControlsHtml}
+			            </div>
+			        `;
+
+    gridEl.appendChild(feedEl);
+  }
+}
+
+/**
+ * 【全新升级】处理监控画面中所有互动按钮点击的事件委托
+ * 增加了变声器设置面板
+ */
+async function handleMonitorInteraction(areaName, action, feedElement) {
+  const contentTextElement = feedElement.querySelector(".monitor-content-text");
+  const currentContent = contentTextElement.textContent; // 获取当前画面内容
+
+  if (action === "speak") {
+    // ... (变声器HTML定义部分保持不变) ...
+    const extraHtml = `
+        <div style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #eee; text-align: left;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <span style="font-size: 14px; color: #333; font-weight: 500;">🕵️ 使用变声器</span>
+                <label class="toggle-switch" style="transform: scale(0.8);">
+                    <input type="checkbox" id="monitor-voice-toggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div id="monitor-voice-input-container" style="display: none; animation: fadeIn 0.3s;">
+                <label style="font-size: 12px; color: #666;">伪装身份:</label>
+                <input type="text" id="monitor-voice-identity" placeholder="例如: 外卖员, 幽灵 (留空默认为陌生人)" 
+                       style="width: 100%; padding: 8px; margin-top: 5px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; font-size: 13px;">
+            </div>
+        </div>
+        `;
+
+    let tempVoiceSettings = { enabled: false, identity: "" };
+
+    const promptPromise = showCustomPrompt(
+      `对【${areaName}】喊话`,
+      "请输入你想说的话：",
+      "",
+      "text",
+      extraHtml,
+    );
+
+    setTimeout(() => {
+      const toggle = document.getElementById("monitor-voice-toggle");
+      const container = document.getElementById(
+        "monitor-voice-input-container",
+      );
+      const identityInput = document.getElementById("monitor-voice-identity");
+
+      if (toggle && container && identityInput) {
+        toggle.addEventListener("change", (e) => {
+          tempVoiceSettings.enabled = e.target.checked;
+          container.style.display = e.target.checked ? "block" : "none";
+          if (e.target.checked) identityInput.focus();
+        });
+        identityInput.addEventListener("input", (e) => {
+          tempVoiceSettings.identity = e.target.value;
+        });
+      }
+    }, 50);
+
+    const userInput = await promptPromise;
+
+    if (userInput && userInput.trim()) {
+      // ★★★ 核心修改点：在最后增加传入 currentContent ★★★
+      await generateMonitorDialogue(
+        areaName,
+        userInput,
+        contentTextElement,
+        tempVoiceSettings,
+        currentContent,
+      );
+    }
+  } else {
+    // Reroll 和 Continue 逻辑
+    const newContent = await generateMonitorUpdate(
+      areaName,
+      action === "continue" ? currentContent : null, // Continue会传入当前内容
+      contentTextElement,
+    );
+    if (newContent) {
+      contentTextElement.innerHTML = newContent;
+    }
+  }
+}
+
+/**
+ * 【AI核心】生成监控画面的“下一帧”或“重Roll”
+ * @param {string} areaName - 区域名
+ * @param {string|null} context - 上一帧的内容（如果是重Roll则为null）
+ * @param {HTMLElement} textElement - 用于显示加载状态的文本元素
+ * @returns {Promise<string|null>} - 新的画面描述
+ */
+async function generateMonitorUpdate(areaName, context, textElement) {
+  const chat = state.chats[activeKkCharId];
+  if (!chat) return null;
+
+  textElement.innerHTML = "<i>正在刷新信号...</i>";
+
+  const { proxyUrl, apiKey, model } = state.apiConfig;
+  if (!proxyUrl || !apiKey || !model) {
+    textElement.innerHTML = '<i style="color: #ff8a80;">API未配置</i>';
+    return null;
+  }
+
+  // ★★★ 核心修改：优化Prompt，区分“继续”和“重Roll” ★★★
+  let promptInstructions = "";
+  if (context) {
+    // 这种情况是点击了“继续”箭头
+    promptInstructions = `
+        # 上一秒的画面 (Context)
+        “${context}”
+        
+        # 任务
+        请基于“上一秒的画面”，**顺延时间线**描述下一秒发生了什么。
+        行为必须连贯。例如：如果刚才拿起了杯子，现在可能是正在喝水；如果刚才在看手机，现在可能是看到了好笑的消息。
+        不要跳跃到完全不相关的动作。
+    `;
+  } else {
+    // 这种情况是点击了“重Roll”刷新
+    promptInstructions = `
+        # 任务
+        请忽略之前的状态，**重新生成**一个该角色在【${areaName}】里的全新随机状态/事件。
+    `;
+  }
+
+  const prompt = `
+			你是一个监控系统AI，正在观察角色“${chat.name}”在【${areaName}】区域的活动。
+            角色人设：${chat.settings.aiPersona}
+            
+            ${promptInstructions}
+
+			你的描述必须是客观的第三人称视角，就像摄像头记录的一样。
+			如果角色说话，请用引号包裹。
+			你的回复只能是纯文本，不要包含任何JSON或额外说明。
+			`;
+
+  try {
+    let isGemini = proxyUrl === GEMINI_API_URL;
+    let messagesForApi = [{ role: "user", content: prompt }];
+    let geminiConfig = toGeminiRequestData(
+      model,
+      apiKey,
+      prompt,
+      messagesForApi,
+      isGemini,
+    );
+
+    const response = isGemini
+      ? await fetch(geminiConfig.url, geminiConfig.data)
+      : await fetch(`${proxyUrl}/v1/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: messagesForApi,
+            temperature: 0.9,
+          }),
+        });
+
+    if (!response.ok) throw new Error(await response.text());
+    const data = await response.json();
+    return (
+      isGemini
+        ? data.candidates[0].content.parts[0].text
+        : data.choices[0].message.content
+    ).trim();
+  } catch (error) {
+    textElement.innerHTML = `<i style="color: #ff8a80;">信号中断: ${error.message}</i>`;
+    return null;
+  }
+}
+
+/**
+ * 【AI核心】处理通过监控进行的对话 (支持变声器 + 用户人设注入 + 上下文感知)
+ * @param {string} areaName - 区域名
+ * @param {string} userInput - 用户说的话
+ * @param {HTMLElement} textElement - 用于显示加载状态的文本元素
+ * @param {object} voiceSettings - 变声器设置
+ * @param {string} currentContext - ★新增参数：对话发生前的画面描述
+ */
+async function generateMonitorDialogue(
+  areaName,
+  userInput,
+  textElement,
+  voiceSettings,
+  currentContext,
+) {
+  const chat = state.chats[activeKkCharId];
+  if (!chat) return;
+
+  textElement.innerHTML = "<i>等待对方回应...</i>";
+
+  const { proxyUrl, apiKey, model } = state.apiConfig;
+  if (!proxyUrl || !apiKey || !model) {
+    textElement.innerHTML =
+      '<i style="color: #ff8a80;">麦克风故障: API未配置</i>';
+    return;
+  }
+
+  const userNickname =
+    chat.settings.myNickname || state.qzoneSettings.nickname || "我";
+  const userPersona = chat.settings.myPersona || "没有特定人设，普通用户。";
+
+  let soundSourceDescription = "";
+  let uiSourceLabel = "";
+
+  if (voiceSettings && voiceSettings.enabled) {
+    const identity = voiceSettings.identity
+      ? voiceSettings.identity.trim()
+      : "陌生人";
+    soundSourceDescription = `监控扬声器里传来一个**经过变声处理的、陌生的声音**。这个声音听起来像是一个【${identity}】。那个声音对你说：“${userInput}”。\n【重要指令】：你完全没有听出这是${userNickname}的声音。`;
+    uiSourceLabel = `(伪装成: ${identity})`;
+  } else {
+    soundSourceDescription = `监控扬声器里传来了你非常熟悉的、用户（${userNickname}）的声音。${userNickname}通过监控对你说：“${userInput}”。\n# 说话人（${userNickname}）的人设：${userPersona}\n【重要指令】：你立刻就听出了这是${userNickname}的声音，请自然互动。`;
+    uiSourceLabel = `(你)`;
+  }
+
+  // ★★★ 核心修改：在Prompt中加入当前上下文 ★★★
+  const prompt = `
+    # 角色扮演任务
+    你现在是角色“${chat.name}”，你正在【${areaName}】里。
+    
+    # 此时此刻的状态 (上下文)
+    就在刚才，**${currentContext || "你在房间里发呆"}**。
+    
+    # 突发事件
+    突然，${soundSourceDescription}
+
+    # 你的角色人设
+    ${chat.settings.aiPersona}
+
+    # 你的任务
+    请以【第一人称】，**紧接着刚才的状态**，对这句突如其来的话做出【反应】。
+    如果刚才你在睡觉，你现在可能被吵醒；如果刚才你在看书，你可能会放下书。
+    你的回复应该包含你的【心理活动、动作、以及说出的话】。
+    你的回复只能是纯文本。
+    `;
+
+  try {
+    let isGemini = proxyUrl === GEMINI_API_URL;
+    let messagesForApi = [{ role: "user", content: prompt }];
+    let geminiConfig = toGeminiRequestData(
+      model,
+      apiKey,
+      prompt,
+      messagesForApi,
+      isGemini,
+    );
+
+    const response = isGemini
+      ? await fetch(geminiConfig.url, geminiConfig.data)
+      : await fetch(`${proxyUrl}/v1/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: messagesForApi,
+            temperature: 0.8,
+          }),
+        });
+
+    if (!response.ok) throw new Error(await response.text());
+    const data = await response.json();
+    const aiResponse = (
+      isGemini
+        ? data.candidates[0].content.parts[0].text
+        : data.choices[0].message.content
+    ).trim();
+
+    textElement.innerHTML = `“${userInput}” <i style="font-size:12px; opacity:0.8;">${uiSourceLabel}</i><br><br>${aiResponse}`;
+  } catch (error) {
+    textElement.innerHTML = `<i style="color: #ff8a80;">通讯失败: ${error.message}</i>`;
+  }
+}
+
+/**
+ * 【AI核心 V2 - 智能移动版】当用户点击“刷新”时，生成所有区域的新状态
+ * @param {string} charId - 角色ID
+ * @returns {Promise<object|null>} - 新的完整监控数据
+ */
+async function generateSurveillanceUpdate(charId) {
+  const chat = state.chats[charId];
+  if (!chat || !chat.houseData) return null;
+
+  showGenerationOverlay("正在刷新所有监控...");
+
+  const lastSurveillance = chat.houseData.surveillanceData;
+
+  try {
+    const { proxyUrl, apiKey, model } = state.apiConfig;
+    if (!proxyUrl || !apiKey || !model) throw new Error("API未配置");
+
+    const systemPrompt = `
+			# 任务
+			你是一个全知的监控系统AI。你的任务是基于角色“${
+        chat.name
+      }”的【上一个状态】，推断出【下一秒钟】他可能做的行动，并更新所有监控区域的画面。他可能会从一个房间移动到另一个房间。
+
+			# 角色信息
+			- 人设: ${chat.settings.aiPersona}
+
+			# 上一秒的监控状态 (重要参考)
+			${JSON.stringify(lastSurveillance, null, 2)}
+
+			# 核心规则
+			1.  **逻辑连贯**: 你的更新必须基于上一秒的状态，做出合乎逻辑的推断。例如，如果上一秒在卧室看手机，下一秒可能是继续看、放下手机准备睡觉，或是走出卧室去客厅。
+			2.  **角色移动**: 角色【有可能】移动到新的区域。你【必须】在 \`characterLocation\` 字段中准确指出他的新位置。
+			3.  **状态更新**: 【所有】区域的画面描述都必须更新。如果角色进入了新区域，该区域的 \`isCharacterPresent\` 必须变为 \`true\`，旧区域的必须变为 \`false\`。
+			4.  **格式铁律**: 你的回复【必须】严格遵守与初始生成时完全相同的JSON格式。
+
+			现在，请生成下一秒的完整监控数据。
+			`;
+
+    const messagesForApi = [{ role: "user", content: systemPrompt }];
+    let isGemini = proxyUrl === GEMINI_API_URL;
+    let geminiConfig = toGeminiRequestData(
+      model,
+      apiKey,
+      systemPrompt,
+      messagesForApi,
+      isGemini,
+    );
+
+    const response = isGemini
+      ? await fetch(geminiConfig.url, geminiConfig.data)
+      : await fetch(`${proxyUrl}/v1/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: messagesForApi,
+            temperature: 0.8,
+          }),
+        });
+
+    if (!response.ok) throw new Error(await response.text());
+
+    const data = await response.json();
+    const rawContent = (
+      isGemini
+        ? data.candidates[0].content.parts[0].text
+        : data.choices[0].message.content
+    ).replace(/^```json\s*|```$/g, "");
+    return JSON.parse(rawContent);
+  } catch (error) {
+    console.error("刷新监控画面失败:", error);
+    await showCustomAlert("刷新失败", `发生错误: ${error.message}`);
+    return null;
+  } finally {
+    document.getElementById("generation-overlay").classList.remove("visible");
+  }
+}
+/**
+ * 【全新】显示加载动画并设置指定的文字
+ * @param {string} text - 要显示的加载提示文字
+ */
+function showGenerationOverlay(text) {
+  const overlay = document.getElementById("generation-overlay");
+  const textElement = document.getElementById("generation-text");
+  if (textElement) {
+    textElement.textContent = text;
+  }
+  overlay.classList.add("visible");
+}
+/* ================= KK查岗 - 沉浸式衣帽间 ================= */
+
+// 当前选中的标签页
+let activeWardrobeCategory = "上装";
+
+// 1. 更新搭配对象，增加新分类
+let currentOutfit = {
+  头饰: null, // 细分出的配饰
+  上装: null,
+  下装: null,
+  鞋子: null, // 新增
+  首饰: null, // 细分出的配饰
+  特殊: null,
+};
+
+/**
+ * 2. 替换 openKkWardrobe 函数 (最终修复版：独立工具栏，不遮挡任何东西)
+ */
+async function openKkWardrobe() {
+  if (!activeKkCharId) return;
+  const chat = state.chats[activeKkCharId];
+
+  // 检查是否有房屋数据
+  if (!chat || !chat.houseData) {
+    alert("请先点击“开始翻找”生成房屋数据后，再查看衣柜。");
+    return;
+  }
+
+  // 检查是否有衣柜数据，没有则生成
+  if (!chat.houseData.wardrobe) {
+    const confirmed = await showCustomConfirm(
+      "发现衣柜",
+      `你推开了卧室的衣柜门...\n\n里面空荡荡的，要让AI生成${chat.name}的衣服吗？`,
+      { confirmText: "生成衣柜" },
+    );
+    if (confirmed) {
+      await generateWardrobeData(activeKkCharId);
+    } else {
+      return;
+    }
+  }
+
+  // 初始化界面状态
+  currentOutfit = {
+    头饰: null,
+    上装: null,
+    下装: null,
+    鞋子: null,
+    首饰: null,
+    特殊: null,
+  };
+  document.getElementById("wardrobe-reaction-bubble").style.display = "none";
+  document.getElementById("wardrobe-try-on-btn").disabled = true;
+  document.getElementById("wardrobe-try-on-btn").textContent = "让Ta穿上";
+
+  // 设置头像
+  document.getElementById("wardrobe-char-avatar").src =
+    chat.settings.aiAvatar || defaultAvatar;
+
+  // 1. 更新搭配槽位 (HTML)
+  const displayContainer = document.getElementById("current-outfit-display");
+
+  // 清除旧的悬浮按钮（如果之前生成过，防止残留）
+  const oldFloatBtn = document.getElementById("wardrobe-history-floating-btn");
+  if (oldFloatBtn) oldFloatBtn.remove();
+
+  displayContainer.innerHTML = `
+        <div class="outfit-slot" data-type="头饰" data-placeholder="头饰"></div>
+        <div class="outfit-slot" data-type="上装" data-placeholder="上衣"></div>
+        <div class="outfit-slot" data-type="下装" data-placeholder="下装"></div>
+        <div class="outfit-slot" data-type="鞋子" data-placeholder="鞋子"></div>
+        <div class="outfit-slot" data-type="首饰" data-placeholder="首饰"></div>
+        <div class="outfit-slot" data-type="特殊" data-placeholder="特殊"></div>
+    `;
+
+  // 2. 更新分类标签页 (HTML)
+  const tabsContainer = document.querySelector(
+    "#wardrobe-inventory-area .wardrobe-tabs",
+  );
+  tabsContainer.innerHTML = `
+        <div class="wardrobe-tab active" data-cat="头饰">头饰</div>
+        <div class="wardrobe-tab" data-cat="上装">上装</div>
+        <div class="wardrobe-tab" data-cat="下装">下装</div>
+        <div class="wardrobe-tab" data-cat="鞋子">鞋子</div>
+        <div class="wardrobe-tab" data-cat="首饰">首饰</div>
+        <div class="wardrobe-tab" data-cat="特殊">特殊</div>
+    `;
+
+  // ★★★★★ 修复重点：插入独立工具栏 ★★★★★
+  // 我们找到 Inventory Area (库存区域)，把按钮插在 标签页(tabs) 的正上方
+  const inventoryArea = document.getElementById("wardrobe-inventory-area");
+
+  // 检查是否已经创建了工具栏容器
+  let toolbar = document.getElementById("wardrobe-toolbar-row");
+  if (!toolbar) {
+    toolbar = document.createElement("div");
+    toolbar.id = "wardrobe-toolbar-row";
+    // 样式：右对齐，留一点内边距，放在标准流中
+    toolbar.style.cssText = `
+          display: flex; 
+          justify-content: flex-end; 
+          padding: 5px 15px 0 15px; 
+          margin-bottom: 5px;
+      `;
+
+    // 把它插入到 tabsContainer 的前面 (即：搭配展示区 和 标签页 之间)
+    inventoryArea.insertBefore(toolbar, tabsContainer);
+  }
+
+  // 清空工具栏并添加按钮
+  toolbar.innerHTML = "";
+
+  const historyBtn = document.createElement("button");
+  historyBtn.innerHTML = "📜 历史搭配";
+  // 按钮样式：小巧一点，不喧宾夺主
+  historyBtn.style.cssText = `
+      background: rgba(0, 0, 0, 0.05);
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 12px;
+      color: #555;
+      cursor: pointer;
+  `;
+  historyBtn.onclick = openWardrobeHistory;
+
+  toolbar.appendChild(historyBtn);
+  // ★★★★★ 修复结束 ★★★★★
+
+  // 重置当前标签页为“上装”
+  activeWardrobeCategory = "上装";
+
+  // 渲染
+  renderWardrobeUI();
+  showScreen("kk-wardrobe-screen");
+}
+
+/**
+ * 2. 核心渲染函数：渲染分类标签、网格和选中状态
+ */
+function renderWardrobeUI() {
+  const chat = state.chats[activeKkCharId];
+  const items = chat.houseData.wardrobe || [];
+
+  // 1. 更新顶部搭配槽的显示
+  const slots = document.querySelectorAll(".outfit-slot");
+  slots.forEach((slot) => {
+    const type = slot.dataset.type;
+    const selectedItem = currentOutfit[type];
+
+    if (selectedItem) {
+      slot.classList.add("filled");
+      slot.innerHTML = selectedItem.icon;
+      // 点击槽位可以取消选择
+      slot.onclick = () => selectCloth(type, null);
+    } else {
+      slot.classList.remove("filled");
+      slot.innerHTML = "";
+      slot.onclick = null;
+    }
+  });
+
+  // 2. 更新“穿上”按钮状态 (至少选一件)
+  const hasSelection = Object.values(currentOutfit).some((v) => v !== null);
+  const btn = document.getElementById("wardrobe-try-on-btn");
+  btn.disabled = !hasSelection;
+
+  // 3. 渲染底部库存网格
+  const grid = document.getElementById("wardrobe-grid");
+  grid.innerHTML = "";
+
+  // 筛选当前标签页的衣服
+  const filteredItems = items.filter((item) => {
+    if (activeWardrobeCategory === "其他") {
+      return !["上装", "下装", "配饰", "特殊"].includes(item.category);
+    }
+    return item.category === activeWardrobeCategory;
+  });
+
+  if (filteredItems.length === 0) {
+    grid.innerHTML =
+      '<p style="grid-column:1/-1; text-align:center; color:#999; margin-top:20px;">这个分类下没有衣服哦</p>';
+  } else {
+    filteredItems.forEach((item) => {
+      const card = document.createElement("div");
+      card.className = "cloth-card";
+
+      // 检查是否被选中
+      if (
+        currentOutfit[item.category] &&
+        currentOutfit[item.category].name === item.name
+      ) {
+        card.classList.add("selected");
+      }
+
+      card.innerHTML = `
+                <div class="cloth-icon">${item.icon || "👕"}</div>
+                <div class="cloth-name">${item.name}</div>
+                <div class="cloth-desc">${item.description}</div>
+            `;
+
+      // 点击卡片：选中或取消
+      card.addEventListener("click", () => {
+        // 如果已经选中，则取消；否则选中
+        if (
+          currentOutfit[item.category] &&
+          currentOutfit[item.category].name === item.name
+        ) {
+          selectCloth(item.category, null);
+        } else {
+          selectCloth(item.category, item);
+        }
+      });
+
+      grid.appendChild(card);
+    });
+  }
+
+  // 4. 更新标签页高亮
+  document.querySelectorAll(".wardrobe-tab").forEach((tab) => {
+    tab.classList.toggle("active", tab.dataset.cat === activeWardrobeCategory);
+  });
+}
+
+/**
+ * 辅助：选择衣服
+ */
+function selectCloth(category, item) {
+  currentOutfit[category] = item;
+  // 隐藏之前的反应气泡，因为搭配变了
+  document.getElementById("wardrobe-reaction-bubble").style.display = "none";
+  document.getElementById("wardrobe-try-on-btn").textContent = "让Ta穿上";
+  renderWardrobeUI();
+}
+
+/**
+ * 3. 核心功能：试穿并触发AI反应 (修改版：增加历史记录保存功能)
+ */
+async function handleTryOn() {
+  const chat = state.chats[activeKkCharId];
+  if (!chat) return;
+
+  // 1. 收集选中的衣服
+  const selectedItems = Object.values(currentOutfit).filter((i) => i !== null);
+  if (selectedItems.length === 0) return;
+
+  // 2. 界面进入加载状态
+  const btn = document.getElementById("wardrobe-try-on-btn");
+  btn.disabled = true;
+  btn.textContent = "正在换装...";
+  document.getElementById("wardrobe-comment-bubble").style.display = "none";
+  const bubble = document.getElementById("wardrobe-reaction-bubble");
+  bubble.style.display = "none";
+
+  try {
+    // --- 构建搭配描述 ---
+    const outfitNames = selectedItems.map((i) => i.name).join(" + ");
+    const outfitDesc = selectedItems
+      .map((i) => `【${i.category}】${i.name} (${i.description})`)
+      .join(" + ");
+
+    // --- 步骤 A: 更新心声 (保持原逻辑) ---
+    if (!chat.latestInnerVoice) {
+      chat.latestInnerVoice = {
+        clothing: "",
+        behavior: "",
+        thoughts: "",
+        naughtyThoughts: "",
+      };
+    }
+    chat.latestInnerVoice.clothing = `穿着${outfitNames}`;
+    if (!chat.innerVoiceHistory) chat.innerVoiceHistory = [];
+    chat.innerVoiceHistory.push({
+      ...chat.latestInnerVoice,
+      timestamp: Date.now(),
+    });
+
+    const hiddenComments = selectedItems
+      .map((i) =>
+        i.charComment ? `(关于${i.name}的内心想法: ${i.charComment})` : "",
+      )
+      .join(" ");
+
+    const prompt = `
+        # 场景
+        用户在你的衣柜里挑选了一套衣服，并要求你穿上。
+        # 你的角色
+        ${chat.settings.aiPersona}
+        # 用户搭配的衣服
+        ${outfitDesc}
+        ${hiddenComments}
+        # 任务
+        请以第一人称，做出穿上这套衣服后的反应。
+        你需要结合你的人设、衣服的风格（是羞耻、日常、还是华丽？）以及用户强行搭配的行为，给出一句有画面感的回复。
+        回复中必须包含【动作】或【神态】描写。
+        # 格式要求
+        只返回纯文本，不要JSON。字数在30-60字之间。
+        `;
+
+    // 4. 调用API
+    const { proxyUrl, apiKey, model } = state.apiConfig;
+    let isGemini = proxyUrl === GEMINI_API_URL;
+    const messagesForApi = [{ role: "user", content: prompt }];
+    let geminiConfig = toGeminiRequestData(
+      model,
+      apiKey,
+      prompt,
+      messagesForApi,
+      isGemini,
+    );
+
+    const response = isGemini
+      ? await fetch(geminiConfig.url, geminiConfig.data)
+      : await fetch(`${proxyUrl}/v1/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: messagesForApi,
+            temperature: 0.9,
+          }),
+        });
+
+    if (!response.ok) throw new Error("API请求失败");
+    const data = await response.json();
+    const reactionText = (
+      isGemini
+        ? data.candidates[0].content.parts[0].text
+        : data.choices[0].message.content
+    ).trim();
+
+    // ================== ★★★ 新增：保存历史搭配记录 ★★★ ==================
+    if (!chat.houseData.wardrobeHistory) {
+      chat.houseData.wardrobeHistory = [];
+    }
+
+    // 创建一条历史记录对象
+    const historyEntry = {
+      id: Date.now(), // 唯一ID
+      timestamp: Date.now(), // 时间戳
+      dateStr: new Date().toLocaleString(), // 可读时间
+      items: selectedItems, // 具体的衣服对象数组
+      summary: outfitNames, // 衣服名字组合字符串
+      reaction: reactionText, // AI当时的评价
+    };
+
+    // 加到数组最前面
+    chat.houseData.wardrobeHistory.unshift(historyEntry);
+
+    // 为了防止记录无限膨胀，只保留最近50条
+    if (chat.houseData.wardrobeHistory.length > 50) {
+      chat.houseData.wardrobeHistory = chat.houseData.wardrobeHistory.slice(
+        0,
+        50,
+      );
+    }
+
+    // 立即保存到数据库，确保记录不丢失
+    await db.chats.put(chat);
+    console.log("已保存搭配历史:", historyEntry);
+    // ====================================================================
+
+    // --- 步骤 B: 弹出确认框 (保持原逻辑) ---
+    const now = Date.now();
+    const wantToDiscuss = await showCustomConfirm(
+      "换装完成",
+      `${chat.name} 换上了【${outfitNames}】并说道：\n\n“${reactionText}”\n\n要去聊天界面和Ta继续讨论这套搭配吗？`,
+      { confirmText: "去讨论", cancelText: "就在这看" },
+    );
+
+    if (wantToDiscuss) {
+      const eventMsg = {
+        role: "system",
+        type: "pat_message",
+        content: `[你为 ${chat.name} 换上了：${outfitNames}]`,
+        timestamp: now,
+      };
+      const aiMsg = {
+        role: "assistant",
+        senderName: chat.name,
+        content: reactionText,
+        timestamp: now + 1,
+      };
+      const hiddenInstruction = {
+        role: "system",
+        content: `[系统提示：用户刚刚在衣帽间为你换上了【${outfitDesc}】。你的当前服装已更新。请基于这个新造型和用户继续对话。]`,
+        timestamp: now + 2,
+        isHidden: true,
+      };
+      chat.history.push(eventMsg, aiMsg, hiddenInstruction);
+      await db.chats.put(chat);
+      openChat(activeKkCharId);
+    } else {
+      bubble.querySelector(".content").textContent = reactionText;
+      bubble.style.display = "block";
+      btn.textContent = "已换装";
+    }
+  } catch (error) {
+    console.error("试穿失败:", error);
+    alert("换装失败了，可能是因为衣服太紧（API错误）...");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ================= KK查岗 - 沉浸式衣帽间 (升级版) =================
+
+// 辅助函数：生成衣服图片 (使用 Pollinations，因为它生成物品效果好且快，无需鉴权)
+async function generateClothingImage(prompt) {
+  // 强制加上白底、产品摄影等关键词
+  const enhancedPrompt = `clothing product photography, ${prompt}, white background, flat lay style, studio lighting, high quality, 4k, realistic, no human`;
+  const encodedPrompt = encodeURIComponent(enhancedPrompt);
+  // 使用随机数防止缓存
+  const randomSeed = Math.floor(Math.random() * 10000);
+  return `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=512&nologo=true&seed=${randomSeed}`;
+}
+
+/**
+ * 核心渲染函数：渲染分类标签、网格和选中状态
+ * (修改版：支持显示图片)
+ */
+function renderWardrobeUI() {
+  const chat = state.chats[activeKkCharId];
+  const items = chat.houseData.wardrobe || [];
+
+  // 1. 更新顶部搭配槽的显示
+  const slots = document.querySelectorAll(".outfit-slot");
+  slots.forEach((slot) => {
+    const type = slot.dataset.type;
+    const selectedItem = currentOutfit[type];
+
+    if (selectedItem) {
+      slot.classList.add("filled");
+      // 如果有图片，显示图片；否则显示 emoji
+      if (selectedItem.imageUrl) {
+        slot.innerHTML = `<img src="${selectedItem.imageUrl}" style="width:100%; height:100%; object-fit:contain;">`;
+      } else {
+        slot.innerHTML = selectedItem.icon || "👕";
+      }
+      slot.onclick = () => selectCloth(type, null);
+    } else {
+      slot.classList.remove("filled");
+      slot.innerHTML = slot.dataset.placeholder; // 显示占位文字
+      slot.onclick = null;
+    }
+  });
+
+  // 2. 更新“穿上”按钮状态
+  const hasSelection = Object.values(currentOutfit).some((v) => v !== null);
+  const btn = document.getElementById("wardrobe-try-on-btn");
+  if (btn) btn.disabled = !hasSelection;
+
+  // 3. 渲染底部库存网格
+  const grid = document.getElementById("wardrobe-grid");
+  grid.innerHTML = "";
+
+  const filteredItems = items.filter(
+    (item) => item.category === activeWardrobeCategory,
+  );
+
+  if (filteredItems.length === 0) {
+    grid.innerHTML =
+      '<p style="grid-column:1/-1; text-align:center; color:#999; margin-top:20px;">这个分类下没有衣服哦</p>';
+  } else {
+    filteredItems.forEach((item) => {
+      const card = document.createElement("div");
+      card.className = "cloth-card";
+
+      // 检查是否被选中
+      if (
+        currentOutfit[item.category] &&
+        currentOutfit[item.category].name === item.name
+      ) {
+        card.classList.add("selected");
+      }
+
+      // 图片显示逻辑
+      let visualContent;
+      if (item.imageUrl) {
+        visualContent = `<img src="${item.imageUrl}" class="cloth-img" style="width:100%; height:80px; object-fit:contain; border-radius:4px;" loading="lazy">`;
+      } else {
+        visualContent = `<div class="cloth-icon" style="font-size:40px;">${item.icon || "👕"}</div>`;
+      }
+
+      card.innerHTML = `
+                ${visualContent}
+                <div class="cloth-name" style="font-size:12px; margin-top:5px; font-weight:bold;">${item.name}</div>
+            `;
+
+      // 点击卡片：选中或取消
+      card.addEventListener("click", () => {
+        if (
+          currentOutfit[item.category] &&
+          currentOutfit[item.category].name === item.name
+        ) {
+          selectCloth(item.category, null);
+        } else {
+          selectCloth(item.category, item);
+        }
+      });
+
+      grid.appendChild(card);
+    });
+  }
+
+  // 4. 更新标签页高亮
+  document.querySelectorAll(".wardrobe-tab").forEach((tab) => {
+    tab.classList.toggle("active", tab.dataset.cat === activeWardrobeCategory);
+  });
+}
+
+/**
+ * 辅助：选择衣服 (修改版：显示看法)
+ */
+function selectCloth(category, item) {
+  currentOutfit[category] = item;
+
+  const commentBubble = document.getElementById("wardrobe-comment-bubble");
+  const reactionBubble = document.getElementById("wardrobe-reaction-bubble");
+  const tryOnBtn = document.getElementById("wardrobe-try-on-btn");
+
+  // 隐藏试穿反应，显示物品看法
+  reactionBubble.style.display = "none";
+  commentBubble.style.display = "block";
+
+  if (item) {
+    // 如果选中了衣服，显示该衣服的评论
+    commentBubble.querySelector(".content").innerHTML =
+      `<strong>${item.name}</strong><br>"${item.charComment}"`;
+  } else {
+    // 如果取消选择，显示默认提示
+    commentBubble.querySelector(".content").textContent =
+      "（在身上比划了一下...）";
+  }
+
+  tryOnBtn.textContent = "让Ta穿上";
+  renderWardrobeUI();
+}
+
+/**
+ * 【AI核心】生成衣柜数据 (修改版：包含新分类 + 逐个生成 + 实时保存)
+ */
+async function generateWardrobeData(charId) {
+  const chat = state.chats[charId];
+  showGenerationOverlay("正在偷偷打开衣柜...");
+
+  try {
+    const { proxyUrl, apiKey, model } = state.apiConfig;
+    if (!proxyUrl || !apiKey || !model) throw new Error("API未配置");
+
+    const prompt = `
+        # 任务
+        你现在是角色 "${chat.name}"。用户正在查看你的【私人衣柜】。
+        请根据你的人设，生成你的衣柜内容。
+
+        # 角色人设
+        ${chat.settings.aiPersona}
+
+        # 核心要求
+        1. **生成分类**：必须包含以下分类：【头饰】、【上装】、【下装】、【鞋子】、【首饰】、【特殊】。
+        2. **生成数量**：每个分类生成1-2件，总共生成 10-15 件单品。
+        3. **内容细节**：
+           - "category": 必须是上述分类之一。
+           - "name": 衣服名称。
+           - "icon": emoji。
+           - "description": 简短描述。
+           - "imagePrompt": **重要！** 用于生成该衣服图片的英文 Prompt。必须描述衣服的外观、颜色、材质，**不要包含人物**，强调是单品展示 (e.g., "a pair of red high heels, product photography, white background")。
+           - "charComment": **重点！** 以【第一人称】写下你对这件衣服的看法（吐槽、回忆、羞耻感等）。
+
+        # JSON输出格式
+        {
+          "wardrobe": [
+            {
+              "category": "鞋子",
+              "name": "红色高跟鞋",
+              "icon": "👠",
+              "description": "漆皮红底高跟鞋。",
+              "imagePrompt": "red patent leather high heels, side view, elegant, product photography, white background",
+              "charComment": "只有重要场合才会穿..."
+            }
+          ]
+        }
+        `;
+
+    const messagesForApi = [{ role: "user", content: prompt }];
+    let isGemini = proxyUrl === GEMINI_API_URL;
+    let geminiConfig = toGeminiRequestData(
+      model,
+      apiKey,
+      prompt,
+      messagesForApi,
+      isGemini,
+    );
+
+    const response = isGemini
+      ? await fetch(geminiConfig.url, geminiConfig.data)
+      : await fetch(`${proxyUrl}/v1/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: messagesForApi,
+            temperature: 0.85,
+          }),
+        });
+
+    if (!response.ok) throw new Error(await response.text());
+
+    const data = await response.json();
+    const rawContent = (
+      isGemini
+        ? data.candidates[0].content.parts[0].text
+        : data.choices[0].message.content
+    )
+      .replace(/^```json\s*|```$/g, "")
+      .trim();
+
+    const result = JSON.parse(rawContent);
+
+    if (result && result.wardrobe) {
+      // 1. 先保存文字数据，确保即使生图失败，物品也在
+      chat.houseData.wardrobe = result.wardrobe;
+      await db.chats.put(chat);
+
+      // 2. --- 逐个生成图片并实时保存 (串行队列) ---
+      const total = result.wardrobe.length;
+      const overlayText = document.getElementById("generation-text");
+
+      for (let i = 0; i < total; i++) {
+        const item = chat.houseData.wardrobe[i]; // 直接操作 chat 对象里的数据引用
+
+        // 更新UI提示
+        if (overlayText) {
+          overlayText.textContent = `正在为衣服拍照 (${i + 1}/${total}): ${item.name}...`;
+        }
+
+        if (item.imagePrompt) {
+          try {
+            // 生成图片
+            const url = await generateClothingImage(item.imagePrompt);
+            // 更新内存数据
+            item.imageUrl = url;
+            // ★★★ 核心：每生成一张，立刻保存一次数据库 ★★★
+            await db.chats.put(chat);
+            console.log(`✅ 已保存图片: ${item.name}`);
+          } catch (e) {
+            console.error(`❌ 图片生成失败: ${item.name}`, e);
+          }
+        }
+
+        // 可选：稍微延迟一下，防止请求过快
+        await new Promise((r) => setTimeout(r, 500));
+      }
+
+      alert("衣柜整理完毕！");
+      // 如果当前还在衣柜界面，刷新一下图片显示
+      if (
+        document
+          .getElementById("kk-wardrobe-screen")
+          .classList.contains("active")
+      ) {
+        renderWardrobeUI();
+      }
+    } else {
+      throw new Error("AI返回数据格式错误");
+    }
+  } catch (error) {
+    console.error("生成衣柜失败:", error);
+    await showCustomAlert("生成失败", `错误: ${error.message}`);
+  } finally {
+    document.getElementById("generation-overlay").classList.remove("visible");
+  }
+}
+
+/**
+ * 【新增】添加更多衣服 (追加模式 - 包含新分类 + 逐个生成 + 实时保存)
+ */
+async function generateMoreWardrobeData() {
+  if (!activeKkCharId) return;
+  const chat = state.chats[activeKkCharId];
+
+  showGenerationOverlay("正在去商场进货...");
+
+  try {
+    const { proxyUrl, apiKey, model } = state.apiConfig;
+    if (!proxyUrl || !apiKey || !model) throw new Error("API未配置");
+
+    // 获取现有衣服名称，避免重复
+    const existingClothes = (chat.houseData.wardrobe || [])
+      .map((i) => i.name)
+      .join(", ");
+
+    const prompt = `
+        # 任务
+        你现在是角色 "${chat.name}"。请为你的衣柜【添置】3-5件新衣服。
+        
+        # 角色人设
+        ${chat.settings.aiPersona}
+
+        # 已有衣服 (不要重复)
+        ${existingClothes}
+
+        # 要求
+        1. 包含不同品类（可以是 头饰、上装、下装、鞋子、首饰、特殊）。
+        2. 必须包含 "imagePrompt" (英文, 白底产品图描述) 和 "charComment" (第一人称看法)。
+        
+        # JSON输出格式
+        {
+          "new_items": [
+            { "category": "鞋子", "name": "...", "icon": "...", "description": "...", "imagePrompt": "...", "charComment": "..." }
+          ]
+        }
+        `;
+
+    const messagesForApi = [{ role: "user", content: prompt }];
+    let isGemini = proxyUrl === GEMINI_API_URL;
+    let geminiConfig = toGeminiRequestData(
+      model,
+      apiKey,
+      prompt,
+      messagesForApi,
+      isGemini,
+    );
+
+    const response = isGemini
+      ? await fetch(geminiConfig.url, geminiConfig.data)
+      : await fetch(`${proxyUrl}/v1/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: messagesForApi,
+            temperature: 0.9,
+          }),
+        });
+
+    if (!response.ok) throw new Error(await response.text());
+    const data = await response.json();
+    const rawContent = (
+      isGemini
+        ? data.candidates[0].content.parts[0].text
+        : data.choices[0].message.content
+    )
+      .replace(/^```json\s*|```$/g, "")
+      .trim();
+    const result = JSON.parse(rawContent);
+
+    if (result && result.new_items) {
+      // 1. 先把新物品加入到数组并保存文字版
+      if (!chat.houseData.wardrobe) chat.houseData.wardrobe = [];
+
+      // 获取当前数组的起始索引，方便后面定位新物品
+      const startIndex = chat.houseData.wardrobe.length;
+
+      chat.houseData.wardrobe.push(...result.new_items);
+      await db.chats.put(chat); // 保存文字数据
+
+      // 2. --- 逐个生成图片并实时保存 ---
+      const total = result.new_items.length;
+      const overlayText = document.getElementById("generation-text");
+
+      for (let i = 0; i < total; i++) {
+        // 定位到刚刚添加进去的那个物品
+        const itemIndex = startIndex + i;
+        const item = chat.houseData.wardrobe[itemIndex];
+
+        if (overlayText) {
+          overlayText.textContent = `正在为新衣服拍照 (${i + 1}/${total}): ${item.name}...`;
+        }
+
+        if (item.imagePrompt) {
+          try {
+            const url = await generateClothingImage(item.imagePrompt);
+            item.imageUrl = url; // 更新内存引用
+            await db.chats.put(chat); // ★★★ 实时保存 ★★★
+          } catch (e) {
+            console.error("图片生成失败", e);
+          }
+        }
+        await new Promise((r) => setTimeout(r, 500));
+      }
+
+      // 刷新界面
+      renderWardrobeUI();
+      alert(`成功添加了 ${result.new_items.length} 件新衣服！`);
+    }
+  } catch (error) {
+    console.error("添加衣服失败:", error);
+    await showCustomAlert("添加失败", error.message);
+  } finally {
+    document.getElementById("generation-overlay").classList.remove("visible");
+  }
+}
+
+// =======================================================
+// 绑定新按钮的事件 (请把这段加在 init() 的事件绑定区域)
+// =======================================================
+// 绑定“添加衣服”按钮
+const addClothBtn = document.getElementById("kk-wardrobe-add-btn");
+if (addClothBtn) {
+  // 防止重复绑定，先移除旧的
+  const newBtn = addClothBtn.cloneNode(true);
+  addClothBtn.parentNode.replaceChild(newBtn, addClothBtn);
+  newBtn.addEventListener("click", generateMoreWardrobeData);
+}
+/**
+ * 【新增】打开历史搭配记录列表
+ */
+function openWardrobeHistory() {
+  const chat = state.chats[activeKkCharId];
+  if (!chat || !chat.houseData || !chat.houseData.wardrobeHistory) {
+    showCustomAlert("暂无记录", "还没有进行过换装搭配哦。");
+    return;
+  }
+
+  const historyList = chat.houseData.wardrobeHistory;
+  const listEl = document.getElementById("kk-file-list"); // 复用文件列表容器
+  const modal = document.getElementById("kk-file-explorer-modal"); // 复用通用列表弹窗
+
+  // 修改弹窗标题
+  modal.querySelector(".modal-header span").textContent =
+    `${chat.name}的穿搭日记`;
+  listEl.innerHTML = "";
+
+  if (historyList.length === 0) {
+    listEl.innerHTML =
+      '<p style="text-align:center; color: var(--text-secondary);">暂无记录</p>';
+  } else {
+    historyList.forEach((entry) => {
+      const itemDiv = document.createElement("div");
+      itemDiv.className = "kk-file-item"; // 复用样式
+      itemDiv.style.cssText =
+        "cursor: pointer; display: flex; flex-direction: column; gap: 5px; padding: 10px; border-bottom: 1px solid #eee;";
+
+      // 格式化时间
+      const timeStr = new Date(entry.timestamp).toLocaleString();
+
+      itemDiv.innerHTML = `
+                <div style="display:flex; justify-content:space-between; font-size:12px; color:#999;">
+                    <span>${timeStr}</span>
+                </div>
+                <div style="font-weight:bold; color:#333;">${entry.summary}</div>
+                <div style="font-size:13px; color:#666; font-style:italic;">“${entry.reaction.substring(0, 30)}${
+                  entry.reaction.length > 30 ? "..." : ""
+                }”</div>
+            `;
+
+      // 点击查看详情
+      itemDiv.addEventListener("click", () => {
+        showHistoryDetail(entry);
+      });
+
+      listEl.appendChild(itemDiv);
+    });
+  }
+
+  modal.classList.add("visible");
+}
+
+/**
+ * 【新增】查看某一条历史记录的详情
+ */
+function showHistoryDetail(entry) {
+  // 这里我们复用“物品分享弹窗”来显示详情，简单快捷
+  const modal = document.getElementById("kk-item-share-modal");
+  const title = document.getElementById("kk-item-share-title");
+  const contentDiv = document.getElementById("kk-item-share-content");
+  const shareBtn = document.getElementById("kk-item-share-confirm-btn");
+
+  title.textContent = "搭配详情";
+
+  // 构建详情内容
+  let detailHtml = `
+        <div style="text-align:left; font-size:14px;">
+            <p><strong>📅 时间:</strong> ${new Date(entry.timestamp).toLocaleString()}</p>
+            <p><strong>👗 搭配方案:</strong><br>${entry.summary}</p>
+            <hr style="margin:10px 0; border:0; border-top:1px dashed #ccc;">
+            <p><strong>🗣️ 当时评价:</strong><br>“${entry.reaction}”</p>
+        </div>
+    `;
+
+  // 如果支持innerHTML，可以直接塞进去，如果你的contentDiv只支持text，则需要改一下结构
+  // 假设 contentDiv 是个 div，我们先清空再塞 HTML
+  contentDiv.innerHTML = detailHtml;
+
+  // 修改按钮功能为“再次穿上” (高级功能，可选)
+  const newShareBtn = shareBtn.cloneNode(true);
+  shareBtn.parentNode.replaceChild(newShareBtn, shareBtn);
+
+  newShareBtn.textContent = "分享/回顾";
+  newShareBtn.onclick = () => {
+    shareKkItemToChat(
+      "历史记录",
+      `回顾了之前的造型：${entry.summary}`,
+      `当时的评价：${entry.reaction}`,
+    );
+    modal.classList.remove("visible");
+  };
+
+  modal.classList.add("visible");
+}

@@ -1,0 +1,925 @@
+          const results = chat.history.filter((msg) => {
+            // 过滤掉系统消息和对用户隐藏的消息
+            if (
+              msg.isHidden ||
+              msg.role === "system" ||
+              msg.type === "recalled_message"
+            ) {
+              return false;
+            }
+
+            // a. 筛选日期
+            if (dateValue) {
+              const msgDate = new Date(msg.timestamp)
+                .toISOString()
+                .split("T")[0];
+              if (msgDate !== dateValue) {
+                return false;
+              }
+            }
+
+            // b. 筛选发言人
+            if (senderValue) {
+              const myNickname = chat.isGroup
+                ? chat.settings.myNickname || "我"
+                : "我";
+              let msgSenderName = "";
+
+              if (msg.role === "user") {
+                msgSenderName = myNickname;
+              } else {
+                // AI或群成员的消息
+                // 这里我们使用 originalName 来精确匹配，因为群昵称可能会变
+                msgSenderName = chat.isGroup ? msg.senderName : chat.name;
+              }
+              if (msgSenderName !== senderValue) {
+                return false;
+              }
+            }
+
+            // c. 筛选关键词
+            if (keyword) {
+              let contentText = "";
+              // 将所有可能包含文本的内容都转换成字符串进行搜索
+              if (typeof msg.content === "string") {
+                contentText = msg.content;
+              } else if (
+                typeof msg.content === "object" &&
+                msg.content !== null
+              ) {
+                // 对于复杂对象，我们可以简单地将它们转为JSON字符串来搜索
+                contentText = JSON.stringify(msg.content);
+              }
+
+              if (!contentText.toLowerCase().includes(keyword.toLowerCase())) {
+                return false;
+              }
+            }
+
+            return true; // 所有条件都满足
+          });
+
+          console.log(`搜索到 ${results.length} 条结果`);
+
+          // 3. 渲染结果
+          renderSearchResults(results);
+        }
+
+        /**
+         * 渲染搜索结果列表
+         * @param {Array} results - 筛选出的消息数组
+         */
+        function renderSearchResults(results) {
+          const listEl = document.getElementById("chat-search-results-list");
+          listEl.innerHTML = "";
+          listEl.scrollTop = 0; // 每次渲染前，都将滚动条重置到顶部
+
+          if (results.length === 0) {
+            listEl.innerHTML =
+              '<p style="text-align:center; color: var(--text-secondary); padding: 50px 0;">未找到相关记录</p>';
+            return;
+          }
+
+          const chat = state.chats[state.activeChatId];
+          const myNickname = chat.isGroup
+            ? chat.settings.myNickname || "我"
+            : "我";
+
+          // 为了性能，只渲染最新的100条结果
+          results
+            .slice(-100)
+            .reverse()
+            .forEach((msg) => {
+              const item = document.createElement("div");
+              item.className = "search-result-item";
+              item.dataset.timestamp = msg.timestamp; // 关键！用于跳转
+
+              let senderName, senderAvatar;
+              if (msg.role === "user") {
+                senderName = myNickname;
+                senderAvatar = chat.settings.myAvatar;
+              } else {
+                if (chat.isGroup) {
+                  senderName = msg.senderName;
+                  const member = chat.members.find(
+                    (m) => m.originalName === senderName,
+                  );
+                  senderAvatar = member
+                    ? member.avatar
+                    : defaultGroupMemberAvatar;
+                } else {
+                  senderName = chat.name;
+                  senderAvatar = chat.settings.aiAvatar;
+                }
+              }
+
+              let contentText = "";
+              if (
+                msg.type === "sticker" ||
+                (typeof msg.content === "string" &&
+                  STICKER_REGEX.test(msg.content))
+              ) {
+                contentText = "[表情]";
+              } else if (
+                msg.type === "ai_image" ||
+                msg.type === "user_photo" ||
+                Array.isArray(msg.content)
+              ) {
+                contentText = "[图片]";
+              } else {
+                contentText = String(msg.content);
+              }
+
+              item.innerHTML = `
+			            <img src="${senderAvatar || defaultAvatar}" class="avatar">
+			            <div class="search-result-info">
+			                <div class="search-result-meta">
+			                    <span class="name">${senderName}</span>
+			                    <span class="timestamp">${formatDateStamp(msg.timestamp)}</span>
+			                </div>
+			                <div class="search-result-content">
+			                    ${highlightText(contentText, currentSearchKeyword)}
+			                </div>
+			            </div>
+			        `;
+              listEl.appendChild(item);
+            });
+        }
+
+        /**
+         * 辅助函数：高亮文本中的关键词
+         * @param {string} text - 原始文本
+         * @param {string} keyword - 要高亮的关键词
+         * @returns {string} - 处理后的HTML字符串
+         */
+        function highlightText(text, keyword) {
+          if (!keyword || !text) {
+            return text;
+          }
+          const regex = new RegExp(
+            keyword.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&"),
+            "gi",
+          );
+          return text.replace(regex, `<span class="highlight">$&</span>`);
+        }
+
+        /**
+         * 点击搜索结果，跳转到对应的消息位置
+         * @param {number} timestamp - 目标消息的时间戳
+         */
+        async function jumpToMessage(timestamp) {
+          const chat = state.chats[state.activeChatId];
+          if (!chat) return;
+
+          const targetIndex = chat.history.findIndex(
+            (msg) => msg.timestamp === timestamp,
+          );
+          if (targetIndex === -1) {
+            await showCustomAlert("错误", "找不到该条消息，可能已被删除。");
+            return;
+          }
+
+          // 1. 切换回聊天界面
+          showScreen("chat-interface-screen");
+          await new Promise((resolve) => setTimeout(resolve, 50));
+
+          const messagesContainer = document.getElementById("chat-messages");
+          messagesContainer.innerHTML = ""; // 清空当前内容
+
+          // 2. 计算要渲染的消息窗口（以目标消息为中心）
+          const windowSize = 50; // 和 MESSAGE_RENDER_WINDOW 保持一致
+          const startIndex = Math.max(
+            0,
+            targetIndex - Math.floor(windowSize / 2),
+          );
+          const messagesToRender = chat.history.slice(startIndex);
+
+          // 3. 更新 currentRenderedCount 以同步加载状态
+          //    这一步至关重要，它告诉“加载更多”功能下次应该从哪里开始加载
+          currentRenderedCount = messagesToRender.length;
+
+          // 4. 如果计算出的起始位置大于0，说明前面还有更早的记录，需要显示“加载更多”按钮
+          if (startIndex > 0) {
+            prependLoadMoreButton(messagesContainer);
+          }
+
+          // 5. 渲染消息窗口和日期戳
+          let lastMessageTimestamp =
+            startIndex > 0 ? chat.history[startIndex - 1].timestamp : null;
+          messagesToRender.forEach((msg) => {
+            if (msg.isHidden) return;
+            if (isNewDay(msg.timestamp, lastMessageTimestamp)) {
+              const dateStampEl = createDateStampElement(msg.timestamp);
+              messagesContainer.appendChild(dateStampEl);
+            }
+            // 使用 true 作为第三个参数，表示这是初始加载，不应播放动画
+            appendMessage(msg, chat, true);
+            lastMessageTimestamp = msg.timestamp;
+          });
+
+          // 6. 滚动到目标消息并高亮它
+          //    使用 setTimeout 确保 DOM 元素已经完全渲染到页面上
+          setTimeout(() => {
+            const targetMessage = messagesContainer.querySelector(
+              `.message-bubble[data-timestamp="${timestamp}"]`,
+            );
+            if (targetMessage) {
+              // 使用 'auto' 滚动，比 'smooth' 更快速直接
+              targetMessage.scrollIntoView({
+                behavior: "auto",
+                block: "center",
+              });
+
+              // 添加闪烁高亮效果，让用户能注意到
+              targetMessage.classList.add("flash");
+              setTimeout(() => {
+                targetMessage.classList.remove("flash");
+              }, 1500);
+            }
+          }, 100);
+        }
+
+        async function openQZonePublisher(mode) {
+          resetCreatePostModal();
+          const modal = document.getElementById("create-post-modal");
+          modal.dataset.mode = mode;
+          document.getElementById("create-post-modal-title").textContent =
+            "发布动态";
+
+          if (mode === "shuoshuo") {
+            modal.querySelector(".post-mode-switcher").style.display = "none";
+            modal.querySelector("#image-mode-content").style.display = "none";
+            modal.querySelector("#text-image-mode-content").style.display =
+              "none";
+            modal.querySelector("#post-public-text").placeholder =
+              "分享新鲜事...";
+          } else {
+            modal.querySelector(".post-mode-switcher").style.display = "flex";
+            modal.querySelector("#image-mode-content").classList.add("active");
+            modal
+              .querySelector("#text-image-mode-content")
+              .classList.remove("active");
+            modal.querySelector("#post-public-text").placeholder =
+              "分享新鲜事...（非必填的公开文字）";
+          }
+
+          document.getElementById("post-comments-toggle-group").style.display =
+            "block";
+
+          const visibilityGroup = document.getElementById(
+            "post-visibility-group",
+          );
+          const groupsContainer = document.getElementById(
+            "post-visibility-groups",
+          );
+          const visibilityRadios = document.querySelectorAll(
+            'input[name="visibility"]',
+          );
+
+          visibilityGroup.style.display = "block";
+          groupsContainer.innerHTML = ""; // 清空旧的分组列表
+
+          // 从数据库读取你的好友分组
+          const groups = await db.qzoneGroups.toArray();
+          if (groups.length > 0) {
+            groups.forEach((group) => {
+              const label = document.createElement("label");
+              label.innerHTML = `<input type="checkbox" value="${group.id}"> ${group.name}`;
+              groupsContainer.appendChild(label);
+            });
+          } else {
+            groupsContainer.innerHTML =
+              '<p style="color: #8a8a8a; font-size: 13px;">还没有创建任何好友分组哦。</p>';
+          }
+
+          // 默认选中“所有人可见”并隐藏分组选择
+          visibilityRadios[0].checked = true;
+          groupsContainer.style.display = "none";
+
+          // 监听单选按钮的变化
+          visibilityRadios.forEach((radio) => {
+            radio.onchange = function () {
+              groupsContainer.style.display =
+                this.value === "groups" ? "block" : "none";
+            };
+          });
+
+          modal.classList.add("visible");
+        }
+
+        /**
+         * 一键清空所有单人聊天背景
+         */
+        async function clearAllSingleChatBackgrounds() {
+          // 弹出确认框，防止误操作
+          const confirmed = await showCustomConfirm(
+            "确认操作",
+            "此操作将移除所有角色单独设置的聊天背景，统一使用全局背景。确定要继续吗？",
+            { confirmButtonClass: "btn-danger" },
+          );
+
+          if (confirmed) {
+            let updatedCount = 0;
+            const chatsToUpdate = [];
+
+            // 遍历所有聊天
+            for (const chatId in state.chats) {
+              const chat = state.chats[chatId];
+              // 如果这个聊天设置了单人背景
+              if (chat.settings && chat.settings.background) {
+                chat.settings.background = ""; // 清空它
+                chatsToUpdate.push(chat);
+                updatedCount++;
+              }
+            }
+
+            // 如果有需要更新的聊天，就批量写入数据库
+            if (chatsToUpdate.length > 0) {
+              await db.chats.bulkPut(chatsToUpdate);
+            }
+
+            await showCustomAlert(
+              "操作成功",
+              `已成功清空 ${updatedCount} 个角色的单人聊天背景！`,
+            );
+          }
+        }
+
+        /* 主屏幕美化预设核心功能函数 */
+
+        let activeHomePresetId = null; // 用于追踪当前选中的预设ID
+
+        /**
+         * 启用或禁用预设管理按钮
+         */
+        function toggleHomePresetButtons(isEnabled) {
+          document.getElementById("apply-home-preset-btn").disabled =
+            !isEnabled;
+          document.getElementById("update-home-preset-btn").disabled =
+            !isEnabled; // <-- 新增这一行
+          document.getElementById("rename-home-preset-btn").disabled =
+            !isEnabled;
+          document.getElementById("delete-home-preset-btn").disabled =
+            !isEnabled;
+          document.getElementById("export-home-preset-btn").disabled =
+            !isEnabled;
+        }
+
+        /**
+         * 加载预设到下拉框
+         */
+        async function loadHomeScreenPresetsToDropdown() {
+          const selector = document.getElementById("home-preset-selector");
+          selector.innerHTML = '<option value="">-- 请选择一个预设 --</option>';
+          const presets = await db.homeScreenPresets.toArray();
+          presets.forEach((preset) => {
+            const option = document.createElement("option");
+            option.value = preset.id;
+            option.textContent = preset.name;
+            selector.appendChild(option);
+          });
+          activeHomePresetId = null; // 重置选择
+          toggleHomePresetButtons(false); // 默认禁用按钮
+        }
+
+        /**
+         * 当用户从下拉框选择一个预设时
+         */
+        function handleHomePresetSelection() {
+          const selector = document.getElementById("home-preset-selector");
+          activeHomePresetId = selector.value ? parseInt(selector.value) : null;
+          // 只有当用户确实选择了一个预设时，才启用相关按钮
+          toggleHomePresetButtons(!!activeHomePresetId);
+        }
+
+        async function applySelectedHomeScreenPreset() {
+          if (!activeHomePresetId) {
+            alert("请先从下拉框中选择一个要应用的预设。");
+            return;
+          }
+          const preset = await db.homeScreenPresets.get(activeHomePresetId);
+          if (preset && preset.data) {
+            // 将预设数据加载到全局状态
+            state.globalSettings.widgetData = preset.data;
+
+            if (preset.data.wallpaper) {
+              state.globalSettings.wallpaper = preset.data.wallpaper;
+            }
+            if (preset.data.appIcons) {
+              state.globalSettings.appIcons = { ...preset.data.appIcons };
+            }
+
+            // 检查预设中是否有appLabels数据，如果有，就加载它
+            if (preset.data.appLabels) {
+              state.globalSettings.appLabels = { ...preset.data.appLabels };
+            } else {
+              // 如果这个旧的预设里没有保存App名字，就清空当前的自定义名字，以恢复默认
+              state.globalSettings.appLabels = {};
+            }
+
+            // 保存所有更新到数据库
+            await db.globalSettings.put(state.globalSettings);
+
+            // 依次应用所有设置 (现在 applyAppLabels() 就能获取到正确的名称了)
+            applyGlobalWallpaper();
+            applyAppIcons();
+            applyAppLabels();
+            applyWidgetData();
+
+            alert(`已成功应用预设: "${preset.name}"！`);
+            showScreen("home-screen");
+          }
+        }
+
+        /**
+         * 渲染主屏幕个人资料卡的头像框
+         */
+        function renderHomeScreenProfileFrame() {
+          // 1. 获取保存的头像框URL
+          const frameUrl = state.globalSettings.homeAvatarFrame || "";
+          // 2. 找到头像框的img元素
+          const frameImg = document.getElementById("profile-avatar-frame");
+          if (frameImg) {
+            // 3. 如果URL存在，就显示它
+            if (frameUrl) {
+              frameImg.src = frameUrl;
+              frameImg.style.display = "block";
+            } else {
+              // 4. 如果URL为空（即选择了“无”），就隐藏它
+              frameImg.src = "";
+              frameImg.style.display = "none";
+            }
+          }
+        }
+
+        /**
+         * 保存当前的主屏幕设置为一个新的预设
+         */
+        async function saveCurrentHomeScreenAsPreset() {
+          saveAppLabels();
+          const presetName = await showCustomPrompt(
+            "保存预设",
+            "请为这个主屏幕美化方案起个名字：",
+          );
+          if (!presetName || !presetName.trim()) {
+            if (presetName !== null) alert("名字不能为空！");
+            return;
+          }
+
+          // 核心：构建一个包含所有主屏幕元素的完整数据对象
+          const presetData = {
+            // --- 个人资料卡片 ---
+            "profile-banner-img":
+              document.getElementById("profile-banner-img").src,
+            "profile-avatar-img":
+              document.getElementById("profile-avatar-img").src,
+            homeAvatarFrame: document.getElementById("profile-avatar-frame")
+              .src, // ★★★ 新增：保存头像框 ★★★
+            "profile-username":
+              document.getElementById("profile-username").textContent,
+            "profile-sub-username": document.getElementById(
+              "profile-sub-username",
+            ).textContent,
+            "profile-bio": document.getElementById("profile-bio").textContent,
+            "profile-location":
+              document.getElementById("profile-location").innerHTML,
+
+            // --- 第一页小组件 ---
+            "widget-bubble-1":
+              document.getElementById("widget-bubble-1").textContent,
+            "widget-image-1": document.getElementById("widget-image-1").src,
+            "widget-subtext-1":
+              document.getElementById("widget-subtext-1").textContent,
+            "widget-bubble-2":
+              document.getElementById("widget-bubble-2").textContent,
+            "widget-image-2": document.getElementById("widget-image-2").src,
+            "widget-subtext-2":
+              document.getElementById("widget-subtext-2").textContent,
+
+            // --- 第二页小组件 ---
+            "widget-image-3": document.getElementById("widget-image-3").src,
+            "second-page-bubble":
+              document.getElementById("second-page-bubble").textContent,
+            "flat-capsule-bubble": document.getElementById(
+              "flat-capsule-bubble",
+            ).textContent,
+            "circular-bubble":
+              document.getElementById("circular-bubble").textContent,
+            "new-widget-avatar":
+              document.getElementById("new-widget-avatar").src,
+            "new-widget-text-1":
+              document.getElementById("new-widget-text-1").textContent,
+            "new-widget-text-2":
+              document.getElementById("new-widget-text-2").textContent,
+            "new-widget-text-3":
+              document.getElementById("new-widget-text-3").textContent,
+            "widget-month-display": document.getElementById(
+              "widget-month-display",
+            ).textContent,
+            "music-rect-img": document.getElementById("music-rect-img").src,
+            "music-record-img": document.getElementById("music-record-img").src,
+            "music-text-line":
+              document.getElementById("music-text-line").textContent,
+
+            // --- App图标和壁纸 ---
+            appIcons: { ...state.globalSettings.appIcons },
+            appLabels: { ...state.globalSettings.appLabels },
+            wallpaper: state.globalSettings.wallpaper,
+          };
+
+          // 保存到数据库
+          await db.homeScreenPresets.add({
+            name: presetName.trim(),
+            data: presetData,
+          });
+          await loadHomeScreenPresetsToDropdown(); // 刷新下拉列表
+          alert(`预设 "${presetName.trim()}" 已保存！`);
+        }
+
+        async function updateSelectedHomeScreenPreset() {
+          saveAppLabels();
+          if (!activeHomePresetId) {
+            alert("请先选择一个要更新的预设。");
+            return;
+          }
+
+          const currentPreset =
+            await db.homeScreenPresets.get(activeHomePresetId);
+          if (!currentPreset) return;
+
+          const confirmed = await showCustomConfirm(
+            "确认更新",
+            `确定要用当前的主屏幕布局覆盖预设 "${currentPreset.name}" 吗？`,
+            { confirmButtonClass: "btn-danger" },
+          );
+
+          if (confirmed) {
+            // 构建与保存时完全相同的完整数据对象
+            const presetData = {
+              "profile-banner-img":
+                document.getElementById("profile-banner-img").src,
+              "profile-avatar-img":
+                document.getElementById("profile-avatar-img").src,
+              homeAvatarFrame: document.getElementById("profile-avatar-frame")
+                .src,
+              "profile-username":
+                document.getElementById("profile-username").textContent,
+              "profile-sub-username": document.getElementById(
+                "profile-sub-username",
+              ).textContent,
+              "profile-bio": document.getElementById("profile-bio").textContent,
+              "profile-location":
+                document.getElementById("profile-location").innerHTML,
+              "widget-bubble-1":
+                document.getElementById("widget-bubble-1").textContent,
+              "widget-image-1": document.getElementById("widget-image-1").src,
+              "widget-subtext-1":
+                document.getElementById("widget-subtext-1").textContent,
+              "widget-bubble-2":
+                document.getElementById("widget-bubble-2").textContent,
+              "widget-image-2": document.getElementById("widget-image-2").src,
+              "widget-subtext-2":
+                document.getElementById("widget-subtext-2").textContent,
+              "widget-image-3": document.getElementById("widget-image-3").src,
+              "second-page-bubble":
+                document.getElementById("second-page-bubble").textContent,
+              "flat-capsule-bubble": document.getElementById(
+                "flat-capsule-bubble",
+              ).textContent,
+              "circular-bubble":
+                document.getElementById("circular-bubble").textContent,
+              "new-widget-avatar":
+                document.getElementById("new-widget-avatar").src,
+              "new-widget-text-1":
+                document.getElementById("new-widget-text-1").textContent,
+              "new-widget-text-2":
+                document.getElementById("new-widget-text-2").textContent,
+              "new-widget-text-3":
+                document.getElementById("new-widget-text-3").textContent,
+              "widget-month-display": document.getElementById(
+                "widget-month-display",
+              ).textContent,
+              "music-rect-img": document.getElementById("music-rect-img").src,
+              "music-record-img":
+                document.getElementById("music-record-img").src,
+              "music-text-line":
+                document.getElementById("music-text-line").textContent,
+              appIcons: { ...state.globalSettings.appIcons },
+              appLabels: { ...state.globalSettings.appLabels },
+              wallpaper: state.globalSettings.wallpaper,
+            };
+
+            await db.homeScreenPresets.update(activeHomePresetId, {
+              data: presetData,
+            });
+            await showCustomAlert(
+              "成功",
+              `预设 "${currentPreset.name}" 已更新！`,
+            );
+          }
+        }
+
+        /**
+         * 重命名选中的预设
+         */
+        async function renameSelectedHomeScreenPreset() {
+          if (!activeHomePresetId) return;
+          const currentPreset =
+            await db.homeScreenPresets.get(activeHomePresetId);
+          const newName = await showCustomPrompt(
+            "重命名",
+            "请输入新的名称：",
+            currentPreset.name,
+          );
+          if (newName && newName.trim()) {
+            await db.homeScreenPresets.update(activeHomePresetId, {
+              name: newName.trim(),
+            });
+            await loadHomeScreenPresetsToDropdown();
+            document.getElementById("home-preset-selector").value =
+              activeHomePresetId;
+            alert("重命名成功！");
+          }
+        }
+
+        /**
+         * 删除选中的预设
+         */
+        async function deleteSelectedHomeScreenPreset() {
+          if (!activeHomePresetId) return;
+          const currentPreset =
+            await db.homeScreenPresets.get(activeHomePresetId);
+          const confirmed = await showCustomConfirm(
+            "确认删除",
+            `确定要删除预设 "${currentPreset.name}" 吗？`,
+            {
+              confirmButtonClass: "btn-danger",
+            },
+          );
+          if (confirmed) {
+            await db.homeScreenPresets.delete(activeHomePresetId);
+            await loadHomeScreenPresetsToDropdown(); // 这会自动重置选择并禁用按钮
+            alert("预设已删除。");
+          }
+        }
+
+        /**
+         * 导出选中的预设
+         */
+        async function exportHomeScreenPreset() {
+          if (!activeHomePresetId) return;
+          const preset = await db.homeScreenPresets.get(activeHomePresetId);
+          const blob = new Blob([JSON.stringify(preset, null, 2)], {
+            type: "application/json",
+          });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `${preset.name}-HomeScreen.json`;
+          a.click();
+          URL.revokeObjectURL(url);
+        }
+
+        /**
+         * 导入预设文件
+         */
+        function importHomeScreenPreset(file) {
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = async (e) => {
+            try {
+              const data = JSON.parse(e.target.result);
+              // 简单验证一下文件内容是不是我们需要的格式
+              if (data.name && data.data) {
+                await db.homeScreenPresets.add({
+                  name: `${data.name} (导入)`,
+                  data: data.data,
+                });
+                await loadHomeScreenPresetsToDropdown();
+                alert(`预设 "${data.name}" 导入成功！`);
+              } else {
+                alert("导入失败：文件格式不正确。");
+              }
+            } catch (error) {
+              alert(`导入失败：文件解析错误。${error.message}`);
+            }
+          };
+          reader.readAsText(file);
+        }
+
+        /**
+         * 角色表情包管理核心功能
+         */
+        async function openCharStickerManager() {
+          if (!state.activeChatId) return;
+          const chat = state.chats[state.activeChatId];
+          // 根据聊天类型显示不同的标题
+          if (chat.isGroup) {
+            document.getElementById("sticker-manager-title").textContent =
+              `“${chat.name}”的群表情`;
+          } else {
+            document.getElementById("sticker-manager-title").textContent =
+              `“${chat.name}”的表情包`;
+          }
+
+          // 默认显示专属表情
+          document.getElementById("sticker-tab-exclusive").click();
+
+          await renderCharStickers("exclusive");
+          await renderCharStickers("common");
+
+          showScreen("char-sticker-manager-screen");
+        }
+
+        async function renderCharStickers(type) {
+          const isExclusive = type === "exclusive";
+          const gridId = isExclusive
+            ? "exclusive-sticker-grid"
+            : "common-sticker-grid";
+          const grid = document.getElementById(gridId);
+          grid.innerHTML = "";
+
+          let stickers = [];
+          if (isExclusive) {
+            const chat = state.chats[state.activeChatId];
+            stickers = chat.settings.stickerLibrary || [];
+          } else {
+            state.charStickers = await db.charStickers.toArray();
+            stickers = state.charStickers || [];
+          }
+
+          if (stickers.length === 0) {
+            grid.innerHTML = `<p style="text-align:center; color: var(--text-secondary); grid-column: 1 / -1;">这里还是空的哦~</p>`;
+            return;
+          }
+
+          // 为了正确删除，我们需要原始索引
+          const stickersWithIndex = stickers.map((sticker, index) => ({
+            ...sticker,
+            originalIndex: index,
+          }));
+
+          stickersWithIndex.forEach((sticker) => {
+            const item = document.createElement("div");
+            item.className = "sticker-item";
+            item.style.backgroundImage = `url(${sticker.url})`;
+            item.title = sticker.name;
+
+            // 我们使用 URL 作为唯一标识符，因为它在两种库中都是唯一的
+            const uniqueId = sticker.url;
+
+            if (isCharStickerSelectionMode) {
+              // 【选择模式】下的逻辑
+              item.classList.add("in-selection-mode");
+              if (selectedCharStickers.has(uniqueId)) {
+                item.classList.add("selected");
+              }
+
+              item.addEventListener("click", () => {
+                item.classList.toggle("selected");
+                if (selectedCharStickers.has(uniqueId)) {
+                  selectedCharStickers.delete(uniqueId);
+                } else {
+                  selectedCharStickers.add(uniqueId);
+                }
+                const deleteBtn = document.getElementById(
+                  "delete-selected-char-stickers-btn",
+                );
+                deleteBtn.textContent = `删除已选 (${selectedCharStickers.size})`;
+                deleteBtn.disabled = selectedCharStickers.size === 0;
+              });
+            } else {
+              // 【正常模式】下的逻辑（只有删除按钮）
+              const deleteBtn = document.createElement("div");
+              deleteBtn.className = "delete-btn";
+              deleteBtn.innerHTML = "×";
+              deleteBtn.style.display = "block"; // 默认就显示
+              deleteBtn.onclick = async (e) => {
+                e.stopPropagation();
+                const confirmed = await showCustomConfirm(
+                  "删除表情",
+                  `确定要删除表情 "${sticker.name}" 吗？`,
+                  {
+                    confirmButtonClass: "btn-danger",
+                  },
+                );
+                if (confirmed) {
+                  if (isExclusive) {
+                    const chat = state.chats[state.activeChatId];
+                    chat.settings.stickerLibrary.splice(
+                      sticker.originalIndex,
+                      1,
+                    );
+                    await db.chats.put(chat);
+                  } else {
+                    await db.charStickers.delete(sticker.id);
+                  }
+                  await renderCharStickers(type); // 刷新
+                }
+              };
+              item.appendChild(deleteBtn);
+            }
+            grid.appendChild(item);
+          });
+        }
+
+        /**
+         * 处理批量删除选中的角色表情
+         */
+        async function handleBulkDeleteCharStickers() {
+          if (selectedCharStickers.size === 0) return;
+
+          const confirmed = await showCustomConfirm(
+            "确认删除",
+            `确定要删除选中的 ${selectedCharStickers.size} 个表情吗？`,
+            { confirmButtonClass: "btn-danger" },
+          );
+
+          if (confirmed) {
+            const activeTab = document.querySelector(
+              "#char-sticker-manager-screen .frame-tab.active",
+            );
+            const type =
+              activeTab.id === "sticker-tab-exclusive" ? "exclusive" : "common";
+
+            if (type === "exclusive") {
+              const chat = state.chats[state.activeChatId];
+              chat.settings.stickerLibrary =
+                chat.settings.stickerLibrary.filter(
+                  (s) => !selectedCharStickers.has(s.url),
+                );
+              await db.chats.put(chat);
+            } else {
+              // common
+              const stickersToDelete = await db.charStickers
+                .where("url")
+                .anyOf(Array.from(selectedCharStickers))
+                .toArray();
+              const idsToDelete = stickersToDelete.map((s) => s.id);
+              if (idsToDelete.length > 0) {
+                await db.charStickers.bulkDelete(idsToDelete);
+              }
+            }
+
+            // 退出编辑模式
+            toggleCharStickerSelectionMode();
+
+            alert("选中的表情已删除。");
+          }
+        }
+
+        /**
+         * 批量添加表情包到指定库
+         */
+        async function bulkAddCharStickers(type) {
+          const textInput = await showCustomPrompt(
+            `批量添加${type === "exclusive" ? "专属" : "通用"}表情`,
+            "一行一个，格式：\n猫猫喝水 https://..../cat.gif",
+            "",
+            "textarea",
+          );
+          if (!textInput || !textInput.trim()) return;
+
+          const lines = textInput.trim().split("\n");
+          const newStickers = [];
+          let successCount = 0;
+
+          lines.forEach((line, index) => {
+            line = line.trim();
+            if (!line) return;
+
+            let name = "";
+            let url = "";
+            let splitIndex = -1;
+            const httpIndex = line.indexOf("http");
+            const dataIndex = line.indexOf("data:image");
+            if (httpIndex > -1) {
+              splitIndex = httpIndex;
+            } else if (dataIndex > -1) {
+              splitIndex = dataIndex;
+            }
+
+            if (splitIndex > 0) {
+              name = line.substring(0, splitIndex).trim();
+              url = line.substring(splitIndex).trim();
+              if (name.endsWith(":") || name.endsWith("：")) {
+                name = name.slice(0, -1).trim();
+              }
+            }
+
+            if (
+              name &&
+              (url.startsWith("http") || url.startsWith("data:image"))
+            ) {
+              const stickerData = { url, name };
+              if (type !== "exclusive") {
+                stickerData.id = "char_sticker_" + (Date.now() + index);
+              }
+              newStickers.push(stickerData);
+              successCount++;
+            }
+          });
+
+          if (newStickers.length > 0) {
+            if (type === "exclusive") {
+              const chat = state.chats[state.activeChatId];

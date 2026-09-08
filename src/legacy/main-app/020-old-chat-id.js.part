@@ -1,0 +1,942 @@
+          if (!state.musicState.isActive) return;
+          const oldChatId = state.musicState.activeChatId;
+          const cleanupLogic = async () => {
+            document.getElementById("floating-lyrics-bar").style.display =
+              "none";
+
+            if (state.musicState.timerId)
+              clearInterval(state.musicState.timerId);
+            if (state.musicState.isPlaying) audioPlayer.pause();
+            if (saveState && oldChatId && state.chats[oldChatId]) {
+              const chat = state.chats[oldChatId];
+              chat.musicData.totalTime = state.musicState.totalElapsedTime;
+              await db.chats.put(chat);
+            }
+            state.musicState.isActive = false;
+            state.musicState.activeChatId = null;
+            state.musicState.totalElapsedTime = 0;
+            state.musicState.timerId = null;
+            updateListenTogetherIcon(oldChatId, true);
+          };
+          closeMusicPlayerWithAnimation(cleanupLogic);
+        }
+
+        function returnToChat() {
+          closeMusicPlayerWithAnimation(() => {
+            if (state.musicState.isActive && lyricsBarSettings.showOnClose) {
+              document.getElementById("floating-lyrics-bar").style.display =
+                "flex";
+            }
+          });
+        }
+
+        function updateListenTogetherIcon(chatId, forceReset = false) {
+          const iconImg = document.querySelector("#listen-together-btn img");
+          if (!iconImg) return;
+          if (
+            forceReset ||
+            !state.musicState.isActive ||
+            state.musicState.activeChatId !== chatId
+          ) {
+            iconImg.src = "https://i.postimg.cc/CxjpF6gK/yi-qi-ting.png";
+            iconImg.className = "";
+            return;
+          }
+          iconImg.src =
+            "https://cdn.jsdelivr.net.cn/gh/qdqqd/tc_temp/jli60izy2n.png";
+          iconImg.classList.add("rotating");
+          if (state.musicState.isPlaying) iconImg.classList.remove("paused");
+          else iconImg.classList.add("paused");
+        }
+        window.updateListenTogetherIconProxy = updateListenTogetherIcon;
+
+        function updatePlayerUI() {
+          updateListenTogetherIcon(state.musicState.activeChatId);
+          updateElapsedTimeDisplay();
+          const titleEl = document.getElementById("music-player-song-title");
+          const artistEl = document.getElementById("music-player-artist");
+          const playPauseBtn = document.getElementById("music-play-pause-btn");
+          const chat = state.chats[state.musicState.activeChatId];
+          const charAvatarEl = document.getElementById("music-char-avatar");
+          const userAvatarEl = document.getElementById("music-user-avatar");
+          const albumCoverEl = document.getElementById("music-album-cover");
+          const avatarsContainer = document.getElementById(
+            "music-avatars-container",
+          );
+          const displayArea = document.getElementById("music-display-area");
+
+          // 1. 判断是群聊还是单聊，并设置正确的头像
+          if (chat) {
+            // 如果是群聊
+            if (chat.isGroup) {
+              // 左边的头像就用群头像
+              charAvatarEl.src =
+                chat.settings.groupAvatar || defaultGroupAvatar;
+            } else {
+              // 否则（是单聊），就用角色的头像
+              charAvatarEl.src = chat.settings.aiAvatar || defaultAvatar;
+            }
+            // 右边的用户头像保持不变
+            userAvatarEl.src = chat.settings.myAvatar || defaultAvatar;
+          }
+
+          // 2. 更新歌曲信息和封面
+          if (
+            state.musicState.currentIndex > -1 &&
+            state.musicState.playlist.length > 0
+          ) {
+            const track =
+              state.musicState.playlist[state.musicState.currentIndex];
+            titleEl.textContent = track.name;
+            artistEl.textContent = track.artist;
+            albumCoverEl.src =
+              track.cover ||
+              "https://i.postimg.cc/pT2xKzPz/album-cover-placeholder.png";
+          } else {
+            titleEl.textContent = "请添加歌曲";
+            artistEl.textContent = "...";
+            albumCoverEl.src =
+              "https://i.postimg.cc/pT2xKzPz/album-cover-placeholder.png";
+          }
+
+          // 3. 控制播放/暂停按钮和头像闪烁
+          playPauseBtn.textContent = state.musicState.isPlaying ? "❚❚" : "▶";
+          avatarsContainer.classList.toggle(
+            "flashing",
+            state.musicState.isPlaying,
+          );
+
+          // 4. 控制唱片旋转和暂停
+          albumCoverEl.classList.toggle(
+            "rotating",
+            state.musicState.currentIndex > -1,
+          );
+          albumCoverEl.classList.toggle("paused", !state.musicState.isPlaying);
+
+          // 5. 默认显示歌曲封面
+          if (displayArea) {
+            displayArea.classList.remove("show-lyrics");
+          }
+        }
+
+        function updateElapsedTimeDisplay() {
+          const hours = (state.musicState.totalElapsedTime / 3600).toFixed(1);
+          document.getElementById("music-time-counter").textContent =
+            `已经一起听了${hours}小时`;
+        }
+
+        /**
+         * 处理用户上传或更新歌曲封面的逻辑
+         * @param {number} index - 被操作的歌曲在播放列表中的索引
+         */
+
+        async function handleCoverUpload(index) {
+          if (index < 0 || index >= state.musicState.playlist.length) return;
+
+          // 1. 弹窗让用户选择来源
+          const choice = await showChoiceModal("选择封面来源", [
+            { text: "使用网络URL", value: "url" },
+            { text: "从本地上传", value: "local" },
+          ]);
+
+          let newCoverUrl = null;
+
+          // 2. 根据选择执行不同操作
+          if (choice === "url") {
+            const url = await showCustomPrompt(
+              "封面URL",
+              "请输入图片文件的网络链接",
+            );
+            if (url && url.trim().startsWith("http")) {
+              newCoverUrl = url.trim();
+            } else if (url !== null) {
+              alert("请输入一个有效的图片URL！");
+            }
+          } else if (choice === "local") {
+            newCoverUrl = await uploadImageLocally();
+          }
+
+          // 3. 如果成功获取到新的封面URL，就更新数据和UI
+          if (newCoverUrl) {
+            state.musicState.playlist[index].cover = newCoverUrl;
+            await saveGlobalPlaylist();
+            updatePlaylistUI();
+            if (state.musicState.currentIndex === index) {
+              updatePlayerUI();
+            }
+            alert("歌曲封面已更新！");
+          }
+        }
+
+        function updatePlaylistUI() {
+          const playlistBody = document.getElementById("playlist-body");
+          playlistBody.innerHTML = "";
+          if (state.musicState.playlist.length === 0) {
+            playlistBody.innerHTML =
+              '<p style="text-align:center; padding: 20px; color: #888;">播放列表是空的~</p>';
+            return;
+          }
+          state.musicState.playlist.forEach((track, index) => {
+            const item = document.createElement("div");
+            item.className = "playlist-item";
+            if (index === state.musicState.currentIndex)
+              item.classList.add("playing");
+            // 新增“封面”按钮
+            item.innerHTML = `
+			            <div class="playlist-item-info">
+			                <div class="title">${track.name}</div>
+			                <div class="artist">${track.artist}</div>
+			            </div>
+			            <div class="playlist-item-actions">
+			                <span class="playlist-action-btn cover-btn" data-index="${index}">封面</span>
+			                <span class="playlist-action-btn lyrics-btn" data-index="${index}">词</span>
+			                <span class="playlist-action-btn delete-track-btn" data-index="${index}">×</span>
+			            </div>
+			        `;
+            item
+              .querySelector(".playlist-item-info")
+              .addEventListener("click", () => playSong(index));
+            playlistBody.appendChild(item);
+          });
+        }
+
+        /**
+         * 加载歌曲，支持自动检测过期并续期URL
+         */
+        async function loadSong(index) {
+          if (index < 0 || index >= state.musicState.playlist.length) return;
+          state.musicState.currentIndex = index;
+          let track = state.musicState.playlist[index];
+
+          if (!track.isLocal && track.musicId && track.musicSource) {
+            // 1. 检查当前链接是否有效
+            const isUrlValid = await checkAudioAvailability(track.src);
+
+            if (!isUrlValid) {
+              console.log(
+                `检测到歌曲《${track.name}》链接失效，正在自动续期...`,
+              );
+              // 显示一个小提示，让用户知道正在努力
+              const statusEl = document.getElementById("music-player-artist");
+              if (statusEl) statusEl.textContent = "正在更新链接...";
+
+              try {
+                // 2. 使用保存的ID重新获取链接
+                const apiUrl =
+                  track.musicSource === "netease"
+                    ? `https://api.vkeys.cn/v2/music/netease?id=${track.musicId}`
+                    : `https://api.vkeys.cn/v2/music/tencent?id=${track.musicId}`;
+
+                const res = await Http_Get(apiUrl);
+                if (res?.data?.url) {
+                  // 3. 更新内存中的链接
+                  track.src = res.data.url;
+                  // 4. 更新数据库，保存新链接
+                  state.musicState.playlist[index] = track;
+                  await saveGlobalPlaylist();
+                  console.log(`续期成功！新链接: ${track.src}`);
+                }
+              } catch (e) {
+                console.error("自动续期失败:", e);
+              }
+            }
+          }
+
+          // 检查并加载网络歌词
+          if (track.lrcUrl && !track.lrcContent) {
+            try {
+              const response = await fetch(track.lrcUrl);
+              if (response.ok) track.lrcContent = await response.text();
+            } catch (error) {
+              console.error("加载歌词URL失败:", error);
+            }
+          }
+
+          // 准备播放
+          state.musicState.parsedLyrics = parseLRC(track.lrcContent || "");
+          state.musicState.currentLyricIndex = -1;
+          renderLyrics();
+
+          if (track.isLocal && track.src instanceof Blob) {
+            audioPlayer.src = URL.createObjectURL(track.src);
+          } else if (!track.isLocal) {
+            audioPlayer.src = track.src;
+          } else {
+            console.error("本地歌曲源错误:", track);
+            return;
+          }
+
+          // 更新界面信息
+          updatePlaylistUI();
+          updatePlayerUI();
+
+          // 尝试播放
+          try {
+            if (state.musicState.isPlaying) {
+              await audioPlayer.play();
+            }
+          } catch (e) {
+            console.warn("加载后自动播放被拦截", e);
+          }
+
+          audioPlayer.onloadedmetadata = () => {
+            updateMusicProgressBar();
+          };
+        }
+
+        async function playSong(index) {
+          await loadSong(index);
+          try {
+            await audioPlayer.play();
+
+            state.musicState.isPlaying = true; // 播放成功后，直接设置状态为 true
+            updatePlayerUI(); // 并立即更新UI
+          } catch (error) {
+            console.error("音频播放失败:", error);
+            state.musicState.isPlaying = false; // 如果播放失败，也要确保状态正确
+            updatePlayerUI();
+          }
+        }
+
+        /**
+         * 处理播放/暂停的函数
+         */
+        function togglePlayPause() {
+          if (audioPlayer.paused) {
+            if (state.musicState.currentIndex > -1) {
+              playSong(state.musicState.currentIndex);
+            }
+          } else {
+            audioPlayer.pause();
+
+            state.musicState.isPlaying = false;
+            updatePlayerUI();
+          }
+        }
+
+        // 播放下一首（正确跳过保活音频）
+        function playNext() {
+          if (state.musicState.playlist.length === 0) return;
+
+          let nextIndex = state.musicState.currentIndex; // 使用临时变量作为起点
+          let attempts = 0; // 防止死循环的安全计数
+
+          do {
+            switch (state.musicState.playMode) {
+              case "random":
+                // 随机模式：直接生成一个随机数
+                nextIndex = Math.floor(
+                  Math.random() * state.musicState.playlist.length,
+                );
+                break;
+              case "single":
+                // 单曲循环模式：虽然通常由ended触发重播，但在手动点击下一首时，应当切换到下一首
+                nextIndex = (nextIndex + 1) % state.musicState.playlist.length;
+                break;
+              case "order":
+              default:
+                // 顺序模式：当前索引 + 1
+                nextIndex = (nextIndex + 1) % state.musicState.playlist.length;
+                break;
+            }
+
+            attempts++;
+          } while (
+            // 如果选中的是保活音频 (isKeepAlive=true)
+            // 并且列表里不只有这一首歌
+            // 并且没有尝试超过列表长度的2倍（防止全都是保活音频导致死循环）
+            state.musicState.playlist[nextIndex].isKeepAlive &&
+            state.musicState.playlist.length > 1 &&
+            attempts < state.musicState.playlist.length * 2
+          );
+
+          playSong(nextIndex);
+        }
+
+        // 播放上一首（自动跳过保活音频）
+        function playPrev() {
+          if (state.musicState.playlist.length === 0) return;
+          let newIndex = state.musicState.currentIndex;
+          let attempts = 0;
+
+          do {
+            newIndex =
+              (newIndex - 1 + state.musicState.playlist.length) %
+              state.musicState.playlist.length;
+            attempts++;
+          } while (
+            state.musicState.playlist[newIndex].isKeepAlive &&
+            state.musicState.playlist.length > 1 &&
+            attempts < state.musicState.playlist.length * 2
+          );
+
+          playSong(newIndex);
+        }
+
+        function changePlayMode() {
+          const modes = ["order", "random", "single"];
+          const currentModeIndex = modes.indexOf(state.musicState.playMode);
+          state.musicState.playMode =
+            modes[(currentModeIndex + 1) % modes.length];
+          document.getElementById("music-mode-btn").textContent = {
+            order: "顺序",
+            random: "随机",
+            single: "单曲",
+          }[state.musicState.playMode];
+        }
+
+        async function addSongFromURL() {
+          const url = await showCustomPrompt(
+            "添加网络歌曲",
+            "请输入歌曲的URL",
+            "",
+            "url",
+          );
+          if (!url) return;
+          const name = await showCustomPrompt("歌曲信息", "请输入歌名");
+          if (!name) return;
+          const artist = await showCustomPrompt("歌曲信息", "请输入歌手名");
+          if (!artist) return;
+
+          // 1. 先弹窗询问用户是否要提供歌词链接
+          const wantLrc = await showCustomConfirm(
+            "导入歌词",
+            `要为《${name}》提供一个歌词文件 (.lrc) 的URL吗？`,
+          );
+          let lrcUrl = ""; // 默认歌词链接为空
+
+          // 2. 如果用户点击了“确定”
+          if (wantLrc) {
+            // 就再弹出一个输入框让用户粘贴URL
+            const inputLrcUrl = await showCustomPrompt(
+              "歌词URL",
+              "请输入 .lrc 歌词文件的网络链接",
+              "",
+              "url",
+            );
+            if (inputLrcUrl) {
+              lrcUrl = inputLrcUrl; // 如果用户输入了，就保存这个URL
+            }
+          }
+
+          state.musicState.playlist.push({
+            name,
+            artist,
+            src: url,
+            isLocal: false,
+            lrcUrl: lrcUrl, // 3. 把获取到的歌词URL也保存到歌曲信息里
+            lrcContent: "", // 同时确保lrcContent是空的，以便后续加载
+          });
+
+          await saveGlobalPlaylist();
+          updatePlaylistUI();
+
+          if (state.musicState.currentIndex === -1) {
+            // 调用 loadSong 来准备好第一首歌
+            loadSong(state.musicState.playlist.length - 1);
+          }
+        }
+
+        async function addSongFromLocal(event) {
+          const files = event.target.files;
+          if (!files.length) return;
+
+          for (const file of files) {
+            let name = file.name.replace(/\.[^/.]+$/, "");
+            name = await showCustomPrompt("歌曲信息", "请输入歌名", name);
+            if (name === null) continue;
+
+            const artist = await showCustomPrompt(
+              "歌曲信息",
+              "请输入歌手名",
+              "未知歌手",
+            );
+            if (artist === null) continue;
+
+            let lrcContent = "";
+            const wantLrc = await showCustomConfirm(
+              "导入歌词",
+              `要为《${name}》导入歌词文件 (.lrc) 吗？`,
+            );
+            if (wantLrc) {
+              lrcContent = await new Promise((resolve) => {
+                const lrcInput = document.getElementById("lrc-upload-input");
+                const lrcChangeHandler = (e) => {
+                  const lrcFile = e.target.files[0];
+                  if (lrcFile) {
+                    const reader = new FileReader();
+                    reader.onload = (readEvent) =>
+                      resolve(readEvent.target.result);
+                    reader.onerror = () => resolve("");
+                    reader.readAsText(lrcFile);
+                  } else {
+                    resolve("");
+                  }
+                  lrcInput.removeEventListener("change", lrcChangeHandler);
+                  lrcInput.value = "";
+                };
+                lrcInput.addEventListener("change", lrcChangeHandler);
+                lrcInput.click();
+              });
+            }
+
+            state.musicState.playlist.push({
+              name,
+              artist,
+              src: file,
+              isLocal: true,
+              lrcContent: lrcContent,
+            });
+          }
+
+          await saveGlobalPlaylist();
+          updatePlaylistUI();
+
+          if (
+            state.musicState.currentIndex === -1 &&
+            state.musicState.playlist.length > 0
+          ) {
+            // 调用 loadSong 来准备好第一首歌
+            loadSong(0);
+          }
+          event.target.value = null;
+        }
+
+        async function deleteTrack(index) {
+          if (index < 0 || index >= state.musicState.playlist.length) return;
+          const track = state.musicState.playlist[index];
+          const wasPlaying =
+            state.musicState.isPlaying &&
+            state.musicState.currentIndex === index;
+          if (
+            track.isLocal &&
+            audioPlayer.src.startsWith("blob:") &&
+            state.musicState.currentIndex === index
+          )
+            URL.revokeObjectURL(audioPlayer.src);
+          state.musicState.playlist.splice(index, 1);
+          await saveGlobalPlaylist();
+          if (state.musicState.playlist.length === 0) {
+            if (state.musicState.isPlaying) audioPlayer.pause();
+            audioPlayer.src = "";
+            state.musicState.currentIndex = -1;
+            state.musicState.isPlaying = false;
+          } else {
+            if (wasPlaying) {
+              playNext();
+            } else {
+              if (state.musicState.currentIndex >= index)
+                state.musicState.currentIndex = Math.max(
+                  0,
+                  state.musicState.currentIndex - 1,
+                );
+            }
+          }
+          updatePlayerUI();
+          updatePlaylistUI();
+        }
+
+        const personaLibraryModal = document.getElementById(
+          "persona-library-modal",
+        );
+        const personaEditorModal = document.getElementById(
+          "persona-editor-modal",
+        );
+        const presetActionsModal = document.getElementById(
+          "preset-actions-modal",
+        );
+
+        function openPersonaLibrary() {
+          renderPersonaLibrary();
+          personaLibraryModal.classList.add("visible");
+        }
+
+        function closePersonaLibrary() {
+          personaLibraryModal.classList.remove("visible");
+        }
+
+        function renderPersonaLibrary() {
+          const grid = document.getElementById("persona-library-grid");
+          grid.innerHTML = "";
+          if (state.personaPresets.length === 0) {
+            grid.innerHTML =
+              '<p style="color: var(--text-secondary); grid-column: 1 / -1; text-align: center; margin-top: 20px;">空空如也~ 点击右上角"添加"来创建你的第一个人设预设吧！</p>';
+            return;
+          }
+          state.personaPresets.forEach((preset) => {
+            const item = document.createElement("div");
+            item.className = "persona-preset-item";
+            item.style.backgroundImage = `url(${preset.avatar})`;
+            item.dataset.presetId = preset.id;
+            item.addEventListener("click", () => applyPersonaPreset(preset.id));
+            addLongPressListener(item, () => showPresetActions(preset.id));
+            grid.appendChild(item);
+          });
+        }
+
+        function showPresetActions(presetId) {
+          editingPersonaPresetId = presetId;
+          presetActionsModal.classList.add("visible");
+        }
+
+        function hidePresetActions() {
+          presetActionsModal.classList.remove("visible");
+          editingPersonaPresetId = null;
+        }
+
+        function applyPersonaPreset(presetId) {
+          const preset = state.personaPresets.find((p) => p.id === presetId);
+          if (preset) {
+            document.getElementById("my-avatar-preview").src = preset.avatar;
+            document.getElementById("my-persona").value = preset.persona;
+          }
+          closePersonaLibrary();
+        }
+
+        function openPersonaEditorForCreate() {
+          editingPersonaPresetId = null;
+
+          document.getElementById("persona-editor-title").textContent =
+            "添加人设预设";
+          document.getElementById("preset-avatar-preview").src = defaultAvatar;
+          document.getElementById("preset-persona-input").value = "";
+
+          // 根据用户人设模式，显隐特定UI元素
+          document.getElementById("npc-editor-name-group").style.display =
+            "none";
+          document.getElementById(
+            "persona-editor-change-frame-btn",
+          ).style.display = "inline-block";
+
+          // 直接覆盖保存按钮的 onclick 事件，强制它只执行保存用户人设的函数
+          document.getElementById("save-persona-preset-btn").onclick =
+            savePersonaPreset;
+
+          document
+            .getElementById("persona-editor-modal")
+            .classList.add("visible");
+        }
+
+        function openPersonaEditorForEdit() {
+          const preset = state.personaPresets.find(
+            (p) => p.id === editingPersonaPresetId,
+          );
+          if (!preset) return;
+
+          document.getElementById("persona-editor-title").textContent =
+            "编辑人设预设";
+          document.getElementById("preset-avatar-preview").src = preset.avatar;
+          document.getElementById("preset-persona-input").value =
+            preset.persona;
+
+          // 根据用户人设模式，显隐特定UI元素
+          document.getElementById("npc-editor-name-group").style.display =
+            "none";
+          document.getElementById(
+            "persona-editor-change-frame-btn",
+          ).style.display = "inline-block";
+
+          // 直接覆盖保存按钮的 onclick 事件，强制它只执行保存用户人设的函数
+          document.getElementById("save-persona-preset-btn").onclick =
+            savePersonaPreset;
+
+          presetActionsModal.classList.remove("visible");
+          document
+            .getElementById("persona-editor-modal")
+            .classList.add("visible");
+        }
+
+        async function deletePersonaPreset() {
+          const confirmed = await showCustomConfirm(
+            "删除预设",
+            "确定要删除这个人设预设吗？此操作不可恢复。",
+            {
+              confirmButtonClass: "btn-danger",
+            },
+          );
+          if (confirmed && editingPersonaPresetId) {
+            await db.personaPresets.delete(editingPersonaPresetId);
+            state.personaPresets = state.personaPresets.filter(
+              (p) => p.id !== editingPersonaPresetId,
+            );
+            hidePresetActions();
+            renderPersonaLibrary();
+          }
+        }
+
+        function closePersonaEditor() {
+          personaEditorModal.classList.remove("visible");
+          editingPersonaPresetId = null;
+        }
+
+        async function savePersonaPreset() {
+          const avatar = document.getElementById("preset-avatar-preview").src;
+          const persona = document
+            .getElementById("preset-persona-input")
+            .value.trim();
+          if (avatar === defaultAvatar && !persona) {
+            alert("头像和人设不能都为空哦！");
+            return;
+          }
+          if (editingPersonaPresetId) {
+            const preset = state.personaPresets.find(
+              (p) => p.id === editingPersonaPresetId,
+            );
+            if (preset) {
+              preset.avatar = avatar;
+              preset.persona = persona;
+              await db.personaPresets.put(preset);
+            }
+          } else {
+            const newPreset = {
+              id: "preset_" + Date.now(),
+              avatar: avatar,
+              persona: persona,
+            };
+            await db.personaPresets.add(newPreset);
+            state.personaPresets.push(newPreset);
+          }
+          renderPersonaLibrary();
+          closePersonaEditor();
+        }
+
+        const batteryAlertModal = document.getElementById(
+          "battery-alert-modal",
+        );
+
+        function showBatteryAlert(imageUrl, text) {
+          clearTimeout(batteryAlertTimeout);
+          document.getElementById("battery-alert-image").src = imageUrl;
+          document.getElementById("battery-alert-text").textContent = text;
+          batteryAlertModal.classList.add("visible");
+          const closeAlert = () => {
+            batteryAlertModal.classList.remove("visible");
+            batteryAlertModal.removeEventListener("click", closeAlert);
+          };
+          batteryAlertModal.addEventListener("click", closeAlert);
+          batteryAlertTimeout = setTimeout(closeAlert, 2000);
+        }
+
+        function updateBatteryDisplay(battery) {
+          const batteryContainer =
+            document.getElementById("status-bar-battery");
+          const batteryLevelEl =
+            batteryContainer.querySelector(".battery-level");
+          const batteryTextEl = batteryContainer.querySelector(".battery-text");
+          const level = Math.floor(battery.level * 100);
+          batteryLevelEl.style.width = `${level}%`;
+          batteryTextEl.textContent = `${level}%`;
+          if (battery.charging) {
+            batteryContainer.classList.add("charging");
+          } else {
+            batteryContainer.classList.remove("charging");
+          }
+        }
+
+        function handleBatteryChange(battery) {
+          updateBatteryDisplay(battery);
+          const level = battery.level;
+          if (!battery.charging) {
+            if (
+              level <= 0.4 &&
+              lastKnownBatteryLevel > 0.4 &&
+              !alertFlags.hasShown40
+            ) {
+              showBatteryAlert(
+                "https://i.postimg.cc/T2yKJ0DV/40.jpg",
+                "有点饿了，可以去找充电器惹",
+              );
+              alertFlags.hasShown40 = true;
+            }
+            if (
+              level <= 0.2 &&
+              lastKnownBatteryLevel > 0.2 &&
+              !alertFlags.hasShown20
+            ) {
+              showBatteryAlert(
+                "https://i.postimg.cc/qB9zbKs9/20.jpg",
+                "赶紧的充电，要饿死了",
+              );
+              alertFlags.hasShown20 = true;
+            }
+            if (
+              level <= 0.1 &&
+              lastKnownBatteryLevel > 0.1 &&
+              !alertFlags.hasShown10
+            ) {
+              showBatteryAlert(
+                "https://i.postimg.cc/ThMMVfW4/10.jpg",
+                "已阵亡，还有30秒爆炸",
+              );
+              alertFlags.hasShown10 = true;
+            }
+          }
+          if (level > 0.4) alertFlags.hasShown40 = false;
+          if (level > 0.2) alertFlags.hasShown20 = false;
+          if (level > 0.1) alertFlags.hasShown10 = false;
+          lastKnownBatteryLevel = level;
+        }
+
+        async function initBatteryManager() {
+          if ("getBattery" in navigator) {
+            try {
+              const battery = await navigator.getBattery();
+              lastKnownBatteryLevel = battery.level;
+              handleBatteryChange(battery);
+              battery.addEventListener("levelchange", () =>
+                handleBatteryChange(battery),
+              );
+              battery.addEventListener("chargingchange", () => {
+                handleBatteryChange(battery);
+                if (battery.charging) {
+                  showBatteryAlert(
+                    "https://i.postimg.cc/3NDQ0dWG/image.jpg",
+                    "窝爱泥，电量吃饱饱",
+                  );
+                }
+              });
+            } catch (err) {
+              console.error("无法获取电池信息:", err);
+              document.querySelector(".battery-text").textContent = "ᗜωᗜ";
+            }
+          } else {
+            console.log("浏览器不支持电池状态API。");
+            document.querySelector(".battery-text").textContent = "ᗜωᗜ";
+          }
+        }
+
+        async function renderAlbumList() {
+          const albumGrid = document.getElementById("album-grid-page");
+          if (!albumGrid) return;
+          const albums = await db.qzoneAlbums
+            .orderBy("createdAt")
+            .reverse()
+            .toArray();
+          albumGrid.innerHTML = "";
+          if (albums.length === 0) {
+            albumGrid.innerHTML =
+              '<p style="grid-column: 1 / -1; text-align: center; color: var(--text-secondary); margin-top: 50px;">你还没有创建任何相册哦~</p>';
+            return;
+          }
+          albums.forEach((album) => {
+            const albumItem = document.createElement("div");
+            albumItem.className = "album-item";
+            albumItem.innerHTML = `
+			                    <div class="album-cover" style="background-image: url(${album.coverUrl});"></div>
+			                    <div class="album-info">
+			                        <p class="album-name">${album.name}</p>
+			                        <p class="album-count">${album.photoCount || 0} 张</p>
+			                    </div>
+			                `;
+            albumItem.addEventListener("click", () => {
+              openAlbum(album.id);
+            });
+
+            addLongPressListener(albumItem, async () => {
+              const confirmed = await showCustomConfirm(
+                "删除相册",
+                `确定要删除相册《${album.name}》吗？此操作将同时删除相册内的所有照片，且无法恢复。`,
+                { confirmButtonClass: "btn-danger" },
+              );
+
+              if (confirmed) {
+                // 1. 从照片表中删除该相册下的所有照片
+                await db.qzonePhotos.where("albumId").equals(album.id).delete();
+
+                // 2. 从相册表中删除该相册本身
+                await db.qzoneAlbums.delete(album.id);
+
+                // 3. 重新渲染相册列表
+                await renderAlbumList();
+
+                alert("相册已成功删除。");
+              }
+            });
+
+            albumGrid.appendChild(albumItem);
+          });
+        }
+
+        async function openAlbum(albumId) {
+          state.activeAlbumId = albumId;
+          await renderAlbumPhotosScreen();
+          showScreen("album-photos-screen");
+        }
+
+        async function renderAlbumPhotosScreen() {
+          if (!state.activeAlbumId) return;
+          const photosGrid = document.getElementById("photos-grid-page");
+          const headerTitle = document.getElementById("album-photos-title");
+          const album = await db.qzoneAlbums.get(state.activeAlbumId);
+          if (!album) {
+            console.error("找不到相册:", state.activeAlbumId);
+            showScreen("album-screen");
+            return;
+          }
+          headerTitle.textContent = album.name;
+          const photos = await db.qzonePhotos
+            .where("albumId")
+            .equals(state.activeAlbumId)
+            .toArray();
+          photosGrid.innerHTML = "";
+          if (photos.length === 0) {
+            photosGrid.innerHTML =
+              '<p style="grid-column: 1 / -1; text-align: center; color: var(--text-secondary); margin-top: 50px;">这个相册还是空的，快上传第一张照片吧！</p>';
+          } else {
+            photos.forEach((photo) => {
+              const photoItem = document.createElement("div");
+              photoItem.className = "photo-item";
+              photoItem.innerHTML = `
+			                        <img src="${photo.url}" class="photo-thumb" alt="相册照片">
+			                        <button class="photo-delete-btn" data-photo-id="${photo.id}">×</button>
+			                    `;
+              photosGrid.appendChild(photoItem);
+            });
+          }
+        }
+
+        /**
+         * 打开图片查看器
+         * @param {string} clickedPhotoUrl - 用户点击的那张照片的URL
+         */
+        async function openPhotoViewer(clickedPhotoUrl) {
+          if (!state.activeAlbumId) return;
+
+          // 1. 从数据库获取当前相册的所有照片
+          const photosInAlbum = await db.qzonePhotos
+            .where("albumId")
+            .equals(state.activeAlbumId)
+            .toArray();
+          photoViewerState.photos = photosInAlbum.map((p) => p.url);
+
+          // 2. 找到被点击照片的索引
+          photoViewerState.currentIndex = photoViewerState.photos.findIndex(
+            (url) => url === clickedPhotoUrl,
+          );
+          if (photoViewerState.currentIndex === -1) return; // 如果找不到，则不打开
+
+          // 3. 显示模态框并渲染第一张图
+          document
+            .getElementById("photo-viewer-modal")
+            .classList.add("visible");
+          renderPhotoViewer();
+          photoViewerState.isOpen = true;
+        }
+
+        /**
+         * 根据当前状态渲染查看器内容（图片和按钮）
+         */
+        function renderPhotoViewer() {
+          if (photoViewerState.currentIndex === -1) return;
+
+          const imageEl = document.getElementById("photo-viewer-image");
+          const prevBtn = document.getElementById("photo-viewer-prev-btn");
+          const nextBtn = document.getElementById("photo-viewer-next-btn");
+
+          // 淡出效果
+          imageEl.style.opacity = 0;
+
+          setTimeout(() => {
+            // 更新图片源
+            imageEl.src =
+              photoViewerState.photos[photoViewerState.currentIndex];

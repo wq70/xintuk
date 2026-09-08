@@ -1,0 +1,854 @@
+          const MESSAGES_PER_PAGE = 50; // 每次加载50条
+
+          const messagesEl = document.getElementById(
+            "character-chat-history-messages",
+          );
+          const characterChat = state.chats[activeCharacterPhoneId];
+          if (!characterChat) {
+            console.error("【错误】: 找不到 characterChat 对象！");
+            return;
+          }
+
+          // --- 准备工作：设置标题和头像 (仅在首次加载时执行) ---
+          if (loadOffset === 0) {
+            messagesEl.innerHTML = ""; // 首次加载才清空
+            let finalContactName = contactName;
+            if (isUserChat) {
+              const myChatData = characterChat.characterPhoneData.chats["我"];
+              // 尝试从手机数据里找AI给用户的备注名
+              const userContactInData = characterChat.characterPhoneData.chats
+                ? Object.values(characterChat.characterPhoneData.chats).find(
+                    (c) => !c.history || c.history.length === 0,
+                  )
+                : null;
+              finalContactName = userContactInData
+                ? userContactInData.remarkName
+                : "我";
+            }
+            document.getElementById("character-chat-with-name").textContent =
+              finalContactName;
+          }
+
+          // --- 数据源选择 ---
+          let fullHistory = [];
+          if (isUserChat) {
+            fullHistory = characterChat.history.filter((m) => !m.isHidden);
+          } else {
+            const npcChat = characterChat.characterPhoneData.chats[contactName];
+            if (npcChat && npcChat.history) {
+              fullHistory = npcChat.history;
+            }
+          }
+
+          // --- 核心分页逻辑 ---
+          const totalMessages = fullHistory.length;
+          const startIndex = Math.max(
+            0,
+            totalMessages - MESSAGES_PER_PAGE - loadOffset,
+          );
+          const endIndex = totalMessages - loadOffset;
+          const historyToShow = fullHistory.slice(startIndex, endIndex);
+
+          // --- 移除旧的“加载更多”按钮 ---
+          const existingLoader = document.getElementById(
+            "load-more-messages-btn",
+          );
+          if (existingLoader) {
+            existingLoader.remove();
+          }
+
+          // --- 渲染消息 ---
+          const fragment = document.createDocumentFragment(); // 使用文档片段提升性能
+          const characterName = characterChat.name;
+
+          // (渲染逻辑与之前版本基本相同，只是添加到了 fragment 中)
+          historyToShow.forEach((msg, index) => {
+            if (msg.isHidden) return;
+            const container = document.createElement("div");
+            let sender;
+            if (isUserChat) {
+              sender = msg.role === "user" ? "我" : characterName;
+            } else {
+              sender = msg.sender;
+            }
+
+            const isSentByCharacter = sender === characterName;
+            container.className = `character-chat-bubble-container ${isSentByCharacter ? "sent" : "received"}`;
+
+            let avatarHtml = "";
+            if (isSentByCharacter) {
+              avatarHtml = `<img src="${
+                characterChat.settings.aiAvatar || defaultAvatar
+              }" class="character-chat-avatar">`;
+            } else {
+              if (isUserChat) {
+                avatarHtml = `<img src="${
+                  characterChat.settings.myAvatar || defaultMyGroupAvatar
+                }" class="character-chat-avatar">`;
+              } else {
+                const npcData = (characterChat.npcLibrary || []).find(
+                  (npc) => npc.name === contactName,
+                );
+                if (npcData && npcData.avatar) {
+                  avatarHtml = `<img src="${npcData.avatar}" class="character-chat-avatar">`;
+                } else {
+                  const avatarColors = [
+                    "#FFC107",
+                    "#4CAF50",
+                    "#2196F3",
+                    "#F44336",
+                    "#9C27B0",
+                    "#00BCD4",
+                  ];
+                  const npcNameInitial = contactName.slice(-1);
+                  const colorIndex = contactName.length % avatarColors.length;
+                  const bgColor = avatarColors[colorIndex];
+                  avatarHtml = `<div class="character-chat-avatar" style="background-color: ${bgColor}; color: white; display: flex; justify-content: center; align-items: center; font-size: 18px; font-weight: 500;">${npcNameInitial}</div>`;
+                }
+              }
+            }
+
+            let contentHtml = "";
+            if (
+              typeof msg.content === "string" &&
+              STICKER_REGEX.test(msg.content)
+            ) {
+              contentHtml = `<img src="${msg.content}" class="sticker-image" style="max-height: 100px;">`;
+            } else {
+              contentHtml = msg.content;
+            }
+            const bubbleHtml = `<div class="character-chat-bubble">${contentHtml}</div>`;
+            const originalIndex = startIndex + index; // 计算在完整历史记录中的真实索引
+            container.innerHTML = `${avatarHtml}${bubbleHtml}<button class="item-delete-btn message-delete-btn" data-contact-name="${contactName}" data-index="${originalIndex}" data-is-user-chat="${isUserChat}">×</button>`;
+            fragment.appendChild(container);
+          });
+
+          // --- 决定是否显示“加载更多”按钮 ---
+          if (startIndex > 0) {
+            const loadMoreBtn = document.createElement("div");
+            loadMoreBtn.id = "load-more-messages-btn";
+            loadMoreBtn.textContent = "加载更早的消息";
+            loadMoreBtn.style.textAlign = "center";
+            loadMoreBtn.style.padding = "10px";
+            loadMoreBtn.style.color = "#888";
+            loadMoreBtn.style.cursor = "pointer";
+            loadMoreBtn.style.fontSize = "12px";
+            loadMoreBtn.onclick = () => {
+              // 记录当前滚动条位置，以便加载后恢复
+              const currentScrollHeight = messagesEl.scrollHeight;
+              renderCharacterChatHistory(
+                contactName,
+                isUserChat,
+                loadOffset + MESSAGES_PER_PAGE,
+              );
+              // 加载后，将滚动条定位到之前的位置，避免跳动
+              messagesEl.scrollTop =
+                messagesEl.scrollHeight - currentScrollHeight;
+            };
+            messagesEl.prepend(loadMoreBtn); // 将按钮添加到顶部
+          }
+
+          messagesEl.prepend(fragment); // 将新消息一次性插入到DOM中
+
+          // --- 滚动条定位 ---
+          if (loadOffset === 0) {
+            // 首次加载，滚动到底部
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+          }
+        }
+
+        function renderCharacterShoppingCart() {
+          const listEl = document.getElementById(
+            "character-shopping-cart-list",
+          );
+
+          const items =
+            state.chats[activeCharacterPhoneId]?.characterPhoneData
+              ?.shoppingCart;
+
+          listEl.innerHTML = "";
+          if (!items || items.length === 0) {
+            listEl.innerHTML =
+              '<p style="text-align:center; color: #8a8a8a; margin-top: 50px;">购物车是空的</p>';
+            return;
+          }
+          items.forEach((item, index) => {
+            const itemEl = document.createElement("div");
+            itemEl.className = "character-cart-item";
+            itemEl.innerHTML = `
+			            <div class="cart-item-icon">
+			                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+			            </div>
+			            <div class="cart-item-info">
+			                <div class="title">${item.name}</div>
+			                <div class="store">${item.store}</div>
+			            </div>
+			            <div class="cart-item-price">¥ ${item.price.toFixed(2)}</div>
+			            <button class="item-delete-btn" data-type="shoppingCart" data-index="${index}">×</button>
+			        `;
+            listEl.appendChild(itemEl);
+          });
+        }
+        function renderCharacterMemos() {
+          const listEl = document.getElementById("character-memos-list");
+
+          const items =
+            state.chats[activeCharacterPhoneId]?.characterPhoneData?.memos;
+
+          listEl.innerHTML = "";
+          if (!items || items.length === 0) {
+            listEl.innerHTML =
+              '<p style="text-align:center; color: #8a8a8a; margin-top: 50px;">备忘录是空的</p>';
+            return;
+          }
+          items.forEach((item, index) => {
+            const itemEl = document.createElement("div");
+            itemEl.className = "character-data-item";
+            itemEl.innerHTML = `
+			            <div class="title">${item.title}</div>
+			            <div class="content">${item.content}</div>
+			            <button class="item-delete-btn" data-type="memos" data-index="${index}">×</button>
+			        `;
+            listEl.appendChild(itemEl);
+          });
+        }
+
+        /**
+         * 在角色手机内部切换页面
+         * @param {string} pageId - 要显示的角色手机页面的ID
+         */
+        function showCharacterPhonePage(pageId) {
+          // 1. 找到角色手机内部屏幕的所有页面
+          const pages = document.querySelectorAll(".character-phone-page");
+          // 2. 隐藏所有页面
+          pages.forEach((p) => p.classList.remove("active"));
+          // 3. 显示目标页面
+          const pageToShow = document.getElementById(pageId);
+          if (pageToShow) {
+            pageToShow.classList.add("active");
+          }
+        }
+
+        // 角色手机新增APP渲染函数
+
+        function renderCharacterBrowser() {
+          const listEl = document.getElementById("character-browser-list");
+
+          const items =
+            state.chats[activeCharacterPhoneId]?.characterPhoneData
+              ?.browserHistory;
+
+          listEl.innerHTML = "";
+          if (!items || items.length === 0) {
+            listEl.innerHTML =
+              '<p style="text-align:center; color: #8a8a8a; margin-top: 50px;">浏览器历史为空</p>';
+            return;
+          }
+          items.forEach((item, index) => {
+            const itemEl = document.createElement("div");
+            itemEl.className = "character-browser-item";
+            itemEl.innerHTML = `
+			            <span class="browser-item-icon">🌐</span>
+			            <div class="title">${item.query}</div>
+			            <button class="item-delete-btn" data-type="browserHistory" data-index="${index}">×</button>
+			        `;
+            itemEl.addEventListener("click", (e) => {
+              if (e.target.classList.contains("item-delete-btn")) return;
+              document.getElementById(
+                "character-browser-detail-title",
+              ).textContent = item.query;
+              document.getElementById(
+                "character-browser-detail-content",
+              ).innerHTML = (item.result || "AI未生成详细内容。").replace(
+                /\n/g,
+                "<br>",
+              );
+              showCharacterPhonePage("character-browser-detail-screen");
+            });
+            listEl.appendChild(itemEl);
+          });
+        }
+
+        function renderCharacterPhotoAlbum() {
+          const gridEl = document.getElementById("character-album-grid");
+
+          const items =
+            state.chats[activeCharacterPhoneId]?.characterPhoneData?.photoAlbum;
+
+          gridEl.innerHTML = "";
+          if (!items || items.length === 0) {
+            gridEl.innerHTML =
+              '<p style="grid-column: 1 / -1; text-align:center; color: #8a8a8a; margin-top: 50px;">相册里没有照片</p>';
+            return;
+          }
+          items.forEach((item, index) => {
+            const itemEl = document.createElement("div");
+            itemEl.className = "character-album-item";
+            itemEl.style.position = "relative";
+            itemEl.innerHTML = `
+			            <img src="https://i.postimg.cc/KYr2qRCK/1.jpg" alt="文字图">
+			            <button class="item-delete-btn" data-type="photoAlbum" data-index="${index}" style="top: 10px; right: 10px; z-index: 1;">×</button>
+			        `;
+            itemEl.addEventListener("click", (e) => {
+              if (e.target.classList.contains("item-delete-btn")) return;
+              showCustomAlert("图片内容", item.hiddenContent);
+            });
+            gridEl.appendChild(itemEl);
+          });
+        }
+
+        /**
+         * 渲染角色手机 - 银行
+         */
+        function renderCharacterBank() {
+          const detailsEl = document.getElementById("character-bank-details");
+          // 获取当前角色对象，为后面找备注名做准备
+          const characterChat = state.chats[activeCharacterPhoneId];
+          if (!characterChat) return;
+
+          const bankData = characterChat.characterPhoneData?.bank;
+          detailsEl.innerHTML = "";
+
+          // 获取角色给用户的备注名
+          const userContactInData = characterChat.characterPhoneData.chats
+            ? Object.values(characterChat.characterPhoneData.chats).find(
+                (c) => !c.history || c.history.length === 0,
+              )
+            : null;
+          const remarkNameForMe = userContactInData
+            ? userContactInData.remarkName
+            : "我";
+
+          const balanceCard = document.createElement("div");
+          balanceCard.className = "character-bank-balance-card";
+          balanceCard.innerHTML = `
+			        <div class="label">账户余额</div>
+			        <div class="amount">¥ ${(bankData?.balance || 0).toFixed(2)}</div>
+			    `;
+          detailsEl.appendChild(balanceCard);
+
+          if (!bankData?.transactions || bankData.transactions.length === 0) {
+            detailsEl.innerHTML +=
+              '<p style="text-align:center; color: #8a8a8a; margin-top: 30px;">暂无交易明细</p>';
+            return;
+          }
+
+          [...bankData.transactions].reverse().forEach((item, index) => {
+            const originalIndex = bankData.transactions.length - 1 - index;
+            const isIncome = item.type === "收入";
+            const itemEl = document.createElement("div");
+            itemEl.className = "character-bank-transaction";
+            const iconBg = isIncome ? "#4CAF50" : "#E91E63";
+            const iconSvg = isIncome
+              ? `<svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M7 10h10v4H7z" opacity=".3"/><path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg>`
+              : `<svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-1 14H5c-.55 0-1-.45-1-1v-5h16v5c0 .55-.45 1-1 1zm1-10H4V7c0-.55.45-1 1-1h14c.55 0 1 .45 1 1v2z"/></svg>`;
+
+            // 用正则表达式 /我/g 全局替换所有“我”字
+            const displayDescription = item.description.replace(
+              /我/g,
+              remarkNameForMe,
+            );
+
+            itemEl.innerHTML = `
+			            <div class="transaction-details">
+			                <div class="transaction-icon" style="background-color: ${iconBg};">${iconSvg}</div>
+			                <div>
+			                    <div class="title">${displayDescription}</div>
+			                    <div class="meta" style="border:none; padding:0; margin-top:4px;"><span>${item.type}</span></div>
+			                </div>
+			            </div>
+			            <div style="display: flex; align-items: center; gap: 10px;">
+			                <span class="transaction-amount ${isIncome ? "income" : "expense"}">
+			                    ${isIncome ? "+" : "-"} ${item.amount.toFixed(2)}
+			                </span>
+			                <button class="item-delete-btn" data-type="bank.transactions" data-index="${originalIndex}">×</button>
+			            </div>
+			        `;
+            detailsEl.appendChild(itemEl);
+          });
+        }
+
+        /**
+         * 渲染角色手机 - 行动轨迹
+         */
+        function renderCharacterTrajectory() {
+          const listEl = document.getElementById("character-trajectory-list");
+          const items =
+            state.chats[activeCharacterPhoneId]?.characterPhoneData?.trajectory;
+          listEl.innerHTML = "";
+          listEl.classList.add("character-trajectory-list");
+
+          if (!items || items.length === 0) {
+            listEl.innerHTML =
+              '<p style="text-align:center; color: #8a8a8a; margin-top: 50px;">暂无足迹</p>';
+            return;
+          }
+
+          // 在渲染之前，使用新加的 parseTime 函数对轨迹数组进行排序
+          items.sort((a, b) => parseTime(a.time) - parseTime(b.time));
+
+          items.forEach((item, index) => {
+            const itemEl = document.createElement("div");
+            itemEl.className = "character-trajectory-item";
+            itemEl.innerHTML = `
+			            <div class="trajectory-item-content">
+			                <div class="title">${item.activity}</div>
+			                <div class="meta">
+			                    <span>📍 ${item.location}</span>
+			                    <span style="margin-left: 10px;">🕒 ${item.time}</span>
+			                </div>
+			            </div>
+			            <button class="item-delete-btn" data-type="trajectory" data-index="${index}">×</button>
+			        `;
+            listEl.appendChild(itemEl);
+          });
+        }
+
+        /**
+         * 渲染角色手机 - APP使用记录
+         */
+        function renderCharacterAppUsage() {
+          const listEl = document.getElementById("character-app-usage-list");
+
+          const items =
+            state.chats[activeCharacterPhoneId]?.characterPhoneData?.appUsage;
+
+          listEl.innerHTML = "";
+          if (!items || items.length === 0) {
+            listEl.innerHTML =
+              '<p style="text-align:center; color: #8a8a8a; margin-top: 50px;">暂无使用记录</p>';
+            return;
+          }
+          const durationsInMinutes = items.map((item) =>
+            parseDurationToMinutes(item.duration),
+          );
+          const maxDuration = Math.max(...durationsInMinutes);
+          items.forEach((item, index) => {
+            const itemEl = document.createElement("div");
+            itemEl.className = "character-app-usage-item";
+            const durationInMinutes = durationsInMinutes[index];
+            const barWidth =
+              maxDuration > 0 ? (durationInMinutes / maxDuration) * 100 : 0;
+            itemEl.innerHTML = `
+			            <div class="app-usage-header">
+			                <span class="name">${item.appName}</span>
+			                <div style="display: flex; align-items: center; gap: 10px;">
+			                    <span class="duration">${item.duration}</span>
+			                    <button class="item-delete-btn" data-type="appUsage" data-index="${index}">×</button>
+			                </div>
+			            </div>
+			            <div class="app-usage-bar-container">
+			                <div class="app-usage-bar" style="width: ${barWidth}%;"></div>
+			            </div>
+			        `;
+            listEl.appendChild(itemEl);
+          });
+        }
+
+        /**
+         * 渲染角色的日记列表
+         */
+        function renderCharacterDiary() {
+          const listEl = document.getElementById("character-diary-list");
+
+          const items =
+            state.chats[activeCharacterPhoneId]?.characterPhoneData?.diary;
+
+          listEl.innerHTML = "";
+          if (!items || items.length === 0) {
+            listEl.innerHTML =
+              '<p style="text-align:center; color: #8a8a8a; margin-top: 50px;">日记本还是空的，点击右上角写下第一篇日记吧。</p>';
+            return;
+          }
+
+          [...items].reverse().forEach((item, index) => {
+            const originalIndex = items.length - 1 - index;
+            const itemEl = document.createElement("div");
+            itemEl.className = "character-data-item";
+            const contentHtml = renderMarkdown(item.content);
+            itemEl.innerHTML = `
+			            <div class="content">${contentHtml}</div>
+			            <div class="meta">
+			                <span>${new Date(item.timestamp).toLocaleString()}</span>
+			            </div>
+			            <button class="item-delete-btn" data-type="diary" data-index="${originalIndex}">×</button>
+			        `;
+            listEl.appendChild(itemEl);
+          });
+        }
+
+        /**
+         * 【日记】独立刷新，生成新的日记条目
+         */
+        async function generateNewDiaryEntry() {
+          const userNickname = state.qzoneSettings.nickname || "我";
+          if (!activeCharacterPhoneId) return;
+          const chat = state.chats[activeCharacterPhoneId];
+          if (!chat) return;
+
+          document
+            .getElementById("generation-overlay")
+            .classList.add("visible");
+
+          try {
+            const persona = chat.settings.aiPersona;
+            const recentHistory = chat.history
+              .slice(-chat.settings.maxMemory || 20)
+              .map((msg) => {
+                const sender = msg.role === "user" ? userNickname : chat.name;
+                return `${sender}: ${msg.content}`;
+              })
+              .join("\n");
+            let linkedMemoryContext = "";
+            if (
+              chat.settings.linkedMemories &&
+              chat.settings.linkedMemories.length > 0
+            ) {
+              const contextPromises = chat.settings.linkedMemories.map(
+                async (link) => {
+                  const linkedChat = state.chats[link.chatId];
+                  if (!linkedChat) return "";
+
+                  const freshLinkedChat = await db.chats.get(link.chatId);
+                  if (!freshLinkedChat) return "";
+
+                  const recentHistory = freshLinkedChat.history
+                    .filter((msg) => !msg.isHidden)
+                    .slice(-link.depth);
+
+                  if (recentHistory.length === 0) return "";
+
+                  const formattedMessages = recentHistory
+                    .map(
+                      (msg) =>
+                        `  - ${formatMessageForContext(msg, freshLinkedChat)}`,
+                    )
+                    .join("\n");
+
+                  return `\n## 附加上下文：来自与“${linkedChat.name}”的最近对话内容 (仅你可见)\n${formattedMessages}`;
+                },
+              );
+
+              const allContexts = await Promise.all(contextPromises);
+              linkedMemoryContext = allContexts.filter(Boolean).join("\n");
+            }
+            let worldBookContext = "";
+            if (
+              chat.settings.linkedWorldBookIds &&
+              chat.settings.linkedWorldBookIds.length > 0
+            ) {
+              worldBookContext =
+                "--- 世界观设定 (这是你必须严格遵守的背景) ---\n" +
+                chat.settings.linkedWorldBookIds
+                  .map((id) => {
+                    const book = state.worldBooks.find((b) => b.id === id);
+                    return book ? `[${book.name}]: ${book.content}` : "";
+                  })
+                  .join("\n\n");
+            }
+
+            const diaryPrompt = `
+			# 任务
+			你现在是角色 "${chat.name}"。今天是 ${new Date().toLocaleString("zh-CN", {
+        dateStyle: "full",
+      })}。请你回顾一下最近和我的聊天，以及你的人设，然后用你的口吻写一篇关于【今天或近期发生事情】的日记。
+			这篇日记是你内心的独白，可以记录你的感受、思考、计划或者秘密。
+			内容要丰富、有深度，长度在100到300字之间。
+
+			# 【【【重要：格式指令】】】
+			你【必须】使用以下Markdown语法来丰富日记的格式，使其更具表现力：
+			-   **标题**: 使用 \`#\` 或 \`##\` 来创建大标题和副标题。 (例如: \`# 今天的心情\`)
+			-   **粗体**: 使用 \`**文字**\` 来强调重点。 (例如: \`今天真的**非常**开心。\`)
+			-   **斜体**: 使用 \`*文字*\` 来表达情绪或内心想法。 (例如: \`*他到底是怎么想的呢...*\`)
+			-   **删除线**: 使用 \`~~文字~~\` 来表示划掉或否定的想法。 (例如: \`我决定明天去<s>逛街</s>学习。\`)
+			-   **遮挡/剧透**: 使用 \`||文字||\` 来隐藏秘密或悄悄话。 (例如: \`我偷偷准备了一个惊喜，||是一个手织的围巾||。\`)
+
+			你的输出【必须且只能】是日记的正文内容，不要包含任何其他说明或JSON格式。
+
+			# 你的信息
+			- 你的名字: ${chat.name}
+			- 你的人设: ${persona}
+			${worldBookContext}
+
+			# 最近聊天记录参考
+			${recentHistory}
+			${linkedMemoryContext}
+			`;
+
+            const { proxyUrl, apiKey, model } = state.apiConfig;
+            let isGemini = proxyUrl === GEMINI_API_URL;
+            let geminiConfig = toGeminiRequestData(
+              model,
+              apiKey,
+              diaryPrompt,
+              [{ role: "user", content: diaryPrompt }],
+              isGemini,
+            );
+
+            const response = isGemini
+              ? await fetch(geminiConfig.url, geminiConfig.data)
+              : await fetch(`${proxyUrl}/v1/chat/completions`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${apiKey}`,
+                  },
+                  body: JSON.stringify({
+                    model: model,
+                    messages: [{ role: "user", content: diaryPrompt }],
+                    temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+                  }),
+                });
+
+            if (!response.ok) {
+              let errorMsg = `API请求失败，状态码: ${response.status}`;
+              try {
+                const errorData = await response.json();
+                errorMsg += `\n错误信息: ${errorData.error.message}`;
+              } catch (e) {
+                errorMsg += `\n无法解析错误响应体。`;
+              }
+              throw new Error(errorMsg);
+            }
+
+            const data = await response.json();
+            const diaryContent = isGemini
+              ? data.candidates[0].content.parts[0].text
+              : data.choices[0].message.content;
+
+            const newEntry = {
+              timestamp: Date.now(),
+              content: diaryContent,
+            };
+
+            chat.characterPhoneData.diary.push(newEntry);
+            await db.chats.put(chat);
+
+            renderCharacterDiary();
+            alert("新日记已生成！");
+          } catch (error) {
+            console.error("生成日记失败:", error);
+            await showCustomAlert(
+              "生成失败",
+              `发生了一个错误，请检查你的网络、API密钥或模型设置。\n\n详细信息:\n${error.message}`,
+            );
+          } finally {
+            document
+              .getElementById("generation-overlay")
+              .classList.remove("visible");
+          }
+        }
+
+        // 万能Markdown渲染函数 (带安全过滤和遮挡效果)
+
+        /**
+         * 将Markdown文本安全地渲染为HTML
+         * @param {string} markdownText - 原始的Markdown文本
+         * @returns {string} - 处理和净化后的安全HTML字符串
+         */
+        function renderMarkdown(markdownText) {
+          if (!markdownText) return "";
+
+          // 1. 支持自定义的“遮挡/剧透”语法 ||spoiler||
+          // 我们在 marked.js 处理之前，手动把 ||text|| 替换成带特定class的HTML标签
+          let processedText = markdownText.replace(
+            /\|\|(.*?)\|\|/g,
+            '<span class="spoiler">$1</span>',
+          );
+
+          // 2. 使用 marked.js 将Markdown转换为HTML
+          // gfm: true 开启GitHub风格的Markdown，支持删除线等
+          // breaks: true 让回车符也能变成<br>，更符合聊天习惯
+          let rawHtml = marked.parse(processedText, {
+            gfm: true,
+            breaks: true,
+          });
+
+          // 3. 使用 DOMPurify 清洗HTML，防止XSS攻击
+          let sanitizedHtml = DOMPurify.sanitize(rawHtml);
+
+          return sanitizedHtml;
+        }
+
+        /**
+         * 【辅助函数】将时长字符串（如“2.5小时”）转换为分钟数
+         */
+        function parseDurationToMinutes(durationString) {
+          if (!durationString) return 0;
+          const num = parseFloat(durationString) || 0;
+          if (durationString.includes("小时") || durationString.includes("h")) {
+            return num * 60;
+          }
+          // 默认单位是分钟
+          return num;
+        }
+
+        function switchVideoViews() {
+          // 切换状态：标记当前谁在主屏幕
+          videoCallState.isUserMain = !videoCallState.isUserMain;
+
+          const chat = state.chats[videoCallState.activeChatId];
+          if (!chat) return;
+
+          const useCamera = chat.settings.useRealCamera;
+
+          // 获取所有视图元素
+          const mainImg = document.querySelector("#video-main-view img");
+          const mainVideo = document.querySelector("#video-main-view video");
+          const pipImg = document.querySelector("#video-pip-view img");
+          const pipVideo = document.querySelector("#video-pip-view video");
+
+          // 准备资源地址
+          const charUrl = chat.settings.charVideoImage || defaultAvatar;
+          const userUrl = chat.settings.userVideoImage || defaultAvatar;
+
+          // 根据前置/后置决定是否镜像 (前置镜像，后置不镜像)
+          const shouldMirror = videoCallState.facingMode === "user";
+          const mirrorStyle = shouldMirror ? "scaleX(-1)" : "none";
+
+          // --- 辅助函数：安全播放视频 ---
+          const safePlay = (videoEl, stream, transform) => {
+            if (!videoEl) return;
+            videoEl.srcObject = stream;
+            videoEl.muted = true; // 必须静音才能自动播放
+            videoEl.style.transform = transform;
+            videoEl.style.display = "block";
+            // 强制触发播放
+            videoEl.play().catch((e) => console.error("视频播放失败:", e));
+          };
+
+          if (videoCallState.isUserMain) {
+            // === 状态 A：用户(我)在主大屏，角色(Ta)在小屏 ===
+
+            // 1. 设置小屏 (显示对方 - 始终是图片)
+            if (pipVideo) {
+              pipVideo.style.display = "none";
+              pipVideo.srcObject = null; // 切断流
+            }
+            if (pipImg) {
+              pipImg.style.display = "block";
+              pipImg.src = charUrl;
+            }
+
+            // 2. 设置大屏 (显示我)
+            if (useCamera && window.localCameraStream) {
+              // 摄像头模式 -> 视频流给大屏
+              if (mainImg) mainImg.style.display = "none";
+              // 使用辅助函数强制播放
+              safePlay(mainVideo, window.localCameraStream, mirrorStyle);
+            } else {
+              // 图片模式 -> 图片给大屏
+              if (mainVideo) {
+                mainVideo.style.display = "none";
+                mainVideo.srcObject = null;
+              }
+              if (mainImg) {
+                mainImg.style.display = "block";
+                mainImg.src = userUrl;
+              }
+            }
+          } else {
+            // === 状态 B (默认)：角色(Ta)在主大屏，用户(我)在小屏 ===
+
+            // 1. 设置大屏 (显示对方 - 始终是图片)
+            if (mainVideo) {
+              mainVideo.style.display = "none";
+              mainVideo.srcObject = null; // 切断流
+            }
+            if (mainImg) {
+              mainImg.style.display = "block";
+              mainImg.src = charUrl;
+            }
+
+            // 2. 设置小屏 (显示我)
+            if (useCamera && window.localCameraStream) {
+              // 摄像头模式 -> 视频流给小屏
+              if (pipImg) pipImg.style.display = "none";
+              // 使用辅助函数强制播放
+              safePlay(pipVideo, window.localCameraStream, mirrorStyle);
+            } else {
+              // 图片模式 -> 图片给小屏
+              if (pipVideo) {
+                pipVideo.style.display = "none";
+                pipVideo.srcObject = null;
+              }
+              if (pipImg) {
+                pipImg.style.display = "block";
+                pipImg.src = userUrl;
+              }
+            }
+          }
+        }
+
+        // 【新增】处理摄像头翻转
+        async function handleCameraFlip() {
+          if (!window.localCameraStream) return;
+
+          // 1. 停止当前流
+          window.localCameraStream.getTracks().forEach((track) => track.stop());
+
+          // 2. 切换模式
+          videoCallState.facingMode =
+            videoCallState.facingMode === "user" ? "environment" : "user";
+
+          // 3. 重新请求摄像头
+          try {
+            const newStream = await navigator.mediaDevices.getUserMedia({
+              video: { facingMode: videoCallState.facingMode },
+              audio: false,
+            });
+
+            window.localCameraStream = newStream;
+
+            // 4. 将新流应用到当前正在显示的 video 标签上
+            const mainVideo = document.querySelector("#video-main-view video");
+            const pipVideo = document.querySelector("#video-pip-view video");
+
+            // 根据前置/后置决定是否镜像
+            const shouldMirror = videoCallState.facingMode === "user";
+            const mirrorStyle = shouldMirror ? "scaleX(-1)" : "none";
+
+            if (videoCallState.isUserMain) {
+              // 如果我在大屏，更新大屏
+              if (mainVideo) {
+                mainVideo.srcObject = newStream;
+                mainVideo.style.transform = mirrorStyle;
+                mainVideo.play();
+              }
+            } else {
+              // 如果我在小屏，更新小屏
+              if (pipVideo) {
+                pipVideo.srcObject = newStream;
+                pipVideo.style.transform = mirrorStyle;
+                pipVideo.play();
+              }
+            }
+          } catch (err) {
+            console.error("切换摄像头失败:", err);
+            alert("切换摄像头失败，可能是设备不支持或权限被拒绝。");
+          }
+        }
+
+        /**
+         * 处理视频通话中的“重roll”请求
+         */
+        async function handleVideoCallReroll() {
+          if (!videoCallState.isActive) return;
+
+          // 1. 找到用户最后一次说的话的索引
+          const lastUserSpeechIndex = videoCallState.callHistory.findLastIndex(
+            (h) => h.role === "user",
+          );
+
+          // 2. 从通话历史中，删除掉那之后的所有AI回复
+          //    如果用户一句话没说（lastUserSpeechIndex 是 -1），就删除所有AI的回复
+          if (lastUserSpeechIndex > -1) {
+            videoCallState.callHistory.splice(lastUserSpeechIndex + 1);
+          } else {
+            // 如果用户还没说过话，就清空所有历史，让AI重说第一句话
+            videoCallState.callHistory = [];
+          }
+
+          // 3. 重新渲染通话界面，让旧的AI气泡从屏幕上消失
+          //    需要根据当前是哪种模式，来清空对应的聊天容器
+          const chat = state.chats[videoCallState.activeChatId];

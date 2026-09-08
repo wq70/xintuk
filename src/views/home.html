@@ -1,0 +1,545 @@
+    <div id="phone-screen">
+      <div id="status-bar">
+        <span id="status-bar-time">12:00</span>
+        <div id="status-bar-battery" class="battery-container">
+          <span class="battery-text">--%</span>
+          <div class="battery-icon">
+            <div class="battery-level"></div>
+          </div>
+        </div>
+      </div>
+      <div id="notification-bar">
+        <img id="notification-avatar" src="" />
+        <!-- 这里就是头像 -->
+        <div id="notification-content">
+          <div class="name"></div>
+          <!-- 名字 -->
+          <div class="message"></div>
+          <!-- 消息 -->
+        </div>
+      </div>
+
+      <div id="video-call-floating-bubble" style="display: none">
+        <img id="video-floating-avatar" src="" />
+      </div>
+
+      <div id="floating-lyrics-bar">
+        <span id="floating-lyric-text">♪</span>
+
+        <div
+          id="lyrics-settings-btn"
+          style="
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          "
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <circle cx="12" cy="12" r="3"></circle>
+            <path
+              d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"
+            ></path>
+          </svg>
+        </div>
+        <span class="close-btn">×</span>
+      </div>
+
+      <div id="lock-screen-background-blur" style="display: none"></div>
+
+      <div id="home-screen" class="screen active">
+        <div id="desktop-edit-done-btn">完成</div>
+        <div class="home-screen-slider">
+          <!-- 第一页，把原来的内容都放进来 -->
+          <div class="home-page">
+            <div id="main-content-area">
+              <div id="profile-widget">
+                <img
+                  id="profile-banner-img"
+                  src="https://i.postimg.cc/k495F4W5/profile-banner.jpg"
+                  class="editable-image"
+                />
+
+                <div class="profile-avatar-container">
+                  <img
+                    id="profile-avatar-img"
+                    src="https://i.postimg.cc/qRqpK5kP/anime-avatar.jpg"
+                    class="editable-image"
+                  />
+
+                  <img
+                    id="profile-avatar-frame"
+                    class="weibo-avatar-frame"
+                    src=""
+                    style="display: none"
+                  />
+                </div>
+
+                <div class="profile-info">
+                  <p id="profile-username" class="editable-text">你的昵称</p>
+                  <p id="profile-sub-username" class="editable-text">
+                    @your_id
+                  </p>
+                  <p id="profile-bio" class="editable-text">
+                    点击这里编辑你的个性签名
+                  </p>
+                  <p
+                    id="profile-location"
+                    class="editable-text"
+                    data-placeholder="点击编辑地点"
+                  >
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                    >
+                      <path
+                        d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"
+                      ></path>
+                    </svg>
+                    <span>点击编辑地点</span>
+                  </p>
+                </div>
+              </div>
+              <div id="desktop-layout">
+                <div id="desktop-widget-column">
+                  <div class="custom-widget-container">
+                    <div
+                      id="widget-bubble-1"
+                      class="widget-bubble editable-text"
+                      contenteditable="true"
+                    >
+                      点击编辑文字
+                    </div>
+                    <div class="widget-circle-uploader">
+                      <img
+                        id="widget-image-1"
+                        src="https://i.postimg.cc/qRqpK5kP/anime-avatar.jpg"
+                        class="editable-image"
+                        title="点击更换图片"
+                      />
+                    </div>
+                    <div
+                      id="widget-subtext-1"
+                      class="widget-subtext editable-text"
+                      contenteditable="true"
+                    >
+                      点击编辑文字
+                    </div>
+                  </div>
+                  <div class="custom-widget-container">
+                    <div
+                      id="widget-bubble-2"
+                      class="widget-bubble editable-text"
+                      contenteditable="true"
+                    >
+                      点击编辑文字
+                    </div>
+                    <div class="widget-circle-uploader">
+                      <img
+                        id="widget-image-2"
+                        src="https://i.postimg.cc/k495F4W5/profile-banner.jpg"
+                        class="editable-image"
+                        title="点击更换图片"
+                      />
+                    </div>
+                    <div
+                      id="widget-subtext-2"
+                      class="widget-subtext editable-text"
+                      contenteditable="true"
+                    >
+                      点击编辑文字
+                    </div>
+                  </div>
+                </div>
+                <div id="desktop-app-container">
+                  <div
+                    class="desktop-app-icon"
+                    onclick="showScreen('chat-list-screen')"
+                  >
+                    <div class="icon-bg-desktop">
+                      <img
+                        id="icon-img-qq"
+                        src="https://i.postimg.cc/MTC3Tkw8/IMG-6436.jpg"
+                        alt="QQ"
+                      />
+                    </div>
+                    <span class="label">QQ</span>
+                  </div>
+                  <div
+                    class="desktop-app-icon"
+                    onclick="showScreen('world-book-screen')"
+                  >
+                    <div class="icon-bg-desktop">
+                      <img
+                        id="icon-img-world-book"
+                        src="https://i.postimg.cc/HWf1JKzn/IMG-6435.jpg"
+                        alt="世界书"
+                      />
+                    </div>
+                    <span class="label">世界书</span>
+                  </div>
+                  <div id="check-phone-btn" class="desktop-app-icon">
+                    <div class="icon-bg-desktop">
+                      <img
+                        id="icon-img-check-phone"
+                        src="https://i.postimg.cc/RVwpwr0r/IMG-8348.jpg"
+                        alt="查手机"
+                      />
+                    </div>
+                    <span class="label">查手机</span>
+                  </div>
+                  <div class="desktop-app-icon" id="weibo-app-icon">
+                    <div class="icon-bg-desktop">
+                      <img
+                        id="icon-img-weibo"
+                        src="https://i.postimg.cc/PqBY5wBq/weibo-icon.png"
+                        alt="微博"
+                      />
+                    </div>
+                    <span class="label">微博</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 新增的第二页，现在是自定义布局 -->
+          <div class="home-page">
+            <!-- 左半边的头像小组件 -->
+            <div id="second-page-left-widget" class="custom-widget-container">
+              <div class="widget-circle-uploader">
+                <img
+                  id="widget-image-3"
+                  src="https://i.postimg.cc/qRqpK5kP/anime-avatar.jpg"
+                  class="editable-image"
+                  title="点击更换图片"
+                />
+              </div>
+
+              <div
+                id="second-page-bubble"
+                class="widget-bubble editable-text"
+                contenteditable="true"
+              >
+                点击编辑文字
+              </div>
+
+              <div id="new-bubbles-container">
+                <div
+                  id="flat-capsule-bubble"
+                  class="widget-bubble editable-text"
+                  contenteditable="true"
+                >
+                  可编辑
+                </div>
+                <div
+                  id="circular-bubble"
+                  class="widget-bubble editable-text"
+                  contenteditable="true"
+                >
+                  文字
+                </div>
+              </div>
+            </div>
+            <!-- 右上角的两个并排图标 -->
+            <div id="second-page-top-right-apps">
+              <div
+                class="desktop-app-icon"
+                onclick="showScreen('forum-screen')"
+              >
+                <div class="icon-bg-desktop">
+                  <img
+                    id="icon-img-forum"
+                    src="https://i.postimg.cc/pr0T3WfC/douban-icon.png"
+                    alt="圈子"
+                  />
+                </div>
+                <span class="label">圈子</span>
+              </div>
+              <div class="desktop-app-icon" id="lovers-space-app-icon">
+                <div class="icon-bg-desktop">
+                  <img
+                    id="icon-img-lovers-space"
+                    src="https://i.postimg.cc/d1wZ39xW/lovers-space-icon.png"
+                    alt="情侣空间"
+                  />
+                </div>
+                <span class="label">情侣空间</span>
+              </div>
+
+              <div
+                id="second-page-x-social-app"
+                class="desktop-app-icon"
+                onclick="showScreen('x-social-screen')"
+              >
+                <div class="icon-bg-desktop">
+                  <img
+                    id="icon-img-x-social"
+                    src="https://i.postimg.cc/8P1H0vQ8/x-logo.png"
+                    alt="X社交"
+                  />
+                </div>
+                <span class="label">X社交</span>
+              </div>
+              <div style="position: absolute; top: 100px; right: 85px">
+                <div
+                  class="desktop-app-icon"
+                  onclick="showScreen('game-hall-screen')"
+                >
+                  <div class="icon-bg-desktop">
+                    <img
+                      id="icon-img-game-hall"
+                      src="https://i.postimg.cc/P5gL5z2g/game-controller-icon.png"
+                      alt="游戏大厅"
+                    />
+                  </div>
+                  <span class="label">游戏大厅</span>
+                </div>
+              </div>
+            </div>
+            <!-- === 新版响应式透明音乐组件 === -->
+            <div class="middle-layout-container">
+              <div id="glass-music-widget">
+                <div class="widget-main-row">
+                  <!-- 左侧：长方形圆角图片 -->
+                  <div class="rect-cover-wrapper">
+                    <img
+                      id="music-rect-img"
+                      src="https://i.postimg.cc/k495F4W5/profile-banner.jpg"
+                      class="editable-image cover-img"
+                      title="点击更换封面"
+                    />
+                  </div>
+
+                  <!-- 右侧：透明水晶唱片 (重叠) -->
+                  <div class="glass-record-wrapper">
+                    <div class="glass-disc">
+                      <!-- 唱片中间的图片 -->
+                      <img
+                        id="music-record-img"
+                        src="https://i.postimg.cc/qRqpK5kP/anime-avatar.jpg"
+                        class="editable-image disc-center-img"
+                        title="点击更换唱片图片"
+                      />
+                      <!-- 唱片的高光纹理 -->
+                      <div class="disc-highlight"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 下方：文字和音浪 -->
+                <div class="widget-footer-row">
+                  <div
+                    id="music-text-line"
+                    class="music-title-text editable-text"
+                    contenteditable="true"
+                  >
+                    点击编辑歌名
+                  </div>
+                  <!-- 律动音浪 (已增加条数以变宽) -->
+                  <div class="music-wave-bars" id="custom-wide-wave">
+                    <i></i><i></i><i></i><i></i><i></i> <i></i><i></i><i></i
+                    ><i></i><i></i> <i></i><i></i><i></i><i></i><i></i> <i></i
+                    ><i></i><i></i><i></i><i></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div id="new-custom-widget">
+              <!-- 用一个新的容器把月份和头像包起来 -->
+              <div id="new-widget-header">
+                <!-- 加上了 contenteditable 和 class，现在可以随便改它了，写数字、文字都可以 -->
+                <div
+                  id="widget-month-display"
+                  class="editable-text"
+                  contenteditable="true"
+                >
+                  12
+                </div>
+
+                <img
+                  id="new-widget-avatar"
+                  src="https://i.postimg.cc/qRqpK5kP/anime-avatar.jpg"
+                  class="editable-image"
+                />
+              </div>
+              <div
+                id="new-widget-text-1"
+                class="new-widget-text editable-text"
+                contenteditable="true"
+              >
+                可编辑文字
+              </div>
+              <div class="new-widget-divider"></div>
+              <div
+                id="new-widget-text-2"
+                class="new-widget-text editable-text"
+                contenteditable="true"
+              >
+                可编辑文字
+              </div>
+              <div class="new-widget-divider"></div>
+              <div
+                id="new-widget-text-3"
+                class="new-widget-text editable-text"
+                contenteditable="true"
+              >
+                可编辑文字
+              </div>
+            </div>
+            <div style="position: absolute; bottom: 105px; left: 35px">
+              <div class="desktop-app-icon" id="taobao-app-icon">
+                <div class="icon-bg-desktop">
+                  <img
+                    id="icon-img-taobao"
+                    src="https://i.postimg.cc/k47tXg1j/taologo.png"
+                    alt="桃宝"
+                  />
+                </div>
+                <span
+                  class="label"
+                  style="
+                    color: white;
+                    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+                  "
+                  >桃宝</span
+                >
+              </div>
+            </div>
+            <div style="position: absolute; bottom: 105px; left: 120px">
+              <div class="desktop-app-icon" id="date-a-live-app-icon">
+                <div class="icon-bg-desktop">
+                  <img
+                    id="icon-img-date-a-live"
+                    src="https://i.postimg.cc/W36mYgP5/DAL-icon.jpg"
+                    alt="约会大作战"
+                  />
+                </div>
+                <span
+                  class="label"
+                  style="
+                    color: white;
+                    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+                  "
+                  >约会大作战</span
+                >
+              </div>
+            </div>
+            <div style="position: absolute; bottom: 15px; left: 120px">
+              <div class="desktop-app-icon" id="kk-checkin-app-icon">
+                <div class="icon-bg-desktop">
+                  <img
+                    id="icon-img-kk-checkin"
+                    src="https://i.postimg.cc/MGwrL0nf/kitty.png"
+                    alt="kk查岗"
+                  />
+                </div>
+                <span
+                  class="label"
+                  style="
+                    color: white;
+                    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+                  "
+                  >kk查岗</span
+                >
+              </div>
+            </div>
+            <div style="position: absolute; bottom: 15px; left: 35px">
+              <div class="desktop-app-icon" id="tukey-accounting-app-icon">
+                <div class="icon-bg-desktop">
+                  <img
+                    id="icon-img-tukey-accounting"
+                    src="https://i.postimg.cc/k4fZKVXP/tu-tu.png"
+                    alt="兔兔记账"
+                  />
+                </div>
+                <span
+                  class="label"
+                  style="
+                    color: white;
+                    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+                  "
+                  >兔兔记账</span
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 底部 Dock 栏保持不变 -->
+        <div id="desktop-dock">
+          <div
+            class="desktop-app-icon"
+            onclick="showScreen('api-settings-screen')"
+          >
+            <div class="icon-bg-desktop">
+              <img
+                id="icon-img-api-settings"
+                src="https://i.postimg.cc/MK8rJ8t7/IMG-6438.jpg"
+                alt="API设置"
+              />
+            </div>
+            <span class="label">API设置</span>
+          </div>
+
+          <div class="desktop-app-icon" id="studio-app-icon">
+            <div class="icon-bg-desktop">
+              <!-- 这里的 id="icon-img-studio" 必须保留，用于JS识别更换图标 -->
+              <img
+                id="icon-img-studio"
+                src="https://i.postimg.cc/W3sLz11s/clapperboard-icon.png"
+                alt="小剧场"
+              />
+            </div>
+            <!-- lrq小剧场 -->
+            <span class="label">lrq小剧场</span>
+          </div>
+
+          <div
+            class="desktop-app-icon"
+            onclick="showScreen('font-settings-screen')"
+          >
+            <div class="icon-bg-desktop">
+              <img
+                id="icon-img-font"
+                src="https://i.postimg.cc/pXxk1JXk/IMG-6442.jpg"
+                alt="字体"
+              />
+            </div>
+            <span class="label">字体</span>
+          </div>
+          <div
+            class="desktop-app-icon"
+            onclick="showScreen('wallpaper-screen')"
+          >
+            <div class="icon-bg-desktop">
+              <img
+                id="icon-img-wallpaper"
+                src="https://i.postimg.cc/T1j03pQr/IMG-6440.jpg"
+                alt="外观设置"
+              />
+            </div>
+            <span class="label">外观设置</span>
+          </div>
+        </div>
+
+        <!-- 小圆点 -->
+        <div class="pagination-dots">
+          <span class="dot active"></span>
+          <span class="dot"></span>
+        </div>
+      </div>
+

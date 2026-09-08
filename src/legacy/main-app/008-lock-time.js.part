@@ -1,0 +1,854 @@
+          const lockTime = document.getElementById("lock-main-time");
+          const lockDate = document.getElementById("lock-main-date");
+          if (lockTime) {
+            lockTime.textContent = timeString;
+          }
+          if (lockDate) {
+            lockDate.textContent = dateString;
+          }
+        }
+
+        /**
+         * 解析AI返回的、可能格式不规范的响应内容
+         * @param {string} content - AI返回的原始字符串
+         * @returns {Array} - 一个标准化的消息对象数组
+         */
+        function parseAiResponse(content) {
+          const trimmedContent = content.trim();
+
+          // 方案1：【最优先】尝试作为标准的、单一的JSON数组解析
+          // 这是最理想、最高效的情况
+          if (trimmedContent.startsWith("[") && trimmedContent.endsWith("]")) {
+            try {
+              const parsed = JSON.parse(trimmedContent);
+              if (Array.isArray(parsed)) {
+                console.log("解析成功：标准JSON数组格式。");
+                return parsed;
+              }
+            } catch (e) {
+              // 如果解析失败，说明它虽然看起来像个数组，但内部格式有问题。
+              // 此时我们不报错，而是继续尝试下面的“强力解析”方案。
+              console.warn("标准JSON数组解析失败，将尝试强力解析...");
+            }
+          }
+
+          // 方案2：【强力解析】使用正则表达式，从混乱的字符串中提取出所有独立的JSON对象
+          // 这能完美解决您遇到的 "(Timestamp: ...)[{...}](Timestamp: ...)[{...}]" 这种格式
+          const jsonMatches = trimmedContent.match(/{[^{}]*}/g);
+
+          if (jsonMatches) {
+            const results = [];
+            for (const match of jsonMatches) {
+              try {
+                // 尝试解析每一个被我们“揪”出来的JSON字符串
+                const parsedObject = JSON.parse(match);
+                results.push(parsedObject);
+              } catch (e) {
+                // 如果某个片段不是有效的JSON，就忽略它，继续处理下一个
+                console.warn("跳过一个无效的JSON片段:", match);
+              }
+            }
+
+            // 如果我们成功提取出了至少一个有效的JSON对象，就返回这个结果
+            if (results.length > 0) {
+              console.log("解析成功：通过强力提取模式。");
+              return results;
+            }
+          }
+
+          // 方案3：【最终备用】如果以上所有方法都失败了，说明AI返回的可能就是纯文本
+          // 我们将原始的、未处理的内容，包装成一个标准的文本消息对象返回，确保程序不会崩溃
+          console.error("所有解析方案均失败！将返回原始文本。");
+          return [{ type: "text", content: content }];
+        }
+        /**
+         * “拉取”并填充Minimax语音模型的下拉框
+         */
+        function fetchMinimaxSpeechModels() {
+          const modelSelect = document.getElementById(
+            "minimax-speech-model-select",
+          );
+          if (!modelSelect) return;
+          modelSelect.innerHTML = ""; // 清空旧选项
+
+          // 从文档中获取的完整模型列表
+          const models = [
+            "speech-2.6-hd",
+            "speech-2.6-turbo",
+            "speech-02-hd",
+            "speech-02-turbo",
+            "speech-01-hd",
+            "speech-01-turbo",
+          ];
+
+          models.forEach((modelId) => {
+            const option = document.createElement("option");
+            option.value = modelId;
+            option.textContent = modelId;
+            modelSelect.appendChild(option);
+          });
+
+          // 自动选中当前已保存的模型，如果没有则使用一个推荐的默认值
+          modelSelect.value =
+            state.apiConfig.minimaxSpeechModel || "speech-01-turbo";
+
+          alert("Minimax 语音模型列表已更新！");
+        }
+        // NovelAI设置相关函数（加载、保存、重置）
+        // NovelAI设置相关函数
+        function loadNovelAISettings() {
+          const settings = getNovelAISettings();
+          document.getElementById("nai-resolution").value = settings.resolution;
+          document.getElementById("nai-steps").value = settings.steps;
+          document.getElementById("nai-cfg-scale").value = settings.cfg_scale;
+          document.getElementById("nai-sampler").value = settings.sampler;
+          document.getElementById("nai-seed").value = settings.seed;
+          document.getElementById("nai-uc-preset").value = settings.uc_preset;
+          document.getElementById("nai-quality-toggle").checked =
+            settings.quality_toggle;
+          document.getElementById("nai-smea").checked = settings.smea;
+          document.getElementById("nai-smea-dyn").checked = settings.smea_dyn;
+          document.getElementById("nai-default-positive").value =
+            settings.default_positive;
+          document.getElementById("nai-default-negative").value =
+            settings.default_negative;
+          document.getElementById("nai-cors-proxy").value = settings.cors_proxy;
+          document.getElementById("nai-custom-proxy-url").value =
+            settings.custom_proxy_url || "";
+
+          // 显示/隐藏自定义代理输入框
+          const customProxyGroup = document.getElementById(
+            "nai-custom-proxy-group",
+          );
+          customProxyGroup.style.display =
+            settings.cors_proxy === "custom" ? "block" : "none";
+        }
+
+        function saveNovelAISettings() {
+          // 保存API Key和模型等基础配置
+          const novelaiEnabled =
+            document.getElementById("novelai-switch").checked;
+          const novelaiModel = document.getElementById("novelai-model").value;
+          const novelaiApiKey = document
+            .getElementById("novelai-api-key")
+            .value.trim();
+
+          localStorage.setItem("novelai-enabled", novelaiEnabled);
+          localStorage.setItem("novelai-model", novelaiModel);
+          localStorage.setItem("novelai-api-key", novelaiApiKey);
+
+          // 保存高级参数配置
+          const settings = {
+            resolution: document.getElementById("nai-resolution").value,
+            steps: parseInt(document.getElementById("nai-steps").value),
+            cfg_scale: parseFloat(
+              document.getElementById("nai-cfg-scale").value,
+            ),
+            sampler: document.getElementById("nai-sampler").value,
+            seed: parseInt(document.getElementById("nai-seed").value),
+            uc_preset: parseInt(document.getElementById("nai-uc-preset").value),
+            quality_toggle:
+              document.getElementById("nai-quality-toggle").checked,
+            smea: document.getElementById("nai-smea").checked,
+            smea_dyn: document.getElementById("nai-smea-dyn").checked,
+            default_positive: document.getElementById("nai-default-positive")
+              .value,
+            default_negative: document.getElementById("nai-default-negative")
+              .value,
+            cors_proxy: document.getElementById("nai-cors-proxy").value,
+            custom_proxy_url: document.getElementById("nai-custom-proxy-url")
+              .value,
+          };
+
+          localStorage.setItem("novelai-settings", JSON.stringify(settings));
+        }
+
+        function resetNovelAISettings() {
+          localStorage.removeItem("novelai-settings");
+          loadNovelAISettings();
+          alert("已恢复默认设置！");
+        }
+
+        function getNovelAISettings() {
+          const defaultSettings = {
+            resolution: "1024x1024",
+            steps: 28,
+            cfg_scale: 5,
+            sampler: "k_euler_ancestral",
+            seed: -1,
+            uc_preset: 1,
+            quality_toggle: true,
+            smea: true,
+            smea_dyn: false,
+            default_positive:
+              "masterpiece, best quality, 1girl, beautiful, detailed face, detailed eyes, long hair, anime style",
+            default_negative:
+              "lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry",
+            cors_proxy: "https://corsproxy.io/?",
+            custom_proxy_url: "",
+          };
+
+          const saved = localStorage.getItem("novelai-settings");
+          if (saved) {
+            try {
+              return { ...defaultSettings, ...JSON.parse(saved) };
+            } catch (e) {
+              return defaultSettings;
+            }
+          }
+          return defaultSettings;
+        }
+
+        /**
+         * 根据角色ID获取对应的NAI提示词配置
+         * @param {string} chatId - 聊天/角色ID
+         * @returns {Object} 包含正面和负面提示词的对象
+         */
+        function getCharacterNAIPrompts(chatId) {
+          // 获取系统默认配置
+          const systemSettings = getNovelAISettings();
+
+          // 如果没有指定角色ID或角色不存在，返回系统配置
+          if (!chatId || !state.chats[chatId]) {
+            console.log("⚠️ NAI提示词：没有角色，使用系统配置");
+            return {
+              positive: systemSettings.default_positive,
+              negative: systemSettings.default_negative,
+              source: "system",
+            };
+          }
+
+          const chat = state.chats[chatId];
+          const naiSettings = chat.settings.naiSettings || {};
+
+          // 选角色就用角色的，选系统就用系统的，就这么简单！
+          if (naiSettings.promptSource === "character") {
+            console.log("✅ NAI提示词：使用角色配置");
+            console.log(
+              "   正面:",
+              naiSettings.characterPositivePrompt || "(空)",
+            );
+            console.log(
+              "   负面:",
+              naiSettings.characterNegativePrompt || "(空)",
+            );
+
+            return {
+              positive: naiSettings.characterPositivePrompt || "",
+              negative: naiSettings.characterNegativePrompt || "",
+              source: "character",
+            };
+          } else {
+            console.log("✅ NAI提示词：使用系统配置");
+            console.log("   正面:", systemSettings.default_positive || "(空)");
+            console.log("   负面:", systemSettings.default_negative || "(空)");
+
+            return {
+              positive: systemSettings.default_positive,
+              negative: systemSettings.default_negative,
+              source: "system",
+            };
+          }
+        }
+
+        /**
+         * 为指定角色生成NovelAI图像（将来聊天调用时使用）
+         * @param {string} chatId - 聊天/角色ID
+         * @param {string} customPrompt - 可选的自定义正面提示词（如果提供则追加到配置的提示词后）
+         * @returns {Promise<string>} 返回生成的图像Base64数据URL
+         */
+        async function generateNovelAIImageForCharacter(
+          chatId,
+          customPrompt = "",
+        ) {
+          const apiKey = document
+            .getElementById("novelai-api-key")
+            .value.trim();
+          const model = document.getElementById("novelai-model").value;
+
+          if (!apiKey) {
+            throw new Error("请先配置NovelAI API Key！");
+          }
+
+          // 获取角色的提示词配置
+          const prompts = getCharacterNAIPrompts(chatId);
+
+          // 构建最终的提示词（如果有自定义提示词则追加）
+          let finalPrompt = prompts.positive;
+          if (customPrompt) {
+            finalPrompt = customPrompt + ", " + prompts.positive;
+          }
+
+          const negativePrompt = prompts.negative;
+
+          console.log(
+            `📝 使用${prompts.source === "character" ? "角色专属" : "系统"}提示词配置`,
+          );
+          console.log("正面提示词:", finalPrompt);
+          console.log("负面提示词:", negativePrompt);
+
+          const settings = getNovelAISettings();
+
+          // 后续的图像生成逻辑将在这里实现
+          // 这个函数预留给将来聊天中调用NAI出图功能使用
+          return null;
+        }
+
+        // 生成NovelAI图片的主函数（完整版）
+        async function generateNovelAIImage() {
+          const apiKey = document
+            .getElementById("novelai-api-key")
+            .value.trim();
+          const model = document.getElementById("novelai-model").value;
+          const prompt = document
+            .getElementById("nai-test-prompt")
+            .value.trim();
+
+          if (!apiKey) {
+            alert("请先配置NovelAI API Key！");
+            return;
+          }
+
+          if (!prompt) {
+            alert("请输入提示词！");
+            return;
+          }
+
+          const settings = getNovelAISettings();
+          const negativePrompt = document
+            .getElementById("nai-test-negative")
+            .value.trim();
+
+          const statusDiv = document.getElementById("nai-test-status");
+          const resultDiv = document.getElementById("nai-test-result");
+          const errorDiv = document.getElementById("nai-test-error");
+          const generateBtn = document.getElementById("nai-generate-btn");
+
+          statusDiv.style.display = "block";
+          resultDiv.style.display = "none";
+          errorDiv.style.display = "none";
+          generateBtn.disabled = true;
+          generateBtn.textContent = "生成中...";
+
+          try {
+            const [width, height] = settings.resolution.split("x").map(Number);
+
+            // V4/V4.5 和 V3 使用不同的请求体格式
+            let requestBody;
+
+            if (model.includes("nai-diffusion-4")) {
+              // V4/V4.5 使用新格式 (params_version: 3)
+              requestBody = {
+                input: prompt,
+                model: model,
+                action: "generate",
+                parameters: {
+                  params_version: 3, // V4必须使用版本3
+                  width: width,
+                  height: height,
+                  scale: settings.cfg_scale,
+                  sampler: settings.sampler,
+                  steps: settings.steps,
+                  seed:
+                    settings.seed === -1
+                      ? Math.floor(Math.random() * 9999999999)
+                      : settings.seed,
+                  n_samples: 1,
+                  ucPreset: settings.uc_preset,
+                  qualityToggle: settings.quality_toggle,
+                  autoSmea: false,
+                  dynamic_thresholding: false,
+                  controlnet_strength: 1,
+                  legacy: false,
+                  add_original_image: true,
+                  cfg_rescale: 0,
+                  noise_schedule: "karras", // V4使用karras
+                  legacy_v3_extend: false,
+                  skip_cfg_above_sigma: null,
+                  use_coords: false,
+                  legacy_uc: false,
+                  normalize_reference_strength_multiple: true,
+                  inpaintImg2ImgStrength: 1,
+                  characterPrompts: [],
+                  // V4专用提示词格式
+                  v4_prompt: {
+                    caption: {
+                      base_caption: prompt,
+                      char_captions: [],
+                    },
+                    use_coords: false,
+                    use_order: true,
+                  },
+                  // V4专用负面提示词格式
+                  v4_negative_prompt: {
+                    caption: {
+                      base_caption: negativePrompt,
+                      char_captions: [],
+                    },
+                    legacy_uc: false,
+                  },
+                  negative_prompt: negativePrompt,
+                  deliberate_euler_ancestral_bug: false,
+                  prefer_brownian: true,
+                  // 注意：不包含 stream 参数，使用标准ZIP响应而非msgpack流
+                },
+              };
+            } else {
+              // V3 及更早版本使用旧格式
+              requestBody = {
+                input: prompt,
+                model: model,
+                action: "generate",
+                parameters: {
+                  width: width,
+                  height: height,
+                  scale: settings.cfg_scale,
+                  sampler: settings.sampler,
+                  steps: settings.steps,
+                  seed:
+                    settings.seed === -1
+                      ? Math.floor(Math.random() * 9999999999)
+                      : settings.seed,
+                  n_samples: 1,
+                  ucPreset: settings.uc_preset,
+                  qualityToggle: settings.quality_toggle,
+                  sm: settings.smea,
+                  sm_dyn: settings.smea_dyn,
+                  dynamic_thresholding: false,
+                  controlnet_strength: 1,
+                  legacy: false,
+                  add_original_image: false,
+                  cfg_rescale: 0,
+                  noise_schedule: "native",
+                  negative_prompt: negativePrompt,
+                },
+              };
+            }
+
+            console.log("📤 发送请求到 NovelAI API");
+            console.log("📊 使用模型:", model);
+            console.log("📋 请求体:", JSON.stringify(requestBody, null, 2));
+
+            // 根据模型选择不同的API端点
+            let apiUrl;
+
+            // V4/V4.5 模型使用流式端点
+            if (model.includes("nai-diffusion-4")) {
+              // V4/V4.5 默认使用流式端点
+              apiUrl = "https://image.novelai.net/ai/generate-image-stream";
+            } else {
+              // V3 及更早版本使用标准端点
+              apiUrl = "https://image.novelai.net/ai/generate-image";
+            }
+
+            let corsProxy = settings.cors_proxy;
+
+            // 如果选择了自定义代理，使用自定义URL
+            if (corsProxy === "custom") {
+              corsProxy = settings.custom_proxy_url || "";
+            }
+
+            // 如果有代理，添加到URL前面
+            if (corsProxy && corsProxy !== "") {
+              apiUrl = corsProxy + encodeURIComponent(apiUrl);
+            }
+
+            // Chrome浏览器专用处理：避免headers中包含非ISO-8859-1字符
+            const isChrome =
+              /Chrome/.test(navigator.userAgent) &&
+              !/Edg/.test(navigator.userAgent);
+            let fetchOptions = {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: "Bearer " + apiKey,
+              },
+              body: JSON.stringify(requestBody),
+            };
+
+            // 针对Chrome浏览器：确保所有header值都是纯ASCII
+            if (isChrome) {
+              console.log("🔧 检测到Chrome浏览器，启用headers兼容性处理");
+              const cleanHeaders = {};
+              for (const [key, value] of Object.entries(fetchOptions.headers)) {
+                // 确保header值只包含ASCII字符（ISO-8859-1兼容）
+                cleanHeaders[key] = value.replace(/[^\x00-\xFF]/g, "");
+              }
+              fetchOptions.headers = cleanHeaders;
+            }
+
+            const response = await fetch(apiUrl, fetchOptions);
+
+            console.log("Response status:", response.status);
+            console.log("Response headers:", [...response.headers.entries()]);
+
+            if (!response.ok) {
+              const errorText = await response.text();
+              console.error("API错误响应:", errorText);
+              throw new Error(`API请求失败 (${response.status}): ${errorText}`);
+            }
+
+            // NovelAI API返回的是ZIP文件，需要解压
+            const contentType = response.headers.get("content-type");
+            console.log("Content-Type:", contentType);
+
+            // 检查是否为 SSE 流式响应
+            let zipBlob;
+            if (contentType && contentType.includes("text/event-stream")) {
+              console.log("检测到 SSE 流式响应，开始解析...");
+              statusDiv.textContent = "正在接收流式数据...";
+
+              // 读取整个流
+              const text = await response.text();
+              console.log("收到 SSE 数据，大小:", text.length);
+
+              // 解析 SSE 格式，提取最后的 data: 行
+              const lines = text.trim().split("\n");
+              let base64Data = null;
+
+              for (let i = lines.length - 1; i >= 0; i--) {
+                const line = lines[i].trim();
+                if (line.startsWith("data: ") && line !== "data: [DONE]") {
+                  const dataContent = line.substring(6); // 移除 'data: ' 前缀
+
+                  // 尝试解析 JSON
+                  try {
+                    const jsonData = JSON.parse(dataContent);
+
+                    // V4.5 流式端点：event_type 为 "final" 时包含最终图片
+                    if (jsonData.event_type === "final" && jsonData.image) {
+                      base64Data = jsonData.image;
+                      console.log("✅ 找到 final 事件的图片数据");
+                      break;
+                    }
+
+                    // 兼容其他格式
+                    if (jsonData.data) {
+                      base64Data = jsonData.data;
+                      console.log("从 JSON.data 中提取图片数据");
+                      break;
+                    }
+                    if (jsonData.image) {
+                      base64Data = jsonData.image;
+                      console.log("从 JSON.image 中提取图片数据");
+                      break;
+                    }
+                  } catch (e) {
+                    // 如果不是 JSON，直接作为 base64 数据
+                    base64Data = dataContent;
+                    console.log("直接使用 base64 数据");
+                    break;
+                  }
+                }
+              }
+
+              if (!base64Data) {
+                throw new Error("无法从 SSE 响应中提取图片数据");
+              }
+
+              // V4.5 流式端点返回的是 PNG base64，不是 ZIP
+              // 检查是否为 PNG (以 iVBORw0KGgo 开头) 或 JPEG (以 /9j/ 开头)
+              const isPNG = base64Data.startsWith("iVBORw0KGgo");
+              const isJPEG = base64Data.startsWith("/9j/");
+
+              if (isPNG || isJPEG) {
+                console.log("✅ 检测到直接的图片 base64 数据 (PNG/JPEG)");
+                // 将 base64 转为 Blob
+                const binaryString = atob(base64Data);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                  bytes[i] = binaryString.charCodeAt(i);
+                }
+                const imageBlob = new Blob([bytes], {
+                  type: isPNG ? "image/png" : "image/jpeg",
+                });
+                console.log("图片 Blob 创建成功，大小:", imageBlob.size);
+
+                // 直接显示图片
+                const imageUrl = URL.createObjectURL(imageBlob);
+                document.getElementById("nai-result-image").src = imageUrl;
+                statusDiv.style.display = "none";
+                resultDiv.style.display = "block";
+                console.log("✅ 图片显示成功！🎨");
+                return;
+              }
+
+              // 否则当作 ZIP 处理
+              console.log("当作 ZIP 文件处理...");
+              const binaryString = atob(base64Data);
+              const bytes = new Uint8Array(binaryString.length);
+              for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+              }
+              zipBlob = new Blob([bytes]);
+              console.log("ZIP Blob 大小:", zipBlob.size);
+            } else {
+              // 非流式响应，直接读取
+              zipBlob = await response.blob();
+              console.log(
+                "收到数据，类型:",
+                zipBlob.type,
+                "大小:",
+                zipBlob.size,
+              );
+            }
+
+            // NovelAI始终返回ZIP格式，需要解压
+            try {
+              // 检查JSZip是否已加载
+              if (typeof JSZip === "undefined") {
+                throw new Error("JSZip库未加载，请刷新页面重试");
+              }
+
+              statusDiv.textContent = "正在解压图片...";
+
+              // 解压ZIP文件
+              const zip = await JSZip.loadAsync(zipBlob);
+              console.log("ZIP文件内容:", Object.keys(zip.files));
+
+              // 查找第一个图片文件（通常是image_0.png）
+              let imageFile = null;
+              for (let filename in zip.files) {
+                if (filename.match(/\.(png|jpg|jpeg|webp)$/i)) {
+                  imageFile = zip.files[filename];
+                  console.log("找到图片文件:", filename);
+                  break;
+                }
+              }
+
+              if (!imageFile) {
+                throw new Error("ZIP文件中未找到图片");
+              }
+
+              // 提取图片数据
+              const imageBlob = await imageFile.async("blob");
+              console.log("提取的图片大小:", imageBlob.size);
+
+              // 创建图片URL并显示
+              const imageUrl = URL.createObjectURL(imageBlob);
+              console.log("生成的图片URL:", imageUrl);
+
+              document.getElementById("nai-result-image").src = imageUrl;
+              statusDiv.style.display = "none";
+              resultDiv.style.display = "block";
+            } catch (zipError) {
+              console.error("ZIP解压失败:", zipError);
+              // 如果解压失败，尝试直接作为图片显示
+              console.log("尝试直接作为图片显示...");
+
+              if (zipBlob.type.startsWith("image/")) {
+                const imageUrl = URL.createObjectURL(zipBlob);
+                document.getElementById("nai-result-image").src = imageUrl;
+                statusDiv.style.display = "none";
+                resultDiv.style.display = "block";
+              } else {
+                throw new Error("图片格式处理失败: " + zipError.message);
+              }
+            }
+          } catch (error) {
+            console.error("NovelAI生成失败:", error);
+            statusDiv.style.display = "none";
+            errorDiv.style.display = "block";
+            errorDiv.textContent = "生成失败: " + error.message;
+          } finally {
+            generateBtn.disabled = false;
+            generateBtn.textContent = "生成图像";
+          }
+        }
+
+        function renderApiSettings() {
+          // 1. 更新 API 相关的输入框
+          document.getElementById("proxy-url").value =
+            state.apiConfig.proxyUrl || "";
+          document.getElementById("api-key").value =
+            state.apiConfig.apiKey || "";
+
+          // --- Minimax 设置 ---
+          document.getElementById("minimax-group-id").value =
+            state.apiConfig.minimaxGroupId || "";
+          document.getElementById("minimax-api-key").value =
+            state.apiConfig.minimaxApiKey || "";
+          document.getElementById("minimax-provider-select").value =
+            state.apiConfig.minimaxProvider || "cn";
+
+          // 2：Minimax 语音模型下拉框回显
+          const speechModelSelect = document.getElementById(
+            "minimax-speech-model-select",
+          );
+          if (speechModelSelect) {
+            // 获取保存的模型，如果没有则默认为 speech-01-turbo
+            const savedSpeechModel =
+              state.apiConfig.minimaxSpeechModel || "speech-01-turbo";
+
+            // 检查下拉框里有没有这个选项
+            let optionExists = Array.from(speechModelSelect.options).some(
+              (opt) => opt.value === savedSpeechModel,
+            );
+
+            // 如果没有（比如刚刷新完页面），就手动创建一个选项加进去
+            if (!optionExists && savedSpeechModel) {
+              const option = document.createElement("option");
+              option.value = savedSpeechModel;
+              option.textContent = savedSpeechModel;
+              speechModelSelect.appendChild(option);
+            }
+
+            // 选中它
+            speechModelSelect.value = savedSpeechModel;
+          }
+          // 主对话模型回显 (新版：直接给输入框赋值)
+          const modelInput = document.getElementById("model-select");
+          if (modelInput) {
+            modelInput.value = state.apiConfig.model || "gpt-4";
+          }
+          // 重置辅助下拉框为隐藏状态（因为刷新页面后拉取的列表已清空）
+          const modelPicker = document.getElementById("fetched-model-list");
+          if (modelPicker) {
+            modelPicker.style.display = "none";
+          }
+
+          // --------------------------------
+
+          // 加载NovelAI配置
+          const novelaiEnabled =
+            localStorage.getItem("novelai-enabled") === "true";
+          const novelaiModel =
+            localStorage.getItem("novelai-model") || "nai-diffusion-4-5-full";
+          const novelaiApiKey = localStorage.getItem("novelai-api-key") || "";
+          document.getElementById("novelai-switch").checked = novelaiEnabled;
+          document.getElementById("novelai-model").value = novelaiModel;
+          document.getElementById("novelai-api-key").value = novelaiApiKey;
+          document.getElementById("novelai-details").style.display =
+            novelaiEnabled ? "block" : "none";
+          document.getElementById("pollinations-api-key").value =
+            state.apiConfig.pollinationsApiKey || "";
+
+          // 2. 更新后台活动相关的开关和输入框
+          document.getElementById("background-activity-switch").checked =
+            !!state.globalSettings.enableBackgroundActivity;
+
+          document.getElementById("background-interval-input").value =
+            state.globalSettings.backgroundActivityInterval || 60;
+          document.getElementById("block-cooldown-input").value =
+            state.globalSettings.blockCooldownHours || 1;
+
+          // 3. 渲染预设和频率的下拉框
+          renderApiPresetSelector();
+          renderBackgroundFrequencySelector();
+          // --- 加载 GitHub 备份设置 ---
+          document.getElementById("github-token").value =
+            state.apiConfig.githubToken || "";
+          document.getElementById("github-username").value =
+            state.apiConfig.githubUsername || "";
+          document.getElementById("github-repo").value =
+            state.apiConfig.githubRepo || "";
+          document.getElementById("github-path").value =
+            state.apiConfig.githubPath || "ephone_backup.json";
+          document.getElementById("github-auto-backup-switch").checked =
+            !!state.apiConfig.githubAutoBackup;
+          document.getElementById("github-backup-mode").value =
+            state.apiConfig.githubBackupMode || "full";
+          document.getElementById("github-backup-interval").value =
+            state.apiConfig.githubBackupInterval || 30;
+
+          // 渲染温度滑块的UI
+          const tempSlider = document.getElementById("temperature-slider");
+          const tempValueDisplay = document.getElementById("temperature-value");
+
+          const currentTemp = state.apiConfig.temperature || 0.8;
+          tempSlider.value = currentTemp;
+          tempValueDisplay.textContent = parseFloat(currentTemp).toFixed(1);
+
+          tempSlider.addEventListener("input", () => {
+            tempValueDisplay.textContent = parseFloat(tempSlider.value).toFixed(
+              1,
+            );
+          });
+
+          const qualitySlider = document.getElementById("image-quality-slider");
+          const qualityValue = document.getElementById("image-quality-value");
+          const currentQuality =
+            state.globalSettings.imageCompressionQuality || 0.7;
+
+          if (qualitySlider && qualityValue) {
+            qualitySlider.value = currentQuality;
+            qualityValue.textContent = parseFloat(currentQuality).toFixed(1);
+
+            qualitySlider.addEventListener("input", () => {
+              qualityValue.textContent = parseFloat(
+                qualitySlider.value,
+              ).toFixed(1);
+            });
+          }
+          const sysNotifSwitch = document.getElementById(
+            "system-notification-switch",
+          );
+
+          // ★★★【修改点2：重写开关加载与交互逻辑】★★★
+          const oldSysSwitch = document.getElementById(
+            "system-notification-switch",
+          );
+          if (oldSysSwitch) {
+            // 1. 使用克隆大法，彻底移除所有之前可能重复绑定的事件监听器
+            const newSysSwitch = oldSysSwitch.cloneNode(true);
+            oldSysSwitch.parentNode.replaceChild(newSysSwitch, oldSysSwitch);
+
+            // 2. 读取保存的状态
+            const savedNotifState =
+              state.globalSettings.enableSystemNotifications;
+            const hasPerm =
+              "Notification" in window && Notification.permission === "granted";
+
+            // 3. 智能判断开关状态：
+            // - 如果有保存的记录，就严格听记录的（是true就是true，是false就是false）
+            // - 如果从没保存过（undefined），但浏览器已经有权限，默认开启
+            if (typeof savedNotifState !== "undefined") {
+              newSysSwitch.checked = savedNotifState;
+            } else {
+              newSysSwitch.checked = hasPerm;
+            }
+
+            // 4. 绑定新的、唯一的点击事件
+            newSysSwitch.addEventListener("change", async (e) => {
+              if (e.target.checked) {
+                // --- 用户想开启 ---
+                if (!("Notification" in window)) {
+                  alert("抱歉，设备不支持系统通知。");
+                  e.target.checked = false;
+                } else if (Notification.permission === "granted") {
+                  // 已有权限，直接开启成功
+                  new Notification("EPhone", {
+                    body: "系统通知已开启！别忘了点击底部的【保存】按钮哦。",
+                  });
+                } else if (Notification.permission !== "denied") {
+                  // 请求权限
+                  const permission = await Notification.requestPermission();
+                  if (permission === "granted") {
+                    new Notification("EPhone", {
+                      body: "权限获取成功！请点击【保存】。",
+                    });
+                  } else {
+                    e.target.checked = false;
+                    alert("权限被拒绝，无法开启。");
+                  }
+                } else {
+                  // 之前被永久拒绝
+                  e.target.checked = false;
+                  alert(
+                    "权限已被拒绝。请去手机/浏览器设置中手动开启通知权限。",
+                  );
+                }
+              } else {
+              }
+            });
+          }
+          const checkPermBtn = document.getElementById(
+            "check-notification-perm-btn",
+          );
+          if (checkPermBtn) {
+            const newBtn = checkPermBtn.cloneNode(true);
+            checkPermBtn.parentNode.replaceChild(newBtn, checkPermBtn);
+
+            newBtn.addEventListener("click", async () => {
+              if (!("Notification" in window)) {
+                alert(

@@ -1,0 +1,816 @@
+                            你现在是角色 "${chat.name}"。请根据你的信息和最近的聊天记录，【只生成一项】你手机中的新数据。
+                            具体任务是：生成${finalDataTypeInfo.description}
+
+                            # 【【【情景一致性铁律】】】
+                            你生成的所有数据（尤其是"trajectory"行动轨迹）**必须**与“最近聊天记录摘要”中提到的最新情景保持绝对一致。
+                            当生成 "bank" 数据时，你的交易记录【绝对不能】包含与用户("${userNickname}")的转账或收款。所有交易都应是你与其他NPC或商家的。
+                            # 【【【绝对禁止事项】】】
+                            在生成 "chats" 数据时，**绝对不允许**让用户（${userNickname}）出现在你与其他NPC的对话中。
+
+
+                            # 【【【重要指令：关于聊天记录生成】】】
+                            - 你正在创作一段对话。提供的聊天记录是上下文，你【绝对不能】重复或改写其中的任何内容。你的生成必须从【全新的、下一条】消息开始。
+                            - 如果指定了对话对象，你【必须】为列表中的【每一个NPC】都生成一段与你（${chat.name}）的对话。
+                            - 如果列表为空，你可以虚构2-3个普通朋友并生成对话。
+                            - 你必须为每个联系人生成一段【至少包含5条消息】的对话。
+                            - 对话内容应该自然流畅，可以包含连续发言、表情包和表情符号等，以体现真实感。
+                            - 不要只生成一问一答的机械式对话。
+                            -   **【【【绝对禁止重复铁律】】】**: 你生成的 "messages" 数组中，【绝对不能】包含我提供给你的上下文里的任何一条消息。你的第一条消息必须是对话历史中最后一条消息的【下一条】。
+                            # 你的信息
+                            - 你的名字: ${chat.name}
+                            - 你的人设: ${persona}
+                            ${worldBookContext}
+                            # 和${userNickname}的最近聊天记录摘要
+                            ${recentHistory}
+                            ${linkedMemoryContext}
+                            ${npcContext}
+                            ${npcChatHistoryContext}
+
+                            # JSON输出格式 (必须严格遵守，只包含你被要求的那个键)
+                            {
+                            ${finalDataTypeInfo.jsonStructure}
+                            }
+                            `;
+            console.log("prompt:", prompt);
+            const { proxyUrl, apiKey, model } = state.apiConfig;
+            let isGemini = proxyUrl === GEMINI_API_URL;
+            let geminiConfig = toGeminiRequestData(
+              model,
+              apiKey,
+              prompt,
+              [{ role: "user", content: prompt }],
+              isGemini,
+            );
+
+            const response = isGemini
+              ? await fetch(geminiConfig.url, geminiConfig.data)
+              : await fetch(`${proxyUrl}/v1/chat/completions`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${apiKey}`,
+                  },
+                  body: JSON.stringify({
+                    model: model,
+                    messages: [{ role: "user", content: prompt }],
+                    temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+                  }),
+                });
+
+            if (!response.ok) {
+              let errorMsg = `API请求失败: ${response.status} - ${await response.text()}`;
+              throw new Error(errorMsg);
+            }
+
+            const data = await response.json();
+            const aiResponseContent = (
+              isGemini
+                ? data.candidates[0].content.parts[0].text
+                : data.choices[0].message.content
+            ).replace(/^```json\s*|```$/g, "");
+
+            const newData = JSON.parse(aiResponseContent);
+
+            let phoneData = chat.characterPhoneData;
+            phoneData.lastGenerated = Date.now();
+            let updateSuccess = false;
+
+            if (newData && newData[dataType]) {
+              if (dataType === "bank" && newData.bank.transactions) {
+                if (!phoneData.bank)
+                  phoneData.bank = { balance: 0, transactions: [] };
+                if (typeof phoneData.bank.balance !== "number")
+                  phoneData.bank.balance = 0;
+                (newData.bank.transactions || []).forEach((transaction) => {
+                  const amount = parseFloat(transaction.amount);
+                  if (!isNaN(amount)) {
+                    if (transaction.type === "收入")
+                      phoneData.bank.balance += amount;
+                    else if (transaction.type === "支出")
+                      phoneData.bank.balance -= amount;
+                  }
+                });
+                phoneData.bank.transactions.push(
+                  ...(newData.bank.transactions || []),
+                );
+                if (typeof newData.bank.balance === "number") {
+                  phoneData.bank.balance = newData.bank.balance;
+                }
+                updateSuccess = true;
+              } else if (dataType === "chats" && newData.chats) {
+                newData.chats.forEach((newChat) => {
+                  if (!newChat.messages) return;
+                  const contactName = newChat.contactName;
+                  if (
+                    phoneData.chats[contactName] &&
+                    phoneData.chats[contactName].history
+                  ) {
+                    phoneData.chats[contactName].history.push(
+                      ...newChat.messages,
+                    );
+                  } else {
+                    phoneData.chats[contactName] = {
+                      avatar: newChat.avatar,
+                      history: newChat.messages,
+                    };
+                  }
+                });
+                updateSuccess = true;
+              } else if (
+                dataType === "appUsage" &&
+                Array.isArray(newData.appUsage)
+              ) {
+                const usageMap = new Map();
+                (phoneData.appUsage || []).forEach((item) => {
+                  usageMap.set(
+                    item.appName,
+                    (usageMap.get(item.appName) || 0) +
+                      parseDurationToMinutes(item.duration),
+                  );
+                });
+                newData.appUsage.forEach((item) => {
+                  usageMap.set(
+                    item.appName,
+                    (usageMap.get(item.appName) || 0) +
+                      parseDurationToMinutes(item.duration),
+                  );
+                });
+                const mergedUsage = [];
+                for (const [appName, totalMinutes] of usageMap.entries()) {
+                  mergedUsage.push({
+                    appName: appName,
+                    duration: formatMinutesToDuration(totalMinutes),
+                  });
+                }
+                phoneData.appUsage = mergedUsage;
+                updateSuccess = true;
+              } else if (Array.isArray(phoneData[dataType])) {
+                phoneData[dataType].push(...(newData[dataType] || []));
+                updateSuccess = true;
+              }
+            }
+
+            if (!updateSuccess) {
+              throw new Error(
+                `AI返回的JSON中缺少'${dataType}'字段或格式不正确。`,
+              );
+            }
+
+            await db.chats.put(chat);
+            alert(
+              `“${chat.name}”的${dataTypeMap[dataType].description.split("。")[0]}已更新！`,
+            );
+
+            switch (dataType) {
+              case "chats":
+                renderCharacterChatList();
+                break;
+              case "shoppingCart":
+                renderCharacterShoppingCart();
+                break;
+              case "memos":
+                renderCharacterMemos();
+                break;
+              case "browserHistory":
+                renderCharacterBrowser();
+                break;
+              case "photoAlbum":
+                renderCharacterPhotoAlbum();
+                break;
+              case "bank":
+                renderCharacterBank();
+                break;
+              case "trajectory":
+                renderCharacterTrajectory();
+                break;
+              case "appUsage":
+                renderCharacterAppUsage();
+                break;
+              case "diary":
+                renderCharacterDiary();
+                break;
+            }
+          } catch (error) {
+            console.error(`生成角色手机数据(${dataType})失败:`, error);
+            await showCustomAlert(
+              "生成失败",
+              `发生了一个错误：\n\n${error.message}`,
+            );
+          } finally {
+            document
+              .getElementById("generation-overlay")
+              .classList.remove("visible");
+          }
+        }
+
+        /**
+         * 处理“查手机”各个APP页面“全部删除”功能的通用函数
+         * @param {string} dataType - 要清空的数据类型，例如 'shoppingCart', 'memos', 'bank.transactions'
+         */
+        async function handleClearCharacterDataSegment(dataType) {
+          if (!activeCharacterPhoneId) return;
+          const chat = state.chats[activeCharacterPhoneId];
+          if (!chat) return;
+
+          // 为不同数据类型设置更人性化的提示文本
+          const dataTypeMap = {
+            chats: { name: "NPC聊天记录", dataKey: "chats" },
+            shoppingCart: { name: "购物车", dataKey: "shoppingCart" },
+            memos: { name: "备忘录", dataKey: "memos" },
+            browserHistory: { name: "浏览器历史", dataKey: "browserHistory" },
+            photoAlbum: { name: "相册", dataKey: "photoAlbum" },
+            "bank.transactions": { name: "交易记录", dataKey: "bank" },
+            trajectory: { name: "足迹", dataKey: "trajectory" },
+            appUsage: { name: "使用记录", dataKey: "appUsage" },
+            diary: { name: "日记", dataKey: "diary" },
+          };
+
+          const info = dataTypeMap[dataType];
+          if (!info) {
+            console.error("未知的清空数据类型:", dataType);
+            return;
+          }
+
+          // 弹出确认框
+          const confirmed = await showCustomConfirm(
+            `确认清空`,
+            `确定要清空“${chat.name}”手机里的所有【${info.name}】吗？此操作不可恢复。`,
+            { confirmButtonClass: "btn-danger" },
+          );
+
+          if (!confirmed) return;
+
+          try {
+            if (dataType === "chats") {
+              // 特殊处理：清空所有NPC聊天（不包括和user的）
+              chat.characterPhoneData.chats = {};
+            } else if (dataType === "bank.transactions") {
+              // 特殊处理：清空银行交易记录，【同时将余额归零】
+              if (chat.characterPhoneData.bank) {
+                chat.characterPhoneData.bank.transactions = [];
+
+                chat.characterPhoneData.bank.balance = 0;
+              }
+            } else if (chat.characterPhoneData[info.dataKey]) {
+              // 通用处理：清空数组
+              chat.characterPhoneData[info.dataKey] = [];
+            }
+
+            // 保存到数据库
+            await db.chats.put(chat);
+
+            // 刷新当前页面
+            switch (dataType) {
+              case "chats":
+                renderCharacterChatList();
+                break;
+              case "shoppingCart":
+                renderCharacterShoppingCart();
+                break;
+              case "memos":
+                renderCharacterMemos();
+                break;
+              case "browserHistory":
+                renderCharacterBrowser();
+                break;
+              case "photoAlbum":
+                renderCharacterPhotoAlbum();
+                break;
+              case "bank.transactions":
+                renderCharacterBank();
+                break;
+              case "trajectory":
+                renderCharacterTrajectory();
+                break;
+              case "appUsage":
+                renderCharacterAppUsage();
+                break;
+              case "diary":
+                renderCharacterDiary();
+                break;
+            }
+
+            alert(`已成功清空所有${info.name}。`);
+          } catch (error) {
+            console.error(`清空 ${info.name} 时出错:`, error);
+            await showCustomAlert(
+              "操作失败",
+              `清空时发生错误: ${error.message}`,
+            );
+          }
+        }
+
+        /**
+         * 生成角色手机数据
+         */
+        async function generateCharacterPhoneData() {
+          if (!activeCharacterPhoneId) return;
+          const chat = state.chats[activeCharacterPhoneId];
+          if (!chat) return;
+
+          showGenerationOverlay("正在同步Ta的手机数据...");
+
+          try {
+            const userNickname = state.qzoneSettings.nickname || "我";
+
+            // 限制人设长度，这是防止503错误的根本方法！
+            // 只取人设的前4000个字符，避免整个人设过长导致请求失败。
+            const persona = (chat.settings.aiPersona || "").substring(0, 4000);
+
+            const recentHistory = chat.history
+              .slice(-chat.settings.maxMemory || 20)
+              .map((msg) => {
+                const sender = msg.role === "user" ? userNickname : chat.name;
+                return `${sender}: ${msg.content}`;
+              })
+              .join("\n");
+
+            console.log("用于生成手机数据的最近聊天记录:", recentHistory);
+            // added by lrq 251028 添加记忆互通的聊天记录作为参考
+            let linkedMemoryContext = "";
+            if (
+              chat.settings.linkedMemories &&
+              chat.settings.linkedMemories.length > 0
+            ) {
+              const contextPromises = chat.settings.linkedMemories.map(
+                async (link) => {
+                  const linkedChat = state.chats[link.chatId];
+                  if (!linkedChat) return "";
+
+                  const freshLinkedChat = await db.chats.get(link.chatId);
+                  if (!freshLinkedChat) return "";
+
+                  const recentHistory = freshLinkedChat.history
+                    .filter((msg) => !msg.isHidden)
+                    .slice(-link.depth);
+
+                  if (recentHistory.length === 0) return "";
+
+                  const formattedMessages = recentHistory
+                    .map(
+                      (msg) =>
+                        `  - ${formatMessageForContext(msg, freshLinkedChat)}`,
+                    )
+                    .join("\n");
+
+                  return `\n## 附加上下文：来自与“${linkedChat.name}”的最近对话内容 (仅你可见)\n${formattedMessages}`;
+                },
+              );
+
+              const allContexts = await Promise.all(contextPromises);
+              linkedMemoryContext = allContexts.filter(Boolean).join("\n");
+            }
+            console.log(
+              "用于生成手机数据的互通聊天记录上下文:",
+              linkedMemoryContext,
+            );
+            let worldBookContext = "";
+            if (
+              chat.settings.linkedWorldBookIds &&
+              chat.settings.linkedWorldBookIds.length > 0
+            ) {
+              worldBookContext =
+                "--- 世界观设定 (必须严格遵守) ---\n" +
+                chat.settings.linkedWorldBookIds
+                  .map((id) => {
+                    const book = state.worldBooks.find((b) => b.id === id);
+                    return book ? `[${book.name}]: ${book.content}` : "";
+                  })
+                  .join("\n\n");
+            }
+            const npcLibrary = chat.npcLibrary || [];
+            let npcContext = "";
+            if (npcLibrary.length > 0) {
+              npcContext =
+                '# 你的专属NPC好友列表 (你必须在下方"chats"中为他们生成对话)\n' +
+                "这些人是你的好朋友，你和他们非常熟悉。请根据他们的人设，生成符合你们关系的、自然的聊天记录。\n" +
+                npcLibrary
+                  .map((npc) => `- **${npc.name}**: ${npc.persona}`)
+                  .join("\n");
+            } else {
+              npcContext =
+                "# 你的专属NPC好友列表\n(你没有专属NPC，请虚构一些普通朋友)";
+            }
+
+            let npcChatHistoryContext = "";
+            const existingNpcChats = Object.entries(
+              chat.characterPhoneData.chats || {},
+            ).filter(
+              ([name, chatData]) =>
+                chatData.history && chatData.history.length > 0,
+            );
+
+            if (existingNpcChats.length > 0) {
+              npcChatHistoryContext +=
+                "\n\n# 已有的聊天记录摘要 (请在此基础上继续对话)\n";
+              existingNpcChats.forEach(([contactName, chatData]) => {
+                const recentMessages = chatData.history
+                  .slice(-5)
+                  .map((msg) => `  - ${msg.sender}: ${msg.content}`)
+                  .join("\n");
+                npcChatHistoryContext += `\n## 你和“${contactName}”的最近对话:\n${recentMessages}\n`;
+              });
+            }
+
+            // 优化提示词，让AI更好地理解任务，并强调情景一致性
+            const prompt = `
+			# 任务
+			【【【情景一致性铁律】】】：你生成的所有数据（尤其是"trajectory"行动轨迹）**必须**与“最近聊天记录摘要”中提到的最新情景保持绝对一致。如果聊天记录显示你正在上课，你的行动轨迹就必须是在教室；如果聊天记录显示你在咖啡馆，你的行动轨迹就必须是咖啡馆。**绝对不能**仅凭你的人设就生成与聊天记录相矛盾的内容。
+			你现在是角色 "${
+        chat.name
+      }"。请根据你的人设、世界观、NPC好友列表以及和${userNickname}的最近聊天记录，模拟生成你手机中的各项数据。你需要一次性生成所有数据，并严格按照下面的JSON格式返回。
+
+			# 【【【绝对禁止事项：这是必须遵守的安全红线】】】
+			1.  在生成JSON数据，特别是chats字段时，**绝对不允许**创建另一个用户（${userNickname}）的虚拟形象或让他/她出现在你与其他NPC的对话中。
+			2.  "bank" 字段中的交易记录【绝对不能】涉及用户("${userNickname}")。所有交易都必须是你与其他NPC、商家或因某些事件（如购物、收到工资）产生的。
+			3.  chats字段中，与NPC或朋友的聊天记录，其sender或content**绝对不能**包含${userNickname}的名字或代称。
+			4.  所有你生成的聊天对话，都必须严格限制在【你(${
+        chat.name
+      })】和【另一位NPC/朋友】这**两个人之间**。**严禁**出现任何形式的第三者，尤其是${userNickname}。
+
+			# 你的信息
+			- 你的名字: ${chat.name}
+			- 你的人设: ${persona}
+			${worldBookContext}
+			# 和${userNickname}的最近聊天记录摘要
+			${recentHistory}
+			${linkedMemoryContext}
+
+			${npcContext}
+			${npcChatHistoryContext}
+			# JSON输出格式 (必须严格遵守，不要添加任何额外说明)
+			{
+			  "chats": [
+			    {
+			      "contactName": "【这里填写你给${userNickname}的备注名】"
+			    },
+			    {
+			      "contactName": "【这里必须填写上面NPC列表中的一个名字，或一个虚构朋友名】",
+			      "messages": [
+			        {"sender": "【联系人名，严禁填写'${userNickname}'】", "content": "消息内容1..."},
+			        {"sender": "${chat.name}", "content": "你的回复1..."},
+			        {"sender": "【联系人名，严禁填写'${userNickname}'】", "content": "消息内容2..."},
+			        {"sender": "【联系人名，严禁填写'${userNickname}'】", "content": "消息内容3..."},
+			        {"sender": "${chat.name}", "content": "你的回复2..."}
+			      ]
+			    }
+			  ],
+			  "shoppingCart": [
+			    {"name": "商品名", "price": 价格, "store": "店铺名"}
+			  ],
+			  "memos": [
+			    {"title": "备忘录标题", "content": "备忘录详细内容..."}
+			  ],
+			  "browserHistory": [
+			    {"query": "搜索或浏览的标题", "result": "【这里是AI生成的、关于这个搜索标题的模拟文章或网页内容】"}
+			  ],
+			  "photoAlbum": [
+			    {"hiddenContent": "对照片画面的详细文字描述"}
+			  ],
+			  "bank": {
+			    "balance": 银行卡余额(数字),
+			    "transactions": [
+			      {"type": "收入或支出", "amount": 金额, "description": "交易描述"}
+			    ]
+			  },
+			  "trajectory": [
+			    {"time": "时间段", "location": "地点", "activity": "干了什么事"}
+			  ],
+			  "appUsage": [
+			    {"appName": "应用名", "duration": "使用时长"}
+			  ],
+			  "diary": [
+			    {"timestamp": ${Date.now()}, "content": "【今天是${new Date().toLocaleString(
+            "zh-CN",
+            {
+              dateStyle: "full",
+            },
+          )}，用Markdown语法写一篇符合人设和今天情景的日记】"}
+			  ]
+			}
+
+			# 【【【重要指令：关于聊天记录生成】】】
+			- 你正在续写这段对话。你提供的聊天记录是上下文，你【绝对不能】重复或改写其中的任何内容。你的生成必须从【全新的、下一条】消息开始。
+			- 你必须严格遵守本提示词最上方的【绝对禁止事项】。
+			- 如果“你的专属NPC好友列表”不为空，你【必须】为列表中的【每一个NPC】都生成一段与你（${chat.name}）的对话。
+			- 如果列表为空，你可以虚构2-3个普通朋友并生成对话。
+			- 你必须为每个联系人生成一段【至少包含5条消息】的对话。
+			- 对话内容应该自然流畅，可以包含连续发言、表情包和表情符号等，以体现真实感。
+			- 不要只生成一问一答的机械式对话。
+			-   **【【【绝对禁止重复铁律】】】**: 你生成的 "messages" 数组中，【绝对不能】包含我提供给你的上下文里的任何一条消息。你的第一条消息必须是对话历史中最后一条消息的【下一条】。
+			`;
+
+            const { proxyUrl, apiKey, model } = state.apiConfig;
+            let isGemini = proxyUrl === GEMINI_API_URL;
+            let geminiConfig = toGeminiRequestData(
+              model,
+              apiKey,
+              prompt,
+              [{ role: "user", content: prompt }],
+              isGemini,
+            );
+
+            const response = isGemini
+              ? await fetch(geminiConfig.url, geminiConfig.data)
+              : await fetch(`${proxyUrl}/v1/chat/completions`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${apiKey}`,
+                  },
+                  body: JSON.stringify({
+                    model: model,
+                    messages: [{ role: "user", content: prompt }],
+                    temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+                  }),
+                });
+
+            if (!response.ok) {
+              let errorMsg = `API请求失败，状态码: ${response.status}`;
+              try {
+                const errorData = await response.json();
+                errorMsg += `\n错误信息: ${errorData.error.message}`;
+              } catch (e) {
+                errorMsg += `\n无法解析错误响应体。`;
+              }
+              throw new Error(errorMsg);
+            }
+
+            const data = await response.json();
+            const aiResponseContent = (
+              isGemini
+                ? data.candidates[0].content.parts[0].text
+                : data.choices[0].message.content
+            ).replace(/^```json\s*|```$/g, "");
+
+            let newData;
+            try {
+              newData = JSON.parse(aiResponseContent);
+            } catch (e) {
+              throw new Error(
+                `AI返回的不是有效的JSON格式，无法解析。\n原始返回内容:\n${aiResponseContent}`,
+              );
+            }
+
+            let phoneData = chat.characterPhoneData;
+            phoneData.lastGenerated = Date.now();
+
+            if (newData.chats) {
+              newData.chats.forEach((newChat) => {
+                if (!newChat.messages) {
+                  const myNickname = userNickname || "我";
+                  if (!phoneData.chats[myNickname]) {
+                    phoneData.chats[myNickname] = { avatar: "", history: [] };
+                  }
+                  phoneData.chats[myNickname].remarkName = newChat.contactName;
+                } else {
+                  const contactName = newChat.contactName;
+                  if (
+                    phoneData.chats[contactName] &&
+                    phoneData.chats[contactName].history
+                  ) {
+                    console.log(
+                      `合并聊天记录: 为 "${contactName}" 追加 ${newChat.messages.length} 条新消息。`,
+                    );
+                    phoneData.chats[contactName].history.push(
+                      ...newChat.messages,
+                    );
+                  } else {
+                    console.log(`创建新聊天: "${contactName}"`);
+                    phoneData.chats[contactName] = {
+                      avatar: newChat.avatar,
+                      history: newChat.messages,
+                    };
+                  }
+                }
+              });
+            }
+
+            // 正确处理其他数组类型数据
+            if (!phoneData.shoppingCart) phoneData.shoppingCart = [];
+            phoneData.shoppingCart.push(...(newData.shoppingCart || []));
+            if (!phoneData.memos) phoneData.memos = [];
+            phoneData.memos.push(...(newData.memos || []));
+            if (!phoneData.browserHistory) phoneData.browserHistory = [];
+            phoneData.browserHistory.push(...(newData.browserHistory || []));
+            if (!phoneData.photoAlbum) phoneData.photoAlbum = [];
+            phoneData.photoAlbum.push(...(newData.photoAlbum || []));
+            if (!phoneData.trajectory) phoneData.trajectory = [];
+            phoneData.trajectory.push(...(newData.trajectory || []));
+            if (!phoneData.diary) phoneData.diary = [];
+            phoneData.diary.push(...(newData.diary || []));
+
+            if (newData.appUsage && Array.isArray(newData.appUsage)) {
+              const usageMap = new Map();
+              // 先加载已有的使用记录
+              (phoneData.appUsage || []).forEach((item) => {
+                usageMap.set(
+                  item.appName,
+                  (usageMap.get(item.appName) || 0) +
+                    parseDurationToMinutes(item.duration),
+                );
+              });
+              // 再累加新生成的使用记录
+              newData.appUsage.forEach((item) => {
+                usageMap.set(
+                  item.appName,
+                  (usageMap.get(item.appName) || 0) +
+                    parseDurationToMinutes(item.duration),
+                );
+              });
+              // 重新生成合并后的列表
+              const mergedUsage = [];
+              for (const [appName, totalMinutes] of usageMap.entries()) {
+                mergedUsage.push({
+                  appName: appName,
+                  duration: formatMinutesToDuration(totalMinutes),
+                });
+              }
+              phoneData.appUsage = mergedUsage;
+            }
+
+            if (newData.bank) {
+              if (!phoneData.bank)
+                phoneData.bank = { balance: 0, transactions: [] };
+              if (typeof phoneData.bank.balance !== "number")
+                phoneData.bank.balance = 0;
+
+              // 如果AI返回了新的总余额 (通常是第一次生成时)，则以此为准
+              if (typeof newData.bank.balance === "number") {
+                phoneData.bank.balance = newData.bank.balance;
+              }
+
+              if (
+                newData.bank.transactions &&
+                Array.isArray(newData.bank.transactions)
+              ) {
+                newData.bank.transactions.forEach((transaction) => {
+                  const amount = parseFloat(transaction.amount);
+                  if (!isNaN(amount)) {
+                    // 只有在AI没有直接提供新余额时，我们才根据交易记录自己计算
+                    if (typeof newData.bank.balance !== "number") {
+                      if (transaction.type === "收入") {
+                        phoneData.bank.balance += amount;
+                      } else if (transaction.type === "支出") {
+                        phoneData.bank.balance -= amount;
+                      }
+                    }
+                  }
+                });
+                // 将新交易记录追加到历史记录中
+                if (!phoneData.bank.transactions)
+                  phoneData.bank.transactions = [];
+                phoneData.bank.transactions.push(...newData.bank.transactions);
+              }
+            }
+
+            await db.chats.put(chat);
+            alert("数据已刷新！");
+          } catch (error) {
+            console.error("生成角色手机数据失败:", error);
+            await showCustomAlert(
+              "生成失败",
+              `发生了一个错误，请检查你的网络、API密钥或模型设置。\n\n详细信息:\n${error.message}`,
+            );
+          } finally {
+            document
+              .getElementById("generation-overlay")
+              .classList.remove("visible");
+          }
+        }
+
+        /**
+         * 清空角色手机数据
+         */
+        async function clearCharacterPhoneData() {
+          if (!activeCharacterPhoneId) return;
+          const chat = state.chats[activeCharacterPhoneId];
+          if (!chat) return;
+
+          const confirmed = await showCustomConfirm(
+            "确认清空",
+            `确定要清空“${chat.name}”的所有手机数据吗？此操作不可恢复。`,
+            { confirmButtonClass: "btn-danger" },
+          );
+          if (confirmed) {
+            // 重置为初始状态
+            chat.characterPhoneData = {
+              lastGenerated: null,
+              chats: {},
+              shoppingCart: [],
+              memos: [],
+              browserHistory: [],
+              photoAlbum: [],
+              bank: { balance: 0, transactions: [] },
+              trajectory: [],
+              appUsage: [],
+              diary: [], // <--- 在这里新增
+            };
+            await db.chats.put(chat);
+            // 重新渲染APP网格，因为点击APP会读取新数据
+            renderCharacterAppGrid();
+            alert("数据已清空。");
+          }
+        }
+
+        /**
+         * 渲染角色手机的聊天列表 (支持透明磨砂分组)
+         */
+        function renderCharacterChatList() {
+          const listEl = document.getElementById("character-chat-list");
+          const characterChat = state.chats[activeCharacterPhoneId];
+          if (!characterChat) return;
+
+          const characterChatData = characterChat.characterPhoneData;
+          const realChatHistory = characterChat.history;
+          listEl.innerHTML = "";
+
+          const npcContainer = document.createElement("div");
+          npcContainer.className = "npc-chat-group"; // 给它一个专属的class名
+
+          // 获取 "我" 的备注名
+          const userContactInData = characterChatData.chats
+            ? Object.values(characterChatData.chats).find(
+                (c) => !c.history || c.history.length === 0,
+              )
+            : null;
+          const remarkNameForMe = userContactInData
+            ? userContactInData.remarkName
+            : "我";
+
+          // 渲染与 "我" 的聊天
+          const lastMsg = realChatHistory
+            .filter((m) => !m.isHidden)
+            .slice(-1)[0] || { content: "..." };
+          const myChatItem = document.createElement("div");
+          myChatItem.className = "chat-list-item"; // 这个是用户自己的消息，单独处理
+          myChatItem.dataset.contactName = remarkNameForMe;
+          myChatItem.dataset.isUserChat = "true";
+          const myAvatar =
+            characterChat.settings.myAvatar || defaultMyGroupAvatar;
+          myChatItem.innerHTML = `
+			                        <img src="${myAvatar}" class="avatar" style="border-radius: 6px;">
+			                        <div class="info">
+			                            <span class="name">${remarkNameForMe}</span>
+			                            <div class="last-msg">${stripHtmlAndCode(String(lastMsg.content)).substring(0, 30)}</div>
+			                        </div>
+			                    `;
+          listEl.appendChild(myChatItem);
+
+          // 渲染与其他NPC的聊天
+          if (characterChatData.chats) {
+            for (const contactName in characterChatData.chats) {
+              if (contactName === remarkNameForMe) continue;
+              const contact = characterChatData.chats[contactName];
+              if (!contact.history || contact.history.length === 0) continue;
+
+              const lastNpcMsg = contact.history.slice(-1)[0] || {
+                content: "...",
+              };
+              const npcChatItem = document.createElement("div");
+              npcChatItem.className = "chat-list-item";
+              npcChatItem.dataset.contactName = contactName;
+
+              let npcAvatarHtml;
+              const npcFromLibrary = (characterChat.npcLibrary || []).find(
+                (npc) => npc.name === contactName,
+              );
+              if (npcFromLibrary && npcFromLibrary.avatar) {
+                npcAvatarHtml = `<img src="${npcFromLibrary.avatar}" class="avatar" style="border-radius: 6px;">`;
+              } else {
+                const avatarColors = [
+                  "#FFC107",
+                  "#4CAF50",
+                  "#2196F3",
+                  "#F44336",
+                  "#9C27B0",
+                  "#00BCD4",
+                ];
+                const npcNameInitial = contactName.slice(-1);
+                const colorIndex = contactName.length % avatarColors.length;
+                const bgColor = avatarColors[colorIndex];
+                npcAvatarHtml = `<div class="avatar" style="border-radius: 6px; background-color: ${bgColor}; color: white; display: flex; justify-content: center; align-items: center; font-size: 18px; font-weight: 500;">${npcNameInitial}</div>`;
+              }
+              npcChatItem.innerHTML = `${npcAvatarHtml}<div class="info"><span class="name">${contactName}</span><div class="last-msg">${stripHtmlAndCode(
+                String(lastNpcMsg.content),
+              ).substring(0, 30)}</div></div>`;
+
+              // 将NPC消息添加到新的容器中
+              npcContainer.appendChild(npcChatItem);
+            }
+          }
+
+          // 将包含所有NPC消息的容器一次性添加到列表中
+          if (npcContainer.hasChildNodes()) {
+            listEl.appendChild(npcContainer);
+          }
+        }
+
+        /**
+         * 渲染角色手机的具体聊天记录 (分页加载)
+         */
+        function renderCharacterChatHistory(
+          contactName,
+          isUserChat = false,
+          loadOffset = 0,
+        ) {

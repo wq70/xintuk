@@ -1,0 +1,372 @@
+    .addEventListener("click", () => {
+      if (postReturnContext === "bookshelf") {
+        showScreen("forum-bookshelf-screen");
+      } else if (postReturnContext === "series-detail" && activeSeriesId) {
+        renderSeriesDetail(activeSeriesId);
+        showScreen("forum-series-detail-screen");
+      } else {
+        openGroup(
+          window.activeGroupId,
+          document.getElementById("group-screen-title").textContent,
+        );
+      }
+      postReturnContext = "group";
+    });
+
+  // 4. 绑定帖子评论区的发送按钮
+  document
+    .getElementById("send-post-comment-btn")
+    .addEventListener("click", handleAddComment);
+
+  // 绑定所有小组头部通用的“生成”按钮
+  document
+    .getElementById("generate-group-content-btn")
+    .addEventListener("click", handleGenerateGroupContent);
+  // ▲▲▲ 替换结束 ▲▲▲
+
+  // 6. 绑定帖子详情页的“转载”按钮
+  document
+    .getElementById("repost-to-chat-btn")
+    .addEventListener("click", repostToChat);
+
+  // ▼▼▼ 在 init() 函数中，用【这一行】替换旧的 create-group-btn 监听器 ▼▼▼
+  document
+    .getElementById("create-group-btn")
+    .addEventListener("click", openGroupCreator);
+  // ▲▲▲ 替换结束 ▲▲▲
+
+  // ▼▼▼ 用这块新代码替换 ▼▼▼
+  document
+    .getElementById("create-forum-post-btn")
+    .addEventListener("click", () => {
+      // 【核心修改】我们不再弹窗提示，而是调用一个新函数来打开真正的发帖窗口
+      openCreateForumPostModal();
+    });
+  // 使用事件委托，为帖子详情页的“生成评论”按钮 和 “删除评论”按钮 绑定事件
+  document
+    .getElementById("post-detail-content")
+    .addEventListener("click", async (e) => {
+      const actionBtn = e.target.closest("[data-action]");
+      if (actionBtn) {
+        const seriesId = parseInt(actionBtn.dataset.seriesId);
+        if (
+          actionBtn.classList.contains("disabled") ||
+          actionBtn.hasAttribute("disabled")
+        )
+          return;
+        if (actionBtn.dataset.action === "follow-series") {
+          if (!isNaN(seriesId)) {
+            await followSeries(seriesId);
+            if (activeForumPostId) await renderPostDetails(activeForumPostId);
+          }
+          return;
+        }
+        if (actionBtn.dataset.action === "continue-series") {
+          if (!isNaN(seriesId)) {
+            await generateNextSeriesChapter(seriesId);
+            if (activeForumPostId) await renderPostDetails(activeForumPostId);
+          }
+          return;
+        }
+      }
+      // 1. 处理生成评论
+      if (e.target.id === "generate-forum-comments-btn") {
+        generateForumComments();
+        return;
+      }
+
+      // 2. ★ 新增：处理删除评论
+      if (e.target.classList.contains("forum-comment-delete-btn")) {
+        e.stopPropagation(); // 阻止冒泡，防止触发回复功能
+        const commentId = parseInt(e.target.dataset.id);
+
+        if (isNaN(commentId)) return;
+
+        // 弹出确认框
+        const confirmed = await showCustomConfirm(
+          "删除评论",
+          "确定要删除这条评论吗？",
+          {
+            confirmButtonClass: "btn-danger",
+          },
+        );
+
+        if (confirmed) {
+          try {
+            await db.forumComments.delete(commentId);
+            // 刷新当前帖子详情页
+            if (activeForumPostId) {
+              await renderPostDetails(activeForumPostId);
+            }
+            // (可选) 如果你希望删除评论后列表页的评论数也刷新，可以解开下面这行
+            // if (activeGroupId) await renderGroupPosts(activeGroupId);
+          } catch (error) {
+            console.error("删除失败", error);
+            alert("删除失败: " + error.message);
+          }
+        }
+      }
+    });
+
+  // 在用户手动输入评论后，如果输入框为空就失去焦点时，自动取消回复状态
+  document
+    .getElementById("post-comment-input")
+    .addEventListener("blur", (e) => {
+      const input = e.target;
+      if (input.value.trim() === "") {
+        input.placeholder = "发布你的评论...";
+        delete input.dataset.replyTo;
+      }
+    });
+  // ▲▲▲ 新代码粘贴结束 ▲▲▲
+  // ▼▼▼ 在 init() 函数的事件监听器区域末尾，粘贴下面这整块新代码 ▼▼▼
+
+  // 使用事件委托，为所有转载的帖子卡片添加点击事件
+  document.getElementById("chat-messages").addEventListener("click", (e) => {
+    const repostCard = e.target.closest(".link-share-card[data-post-id]");
+    if (repostCard) {
+      const postId = parseInt(repostCard.dataset.postId);
+      if (!isNaN(postId)) {
+        // 调用你已经写好的“打开帖子”函数
+        openPost(postId);
+      }
+    }
+  });
+
+  // ▲▲▲ 新增代码结束 ▲▲▲
+  // ▼▼▼ 【全新】论坛帖子列表事件委托 ▼▼▼
+  document
+    .getElementById("group-post-list")
+    .addEventListener("click", async (e) => {
+      const postItem = e.target.closest(".forum-post-item");
+      if (!postItem) return;
+
+      // 检查点击的是否是删除按钮
+      if (e.target.classList.contains("forum-post-delete-btn")) {
+        const postId = postItem.dataset.postId;
+        if (!postId) return;
+
+        const post = await db.forumPosts.get(parseInt(postId));
+        if (!post) return;
+
+        const confirmed = await showCustomConfirm(
+          "删除帖子",
+          `确定要删除帖子《${post.title}》吗？此操作将同时删除帖子下的所有评论，且无法恢复。`,
+          { confirmButtonClass: "btn-danger" },
+        );
+
+        if (confirmed) {
+          try {
+            // 使用数据库事务来确保帖子和评论被同时删除
+            await db.transaction(
+              "rw",
+              db.forumPosts,
+              db.forumComments,
+              async () => {
+                // 1. 删除所有与该帖子关联的评论
+                await db.forumComments
+                  .where("postId")
+                  .equals(parseInt(postId))
+                  .delete();
+                // 2. 删除帖子本身
+                await db.forumPosts.delete(parseInt(postId));
+              },
+            );
+
+            await showCustomAlert("删除成功", "帖子及其所有评论已被删除。");
+            // 刷新帖子列表
+            await renderGroupPosts(activeGroupId);
+          } catch (error) {
+            console.error("删除帖子失败:", error);
+            await showCustomAlert("删除失败", `操作失败: ${error.message}`);
+          }
+        }
+      } else {
+        // 如果点击的不是删除按钮，那就是点击了帖子本身，执行跳转逻辑
+        const postId = postItem.dataset.postId;
+        if (postId) {
+          openPost(parseInt(postId));
+        }
+      }
+    });
+  // ▲▲▲ 新事件监听器结束 ▲▲▲
+  // ▼▼▼ 【全新】圈子/小组高级功能事件监听 ▼▼▼
+
+  // 1. 为“圈子”主页右上角的“+”按钮，绑定创建小组的事件
+  document
+    .getElementById("create-group-btn")
+    .addEventListener("click", openGroupCreator);
+
+  // 2. 为小组编辑器弹窗的“保存”和“取消”按钮绑定事件
+  document
+    .getElementById("save-group-editor-btn")
+    .addEventListener("click", saveGroupSettings);
+  document
+    .getElementById("cancel-group-editor-btn")
+    .addEventListener("click", () => {
+      document
+        .getElementById("forum-group-editor-modal")
+        .classList.remove("visible");
+    });
+
+  // 3. 为分类管理弹窗的按钮绑定事件
+  document
+    .getElementById("add-new-forum-category-btn")
+    .addEventListener("click", addNewForumCategory);
+  document
+    .getElementById("close-forum-category-manager-btn")
+    .addEventListener("click", () => {
+      document
+        .getElementById("forum-category-manager-modal")
+        .classList.remove("visible");
+    });
+
+  // 4. 使用事件委托，为分类列表中的“删除”按钮绑定事件
+  document
+    .getElementById("existing-forum-categories-list")
+    .addEventListener("click", (e) => {
+      if (e.target.classList.contains("delete-group-btn")) {
+        // 复用样式
+        const categoryId = parseInt(e.target.dataset.id);
+        deleteForumCategory(categoryId);
+      }
+    });
+  // ▲▲▲ 新增事件监听结束 ▲▲▲
+  // ▼▼▼ 【全新】圈子/小组分类筛选功能事件监听 ▼▼▼
+  // 1. 绑定主页和小组页的筛选按钮
+  document
+    .getElementById("forum-filter-btn")
+    .addEventListener("click", () => openForumFilterModal("global"));
+  // 筛选按钮
+  document.getElementById("group-filter-btn").addEventListener("click", () => {
+    openForumFilterModal("group", window.activeGroupId); // 【修改】
+  });
+
+  // 2. 绑定筛选弹窗内的按钮
+  document
+    .getElementById("apply-forum-filter-btn")
+    .addEventListener("click", applyForumFilter);
+  document
+    .getElementById("cancel-forum-filter-btn")
+    .addEventListener("click", () => {
+      document.getElementById("forum-filter-modal").classList.remove("visible");
+    });
+  document
+    .getElementById("reset-forum-filter-btn")
+    .addEventListener("click", async () => {
+      // 清空复选框并应用
+      document
+        .querySelectorAll("#forum-filter-category-list input:checked")
+        .forEach((cb) => (cb.checked = false));
+      await applyForumFilter();
+    });
+  // ▲▲▲ 新增事件监听结束 ▲▲▲
+  // --- 同人文控制台事件绑定 ---
+  document
+    .getElementById("fanfic-bar-header")
+    .addEventListener("click", toggleFanficBar);
+
+  document
+    .getElementById("save-fanfic-preset-btn")
+    .addEventListener("click", saveCurrentFanficPreset);
+
+  document
+    .getElementById("delete-fanfic-preset-btn")
+    .addEventListener("click", deleteFanficPreset);
+
+  document
+    .getElementById("fanfic-preset-select")
+    .addEventListener("change", applyFanficPreset);
+
+  const forumBookshelfBtn = document.getElementById("open-forum-bookshelf-btn");
+  if (forumBookshelfBtn) {
+    forumBookshelfBtn.addEventListener("click", openForumBookshelf);
+  }
+
+  const backFromBookshelfBtn = document.getElementById(
+    "back-from-forum-bookshelf",
+  );
+  if (backFromBookshelfBtn) {
+    backFromBookshelfBtn.addEventListener("click", () =>
+      showScreen("forum-screen"),
+    );
+  }
+
+  const backFromSeriesDetailBtn = document.getElementById(
+    "back-from-series-detail",
+  );
+  if (backFromSeriesDetailBtn) {
+    backFromSeriesDetailBtn.addEventListener("click", () =>
+      showScreen("forum-bookshelf-screen"),
+    );
+  }
+
+  const seriesNextBtn = document.getElementById("series-next-chapter-btn");
+  if (seriesNextBtn) {
+    seriesNextBtn.addEventListener("click", async () => {
+      if (seriesNextBtn.disabled) return;
+      const seriesId = parseInt(
+        seriesNextBtn.dataset.seriesId || activeSeriesId,
+      );
+      if (!isNaN(seriesId)) {
+        await generateNextSeriesChapter(seriesId);
+      }
+    });
+  }
+
+  const bookshelfListEl = document.getElementById("forum-bookshelf-list");
+  if (bookshelfListEl) {
+    bookshelfListEl.addEventListener("click", async (e) => {
+      const actionBtn = e.target.closest("[data-series-action]");
+      if (!actionBtn) return;
+      const seriesId = parseInt(actionBtn.dataset.seriesId);
+      if (isNaN(seriesId)) return;
+      if (
+        actionBtn.classList.contains("disabled") ||
+        actionBtn.hasAttribute("disabled")
+      )
+        return;
+      const series = await db.forumSeries.get(seriesId);
+      if (series?.groupId) window.activeGroupId = series.groupId;
+      activeSeriesId = seriesId;
+      const action = actionBtn.dataset.seriesAction;
+      if (action === "read-latest") {
+        const postId = parseInt(actionBtn.dataset.postId);
+        postReturnContext = "bookshelf";
+        if (!isNaN(postId)) {
+          openPost(postId, "bookshelf", seriesId);
+        } else {
+          openSeriesDetail(seriesId);
+        }
+      } else if (action === "open-detail") {
+        await openSeriesDetail(seriesId);
+      } else if (action === "continue") {
+        await generateNextSeriesChapter(seriesId);
+      } else if (action === "share") {
+        await shareSeriesToChat(seriesId);
+      }
+    });
+  }
+
+  const seriesChapterList = document.getElementById(
+    "forum-series-chapter-list",
+  );
+  if (seriesChapterList) {
+    seriesChapterList.addEventListener("click", async (e) => {
+      const actionBtn = e.target.closest("[data-series-action]");
+      if (!actionBtn) return;
+      if (actionBtn.dataset.seriesAction === "open-post") {
+        const seriesId = parseInt(actionBtn.dataset.seriesId);
+        const postId = parseInt(actionBtn.dataset.postId);
+        if (isNaN(postId)) return;
+        const series = await db.forumSeries.get(seriesId);
+        if (series?.groupId) window.activeGroupId = series.groupId;
+        activeSeriesId = seriesId;
+        postReturnContext = "series-detail";
+        openPost(postId, "series-detail", seriesId);
+      }
+    });
+  }
+
+  // ▲▲▲ 论坛事件监听器结束 ▲▲▲
+});

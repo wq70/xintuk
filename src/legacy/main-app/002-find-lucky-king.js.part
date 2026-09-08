@@ -1,0 +1,802 @@
+              storyline: `我急需用钱，但老家伙一分钱都不肯给我。我今晚准备偷点东西去卖。\n**晚上8:00**：我和安娜在花园见面，她告诉我一条通往书房的密道，这正合我意。\n**晚上8:30**：我看到医生马丁行色匆匆地进了伯爵的书房。\n**晚上9:10**：我准备通过安娜告诉我的密道进入书房，但在密道口听到了里面有奇怪的响动，我害怕被发现，就退了回来。\n**晚上9:40**：我在走廊里遇到了女巫罗兰女士，她警告我今晚城堡会有血光之灾，让我不要乱走动。她的眼神很奇怪，让我不寒而栗。`,
+              tasks:
+                "1. 隐藏你计划偷窃以及知道密道的事实。\n2. 伯爵死了，你是最大受益人，你的嫌疑最大。你需要将嫌疑转移到他人身上，比如医生或行为诡异的女巫。\n3. 你需要找到对你有利的证据。",
+              isKiller: false,
+            },
+            {
+              name: "马丁医生",
+              description: "伯爵的私人医生，医术高明，但深陷赌博债务。",
+              storyline: `我欠了伯爵一大笔钱，他拿走了我的行医执照作为抵押，并威胁如果我还不上钱，就让我身败名裂。\n**晚上8:30**：我去找伯爵，恳求他再宽限我一段时间。他不仅拒绝了，还羞辱了我一番。我绝望地离开。\n**晚上9:00**：我回到我的房间，准备了一些强效镇定剂，我计划让他睡着，然后偷回我的行医执照。\n**晚上9:20**：我再次来到书房门口，却听到里面安娜和伯爵在激烈争吵。我只好暂时放弃计划，躲在附近观察。\n**晚上9:40后**：我看到安娜气冲冲地离开后，就再也没人进出过书房。我因为害怕一直没敢动手，直到尸体被发现。`,
+              tasks:
+                "1. 隐藏你欠下巨额赌债并被伯爵威胁的事实。\n2. 隐藏你准备了镇定剂并计划偷东西的意图。\n3. 你是最后一个见到伯爵的人之一，你需要证明你离开后还有作案时间。",
+              isKiller: false,
+            },
+            {
+              name: "罗兰女士",
+              description:
+                "著名的灵媒、女巫，被伯爵请来进行降神会，与城堡的“幽灵”对话。",
+              storyline: `我是个骗子。伯爵发现了我的秘密，并以此敲诈我，让我免费为他“服务”。\n**晚上9:10**：伯爵把我叫到书房，再次威胁我，说如果今晚的降神会不能让他满意，就要揭穿我的一切。我感到前所未有的恐惧。\n**晚上9:30**：我借口准备仪式，独自留在书房。伯爵背对着我，在欣赏一幅画。我看到桌上有一把锋利的拆信刀，一时冲动，拿起刀从背后刺向了他。他当场倒下。我发出一声短促的尖叫，但立刻捂住了嘴。\n**晚上9:35**：我慌乱地将书房门从内反锁，然后从墙角的书架后面启动了密道（这是我之前偷偷发现的），逃离了现场。在密道中，我的一片蕾丝袖口被挂掉了。\n**晚上9:40**：我从密道出来，遇到了爱德华，我故作神秘地警告他有血光之灾，以掩饰我的慌张。`,
+              tasks:
+                "1. 你是真凶！你的任务是隐藏一切，将罪行嫁祸给他人。\n2. 利用你“女巫”的身份，编造一些鬼神之说来混淆视听。\n3. 爱德华和安娜都知道密道，这是嫁祸他们的好机会。马丁医生有强烈的动机，也可以加以利用。",
+              isKiller: true,
+            },
+          ],
+          clues: [
+            {
+              owner: "安娜",
+              description:
+                "你的珠宝盒里有一张单程的火车票，目的地是巴黎，时间是明天一早。",
+            },
+            {
+              owner: "爱德华",
+              description:
+                "你的口袋里有一张当票，上面是一枚属于伯爵家族的古董怀表。",
+            },
+            {
+              owner: "马丁医生",
+              description:
+                "你的药箱里有一瓶几乎满装的强效镇定剂，以及一张伯爵写的、要求你一周内还清10万英镑欠款的字条。",
+            },
+            {
+              owner: "罗兰女士",
+              description:
+                "你的长裙袖口处有一块明显的撕裂痕迹，似乎是被什么东西挂坏的。",
+              isKey: true,
+            },
+            {
+              owner: "公共",
+              description:
+                "在书房壁炉后面发现一个隐蔽的按钮，按下后，旁边的一整面书架会旋转打开，露出一条通往楼上走廊的密道。",
+            },
+            {
+              owner: "公共",
+              description: "在密道的地板上，发现了一小片黑色的蕾丝布料。",
+            },
+            {
+              owner: "公共",
+              description:
+                "伯爵的书桌上摊开着一本关于“灵媒与欺诈”的书，其中一页用红笔圈出了“罗兰女士”的名字。",
+            },
+          ],
+          truth:
+            "凶手是女巫罗兰女士。伯爵发现了她是个骗子并以此敲诈她。当晚，伯爵再次威胁她，罗兰在恐惧和愤怒之下，用拆信刀从背后杀害了伯主。她知道城堡的密道，于是反锁房门，通过密道逃离，伪造了密室杀人案。但慌乱中，她的一片蕾f丝袖口挂在了密道里，成为了关键证据。",
+        },
+      ];
+
+      /**
+       * 【全新】从一个已领完的红包中找出“手气王”
+       * @param {object} packet - 已领完的红包消息对象
+       * @returns {object|null} - 返回手气王的信息 { name, amount }，或 null
+       */
+      function findLuckyKing(packet) {
+        const claimedBy = packet.claimedBy || {};
+        const claimedEntries = Object.entries(claimedBy);
+
+        // 如果红包是“拼手气”类型，并且有超过1个人领取
+        if (packet.packetType === "lucky" && claimedEntries.length > 1) {
+          let luckyKing = { name: "", amount: -1 };
+          claimedEntries.forEach(([name, amount]) => {
+            if (amount > luckyKing.amount) {
+              luckyKing = { name, amount };
+            }
+          });
+          return luckyKing;
+        }
+        return null; // 如果不满足条件，则没有手气王
+      }
+
+      // ▲▲▲ 新代码粘贴结束 ▲▲▲
+      window.state = {
+        chats: {},
+        activeChatId: null,
+        globalSettings: {},
+        apiConfig: {},
+        userStickers: [],
+        worldBooks: [],
+        personaPresets: [],
+        qzoneSettings: {},
+        activeAlbumId: null,
+      };
+
+      const defaultAvatar = "https://i.postimg.cc/PxZrFFFL/o-o-1.jpg";
+      const defaultMyGroupAvatar = "https://i.postimg.cc/cLPP10Vm/4.jpg";
+      const defaultGroupMemberAvatar = "https://i.postimg.cc/VkQfgzGJ/1.jpg";
+      const defaultGroupAvatar =
+        "https://i.postimg.cc/gc3QYCDy/1-NINE7-Five.jpg";
+
+      const GEMINI_API_URL =
+        "https://generativelanguage.googleapis.com/v1beta/models";
+      // gemini如果是多个密钥, 那么随机获取一个
+      function getRandomValue(str) {
+        // 检查字符串是否包含逗号
+        if (str.includes(",")) {
+          // 用逗号分隔字符串并移除多余空格
+          const arr = str.split(",").map((item) => item.trim());
+          // 生成随机索引 (0 到 arr.length-1)
+          const randomIndex = Math.floor(Math.random() * arr.length);
+          // 返回随机元素
+          return arr[randomIndex];
+        }
+        // 没有逗号则直接返回原字符串
+        return str;
+      }
+      function isImage(text, content) {
+        let currentImageData = content.image_url.url;
+        // 提取Base64数据（去掉前缀）
+        const base64Data = currentImageData.split(",")[1];
+        // 根据图片类型获取MIME类型
+        const mimeType = currentImageData.match(/^data:(.*);base64/)[1];
+        return [
+          { text: `${text.text}用户向你发送了一张图片` },
+          {
+            inline_data: {
+              mime_type: mimeType,
+              data: base64Data,
+            },
+          },
+        ];
+      }
+
+      function extractArray(text) {
+        // 正则表达式模式：匹配开头的时间戳部分和后续的JSON数组
+        const pattern = /^\(Timestamp: (\d+)\)(.*)$/s;
+        const match = text.match(pattern);
+
+        if (match) {
+          const timestampPart = `(Timestamp: ${match[1]}) `;
+          const jsonPart = match[2].trim();
+
+          try {
+            // 尝试解析JSON部分
+            const parsedJson = JSON.parse(jsonPart);
+            // 验证解析结果是否为数组
+            if (Array.isArray(parsedJson)) {
+              return [timestampPart, parsedJson[0]];
+            }
+          } catch (error) {
+            // 解析失败，返回原始文本
+          }
+        }
+
+        // 不匹配格式或解析失败时返回原值
+        return text;
+      }
+      function transformChatData(item) {
+        let type = {
+          send_and_recall: "撤回了消息",
+          update_status: "更新了状态",
+          change_music: "切换了歌曲",
+          create_memory: "记录了回忆",
+          create_countdown: "创建了约定/倒计时",
+          text: "发送了文本",
+          sticker: "发送了表情",
+          ai_image: "发送了图片",
+          voice_message: "发送了语音",
+          transfer: "发起了转账",
+          waimai_request: "发起了外卖请求",
+          waimai_response: {
+            paid: "回应了外卖-同意",
+            rejected: "回应了外卖-拒绝",
+          },
+          video_call_request: "发起了视频通话",
+          video_call_response: {
+            accept: "回应了视频通话-接受",
+            reject: "回应了视频通话-拒绝",
+          },
+          qzone_post: {
+            shuoshuo: "发布了说说",
+            text_image: "发布了文字图",
+          },
+          qzone_comment: "评论了动态",
+          qzone_like: "点赞了动态",
+          pat_user: "拍一拍了用户",
+          block_user: "拉黑了用户",
+          friend_request_response: "回应了好友申请",
+          change_avatar: "更换了头像",
+          share_link: "分享了链接",
+          accept_transfer: "回应了转账-接受",
+          decline_transfer: "回应了转账-拒绝/退款",
+          quote_reply: "引用了回复",
+          text: "",
+        };
+        let res = extractArray(item.content);
+
+        if (Array.isArray(res)) {
+          let obj = res[1];
+          let itemType = obj.type;
+          let time = res[0];
+          let text = type[itemType];
+          if (text) {
+            if (itemType === "sticker") {
+              return [{ text: `${time}[${text}] 含义是:${obj.meaning}` }];
+            } else if (itemType === "send_and_recall") {
+              return [{ text: `${time}[${text}] ${obj.content}` }];
+            } else if (itemType === "update_status") {
+              return [
+                {
+                  text: `${time}[${text}] ${obj.status_text}(${obj.is_busy ? "忙碌/离开" : "空闲"})`,
+                },
+              ];
+            } else if (itemType === "change_music") {
+              return [
+                {
+                  text: `${time}[${text}] ${obj.change_music}, 歌名是:${obj.song_name}`,
+                },
+              ];
+            } else if (itemType === "create_memory") {
+              return [{ text: `${time}[${text}] ${obj.description}` }];
+            } else if (itemType === "create_countdown") {
+              return [{ text: `${time}[${text}] ${obj.title}(${obj.date})` }];
+            } else if (itemType === "ai_image") {
+              return [
+                { text: `${time}[${text}] 图片描述是:${obj.description}` },
+              ];
+            } else if (itemType === "voice_message") {
+              return [{ text: `${time}[${text}] ${obj.content}` }];
+            } else if (itemType === "transfer") {
+              return [
+                {
+                  text: `${time}[${text}] 金额是:${obj.amount} 备注是:${obj.amount}`,
+                },
+              ];
+            } else if (itemType === "waimai_request") {
+              return [
+                {
+                  text: `${time}[${text}] 金额是:${obj.amount} 商品是:${obj.productInfo}`,
+                },
+              ];
+            } else if (itemType === "waimai_response") {
+              return [
+                {
+                  text: `${time}[${text[obj.status]}] ${obj.status === "paid" ? "同意" : "拒绝"}`,
+                },
+              ];
+            } else if (itemType === "video_call_request") {
+              return [{ text: `${time}[${text}]` }];
+            } else if (itemType === "video_call_request") {
+              return [
+                {
+                  text: `${time}[${text[obj.decision]}] ${obj.decision === "accept" ? "同意" : "拒绝"}`,
+                },
+              ];
+            } else if (itemType === "qzone_post") {
+              return [
+                {
+                  text: `${time}[${text[obj.postType]}] ${
+                    obj.postType === "shuoshuo"
+                      ? `${obj.content}`
+                      : `图片描述是:${obj.hiddenContent} ${obj.publicText ? `文案是: ${obj.publicText}` : ""}`
+                  }`,
+                },
+              ];
+            } else if (itemType === "qzone_comment") {
+              return [
+                {
+                  text: `${time}[${text}] 评论的id是: ${obj.postId} 评论的内容是: ${obj.commentText}`,
+                },
+              ];
+            } else if (itemType === "qzone_like") {
+              return [{ text: `${time}[${text}] 点赞的id是: ${obj.postId}` }];
+            } else if (itemType === "pat_user") {
+              return [
+                { text: `${time}[${text}] ${obj.suffix ? obj.suffix : ""}` },
+              ];
+            } else if (itemType === "block_user") {
+              return [{ text: `${time}[${text}]` }];
+            } else if (itemType === "friend_request_response") {
+              return [
+                {
+                  text: `${time}[${text}] 结果是:${obj.decision === "accept" ? "同意" : "拒绝"}`,
+                },
+              ];
+            } else if (itemType === "change_avatar") {
+              return [{ text: `${time}[${text}] 头像名是:${obj.name}` }];
+            } else if (itemType === "share_link") {
+              return [
+                {
+                  text: `${time}[${text}] 文章标题是:${obj.title}  文章摘要是:${obj.description} 来源网站名是:${obj.source_name} 文章正文是:${obj.content}`,
+                },
+              ];
+            } else if (itemType === "accept_transfer") {
+              return [{ text: `${time}[${text}]` }];
+            } else if (itemType === "accept_transfer") {
+              return [{ text: `${time}[${text}]` }];
+            } else if (itemType === "quote_reply") {
+              return [
+                { text: `${time}[${text}] 引用的内容是:${obj.reply_content}` },
+              ];
+            } else if (itemType === "text") {
+              return [{ text: `${time}${obj.content}` }];
+            }
+          }
+
+          // (例如，它是一个数组，或者一个AI返回的、我们不认识的JSON对象)
+          if (typeof res !== "string") {
+            // 我们就强制使用最原始、最安全的 item.content 字符串
+            res = item.content;
+          }
+
+          return [{ text: String(res || "") }];
+        }
+      }
+
+      /**
+       * 【已修复 Gemini 直连问题】构建 Gemini API 请求数据
+       * 修复内容：
+       * 1. 自动合并连续的相同角色消息 (解决 context 丢失和 400 错误)
+       * 2. 智能去重 System Prompt (解决重复生成和忽略用户输入)
+       * 3. 确保 contents 不为空 (解决功能性 400 错误)
+       */
+      window.toGeminiRequestData = function (
+        model,
+        apiKey,
+        systemInstruction,
+        messagesForDecision,
+        isGemini,
+        temperature,
+      ) {
+        if (!isGemini) {
+          return undefined;
+        }
+
+        let roleType = {
+          user: "user",
+          assistant: "model",
+          system: "user", // System 消息在 Gemini 中通常作为 User 消息的一部分或 SystemInstruction
+        };
+
+        // --- 1. 预处理消息列表 ---
+        let processedMessages = [...messagesForDecision];
+        let finalSystemInstruction = systemInstruction;
+
+        // 场景A：聊天模式
+        // 如果消息列表很长，且最后一条消息的内容等于 System Instruction
+        // 说明这是 triggerAiResponse 自动追加的，我们需要把它移除，防止重复和覆盖用户输入
+        if (finalSystemInstruction && processedMessages.length > 1) {
+          const lastMsg = processedMessages[processedMessages.length - 1];
+          if (
+            lastMsg.role === "system" &&
+            lastMsg.content === finalSystemInstruction
+          ) {
+            processedMessages.pop();
+          }
+        }
+        // 场景B：功能生成模式 (如查手机、生成图片描述)
+        // 这种情况下 messagesForDecision 通常只包含一条与 System Instruction 相同的消息
+        // 为了避免 contents 为空 (导致400)，我们清空 systemInstruction 字段，让这条消息作为唯一的 User 消息发送
+        else if (processedMessages.length === 1 && finalSystemInstruction) {
+          if (processedMessages[0].content === finalSystemInstruction) {
+            finalSystemInstruction = ""; // 清空系统指令，依靠 contents 里的消息
+          }
+        }
+
+        // --- 2. 构建 contents 数组 (核心：合并连续角色) ---
+        const contents = [];
+        let currentTurn = null;
+
+        processedMessages.forEach((item) => {
+          const targetRole = roleType[item.role] || "user";
+
+          // 处理消息内容，兼容多模态 (图片) 和纯文本
+          let parts = [];
+          if (Array.isArray(item.content)) {
+            // 检查是否包含图片
+            const hasImage = item.content.some(
+              (sub) => sub.type === "image_url",
+            );
+            if (hasImage) {
+              parts = isImage(item.content[0], item.content[1]);
+            } else {
+              // 纯文本数组转字符串
+              parts = [{ text: JSON.stringify(item.content) }];
+            }
+          } else {
+            // 普通字符串
+            const textVal = String(item.content || "");
+            if (textVal.trim() === "") return; // 跳过空消息
+            parts = [{ text: textVal }];
+          }
+
+          if (parts.length === 0) return;
+
+          // 【关键逻辑】如果当前消息角色与上一条相同，则合并到上一条的 parts 中
+          // 这让 Gemini 能够同时看到 [用户输入] 和 [系统补充的Context]，而不会把它们当成两轮对话
+          if (currentTurn && currentTurn.role === targetRole) {
+            currentTurn.parts.push(...parts);
+          } else {
+            // 否则，开始新的一轮
+            if (currentTurn) contents.push(currentTurn);
+            currentTurn = {
+              role: targetRole,
+              parts: [...parts],
+            };
+          }
+        });
+
+        // 推入最后一轮
+        if (currentTurn) contents.push(currentTurn);
+
+        // --- 3. 最后的兜底检查 ---
+        // Gemini 要求 contents 不能为空。如果经过过滤后为空，必须补救。
+        if (contents.length === 0) {
+          if (finalSystemInstruction) {
+            // 如果有系统指令，就把它挪到 contents 里作为 User 消息
+            contents.push({
+              role: "user",
+              parts: [{ text: finalSystemInstruction }],
+            });
+            finalSystemInstruction = ""; // 避免重复
+          } else {
+            // 实在没东西发了，发个空格防止报错 (极罕见情况)
+            contents.push({ role: "user", parts: [{ text: " " }] });
+          }
+        }
+
+        // --- 4. 组装请求体 ---
+        const body = {
+          contents: contents,
+          generationConfig: {
+            temperature: parseFloat(temperature) || 0.8,
+          },
+        };
+
+        // 只有当 systemInstruction 不为空时才添加该字段
+        if (finalSystemInstruction && finalSystemInstruction.trim()) {
+          body.systemInstruction = {
+            parts: [{ text: finalSystemInstruction }],
+          };
+        }
+
+        return {
+          url: `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${getRandomValue(
+            apiKey,
+          )}`,
+          data: {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(body),
+          },
+        };
+      };
+      document.addEventListener("DOMContentLoaded", () => {
+        // ===================================================================
+        // 1. 所有变量和常量定义
+        // ===================================================================
+        // 宠物数值衰减相关的全局变量和常量
+        const PET_DECAY_INTERVAL = 60 * 60 * 1000; // 每60分钟衰减一次
+        const PET_DECAY_AMOUNT = {
+          // 每次衰减的数值
+          hunger: 5,
+          happiness: 3,
+        };
+        let petDecayTimer = null; // 用于管理衰减计时器的全局变量
+        let pieChartInstance = null;
+        let lineChartInstance = null;
+
+        const CHAR_PHONE_APPS = [
+          {
+            id: "chat",
+            name: "微信",
+            screen: "character-chat-list-screen",
+            svg: `<svg viewBox="0 0 24 24" fill="#4CAF50"><path d="M12 2C6.48 2 2 6.48 2 12c0 2.94 1.28 5.58 3.34 7.42c-.22 1.4-.89 3.1-1.25 3.82c-.36.72.48 1.39 1.05.94c.82-.67 2.43-1.88 3.3-2.58C9.44 21.78 10.68 22 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2zm3.5 10.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5s1.5.67 1.5 1.5s-.67 1.5-1.5 1.5zm-7 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5s1.5.67 1.5 1.5s-.67 1.5-1.5 1.5z"/></svg>`,
+          },
+          {
+            id: "cart",
+            name: "购物车",
+            screen: "character-shopping-cart-screen",
+            svg: `<svg viewBox="0 0 24 24" fill="#F44336"><path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2s-.9-2-2-2zm10 0c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2s2-.9 2-2s-.9-2-2-2zm-15-14h3.27l.94 2H20c.69 0 1.25.56 1.25 1.25c0 .09-.02.18-.04.27l-3.58 6.49c-.25.44-.73.74-1.26.74H8.52l-.94-2H4.27V4H2V2h3.27z"/></svg>`,
+          },
+          {
+            id: "memos",
+            name: "备忘录",
+            screen: "character-memos-screen",
+            svg: `<svg viewBox="0 0 24 24" fill="#FFC107"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>`,
+          },
+          {
+            id: "browser",
+            name: "浏览器",
+            screen: "character-browser-screen",
+            svg: `<svg viewBox="0 0 24 24" fill="#2196F3"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1.5-12.5l3 7.5 7.5-3-7.5-3z"/></svg>`,
+          },
+          {
+            id: "album",
+            name: "相册",
+            screen: "character-album-screen",
+            svg: `<svg viewBox="0 0 24 24" fill="#8BC34A"><path d="M22 16V4c0-1.1-.9-2-2-2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2zm-11-4l2.03 2.71L16 11l4 5H8l3-4zM2 6v14c0 1.1.9 2 2 2h14v-2H4V6H2z"/></svg>`,
+          },
+          {
+            id: "bank",
+            name: "钱包",
+            screen: "character-bank-screen",
+            svg: `<svg viewBox="0 0 24 24" fill="#E91E63"><path d="M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V5c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>`,
+          },
+          {
+            id: "trajectory",
+            name: "足迹",
+            screen: "character-trajectory-screen",
+            svg: `<svg viewBox="0 0 24 24" fill="#795548"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>`,
+          },
+          {
+            id: "app_usage",
+            name: "使用记录",
+            screen: "character-app-usage-screen",
+            svg: `<svg viewBox="0 0 24 24" fill="#607D8B"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8s8 3.58 8 8s-3.58 8-8 8zm.5-13H11v6l5.25 3.15l.75-1.23l-4.5-2.67z"/></svg>`,
+          },
+          {
+            id: "diary",
+            name: "日记",
+            screen: "character-diary-screen",
+            svg: `<svg viewBox="0 0 24 24" fill="#009688"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83l3.75 3.75 1.83-1.83z"/></svg>`,
+          },
+          // 这就是我们新加的App
+          {
+            id: "appearance",
+            name: "外观设置",
+            screen: "character-phone-appearance-screen",
+            svg: `<svg viewBox="0 0 24 24" fill="#9C27B0"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1.17 14.34c-.21.21-.46.32-.71.32s-.5-.11-.71-.32l-1.41-1.41c-.2-.2-.31-.45-.31-.71 0-.26.11-.51.31-.71l1.41-1.41c.2-.2.45-.31.71-.31s.51.11.71.31l1.41 1.41c.4.4.4 1.04 0 1.41l-1.41 1.41zm3.34-5.34c-.21.21-.46.32-.71.32s-.5-.11-.71-.32L11.41 8.5c-.2-.2-.31-.45-.31-.71 0-.26.11-.51.31-.71l1.41-1.41c.2-.2.45-.31.71-.31s.51.11.71.31l1.41 1.41c.4.4.4 1.04 0 1.41l-1.41 1.41zm3.34 5.34c-.21.21-.46.32-.71.32s-.5-.11-.71-.32l-1.41-1.41c-.4-.4-.4-1.04 0-1.41l1.41-1.41c.2-.2.45-.31.71-.31s.51.11.71.31l1.41 1.41c.2.2.31.45.31.71 0 .26-.11.51-.31.71l-1.41 1.41z"/></svg>`,
+          },
+        ];
+
+        const BLOCKED_API_SITES = [
+          "api.pisces.ink",
+          "aiapi.qzz.io",
+          "api520.pro",
+          "api521.pro",
+          "api522.pro",
+        ];
+
+        // --- 已修正 ---
+
+        // --- 修正结束 ---
+        let isUserStickerSelectionMode = false;
+        let activeStickerCategoryId = "uncategorized";
+        let userStickerCategories = []; // 用于缓存用户的所有分类
+
+        let isCharStickerSelectionMode = false;
+        let selectedCharStickers = new Set();
+
+        let selectedUserStickers = new Set();
+        let isLocked = false;
+        let newLockscreenWallpaperBase64 = null;
+        let newGlobalBgBase64 = null; // 用于暂存新的全局聊天背景
+        let newAppWallpaperBase64 = null;
+        window.state.musicState = {
+          isActive: false,
+          activeChatId: null,
+          isPlaying: false,
+          playlist: [],
+          currentIndex: -1,
+          playMode: "order",
+          totalElapsedTime: 0,
+          timerId: null,
+
+          parsedLyrics: [], // 当前歌曲解析后的歌词数组
+          currentLyricIndex: -1, // 当前高亮的歌词行索引
+        };
+
+        let isWorldBookEditMode = false;
+        let selectedWorldBooks = new Set();
+
+        let lyricsBarSettings = {
+          fontSize: 14,
+          bgOpacity: 0,
+          fontColor: "#FFFFFF",
+          showOnClose: true, // 【问题4需要】默认开启
+        };
+
+        const audioPlayer = document.getElementById("audio-player");
+        let newWallpaperBase64 = null;
+        let isSelectionMode = false;
+        let isInnerVoiceHistoryOpen = false; // 用于跟踪历史面板是否打开
+
+        let selectedMessages = new Set();
+        let editingMemberId = null;
+        let editingWorldBookId = null;
+        let editingPersonaPresetId = null;
+        let activeCharPhonePresetId = null; // 用于追踪角色手机外观预设的选择
+        let activeCharacterPhoneId = null;
+        let waimaiTimers = {}; // 用于存储外卖倒计时
+        let editingSpriteGroupId = null;
+        let activeMessageTimestamp = null;
+
+        let currentReplyContext = null; // <--- 新增这行，用来存储当前正在引用的消息信息
+        let currentSearchKeyword = ""; // 用于在搜索结果中高亮关键词
+        let activePostId = null; // <-- 新增：用于存储当前操作的动态ID
+
+        // 一个简单的网络请求函数
+        if (typeof Http_Get_External === "undefined") {
+          window.Http_Get_External = function (url) {
+            return new Promise((resolve) => {
+              fetch(url)
+                .then((res) => res.json().catch(() => res.text()))
+                .then(resolve)
+                .catch(() => resolve(null));
+            });
+          };
+        }
+        async function Http_Get(url) {
+          return await Http_Get_External(url);
+        }
+
+        // 检查音频链接是否真的可以播放
+        function checkAudioAvailability(url) {
+          return new Promise((resolve) => {
+            const tester = new Audio();
+            tester.addEventListener("loadedmetadata", () => resolve(true), {
+              once: true,
+            });
+            tester.addEventListener("error", () => resolve(false), {
+              once: true,
+            });
+            tester.src = url;
+          });
+        }
+
+        /**
+         * 移除所有代理，直接请求你找到的 vkeys.cn API
+         */
+        async function searchNeteaseMusic(name, singer) {
+          try {
+            let searchTerm = name.replace(/\s/g, "");
+            if (singer) {
+              searchTerm += ` ${singer.replace(/\s/g, "")}`;
+            }
+
+            const apiUrl = `https://api.vkeys.cn/v2/music/netease?word=${encodeURIComponent(searchTerm)}`;
+
+            console.log("正在尝试直接请求:", apiUrl); // 添加一条日志，方便我们调试
+
+            const response = await fetch(apiUrl);
+
+            if (!response.ok) {
+              throw new Error(
+                `API request failed with status ${response.status}: ${response.statusText}`,
+              );
+            }
+
+            const result = await response.json();
+
+            if (
+              result.code !== 200 ||
+              !result.data ||
+              result.data.length === 0
+            ) {
+              console.log("vkeys API返回无结果:", result);
+              return [];
+            }
+
+            return result.data
+              .map((song) => ({
+                name: song.song,
+                artist: song.singer,
+                id: song.id,
+                cover:
+                  song.cover ||
+                  "https://i.postimg.cc/pT2xKzP-album-cover-placeholder.png",
+                source: "netease",
+              }))
+              .slice(0, 15);
+          } catch (e) {
+            // 如果这次还失败，请把浏览器F12控制台里的红色错误信息完整地截图给我
+            console.error("【vkeys API 直连】搜索失败:", e);
+            await showCustomAlert(
+              "网易云接口直连失败",
+              `如果浏览器控制台(F12)提示CORS错误，说明此API禁止直接访问。错误: ${e.message}`,
+            );
+            return [];
+          }
+        }
+        /**
+         * 【全新】从 GD 音乐台搜索歌曲列表 (聚合搜索)
+         */
+        async function searchGdstudioMusic(name) {
+          try {
+            const searchTerm = name.replace(/\s/g, "");
+            // 同时请求网易云和QQ音乐源，然后合并结果
+            const [neteaseResults, tencentResults] = await Promise.all([
+              Http_Get(
+                `https://music-api.gdstudio.xyz/api.php?btwaf=9018895&types=search&source=netease&name=${encodeURIComponent(
+                  searchTerm,
+                )}&count=10&pages=1`,
+              ),
+              Http_Get(
+                `https://music-api.gdstudio.xyz/api.php?btwaf=9018895&types=search&source=tencent&name=${encodeURIComponent(
+                  searchTerm,
+                )}&count=10&pages=1`,
+              ),
+            ]);
+
+            const combined = [
+              ...(neteaseResults || []),
+              ...(tencentResults || []),
+            ];
+
+            if (!combined.length) return [];
+
+            // 对结果进行去重和格式化
+            const uniqueSongs = new Map();
+            combined.forEach((song) => {
+              if (song && song.id && !uniqueSongs.has(song.id)) {
+                uniqueSongs.set(song.id, {
+                  name: song.name,
+                  artist:
+                    song.artist?.map((a) => a.name).join(" / ") ||
+                    song.artist?.[0] ||
+                    "未知艺术家",
+                  id: song.id,
+                  // pic_id 是为了获取专辑图，id 是为了获取歌曲和歌词
+                  pic_id: song.pic_id || song.album?.id,
+                  lyric_id: song.lyric_id || song.id,
+                  cover:
+                    song.pic ||
+                    "https://i.postimg.cc/pT2xKzPz/album-cover-placeholder.png",
+                  // 这里的 source 是给 GD API 内部使用的，我们用一个新字段来标记 API 提供商
+                  originalSource: song.source,
+                  apiProvider: "gdstudio", // 标记这是来自GD音乐台的结果
+                });
+              }
+            });
+
+            return Array.from(uniqueSongs.values());
+          } catch (e) {
+            console.error("【GD 音乐台】搜索API失败:", e);
+            return [];
+          }
+        }
+
+        /**
+         * 从QQ音乐搜索歌曲列表
+         */
+        async function searchTencentMusic(name) {
+          try {
+            name = name.replace(/\s/g, "");
+            const result = await Http_Get(
+              `https://api.vkeys.cn/v2/music/tencent?word=${encodeURIComponent(name)}`,
+            );
+            if (!result?.data?.length) return [];
+            return result.data
+              .map((song) => ({
+                name: song.song,
+                artist: song.singer,
+                id: song.id,
+                cover:
+                  song.cover ||
+                  "https://i.postimg.cc/pT2xKzPz/album-cover-placeholder.png",
+                source: "tencent", // 标记来源
+              }))
+              .slice(0, 5); // 只取前5条结果
+          } catch (e) {
+            console.error("QQ音乐搜索API失败:", e);
+            return [];
+          }
+        }
+
+        async function addSongFromSearch() {
+          const source = await showSearchSourceSelector();
+          if (!source) return;
+
+          const searchTerm = await showCustomPrompt(
+            "搜索歌曲",
+            "请输入 歌名 或 歌名-歌手",
+          );
+          if (!searchTerm || !searchTerm.trim()) return;
+
+          await showCustomAlert("请稍候...", "正在搜索歌曲资源...");
+
+          let musicName = searchTerm.trim();
+          let singerName = "";
+          if (searchTerm.includes("-") || searchTerm.includes("–")) {
+            const parts = searchTerm.split(/[-–]/);
+            musicName = parts[0].trim();
+            singerName = parts.slice(1).join(" ").trim();
+          }
+
+          let combinedResults = [];
+
+          // ▼▼▼ 修改/新增部分开始 ▼▼▼
+          if (source === "gdstudio") {
+            // 如果选择 "GD音乐台"，调用我们新增的函数
+            combinedResults = await searchGdstudioMusic(musicName);
+          } else if (source === "all") {

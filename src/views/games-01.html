@@ -1,0 +1,1056 @@
+    <div id="aurora-bookshelf-screen" class="screen">
+      <div
+        class="header"
+        style="
+          background-color: #3e2723 !important;
+          color: #e0c097 !important;
+          border-bottom: 1px solid #5d4037;
+        "
+      >
+        <span class="back-btn" id="back-from-bookshelf" style="color: #e0c097"
+          >‹</span
+        >
+        <span
+          style="
+            font-family: &quot;serif&quot;;
+            font-weight: bold;
+            letter-spacing: 2px;
+          "
+          >藏书阁</span
+        >
+        <span style="width: 30px"></span>
+      </div>
+      <!-- 书架背景容器 -->
+      <div id="bookshelf-container">
+        <!-- 书籍将由JS生成在这里 -->
+      </div>
+    </div>
+
+    <div id="game-hall-screen" class="screen">
+      <div class="header">
+        <span class="back-btn" onclick="showScreen('home-screen')">‹</span>
+        <span>游戏大厅</span>
+        <span style="width: 30px"></span>
+        <!-- 占位符 -->
+      </div>
+      <div class="list-container" style="padding: 20px">
+        <p style="text-align: center; color: var(--text-secondary)">
+          选择一个游戏开始吧！
+        </p>
+        <div id="game-hall-grid">
+          <!-- 游戏列表将显示在这里 -->
+          <div class="game-card" data-game="werewolf">
+            <div class="game-icon">🐺</div>
+            <div class="game-info">
+              <div class="game-title">狼人杀</div>
+              <div class="game-desc">逻辑与谎言的对决</div>
+            </div>
+          </div>
+          <div class="game-card" data-game="sea-turtle-soup">
+            <div class="game-icon">🐢</div>
+            <div class="game-info">
+              <div class="game-title">海龟汤</div>
+              <div class="game-desc">揭开情景的真相</div>
+            </div>
+          </div>
+          <div class="game-card" data-game="script-kill">
+            <div class="game-icon">📜</div>
+            <div class="game-info">
+              <div class="game-title">剧本杀</div>
+              <div class="game-desc">扮演角色，探寻谜案</div>
+            </div>
+          </div>
+          <div class="game-card" data-game="guess-what">
+            <div class="game-icon">🗣️</div>
+            <div class="game-info">
+              <div class="game-title">你说我猜</div>
+              <div class="game-desc">考验默契的时候到了</div>
+            </div>
+          </div>
+          <div class="game-card" data-game="ludo">
+            <div class="game-icon">🎲</div>
+            <div class="game-info">
+              <div class="game-title">心动飞行棋</div>
+              <div class="game-desc">和Ta来一场只属于你们的冒险</div>
+            </div>
+          </div>
+
+          <div class="game-card" data-game="undercover">
+            <div class="game-icon">🕵️</div>
+            <div class="game-info">
+              <div class="game-title">谁是卧底</div>
+              <div class="game-desc">语言的伪装，逻辑的陷阱</div>
+            </div>
+          </div>
+
+          <p
+            style="
+              grid-column: 1 / -1;
+              text-align: center;
+              color: var(--text-secondary);
+              font-size: 14px;
+              margin-top: 20px;
+            "
+          >
+            更多游戏正在火速开发中...
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1. 狼人杀游戏设置屏幕 -->
+    <div id="werewolf-setup-screen" class="screen">
+      <div class="header">
+        <span class="back-btn" onclick="showScreen('game-hall-screen')">‹</span>
+        <span>狼人杀 - 游戏设置</span>
+      </div>
+      <div class="form-container">
+        <div class="form-group">
+          <label for="werewolf-player-count">选择游戏人数</label>
+          <select id="werewolf-player-count">
+            <option value="6">6人局 (2狼, 2民, 预言家, 守卫)</option>
+            <option value="9">9人局 (3狼, 3民, 预言家, 女巫, 猎人)</option>
+            <option value="12">
+              12人局 (4狼, 4民, 预言家, 女巫, 猎人, 白痴)
+            </option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>邀请玩家 (你已自动加入)</label>
+          <div
+            id="werewolf-player-selection"
+            class="list-container"
+            style="
+              height: 300px;
+              border: 1px solid var(--border-color);
+              border-radius: 8px;
+            "
+          >
+            <!-- 玩家选择列表将由JS动态生成 -->
+          </div>
+        </div>
+        <button id="start-werewolf-game-btn" class="form-button">
+          开始游戏
+        </button>
+      </div>
+    </div>
+
+    <!-- 2. 狼人杀游戏主界面 -->
+    <div id="werewolf-game-screen" class="screen">
+      <div class="header">
+        <span class="back-btn" id="exit-werewolf-game-btn">‹ 退出</span>
+        <span id="werewolf-game-title">狼人杀</span>
+        <span class="action-btn" id="werewolf-my-role-btn">我的身份</span>
+      </div>
+      <!-- 游戏主内容区 -->
+      <div id="werewolf-game-content">
+        <!-- 玩家座位区 -->
+        <div id="werewolf-players-grid">
+          <!-- 玩家头像和状态将由JS动态生成 -->
+        </div>
+        <!-- 游戏日志/信息区 -->
+        <div id="werewolf-log-container">
+          <div id="werewolf-game-log">
+            <!-- 游戏过程信息会显示在这里 -->
+          </div>
+        </div>
+        <!-- 玩家操作区 -->
+        <div id="werewolf-action-area">
+          <!-- 玩家的按钮会根据游戏阶段显示在这里 -->
+        </div>
+      </div>
+    </div>
+
+    <!-- 狼人杀游戏结算卡片 -->
+    <div id="werewolf-summary-modal" class="modal">
+      <div class="modal-content" style="height: auto; max-height: 80%">
+        <div class="modal-header">
+          <span>游戏结算</span>
+        </div>
+        <div
+          class="modal-body"
+          id="werewolf-summary-content"
+          style="white-space: pre-wrap; line-height: 1.7"
+        >
+          <!-- 结算内容将由JS动态生成在这里 -->
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="repost-summary-btn">发送复盘到聊天</button>
+          <button class="save" id="back-to-hall-btn">返回大厅</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 狼人杀复盘发送目标选择器 -->
+    <div id="werewolf-target-picker-modal" class="modal">
+      <div class="modal-content" style="height: 60%">
+        <div class="modal-header">
+          <span>选择要发送的玩家</span>
+        </div>
+        <div class="modal-body" id="werewolf-target-list" style="padding: 0">
+          <!-- 玩家列表将由JS动态生成在这里 -->
+        </div>
+        <div class="modal-footer">
+          <button
+            id="wt-select-all-btn"
+            class="form-button-secondary"
+            style="width: 45%; margin: 0"
+          >
+            全选
+          </button>
+          <button
+            id="wt-deselect-all-btn"
+            class="form-button-secondary"
+            style="width: 45%; margin: 0"
+          >
+            全不选
+          </button>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="wt-cancel-btn">取消</button>
+          <button class="save" id="wt-confirm-btn">确认发送</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1. 海龟汤游戏主界面 -->
+    <div id="sea-turtle-soup-screen" class="screen">
+      <div class="header">
+        <span class="back-btn" id="exit-sts-game-btn">‹ 退出</span>
+        <span>海龟汤</span>
+        <span class="action-btn" id="reveal-sts-answer-btn">揭晓答案</span>
+      </div>
+      <div
+        id="sts-game-content"
+        style="
+          display: flex;
+          flex-direction: column;
+          height: 100%;
+          overflow: hidden;
+          padding: 10px;
+          box-sizing: border-box;
+        "
+      >
+        <!-- 玩家座位区 -->
+        <div
+          id="sts-players-grid"
+          style="
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
+            gap: 10px;
+            padding: 10px;
+            flex-shrink: 0;
+          "
+        >
+          <!-- 玩家头像和状态将由JS动态生成 -->
+        </div>
+        <!-- 游戏日志/信息区 -->
+        <div
+          id="sts-log-container"
+          style="
+            flex-grow: 1;
+            background-color: rgba(0, 0, 0, 0.05);
+            border-radius: 10px;
+            padding: 10px;
+            overflow-y: auto;
+            margin: 10px 0;
+            min-height: 0;
+          "
+        >
+          <div id="sts-game-log">
+            <!-- 游戏过程信息会显示在这里 -->
+          </div>
+        </div>
+
+        <div
+          id="sts-action-area"
+          class="chat-input-area"
+          style="visibility: visible"
+        >
+          <div class="chat-input-main-row">
+            <textarea
+              id="sts-question-input"
+              rows="1"
+              placeholder="输入问题或答案..."
+            ></textarea>
+            <!-- 新增“猜答案”按钮 -->
+            <button
+              id="guess-sts-answer-btn"
+              class="action-button"
+              style="background-color: #ff9800"
+            >
+              猜答案
+            </button>
+            <button id="send-sts-question-btn" class="action-button">
+              提问
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. 海龟汤游戏设置模态框 -->
+    <div id="sea-turtle-soup-setup-modal" class="modal">
+      <div class="modal-content" style="height: auto; max-height: 85%">
+        <div class="modal-header">
+          <span>海龟汤 - 游戏设置</span>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>邀请玩家 (你已自动加入)</label>
+            <div
+              id="sts-player-selection"
+              class="list-container"
+              style="
+                height: 200px;
+                border: 1px solid var(--border-color);
+                border-radius: 8px;
+              "
+            >
+              <!-- 玩家选择列表将由JS动态生成 -->
+            </div>
+          </div>
+          <div class="form-group">
+            <label>谁来出题？</label>
+            <select id="sts-riddle-provider-select">
+              <option value="user">我来出题</option>
+              <option value="random_ai">随机一位AI</option>
+            </select>
+          </div>
+          <!-- 用户出题的输入区 (默认隐藏) -->
+          <div id="sts-user-riddle-input-area" style="display: none">
+            <div class="form-group">
+              <label for="sts-user-riddle-surface">谜面</label>
+              <textarea
+                id="sts-user-riddle-surface"
+                rows="2"
+                placeholder="例如：一个男人走进酒吧，要了一杯水..."
+              ></textarea>
+            </div>
+            <div class="form-group">
+              <label for="sts-user-riddle-answer">谜底 (完整故事)</label>
+              <textarea
+                id="sts-user-riddle-answer"
+                rows="4"
+                placeholder="例如：男人在打嗝，他想喝水止嗝..."
+              ></textarea>
+            </div>
+          </div>
+          <!-- AI出题的输入区 (默认隐藏) -->
+          <div id="sts-ai-riddle-input-area" style="display: none">
+            <div class="form-group">
+              <label for="sts-ai-riddle-type">谜题类型 (可选)</label>
+              <input
+                type="text"
+                id="sts-ai-riddle-type"
+                placeholder="例如：恐怖、温情、脑洞、经典"
+              />
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="cancel-sts-setup-btn">取消</button>
+          <button class="save" id="start-sts-game-btn">开始游戏</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1. 海龟汤游戏结算卡片 -->
+    <div id="sts-summary-modal" class="modal">
+      <div class="modal-content" style="height: auto; max-height: 80%">
+        <div class="modal-header">
+          <span>游戏结算</span>
+        </div>
+        <div
+          class="modal-body"
+          id="sts-summary-content"
+          style="white-space: pre-wrap; line-height: 1.7"
+        >
+          <!-- 结算内容将由JS动态生成在这里 -->
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="share-sts-summary-btn">分享复盘</button>
+          <button class="save" id="back-to-hall-from-sts-btn">返回大厅</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. 海龟汤复盘发送目标选择器 -->
+    <div id="sts-share-target-modal" class="modal">
+      <div class="modal-content" style="height: 60%">
+        <div class="modal-header">
+          <span>选择要分享的玩家</span>
+        </div>
+        <div class="modal-body" id="sts-share-target-list" style="padding: 0">
+          <!-- 玩家列表将由JS动态生成在这里 -->
+        </div>
+        <div class="modal-footer">
+          <button
+            id="sts-select-all-btn"
+            class="form-button-secondary"
+            style="width: 45%; margin: 0"
+          >
+            全选
+          </button>
+          <button
+            id="sts-deselect-all-btn"
+            class="form-button-secondary"
+            style="width: 45%; margin: 0"
+          >
+            全不选
+          </button>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="sts-cancel-share-btn">取消</button>
+          <button class="save" id="sts-confirm-share-btn">确认分享</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1. 剧本杀游戏设置屏幕 -->
+    <div id="script-kill-setup-screen" class="screen">
+      <div class="header">
+        <span class="back-btn" onclick="showScreen('game-hall-screen')">‹</span>
+        <span>剧本杀 - 游戏设置</span>
+      </div>
+      <div class="form-container">
+        <div class="form-group">
+          <label>选择剧本</label>
+          <div style="display: flex; gap: 10px">
+            <select
+              id="script-kill-script-select"
+              style="flex-grow: 1"
+            ></select>
+            <button
+              id="manage-custom-scripts-btn"
+              class="form-button-secondary"
+              style="margin-top: 0; padding: 0 15px"
+            >
+              管理
+            </button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>邀请玩家 (你已自动加入)</label>
+          <div
+            id="script-kill-player-selection"
+            class="list-container"
+            style="
+              height: 300px;
+              border: 1px solid var(--border-color);
+              border-radius: 8px;
+            "
+          >
+            <!-- 玩家选择列表将由JS动态生成 -->
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="toggle-switch-label">
+            <span class="toggle-switch-text"
+              >自由选择角色 (关闭则随机分配)</span
+            >
+            <input type="checkbox" id="script-kill-free-choice-toggle" />
+            <span class="toggle-switch-slider"></span>
+          </label>
+        </div>
+        <button id="start-script-kill-game-btn" class="form-button">
+          开始游戏
+        </button>
+      </div>
+    </div>
+
+    <!-- 2. 剧本杀游戏主界面 -->
+    <div id="script-kill-game-screen" class="screen">
+      <div class="header">
+        <span class="back-btn" id="exit-script-kill-game-btn">‹ 退出</span>
+        <span id="script-kill-game-title">剧本杀</span>
+        <div class="header-actions">
+          <span class="action-btn" id="script-kill-my-role-btn">我的角色</span>
+          <span class="action-btn" id="script-kill-all-evidence-btn"
+            >公共线索</span
+          >
+        </div>
+      </div>
+      <div id="script-kill-game-content">
+        <div id="script-kill-players-grid">
+          <!-- 玩家头像和状态将由JS动态生成 -->
+        </div>
+        <div id="script-kill-log-container">
+          <div id="script-kill-game-log">
+            <!-- 游戏过程信息会显示在这里 -->
+          </div>
+        </div>
+        <div id="script-kill-action-area">
+          <!-- 玩家的按钮会根据游戏阶段显示在这里 -->
+        </div>
+      </div>
+    </div>
+
+    <!-- 剧本杀自定义剧本管理模态框 -->
+    <div id="script-kill-manager-modal" class="modal">
+      <div class="modal-content" style="height: 70%">
+        <div class="modal-header">
+          <span>管理自定义剧本</span>
+          <div class="header-actions">
+            <button
+              id="import-script-btn"
+              class="action-button"
+              style="font-size: 14px"
+            >
+              导入
+            </button>
+
+            <button
+              id="open-sk-ai-generator-btn"
+              class="action-button"
+              style="font-size: 14px"
+            >
+              AI生成
+            </button>
+
+            <button id="add-new-script-btn" class="action-button">添加</button>
+          </div>
+        </div>
+
+        <div class="modal-body" id="custom-scripts-list" style="padding: 0">
+          <!-- 自定义剧本列表将由JS动态生成在这里 -->
+        </div>
+        <div class="modal-footer">
+          <button
+            class="save"
+            id="close-script-manager-btn"
+            style="width: 100%"
+          >
+            完成
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1. 剧本编辑器主弹窗 (可视化版) -->
+    <div id="script-kill-editor-modal" class="modal">
+      <div class="modal-content" style="height: 90%">
+        <div class="modal-header">
+          <span id="script-editor-title">剧本编辑器</span>
+        </div>
+        <div
+          class="modal-body"
+          style="display: flex; flex-direction: column; gap: 15px"
+        >
+          <!-- 基础信息 -->
+          <div class="form-group">
+            <label for="script-name-input">剧本名称</label>
+            <input type="text" id="script-name-input" />
+          </div>
+          <div class="form-group">
+            <label for="script-background-input">故事背景</label>
+            <textarea id="script-background-input" rows="3"></textarea>
+          </div>
+
+          <hr style="opacity: 0.2" />
+
+          <!-- 角色设定区 -->
+          <div>
+            <div
+              style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 10px;
+              "
+            >
+              <label style="margin: 0; font-weight: 600">角色设定</label>
+              <button
+                id="sk-add-role-btn"
+                class="form-button-secondary"
+                style="margin: 0; padding: 5px 15px"
+              >
+                + 添加角色
+              </button>
+            </div>
+            <div id="sk-roles-container" class="sk-item-container">
+              <!-- 角色卡片将由JS动态生成在这里 -->
+            </div>
+          </div>
+
+          <!-- 线索卡区 -->
+          <div>
+            <div
+              style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 10px;
+              "
+            >
+              <label style="margin: 0; font-weight: 600">线索卡</label>
+              <button
+                id="sk-add-clue-btn"
+                class="form-button-secondary"
+                style="margin: 0; padding: 5px 15px"
+              >
+                + 添加线索
+              </button>
+            </div>
+            <div id="sk-clues-container" class="sk-item-container">
+              <!-- 线索卡片将由JS动态生成在这里 -->
+            </div>
+          </div>
+
+          <!-- 最终真相互动 -->
+          <div class="form-group">
+            <label for="sk-truth-input">最终真相</label>
+            <textarea id="sk-truth-input" rows="3"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="cancel-script-editor-btn">取消</button>
+          <button class="save" id="save-script-btn">保存剧本</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. 用于编辑单个角色/线索的子弹窗 -->
+    <div id="sk-item-editor-modal" class="modal" style="z-index: 1003">
+      <div class="modal-content" style="height: auto; max-height: 85%">
+        <div class="modal-header">
+          <span id="sk-item-editor-title"></span>
+        </div>
+        <div class="modal-body">
+          <!-- 角色编辑字段 (默认隐藏) -->
+          <div id="sk-role-editor-fields" style="display: none">
+            <div class="form-group">
+              <label for="sk-role-name-input">角色名称</label>
+              <input type="text" id="sk-role-name-input" />
+            </div>
+            <div class="form-group">
+              <label for="sk-role-desc-input">角色介绍</label>
+              <textarea id="sk-role-desc-input" rows="3"></textarea>
+            </div>
+            <div class="form-group">
+              <label for="sk-role-storyline-input"
+                >故事线 (案发时间段的详细行动轨迹)</label
+              >
+              <textarea id="sk-role-storyline-input" rows="5"></textarea>
+            </div>
+            <div class="form-group">
+              <label for="sk-role-tasks-input">秘密任务</label>
+              <textarea id="sk-role-tasks-input" rows="2"></textarea>
+            </div>
+            <div class="form-group">
+              <label class="toggle-switch-label">
+                <span class="toggle-switch-text">是凶手</span>
+                <input type="checkbox" id="sk-role-killer-toggle" />
+                <span class="toggle-switch-slider"></span>
+              </label>
+            </div>
+          </div>
+          <!-- 线索编辑字段 (默认隐藏) -->
+          <div id="sk-clue-editor-fields" style="display: none">
+            <div class="form-group">
+              <label for="sk-clue-owner-select">线索归属</label>
+              <select id="sk-clue-owner-select">
+                <!-- 选项将由JS动态生成 -->
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="sk-clue-desc-input">线索描述</label>
+              <textarea id="sk-clue-desc-input" rows="4"></textarea>
+            </div>
+            <div class="form-group">
+              <label class="toggle-switch-label">
+                <span class="toggle-switch-text">是关键线索</span>
+                <input type="checkbox" id="sk-clue-key-toggle" />
+                <span class="toggle-switch-slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="sk-item-editor-cancel-btn">取消</button>
+          <button class="save" id="sk-item-editor-save-btn">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. 角色身份卡模态框 -->
+    <div id="script-kill-role-modal" class="modal">
+      <div class="modal-content" style="height: 70%">
+        <div class="modal-header">
+          <span id="sk-role-name">你的角色</span>
+        </div>
+        <div
+          class="modal-body"
+          id="sk-role-details"
+          style="white-space: pre-wrap; line-height: 1.7"
+        >
+          <!-- 角色介绍、任务等将显示在这里 -->
+        </div>
+        <div class="modal-footer">
+          <button class="save" id="close-sk-role-modal-btn" style="width: 100%">
+            我已了解
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. 个人线索板模态框 -->
+    <div id="script-kill-evidence-modal" class="modal">
+      <div class="modal-content" style="height: 70%">
+        <div class="modal-header">
+          <span>我的线索板</span>
+        </div>
+        <div
+          class="modal-body"
+          id="sk-evidence-list"
+          style="
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+          "
+        >
+          <!-- 搜到的线索卡片会显示在这里 -->
+        </div>
+        <div class="modal-footer">
+          <button
+            class="save"
+            id="close-sk-evidence-modal-btn"
+            style="width: 100%"
+          >
+            关闭
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6. 投票模态框 -->
+    <div id="script-kill-vote-modal" class="modal">
+      <div class="modal-content" style="height: auto; max-height: 70%">
+        <div class="modal-header">
+          <span id="sk-vote-title">最终投票</span>
+        </div>
+        <div
+          class="modal-body"
+          id="sk-vote-options-list"
+          style="text-align: left; padding: 20px"
+        >
+          <!-- 投票选项将由JS动态生成 -->
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="cancel-sk-vote-btn">取消</button>
+          <button class="save" id="confirm-sk-vote-btn">确认投票</button>
+        </div>
+      </div>
+    </div>
+    <!-- 剧本杀游戏结算卡片 -->
+    <div id="script-kill-summary-modal" class="modal">
+      <div class="modal-content" style="height: auto; max-height: 80%">
+        <div class="modal-header">
+          <span>游戏结算</span>
+        </div>
+        <div
+          class="modal-body"
+          id="script-kill-summary-content"
+          style="white-space: pre-wrap; line-height: 1.7"
+        >
+          <!-- 结算内容将由JS动态生成在这里 -->
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="repost-sk-summary-btn">
+            转发复盘到单聊
+          </button>
+          <button class="save" id="back-to-hall-from-sk-btn">返回大厅</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 剧本杀复盘发送目标选择器 -->
+    <div id="script-kill-target-picker-modal" class="modal">
+      <div class="modal-content" style="height: 60%">
+        <div class="modal-header">
+          <span>选择要转发的玩家</span>
+        </div>
+        <div class="modal-body" id="script-kill-target-list" style="padding: 0">
+          <!-- 玩家列表将由JS动态生成在这里 -->
+        </div>
+        <div class="modal-footer">
+          <button
+            id="sk-select-all-btn"
+            class="form-button-secondary"
+            style="width: 45%; margin: 0"
+          >
+            全选
+          </button>
+          <button
+            id="sk-deselect-all-btn"
+            class="form-button-secondary"
+            style="width: 45%; margin: 0"
+          >
+            全不选
+          </button>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="sk-cancel-share-btn">取消</button>
+          <button class="save" id="sk-confirm-share-btn">确认转发</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="sk-ai-generator-modal" class="modal">
+      <div class="modal-content" style="height: 90%">
+        <div class="modal-header">
+          <span>AI 剧本生成器</span>
+        </div>
+        <div
+          class="modal-body"
+          style="display: flex; flex-direction: column; gap: 15px"
+        >
+          <div class="form-group">
+            <label for="sk-ai-elements-input">核心要素 (用逗号分隔)</label>
+            <input
+              type="text"
+              id="sk-ai-elements-input"
+              placeholder="例如：现代, 谋杀, 暴风雪山庄, 遗产"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="sk-ai-player-count-input"
+              >玩家人数 (包含凶手, 建议4-8人)</label
+            >
+            <input
+              type="number"
+              id="sk-ai-player-count-input"
+              value="5"
+              min="3"
+              max="12"
+              style="
+                width: 100%;
+                box-sizing: border-box;
+                padding: 10px;
+                border-radius: 6px;
+                border: 1px solid var(--border-color);
+              "
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="sk-ai-summary-input">剧情梗概 (可选)</label>
+            <textarea
+              id="sk-ai-summary-input"
+              rows="4"
+              placeholder="可以写一个简单的故事大纲，帮助AI更好地理解你的想法..."
+            ></textarea>
+          </div>
+          <button id="sk-trigger-ai-generation-btn" class="form-button">
+            开始生成
+          </button>
+
+          <hr style="opacity: 0.2; margin: 5px 0" />
+
+          <div
+            class="form-group"
+            style="
+              flex-grow: 1;
+              min-height: 0;
+              display: flex;
+              flex-direction: column;
+            "
+          >
+            <label>AI 生成结果预览</label>
+            <div
+              id="sk-ai-result-preview"
+              style="
+                flex-grow: 1;
+                overflow-y: auto;
+                background: #f0f2f5;
+                padding: 10px;
+                border-radius: 8px;
+                white-space: pre-wrap;
+                line-height: 1.6;
+                color: #555;
+              "
+            >
+              点击“开始生成”后，结果将显示在这里...
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="sk-ai-generator-cancel-btn">关闭</button>
+          <!-- 这个保存按钮初始是禁用的，生成成功后才会激活 -->
+          <button class="save" id="sk-ai-generator-save-btn" disabled>
+            保存剧本
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1. “你说我猜”游戏设置屏幕 -->
+    <div id="guess-what-setup-screen" class="screen">
+      <div class="header">
+        <span class="back-btn" onclick="showScreen('game-hall-screen')">‹</span>
+        <span>你说我猜 - 游戏设置</span>
+      </div>
+      <div class="form-container">
+        <div class="form-group">
+          <label>邀请一位玩伴</label>
+          <div
+            id="guess-what-player-selection"
+            class="list-container"
+            style="
+              height: 200px;
+              border: 1px solid var(--border-color);
+              border-radius: 8px;
+            "
+          >
+            <!-- 玩家选择列表将由JS动态生成 -->
+          </div>
+        </div>
+        <div class="form-group">
+          <label>选择游戏模式</label>
+          <div style="display: flex; gap: 20px">
+            <label
+              ><input
+                type="radio"
+                name="guess_what_mode"
+                value="ai_guesses"
+                checked
+              />
+              我出题，AI猜</label
+            >
+            <label
+              ><input
+                type="radio"
+                name="guess_what_mode"
+                value="user_guesses"
+              />
+              AI出题，我猜</label
+            >
+          </div>
+        </div>
+        <!-- "我出题"模式下的输入框 -->
+        <div class="form-group" id="user-word-input-container">
+          <label for="guess-what-user-word">请输入你要出的词</label>
+          <input
+            type="text"
+            id="guess-what-user-word"
+            placeholder="例如：苹果、流浪地球..."
+          />
+        </div>
+        <button id="start-guess-what-game-btn" class="form-button">
+          开始游戏
+        </button>
+      </div>
+    </div>
+
+    <!-- 2. “你说我猜”游戏主界面 -->
+    <div id="guess-what-game-screen" class="screen">
+      <div class="header">
+        <span class="back-btn" id="exit-guess-what-game-btn">‹ 退出</span>
+        <span id="guess-what-game-title">你说我猜</span>
+        <span class="action-btn" id="give-up-guess-what-btn">放弃</span>
+      </div>
+      <!-- 游戏主内容区 -->
+      <div
+        id="guess-what-game-content"
+        style="
+          display: flex;
+          flex-direction: column;
+          height: 100%;
+          overflow: hidden;
+          padding: 10px;
+          box-sizing: border-box;
+        "
+      >
+        <!-- 游戏日志/信息区 -->
+        <div
+          id="guess-what-log-container"
+          style="
+            flex-grow: 1;
+            background-color: rgba(0, 0, 0, 0.05);
+            border-radius: 10px;
+            padding: 10px;
+            overflow-y: auto;
+            margin: 10px 0;
+            min-height: 0;
+          "
+        >
+          <div id="guess-what-game-log">
+            <!-- 游戏过程信息会显示在这里 -->
+          </div>
+        </div>
+        <!-- 玩家操作区 -->
+        <div
+          id="guess-what-action-area"
+          class="chat-input-area"
+          style="visibility: visible"
+        >
+          <div class="chat-input-main-row">
+            <textarea
+              id="guess-what-user-input"
+              rows="1"
+              placeholder="输入提示或猜测..."
+            ></textarea>
+            <button id="send-guess-what-input-btn" class="action-button">
+              发送
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- “你说我猜”游戏结算卡片 -->
+    <div id="guess-what-summary-modal" class="modal">
+      <div class="modal-content" style="height: auto; max-height: 80%">
+        <div class="modal-header">
+          <span>游戏结算</span>
+        </div>
+        <div
+          class="modal-body"
+          id="guess-what-summary-content"
+          style="white-space: pre-wrap; line-height: 1.7"
+        >
+          <!-- 结算内容将由JS动态生成在这里 -->
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="forward-guess-what-summary-btn">
+            转发给Ta
+          </button>
+          <button class="save" id="close-guess-what-summary-btn">
+            返回大厅
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1. 飞行棋游戏设置屏幕 -->
+    <div id="ludo-setup-screen" class="screen">
+      <div class="header">
+        <span class="back-btn" onclick="showScreen('game-hall-screen')">‹</span>
+        <span>心动飞行棋 - 游戏设置</span>
+      </div>
+      <div class="form-container">
+        <div class="form-group">
+          <label>选择一位玩伴</label>
+          <!-- 邀请列表，我们会用JS来填充 -->
+          <div
+            id="ludo-player-selection"
+            class="list-container"
+            style="
+              height: 200px;
+              border: 1px solid var(--border-color);
+              border-radius: 8px;
+            "
+          ></div>
+        </div>
+
+        <div class="form-group">
+          <label>选择问题库</label>
+          <div style="display: flex; align-items: center; gap: 10px">
+            <select
+              id="ludo-question-bank-select"
+              style="flex-grow: 1"
+            ></select>
+            <button
+              id="manage-ludo-question-banks-btn"

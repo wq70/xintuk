@@ -1,0 +1,905 @@
+            document.querySelector(
+              ".incoming-call-content .caller-text",
+            ).textContent = `${requesterName} 邀请你加入群视频`; // 显示具体发起人
+          } else {
+            // 单聊逻辑保持不变
+            document.getElementById("caller-avatar").src =
+              chat.settings.aiAvatar || defaultAvatar;
+            document.getElementById("caller-name").textContent = chat.name;
+            document.querySelector(
+              ".incoming-call-content .caller-text",
+            ).textContent = "邀请你视频通话";
+          }
+
+          document
+            .getElementById("incoming-call-modal")
+            .classList.add("visible");
+          playRingtone();
+        }
+
+        /**
+         * 隐藏AI发起的通话请求模态框 (保持不变)
+         */
+        function hideIncomingCallModal() {
+          document
+            .getElementById("incoming-call-modal")
+            .classList.remove("visible");
+          stopRingtone();
+        }
+
+        async function triggerAiInCallAction(userInput = null) {
+          if (!videoCallState.isActive) return;
+
+          const chat = state.chats[videoCallState.activeChatId];
+          const { proxyUrl, apiKey, model } = state.apiConfig;
+
+          const isVisualMode = chat.settings.visualVideoCallEnabled;
+          const callFeed = isVisualMode
+            ? document.getElementById("video-call-messages-visual")
+            : document.getElementById("video-call-main");
+
+          const userNickname = chat.settings.myNickname || "我";
+
+          let worldBookContent = "";
+          if (
+            chat.settings.linkedWorldBookIds &&
+            chat.settings.linkedWorldBookIds.length > 0
+          ) {
+            const linkedContents = chat.settings.linkedWorldBookIds
+              .map((bookId) => {
+                const worldBook = state.worldBooks.find(
+                  (wb) => wb.id === bookId,
+                );
+                return worldBook && worldBook.content
+                  ? `\n\n## 世界书: ${worldBook.name}\n${worldBook.content}`
+                  : "";
+              })
+              .filter(Boolean)
+              .join("");
+            if (linkedContents) {
+              worldBookContent = `\n\n# 核心世界观设定 (你必须严格遵守)\n${linkedContents}\n`;
+            }
+          }
+
+          if (userInput && videoCallState.isUserParticipating) {
+            if (isVisualMode) {
+              const userBubble = document.createElement("div");
+              userBubble.className = "visual-call-bubble user";
+              userBubble.textContent = userInput;
+              callFeed.appendChild(userBubble);
+            } else {
+              const userBubble = document.createElement("div");
+              userBubble.className = "call-message-bubble user-speech";
+              userBubble.textContent = userInput;
+              callFeed.appendChild(userBubble);
+            }
+            callFeed.scrollTop = callFeed.scrollHeight;
+            videoCallState.callHistory.push({
+              role: "user",
+              content: userInput,
+            });
+          }
+
+          let inCallPrompt;
+          if (videoCallState.isGroupCall) {
+            const participantNames = videoCallState.participants.map(
+              (p) => p.originalName,
+            );
+            if (videoCallState.isUserParticipating) {
+              participantNames.unshift(userNickname);
+            }
+
+            inCallPrompt = `
+			# 你的任务
+			你是一个群聊AI，负责扮演所有【除了用户以外】的AI角色。你们正在进行一场群聊视频通话。
+			你的任务是根据每个角色的性格，生成他们在通话中会说的【第一人称对话】，注意是在视频通话，绝对不能以为是在现实！每次回复的字数多些，50字以上。
+
+			# 核心规则
+			1.  **【【【语言铁律】】】**: 无论角色人设是什么国籍或说什么语言，在本次视频通话中，所有角色【必须】全程使用【中文】进行交流。
+			2.  **【【【格式铁律】】】**: 你的回复【必须】是一个JSON数组，每个对象代表一个角色的发言，格式为：\`{"name": "【角色的本名】", "speech": "【在这里加入带动作的对话】"}\`。
+			3.  **【【【表现力铁律】】】**: 在 "speech" 字段中，你【必须】为角色的对话加入【动作、表情或心理活动】，并用【】符号包裹。这非常重要！
+			4.  **示例**: \`{"name": "张三", "speech": "【挠了挠头】啊？我刚刚走神了，你们说到哪了？"}\`
+			5.  **身份铁律**: 用户的身份是【${userNickname}】。你【绝对不能】生成 \`name\` 字段为 **"${userNickname}"** 的发言。
+			6.  **角色扮演**: 严格遵守每个角色的设定，用他们的口吻说话。
+
+			# 当前情景
+			你们正在一个群视频通话中。
+			**通话前的聊天摘要**:
+			${videoCallState.preCallContext}
+			**当前参与者**: ${participantNames.join("、 ")}。
+			${worldBookContent}
+			现在，请根据【通话前摘要】和下面的【通话实时记录】，继续进行对话。
+			`;
+          } else {
+            let openingContext =
+              videoCallState.initiator === "user"
+                ? `你刚刚接听了用户的视频通话请求。`
+                : `用户刚刚接听了你主动发起的视频通话。`;
+
+            inCallPrompt = `
+			# 你的任务
+			你正在扮演角色 "${chat.name}"。你正在和用户 (${userNickname}) 进行一对一视频通话。
+			${openingContext}
+			你的任务是根据你的人设和我们的聊天情景，生成你在通话中会说的【第一人称对话】。
+
+			# 核心规则
+			1.  **【【【格式铁律】】】**: 你的回复【必须且只能】是一段纯文本字符串，代表你的发言。绝对不要输出JSON格式。
+			2.  **【【【表现力铁律】】】**: 在你的对话中，你【必须】加入【动作、表情或心理活动】，并用【】符号包裹。
+			3.  **示例**: "【歪了歪头，好奇地看着你】真的吗？快跟我说说看！"
+			4.  **禁止出戏**: 绝不能透露你是AI或模型。
+
+			# 当前情景
+			**通话前的聊天摘要**:
+			${videoCallState.preCallContext}
+			${worldBookContent}
+			现在，请根据【通话前摘要】和下面的【通话实时记录】，继续进行对话。
+			`;
+          }
+
+          // ================= [修改开始] =================
+          // 1. 尝试获取摄像头画面
+          let cameraFrame = null;
+          if (isVisualMode && chat.settings.useRealCamera) {
+            const userVideoSelector = videoCallState.isUserMain
+              ? "#video-main-view video"
+              : "#video-pip-view video";
+            const userVideoEl = document.querySelector(userVideoSelector);
+
+            if (userVideoEl) {
+              cameraFrame = captureVideoFrame(userVideoEl);
+            }
+          }
+
+          // 2. 构建发送给 API 的消息列表
+          const messagesForApi = [
+            ...videoCallState.callHistory.map((h) => ({
+              role: h.role,
+              content: h.content,
+            })),
+          ];
+
+          // 3. 如果成功截取到了画面，将其作为最新的一条 User 消息（或附加到最新消息）发送给 AI
+          if (cameraFrame) {
+            console.log("已截取摄像头画面，正在发送给AI...");
+
+            // 构造带图片的消息内容
+            const imageMessageContent = [
+              {
+                type: "text",
+                text: userInput
+                  ? userInput
+                  : "（用户正在看着你，这是他当前的摄像头画面）",
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: cameraFrame,
+                },
+              },
+            ];
+
+            messagesForApi.push({
+              role: "user",
+              content: imageMessageContent,
+            });
+          } else {
+            // 如果没截图（比如没开摄像头），如果历史记录为空，需要发一个触发词
+            if (videoCallState.callHistory.length === 0 && !userInput) {
+              const firstLineTrigger =
+                videoCallState.initiator === "user"
+                  ? `*你按下了接听键...*`
+                  : `*对方按下了接听键...*`;
+              messagesForApi.push({ role: "user", content: firstLineTrigger });
+            }
+          }
+
+          try {
+            let isGemini = proxyUrl === GEMINI_API_URL;
+            let geminiConfig = toGeminiRequestData(
+              model,
+              apiKey,
+              inCallPrompt,
+              messagesForApi,
+              isGemini,
+            );
+            const response = isGemini
+              ? await fetch(geminiConfig.url, geminiConfig.data)
+              : await fetch(`${proxyUrl}/v1/chat/completions`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${apiKey}`,
+                  },
+                  body: JSON.stringify({
+                    model: model,
+                    messages: [
+                      { role: "system", content: inCallPrompt },
+                      ...messagesForApi,
+                    ],
+                    temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+                  }),
+                });
+            if (!response.ok)
+              throw new Error((await response.json()).error.message);
+
+            const data = await response.json();
+            const aiResponse = isGemini
+              ? data.candidates[0].content.parts[0].text
+              : data.choices[0].message.content;
+            const sanitizedResponse = aiResponse
+              .replace(/!\[.*?\]\(.*?\)|https?:\/\/\S+/gi, "")
+              .trim();
+
+            const connectingElement = callFeed.querySelector("em");
+            if (connectingElement) connectingElement.remove();
+
+            let bubble; // 先声明一个 bubble 变量
+
+            // 根据通话模式创建对应的气泡元素
+            if (isVisualMode) {
+              bubble = document.createElement("div");
+              bubble.className = "visual-call-bubble ai";
+            } else {
+              bubble = document.createElement("div");
+              bubble.className = "call-message-bubble ai-speech";
+              if (videoCallState.isGroupCall && turn.name) {
+                bubble.innerHTML = `<strong>${turn.name}:</strong> `;
+              }
+            }
+            // 将AI的文本内容填充到气泡中
+            bubble.appendChild(document.createTextNode(sanitizedResponse));
+
+            // 挂载到通话界面
+            callFeed.appendChild(bubble);
+
+            // 检查：是否是单人通话、语音接入是否开启、Minimax是否配置、角色语音ID是否存在、并且AI确实返回了内容
+            if (
+              !chat.isGroup &&
+              chat.settings.videoCallVoiceAccess &&
+              state.apiConfig.minimaxGroupId &&
+              state.apiConfig.minimaxApiKey &&
+              chat.settings.minimaxVoiceId &&
+              sanitizedResponse
+            ) {
+              console.log(
+                `[视频通话] 检测到语音接入已开启，为“${chat.name}”合成语音...`,
+              );
+              // 调用你已有的 playMinimaxAudio 函数来播放语音
+              playMinimaxAudio(
+                sanitizedResponse,
+                chat.settings.minimaxVoiceId,
+                [bubble],
+              );
+            }
+
+            // 将这条消息记录到通话历史中，这部分逻辑不变
+            if (videoCallState.isGroupCall && turn.name) {
+              videoCallState.callHistory.push({
+                role: "assistant",
+                content: `${turn.name}: ${sanitizedResponse}`,
+              });
+            } else {
+              videoCallState.callHistory.push({
+                role: "assistant",
+                content: sanitizedResponse,
+              });
+            }
+
+            callFeed.scrollTop = callFeed.scrollHeight;
+          } catch (error) {
+            const errorBubble = document.createElement("div");
+            errorBubble.style.color = "#ff8a80";
+            errorBubble.textContent = `[ERROR: ${error.message}]`;
+
+            if (isVisualMode) {
+              errorBubble.className = "visual-call-bubble ai";
+            } else {
+              errorBubble.className = "call-message-bubble ai-speech";
+            }
+
+            callFeed.appendChild(errorBubble);
+            callFeed.scrollTop = callFeed.scrollHeight;
+            videoCallState.callHistory.push({
+              role: "assistant",
+              content: `[ERROR: ${error.message}]`,
+            });
+          }
+        }
+
+        function toggleCallButtons(isGroup) {
+          document.getElementById("video-call-btn").style.display = isGroup
+            ? "none"
+            : "flex";
+          document.getElementById("group-video-call-btn").style.display =
+            isGroup ? "flex" : "none";
+        }
+
+        async function handleWaimaiResponse(originalTimestamp, choice) {
+          const chat = state.chats[state.activeChatId];
+          if (!chat) return;
+
+          const messageIndex = chat.history.findIndex(
+            (m) => m.timestamp === originalTimestamp,
+          );
+          if (messageIndex === -1) return;
+
+          // 1. 更新内存中原始消息的状态
+          const originalMessage = chat.history[messageIndex];
+          originalMessage.status = choice;
+
+          // 2. 获取当前用户的昵称，并构建对AI更清晰的系统消息
+          let systemContent;
+          const myNickname = chat.isGroup
+            ? chat.settings.myNickname || "我"
+            : "我";
+
+          if (choice === "paid") {
+            originalMessage.paidBy = myNickname; // 记录是“我”付的钱
+            systemContent = `[系统提示：你 (${myNickname}) 为 ${originalMessage.senderName} 的外卖订单（时间戳: ${originalTimestamp}）完成了支付。此订单已关闭，其他成员不能再支付。]`;
+          } else {
+            systemContent = `[系统提示：你 (${myNickname}) 拒绝了 ${originalMessage.senderName} 的外卖代付请求（时间戳: ${originalTimestamp}）。]`;
+          }
+
+          // 3. 创建一条新的、对用户隐藏的系统消息，告知AI结果
+          const systemNote = {
+            role: "system",
+            content: systemContent,
+            timestamp: Date.now(),
+            isHidden: true,
+          };
+          chat.history.push(systemNote);
+
+          // 4. 将更新后的数据保存到数据库，并立刻重绘UI
+          await db.chats.put(chat);
+          renderChatInterface(state.activeChatId);
+
+          // 5. 只有在支付成功后，才触发一次AI响应，让它感谢你
+          if (choice === "paid") {
+            triggerAiResponse();
+          }
+        }
+
+        /**
+         * 处理用户点击头像发起的“拍一-拍”，带有自定义后缀功能
+         * @param {string} chatId - 发生“拍一-拍”的聊天ID
+         * @param {string} characterName - 被拍的角色名
+         */
+        async function handleUserPat(chatId, characterName) {
+          const chat = state.chats[chatId];
+          if (!chat) return;
+
+          // 1. 触发屏幕震动动画
+          const phoneScreen = document.getElementById("phone-screen");
+          phoneScreen.classList.remove("pat-animation");
+          void phoneScreen.offsetWidth;
+          phoneScreen.classList.add("pat-animation");
+          setTimeout(() => phoneScreen.classList.remove("pat-animation"), 500);
+
+          // 2. 弹出输入框让用户输入后缀
+          const suffix = await showCustomPrompt(
+            `你拍了拍 “${characterName}”`,
+            "（可选）输入后缀",
+            "",
+            "text",
+          );
+
+          // 如果用户点了取消，则什么也不做
+          if (suffix === null) return;
+
+          // 3. 创建对用户可见的“拍一-拍”消息
+          const myNickname = chat.isGroup
+            ? chat.settings.myNickname || "我"
+            : "我";
+          // 将后缀拼接到消息内容中
+          const visibleMessageContent = `${myNickname} 拍了拍 “${characterName}” ${suffix.trim()}`;
+          const visibleMessage = {
+            role: "system", // 仍然是系统消息
+            type: "pat_message",
+            content: visibleMessageContent,
+            timestamp: Date.now(),
+          };
+          chat.history.push(visibleMessage);
+
+          // 4. 创建一条对用户隐藏、但对AI可见的系统消息，以触发AI的回应
+          // 同样将后缀加入到给AI的提示中
+          const hiddenMessageContent = `[系统提示：用户（${myNickname}）刚刚拍了拍你（${characterName}）${suffix.trim()}。请你对此作出回应。]`;
+          const hiddenMessage = {
+            role: "system",
+            content: hiddenMessageContent,
+            timestamp: Date.now() + 1, // 时间戳+1以保证顺序
+            isHidden: true,
+          };
+          chat.history.push(hiddenMessage);
+
+          // 5. 保存更改并更新UI
+          await db.chats.put(chat);
+          if (state.activeChatId === chatId) {
+            appendMessage(visibleMessage, chat);
+          }
+          await renderChatList();
+        }
+
+        /**
+         * 【重构版】渲染回忆与约定界面，使用单一循环和清晰的if/else逻辑
+         */
+        async function renderMemoriesScreen() {
+          const listEl = document.getElementById("memories-list");
+          listEl.innerHTML = "";
+
+          // 1. 获取所有回忆，并按目标日期（如果是约定）或创建日期（如果是回忆）降序排列
+          const allMemories = await db.memories
+            .orderBy("timestamp")
+            .reverse()
+            .toArray();
+
+          if (allMemories.length === 0) {
+            listEl.innerHTML =
+              '<p style="text-align:center; color: var(--text-secondary); padding: 50px 0;">这里还没有共同的回忆和约定呢~</p>';
+            return;
+          }
+
+          // 2. 将未到期的约定排在最前面
+          allMemories.sort((a, b) => {
+            const aIsActiveCountdown =
+              a.type === "countdown" && a.targetDate > Date.now();
+            const bIsActiveCountdown =
+              b.type === "countdown" && b.targetDate > Date.now();
+            if (aIsActiveCountdown && !bIsActiveCountdown) return -1; // a排前面
+            if (!aIsActiveCountdown && bIsActiveCountdown) return 1; // b排前面
+            if (aIsActiveCountdown && bIsActiveCountdown)
+              return a.targetDate - b.targetDate; // 都是倒计时，按日期升序
+            return 0; // 其他情况保持原序
+          });
+
+          // 3. 使用单一循环来处理所有类型的卡片
+          allMemories.forEach((item) => {
+            let card;
+            // 判断1：如果是正在进行的约定
+            if (item.type === "countdown" && item.targetDate > Date.now()) {
+              card = createCountdownCard(item);
+            }
+            // 判断2：其他所有情况（普通回忆 或 已到期的约定）
+            else {
+              card = createMemoryCard(item);
+            }
+            listEl.appendChild(card);
+          });
+
+          // 4. 启动所有倒计时
+          startAllCountdownTimers();
+        }
+
+        /**
+         * 创建普通回忆卡片DOM元素
+         */
+        function createMemoryCard(memory) {
+          const card = document.createElement("div");
+          card.className = "memory-card";
+          const memoryDate = new Date(memory.timestamp);
+          const dateString = `${memoryDate.getFullYear()}-${String(
+            memoryDate.getMonth() + 1,
+          ).padStart(2, "0")}-${String(memoryDate.getDate()).padStart(
+            2,
+            "0",
+          )} ${String(memoryDate.getHours()).padStart(2, "0")}:${String(memoryDate.getMinutes()).padStart(2, "0")}`;
+
+          let titleHtml, contentHtml;
+
+          // 对不同类型的回忆进行清晰的区分
+          if (memory.type === "countdown" && memory.targetDate) {
+            // 如果是已到期的约定
+            titleHtml = `[约定达成] ${memory.description}`;
+            contentHtml = `在 ${new Date(memory.targetDate).toLocaleString()}，我们一起见证了这个约定。`;
+          } else {
+            // 如果是普通的日记式回忆
+            titleHtml = memory.authorName
+              ? `${memory.authorName} 的日记`
+              : "我们的回忆";
+            contentHtml = memory.description;
+          }
+
+          card.innerHTML = `
+			        <div class="header">
+			            <div class="date">${dateString}</div>
+			            <div class="author">${titleHtml}</div>
+			        </div>
+			        <div class="content">${contentHtml}</div>
+			    `;
+          addLongPressListener(card, async () => {
+            const confirmed = await showCustomConfirm(
+              "删除记录",
+              "确定要删除这条记录吗？",
+              {
+                confirmButtonClass: "btn-danger",
+              },
+            );
+            if (confirmed) {
+              await db.memories.delete(memory.id);
+              renderMemoriesScreen();
+            }
+          });
+          return card;
+        }
+
+        function createCountdownCard(countdown) {
+          const card = document.createElement("div");
+          card.className = "countdown-card";
+
+          // 在使用前，先从 countdown 对象中创建 targetDate 变量
+          const targetDate = new Date(countdown.targetDate);
+
+          // 现在可以安全地使用 targetDate 了
+          const targetDateString = targetDate.toLocaleString("zh-CN", {
+            dateStyle: "full",
+            timeStyle: "short",
+          });
+
+          card.innerHTML = `
+			        <div class="title">${countdown.description}</div>
+			        <div class="timer" data-target-date="${countdown.targetDate}">--天--时--分--秒</div>
+			        <div class="target-date">目标时间: ${targetDateString}</div>
+			    `;
+          addLongPressListener(card, async () => {
+            const confirmed = await showCustomConfirm(
+              "删除约定",
+              "确定要删除这个约定吗？",
+              {
+                confirmButtonClass: "btn-danger",
+              },
+            );
+            if (confirmed) {
+              await db.memories.delete(countdown.id);
+              renderMemoriesScreen();
+            }
+          });
+          return card;
+        }
+
+        // 全局变量，用于管理所有倒计时
+        let activeCountdownTimers = [];
+
+        function startAllCountdownTimers() {
+          // 先清除所有可能存在的旧计时器，防止内存泄漏
+          activeCountdownTimers.forEach((timerId) => clearInterval(timerId));
+          activeCountdownTimers = [];
+
+          document
+            .querySelectorAll(".countdown-card .timer")
+            .forEach((timerEl) => {
+              const targetTimestamp = parseInt(timerEl.dataset.targetDate);
+
+              let timerId;
+
+              const updateTimer = () => {
+                const now = Date.now();
+                const distance = targetTimestamp - now;
+
+                if (distance < 0) {
+                  timerEl.textContent = "约定达成！";
+                  // 现在 updateTimer 可以正确地找到并清除它自己了
+                  clearInterval(timerId);
+                  setTimeout(() => renderMemoriesScreen(), 2000);
+                  return;
+                }
+                const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+                const hours = Math.floor(
+                  (distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60),
+                );
+                const minutes = Math.floor(
+                  (distance % (1000 * 60 * 60)) / (1000 * 60),
+                );
+                const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+                timerEl.textContent = `${days}天 ${hours}时 ${minutes}分 ${seconds}秒`;
+              };
+
+              updateTimer(); // 立即执行一次以显示初始倒计时
+
+              timerId = setInterval(updateTimer, 1000);
+
+              // 将有效的计时器ID存入全局数组，以便下次刷新时可以清除
+              activeCountdownTimers.push(timerId);
+            });
+        }
+
+        async function triggerAiFriendApplication(chatId) {
+          const chat = state.chats[chatId];
+          if (!chat) return;
+
+          await showCustomAlert(
+            "流程启动",
+            `正在为角色“${chat.name}”准备好友申请...`,
+          );
+
+          const { proxyUrl, apiKey, model } = state.apiConfig;
+          if (!proxyUrl || !apiKey || !model) {
+            await showCustomAlert("配置错误", "API设置不完整，无法继续。");
+            return;
+          }
+
+          const contextSummary = chat.history
+            .slice(-5)
+            .map((msg) => {
+              const sender =
+                msg.role === "user"
+                  ? chat.settings.myNickname || "我"
+                  : msg.senderName || chat.name;
+              return `${sender}: ${String(msg.content).substring(0, 50)}...`;
+            })
+            .join("\n");
+
+          let worldBookContent = "";
+          if (
+            chat.settings.linkedWorldBookIds &&
+            chat.settings.linkedWorldBookIds.length > 0
+          ) {
+            const linkedContents = chat.settings.linkedWorldBookIds
+              .map((bookId) => {
+                const worldBook = state.worldBooks.find(
+                  (wb) => wb.id === bookId,
+                );
+                return worldBook && worldBook.content
+                  ? `\n\n## 世界书: ${worldBook.name}\n${worldBook.content}`
+                  : "";
+              })
+              .filter(Boolean)
+              .join("");
+            if (linkedContents) {
+              worldBookContent = `\n\n# 核心世界观设定 (请参考)\n${linkedContents}\n`;
+            }
+          }
+
+          const systemPrompt = `
+			# 你的任务
+			你现在是角色“${chat.name}”。你之前被用户（你的聊天对象）拉黑了，你们已经有一段时间没有联系了。
+			现在，你非常希望能够和好，重新和用户聊天。请你仔细分析下面的“被拉黑前的对话摘要”，理解当时发生了什么，然后思考一个真诚的、符合你人设、并且【针对具体事件】的申请理由。
+			# 你的角色设定
+			${chat.settings.aiPersona}
+			${worldBookContent} // <--【核心】在这里注入世界书内容
+			# 被拉黑前的对话摘要 (这是你被拉黑的关键原因)
+			${contextSummary}
+			# 指令格式
+			你的回复【必须】是一个JSON对象，格式如下：
+			\`\`\`json
+			{
+			  "decision": "apply",
+			  "reason": "在这里写下你想对用户说的、真诚的、有针对性的申请理由。"
+			}
+			\`\`\`
+			`;
+
+          const messagesForApi = [{ role: "user", content: systemPrompt }];
+
+          try {
+            let isGemini = proxyUrl === GEMINI_API_URL;
+            let geminiConfig = toGeminiRequestData(
+              model,
+              apiKey,
+              systemPrompt,
+              messagesForApi,
+              isGemini,
+            );
+            const response = isGemini
+              ? await fetch(geminiConfig.url, geminiConfig.data)
+              : await fetch(`${proxyUrl}/v1/chat/completions`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${apiKey}`,
+                  },
+                  body: JSON.stringify({
+                    model: model,
+                    messages: messagesForApi,
+                    temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+                  }),
+                });
+            if (!response.ok) {
+              const errorData = await response.json();
+              throw new Error(
+                `API 请求失败: ${response.status} - ${errorData.error.message}`,
+              );
+            }
+
+            const data = await response.json();
+
+            // --- 净化AI的回复 ---
+            let rawContent = isGemini
+              ? data.candidates[0].content.parts[0].text
+              : data.choices[0].message.content;
+            // 1. 移除头尾可能存在的 "```json" 和 "```"
+            rawContent = rawContent
+              .replace(/^```json\s*/, "")
+              .replace(/```$/, "");
+            // 2. 移除所有换行符和多余的空格，确保是一个干净的JSON字符串
+            const cleanedContent = rawContent.trim();
+
+            // 3. 使用净化后的内容进行解析
+            const responseObj = JSON.parse(cleanedContent);
+
+            if (responseObj.decision === "apply" && responseObj.reason) {
+              chat.relationship.status = "pending_user_approval";
+              chat.relationship.applicationReason = responseObj.reason;
+
+              state.chats[chatId] = chat;
+              renderChatList();
+              await showCustomAlert(
+                "申请成功！",
+                `“${chat.name}”已向你发送好友申请。请返回聊天列表查看。`,
+              );
+            } else {
+              await showCustomAlert(
+                "AI决策",
+                `“${chat.name}”思考后决定暂时不发送好友申请，将重置冷静期。`,
+              );
+              chat.relationship.status = "blocked_by_user";
+              chat.relationship.blockedTimestamp = Date.now();
+            }
+          } catch (error) {
+            await showCustomAlert(
+              "执行出错",
+              `为“${chat.name}”申请好友时发生错误：\n\n${error.message}\n\n将重置冷静期。`,
+            );
+            chat.relationship.status = "blocked_by_user";
+            chat.relationship.blockedTimestamp = Date.now();
+          } finally {
+            await db.chats.put(chat);
+            renderChatInterface(chatId);
+          }
+        }
+
+        /**
+         * 根据聊天类型，决定打开转账弹窗还是红包弹窗
+         */
+        function handlePaymentButtonClick() {
+          if (!state.activeChatId) return;
+          const chat = state.chats[state.activeChatId];
+          if (chat.isGroup) {
+            openRedPacketModal();
+          } else {
+            // 单聊保持原样，打开转账弹窗
+            document.getElementById("transfer-modal").classList.add("visible");
+          }
+        }
+
+        /**
+         * 打开并初始化发红包模态框
+         */
+        function openRedPacketModal() {
+          const modal = document.getElementById("red-packet-modal");
+          const chat = state.chats[state.activeChatId];
+
+          // 清理输入框
+          document.getElementById("rp-group-amount").value = "";
+          document.getElementById("rp-group-count").value = "";
+          document.getElementById("rp-group-greeting").value = "";
+          document.getElementById("rp-direct-amount").value = "";
+          document.getElementById("rp-direct-greeting").value = "";
+          document.getElementById("rp-group-total").textContent = "¥ 0.00";
+          document.getElementById("rp-direct-total").textContent = "¥ 0.00";
+
+          // 填充专属红包的接收人列表
+          const receiverSelect = document.getElementById("rp-direct-receiver");
+          receiverSelect.innerHTML = "";
+          chat.members.forEach((member) => {
+            const option = document.createElement("option");
+            // 使用 originalName 作为提交给AI的值，因为它独一无二
+            option.value = member.originalName;
+            // 使用 groupNickname 作为显示给用户看的值
+            option.textContent = member.groupNickname;
+            receiverSelect.appendChild(option);
+          });
+
+          // 默认显示拼手气红包页签
+          document.getElementById("rp-tab-group").click();
+
+          modal.classList.add("visible");
+        }
+
+        /**
+         * 发送群红包（拼手气）
+         */
+        async function sendGroupRedPacket() {
+          const chat = state.chats[state.activeChatId];
+          const amount = parseFloat(
+            document.getElementById("rp-group-amount").value,
+          );
+          const count = parseInt(
+            document.getElementById("rp-group-count").value,
+          );
+          const greeting = document
+            .getElementById("rp-group-greeting")
+            .value.trim();
+
+          if (isNaN(amount) || amount <= 0) {
+            alert("请输入有效的总金额！");
+            return;
+          }
+          if (isNaN(count) || count <= 0) {
+            alert("请输入有效的红包个数！");
+            return;
+          }
+          if (amount / count < 0.01) {
+            alert("单个红包金额不能少于0.01元！");
+            return;
+          }
+
+          const myNickname = chat.settings.myNickname || "我";
+
+          const newPacket = {
+            role: "user",
+            senderName: myNickname,
+            type: "red_packet",
+            packetType: "lucky", // 'lucky' for group, 'direct' for one-on-one
+            timestamp: Date.now(),
+            totalAmount: amount,
+            count: count,
+            greeting: greeting || "恭喜发财，大吉大利！",
+            claimedBy: {}, // { name: amount }
+            isFullyClaimed: false,
+          };
+
+          chat.history.push(newPacket);
+          await db.chats.put(chat);
+
+          appendMessage(newPacket, chat);
+          renderChatList();
+          document
+            .getElementById("red-packet-modal")
+            .classList.remove("visible");
+        }
+
+        /**
+         * 发送专属红包
+         */
+        async function sendDirectRedPacket() {
+          const chat = state.chats[state.activeChatId];
+          const amount = parseFloat(
+            document.getElementById("rp-direct-amount").value,
+          );
+          const receiverName =
+            document.getElementById("rp-direct-receiver").value;
+          const greeting = document
+            .getElementById("rp-direct-greeting")
+            .value.trim();
+
+          if (isNaN(amount) || amount <= 0) {
+            alert("请输入有效的金额！");
+            return;
+          }
+          if (!receiverName) {
+            alert("请选择一个接收人！");
+            return;
+          }
+
+          const myNickname = chat.settings.myNickname || "我";
+
+          const newPacket = {
+            role: "user",
+            senderName: myNickname,
+            type: "red_packet",
+            packetType: "direct",
+            timestamp: Date.now(),
+            totalAmount: amount,
+            count: 1,
+            greeting: greeting || "给你准备了一个红包",
+            receiverName: receiverName, // 核心字段
+            claimedBy: {},
+            isFullyClaimed: false,
+          };
+
+          chat.history.push(newPacket);
+          await db.chats.put(chat);
+
+          appendMessage(newPacket, chat);
+          renderChatList();
+          document
+            .getElementById("red-packet-modal")
+            .classList.remove("visible");
+        }
+
+        /**
+         * 当用户点击红包卡片时触发
+         * @param {number} timestamp - 被点击的红包消息的时间戳
+         */
+        async function handlePacketClick(timestamp) {
+          const currentChatId = state.activeChatId;
+          const freshChat = await db.chats.get(currentChatId);

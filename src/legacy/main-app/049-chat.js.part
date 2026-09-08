@@ -1,0 +1,905 @@
+              if (text && text.trim()) {
+                const chat = state.chats[state.activeChatId];
+                const msg = {
+                  role: "user",
+                  type: "voice_message",
+                  content: text.trim(),
+                  timestamp: Date.now(),
+                };
+                chat.history.push(msg);
+                await db.chats.put(chat);
+                appendMessage(msg, chat);
+                renderChatList();
+              }
+            });
+          document
+            .getElementById("send-photo-btn")
+            .addEventListener("click", async () => {
+              if (!state.activeChatId) return;
+              const description = await showCustomPrompt(
+                "发送照片",
+                "请用文字描述您要发送的照片：",
+              );
+              if (description && description.trim()) {
+                const chat = state.chats[state.activeChatId];
+                const msg = {
+                  role: "user",
+                  type: "user_photo",
+                  content: description.trim(),
+                  timestamp: Date.now(),
+                };
+                chat.history.push(msg);
+                await db.chats.put(chat);
+                appendMessage(msg, chat);
+                renderChatList();
+              }
+            });
+
+          // 外卖请求功能事件绑定
+          const waimaiModal = document.getElementById("waimai-request-modal");
+          document
+            .getElementById("send-waimai-request-btn")
+            .addEventListener("click", () => {
+              waimaiModal.classList.add("visible");
+            });
+
+          document
+            .getElementById("waimai-cancel-btn")
+            .addEventListener("click", () => {
+              waimaiModal.classList.remove("visible");
+            });
+
+          document
+            .getElementById("waimai-confirm-btn")
+            .addEventListener("click", async () => {
+              if (!state.activeChatId) return;
+
+              const productInfoInput = document.getElementById(
+                "waimai-product-info",
+              );
+              const amountInput = document.getElementById("waimai-amount");
+
+              const productInfo = productInfoInput.value.trim();
+              const amount = parseFloat(amountInput.value);
+
+              if (!productInfo) {
+                alert("请输入商品信息！");
+                return;
+              }
+              if (isNaN(amount) || amount <= 0) {
+                alert("请输入有效的代付金额！");
+                return;
+              }
+
+              const chat = state.chats[state.activeChatId];
+              const now = Date.now();
+
+              const myNickname = chat.isGroup
+                ? chat.settings.myNickname || "我"
+                : "我";
+
+              const msg = {
+                role: "user",
+                senderName: myNickname,
+                type: "waimai_request",
+                productInfo: productInfo,
+                amount: amount,
+                status: "pending",
+                countdownEndTime: now + 15 * 60 * 1000,
+                timestamp: now,
+              };
+
+              chat.history.push(msg);
+
+              // 那一大段代码已经被删除了
+
+              await db.chats.put(chat);
+              appendMessage(msg, chat);
+              renderChatList();
+
+              productInfoInput.value = "";
+              amountInput.value = "";
+              waimaiModal.classList.remove("visible");
+            });
+          document
+            .getElementById("open-persona-library-btn")
+            .addEventListener("click", openPersonaLibrary);
+          document
+            .getElementById("close-persona-library-btn")
+            .addEventListener("click", closePersonaLibrary);
+          document
+            .getElementById("add-persona-preset-btn")
+            .addEventListener("click", openPersonaEditorForCreate);
+          document
+            .getElementById("cancel-persona-editor-btn")
+            .addEventListener("click", closePersonaEditor);
+
+          document
+            .getElementById("preset-action-edit")
+            .addEventListener("click", openPersonaEditorForEdit);
+          document
+            .getElementById("preset-action-delete")
+            .addEventListener("click", deletePersonaPreset);
+          document
+            .getElementById("preset-action-cancel")
+            .addEventListener("click", hidePresetActions);
+
+          document
+            .getElementById("selection-cancel-btn")
+            .addEventListener("click", exitSelectionMode);
+
+          document
+            .getElementById("selection-delete-btn")
+            .addEventListener("click", async () => {
+              if (selectedMessages.size === 0) return;
+              const confirmed = await showCustomConfirm(
+                "删除消息",
+                `确定要删除选中的 ${selectedMessages.size} 条消息吗？这将改变AI的记忆。`,
+                { confirmButtonClass: "btn-danger" },
+              );
+              if (confirmed) {
+                const chat = state.chats[state.activeChatId];
+
+                // 1. 在删除前，检查被删除的消息中是否包含投票
+                let deletedPollsInfo = [];
+                for (const timestamp of selectedMessages) {
+                  const msg = chat.history.find(
+                    (m) => m.timestamp === timestamp,
+                  );
+                  if (msg && msg.type === "poll") {
+                    deletedPollsInfo.push(
+                      `关于“${msg.question}”的投票(时间戳: ${msg.timestamp})`,
+                    );
+                  }
+                }
+
+                // 2. 更新后端的历史记录
+                chat.history = chat.history.filter(
+                  (msg) => !selectedMessages.has(msg.timestamp),
+                );
+
+                // 3. 构建更具体的“遗忘指令”
+                let forgetReason = "一些之前的消息已被用户删除。";
+                if (deletedPollsInfo.length > 0) {
+                  forgetReason += ` 其中包括以下投票：${deletedPollsInfo.join("；")}。`;
+                }
+                forgetReason +=
+                  " 你应该像它们从未存在过一样继续对话，并相应地调整你的记忆和行为，不要再提及这些被删除的内容。";
+
+                const forgetInstruction = {
+                  role: "system",
+                  content: `[系统提示：${forgetReason}]`,
+                  timestamp: Date.now(),
+                  isHidden: true,
+                };
+                chat.history.push(forgetInstruction);
+
+                // 4. 将包含“遗忘指令”的、更新后的chat对象存回数据库
+                await db.chats.put(chat);
+
+                // 5. 最后才更新UI
+                renderChatInterface(state.activeChatId);
+                renderChatList();
+              }
+            });
+
+          document
+            .getElementById("reset-font-btn")
+            .addEventListener("click", resetToDefaultFont);
+
+          document
+            .querySelectorAll("#chat-list-bottom-nav .nav-item")
+            .forEach((item) => {
+              item.addEventListener("click", () =>
+                switchToChatListView(item.dataset.view),
+              );
+            });
+          document
+            .getElementById("qzone-back-btn")
+            .addEventListener("click", () =>
+              switchToChatListView("messages-view"),
+            );
+          document
+            .getElementById("qzone-nickname")
+            .addEventListener("click", async () => {
+              const newNickname = await showCustomPrompt(
+                "修改昵称",
+                "请输入新的昵称",
+                state.qzoneSettings.nickname,
+              );
+              if (newNickname && newNickname.trim()) {
+                state.qzoneSettings.nickname = newNickname.trim();
+                await saveQzoneSettings();
+                renderQzoneScreen();
+              }
+            });
+          document
+            .getElementById("qzone-avatar-container")
+            .addEventListener("click", () =>
+              document.getElementById("qzone-avatar-input").click(),
+            );
+          document
+            .getElementById("qzone-banner-container")
+            .addEventListener("click", () =>
+              document.getElementById("qzone-banner-input").click(),
+            );
+          document
+            .getElementById("qzone-avatar-input")
+            .addEventListener("change", async (event) => {
+              const file = event.target.files[0];
+              if (file) {
+                const dataUrl = await new Promise((res) => {
+                  const reader = new FileReader();
+                  reader.onload = () => res(reader.result);
+                  reader.readAsDataURL(file);
+                });
+                state.qzoneSettings.avatar = dataUrl;
+                await saveQzoneSettings();
+                renderQzoneScreen();
+              }
+              event.target.value = null;
+            });
+          document
+            .getElementById("qzone-banner-input")
+            .addEventListener("change", async (event) => {
+              const file = event.target.files[0];
+              if (file) {
+                const dataUrl = await new Promise((res) => {
+                  const reader = new FileReader();
+                  reader.onload = () => res(reader.result);
+                  reader.readAsDataURL(file);
+                });
+                state.qzoneSettings.banner = dataUrl;
+                await saveQzoneSettings();
+                renderQzoneScreen();
+              }
+              event.target.value = null;
+            });
+
+          document
+            .getElementById("create-shuoshuo-btn")
+            .addEventListener("click", () => openQZonePublisher("shuoshuo"));
+          document
+            .getElementById("create-post-btn")
+            .addEventListener("click", () => openQZonePublisher("complex"));
+
+          document
+            .getElementById("open-album-btn")
+            .addEventListener("click", async () => {
+              await renderAlbumList();
+              showScreen("album-screen");
+            });
+          document
+            .getElementById("album-back-btn")
+            .addEventListener("click", () => {
+              showScreen("chat-list-screen");
+              switchToChatListView("qzone-screen");
+            });
+
+          document
+            .getElementById("album-photos-back-btn")
+            .addEventListener("click", () => {
+              state.activeAlbumId = null;
+              showScreen("album-screen");
+            });
+
+          document
+            .getElementById("album-upload-photo-btn")
+            .addEventListener("click", () =>
+              document.getElementById("album-photo-input").click(),
+            );
+
+          document
+            .getElementById("album-photo-input")
+            .addEventListener("change", async (event) => {
+              if (!state.activeAlbumId) return;
+              const files = event.target.files;
+              if (!files.length) return;
+
+              const album = await db.qzoneAlbums.get(state.activeAlbumId);
+
+              for (const file of files) {
+                const dataUrl = await new Promise((resolve) => {
+                  const reader = new FileReader();
+                  reader.onload = () => resolve(reader.result);
+                  reader.readAsDataURL(file);
+                });
+                await db.qzonePhotos.add({
+                  albumId: state.activeAlbumId,
+                  url: dataUrl,
+                  createdAt: Date.now(),
+                });
+              }
+
+              const photoCount = await db.qzonePhotos
+                .where("albumId")
+                .equals(state.activeAlbumId)
+                .count();
+              const updateData = { photoCount };
+
+              if (!album.photoCount || album.coverUrl.includes("placeholder")) {
+                const firstPhoto = await db.qzonePhotos
+                  .where("albumId")
+                  .equals(state.activeAlbumId)
+                  .first();
+                if (firstPhoto) updateData.coverUrl = firstPhoto.url;
+              }
+
+              await db.qzoneAlbums.update(state.activeAlbumId, updateData);
+              await renderAlbumPhotosScreen();
+              await renderAlbumList();
+
+              event.target.value = null;
+              alert("照片上传成功！");
+            });
+
+          document
+            .getElementById("photos-grid-page")
+            .addEventListener("click", async (e) => {
+              const deleteBtn = e.target.closest(".photo-delete-btn");
+              const photoThumb = e.target.closest(".photo-thumb");
+
+              if (deleteBtn) {
+                e.stopPropagation(); // 阻止事件冒泡到图片上
+                const photoId = parseInt(deleteBtn.dataset.photoId);
+                const confirmed = await showCustomConfirm(
+                  "删除照片",
+                  "确定要删除这张照片吗？此操作不可恢复。",
+                  {
+                    confirmButtonClass: "btn-danger",
+                  },
+                );
+
+                if (confirmed) {
+                  const deletedPhoto = await db.qzonePhotos.get(photoId);
+                  if (!deletedPhoto) return;
+
+                  await db.qzonePhotos.delete(photoId);
+
+                  const album = await db.qzoneAlbums.get(state.activeAlbumId);
+                  const photoCount = (album.photoCount || 1) - 1;
+                  const updateData = { photoCount };
+
+                  if (album.coverUrl === deletedPhoto.url) {
+                    const nextPhoto = await db.qzonePhotos
+                      .where("albumId")
+                      .equals(state.activeAlbumId)
+                      .first();
+                    updateData.coverUrl = nextPhoto
+                      ? nextPhoto.url
+                      : "https://i.postimg.cc/pT2xKzPz/album-cover-placeholder.png";
+                  }
+
+                  await db.qzoneAlbums.update(state.activeAlbumId, updateData);
+                  await renderAlbumPhotosScreen();
+                  await renderAlbumList();
+                  alert("照片已删除。");
+                }
+              } else if (photoThumb) {
+                // 这就是恢复的图片点击放大功能！
+                openPhotoViewer(photoThumb.src);
+              }
+            });
+
+          // 恢复图片查看器的控制事件
+          document
+            .getElementById("photo-viewer-close-btn")
+            .addEventListener("click", closePhotoViewer);
+          document
+            .getElementById("photo-viewer-next-btn")
+            .addEventListener("click", showNextPhoto);
+          document
+            .getElementById("photo-viewer-prev-btn")
+            .addEventListener("click", showPrevPhoto);
+
+          // 恢复键盘左右箭头和ESC键的功能
+          document.addEventListener("keydown", (e) => {
+            if (!photoViewerState.isOpen) return;
+
+            if (e.key === "ArrowRight") {
+              showNextPhoto();
+            } else if (e.key === "ArrowLeft") {
+              showPrevPhoto();
+            } else if (e.key === "Escape") {
+              closePhotoViewer();
+            }
+          });
+
+          // --- ↑↑↑ 复制到这里结束 ↑↑↑ ---
+
+          document
+            .getElementById("create-album-btn-page")
+            .addEventListener("click", async () => {
+              const albumName = await showCustomPrompt(
+                "创建新相册",
+                "请输入相册名称",
+              );
+              if (albumName && albumName.trim()) {
+                const newAlbum = {
+                  name: albumName.trim(),
+                  coverUrl:
+                    "https://i.postimg.cc/pT2xKzPz/album-cover-placeholder.png",
+                  photoCount: 0,
+                  createdAt: Date.now(),
+                };
+                await db.qzoneAlbums.add(newAlbum);
+                await renderAlbumList();
+                alert(`相册 "${albumName}" 创建成功！`);
+              } else if (albumName !== null) {
+                alert("相册名称不能为空！");
+              }
+            });
+
+          document
+            .getElementById("cancel-create-post-btn")
+            .addEventListener("click", () =>
+              document
+                .getElementById("create-post-modal")
+                .classList.remove("visible"),
+            );
+          document
+            .getElementById("post-upload-local-btn")
+            .addEventListener("click", () =>
+              document.getElementById("post-local-image-input").click(),
+            );
+          document
+            .getElementById("post-local-image-input")
+            .addEventListener("change", (event) => {
+              const file = event.target.files[0];
+              if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                  document.getElementById("post-image-preview").src =
+                    e.target.result;
+                  document
+                    .getElementById("post-image-preview-container")
+                    .classList.add("visible");
+                  document.getElementById(
+                    "post-image-desc-group",
+                  ).style.display = "block";
+                };
+                reader.readAsDataURL(file);
+              }
+            });
+          document
+            .getElementById("post-use-url-btn")
+            .addEventListener("click", async () => {
+              const url = await showCustomPrompt(
+                "输入图片URL",
+                "请输入网络图片的链接",
+                "",
+                "url",
+              );
+              if (url) {
+                document.getElementById("post-image-preview").src = url;
+                document
+                  .getElementById("post-image-preview-container")
+                  .classList.add("visible");
+                document.getElementById("post-image-desc-group").style.display =
+                  "block";
+              }
+            });
+          document
+            .getElementById("post-remove-image-btn")
+            .addEventListener("click", () => resetCreatePostModal());
+          const imageModeBtn = document.getElementById("switch-to-image-mode");
+          const textImageModeBtn = document.getElementById(
+            "switch-to-text-image-mode",
+          );
+          const imageModeContent =
+            document.getElementById("image-mode-content");
+          const textImageModeContent = document.getElementById(
+            "text-image-mode-content",
+          );
+          imageModeBtn.addEventListener("click", () => {
+            imageModeBtn.classList.add("active");
+            textImageModeBtn.classList.remove("active");
+            imageModeContent.classList.add("active");
+            textImageModeContent.classList.remove("active");
+          });
+          textImageModeBtn.addEventListener("click", () => {
+            textImageModeBtn.classList.add("active");
+            imageModeBtn.classList.remove("active");
+            textImageModeContent.classList.add("active");
+            imageModeContent.classList.remove("active");
+          });
+
+          document
+            .getElementById("confirm-create-post-btn")
+            .addEventListener("click", async () => {
+              const modal = document.getElementById("create-post-modal");
+              const mode = modal.dataset.mode;
+
+              // 如果当前是 'forum' (小组发帖) 模式，就调用我们刚刚写的发帖函数
+              if (mode === "forum") {
+                await handleCreateForumPost();
+                return; // 执行完就结束，不往下走了
+              }
+
+              // 如果是 'weibo' 模式，就调用发微博的函数
+              if (mode === "weibo") {
+                await handlePublishWeibo();
+                return;
+              }
+
+              // --- 下面是你原来已有的发布“动态”的逻辑，我们保持不变 ---
+              const editingId = parseInt(modal.dataset.editingPostId);
+              const areCommentsVisible = document.getElementById(
+                "post-comments-toggle",
+              ).checked;
+
+              const visibility = document.querySelector(
+                'input[name="visibility"]:checked',
+              ).value;
+              let visibleGroupIds = null;
+              if (visibility === "groups") {
+                visibleGroupIds = Array.from(
+                  document.querySelectorAll(
+                    "#post-visibility-groups input:checked",
+                  ),
+                ).map((cb) => parseInt(cb.value));
+                if (visibleGroupIds.length === 0) {
+                  alert("请至少选择一个可见的分组！");
+                  return;
+                }
+              }
+
+              let postData = {};
+
+              if (mode === "edit") {
+                const existingPost = await db.qzonePosts.get(editingId);
+                if (!existingPost) {
+                  alert("错误：找不到要编辑的动态！");
+                  return;
+                }
+                postData = {
+                  ...existingPost,
+                  areCommentsVisible: areCommentsVisible,
+                  visibleGroupIds: visibleGroupIds,
+                };
+
+                if (postData.type === "shuoshuo") {
+                  postData.content = document
+                    .getElementById("post-public-text")
+                    .value.trim();
+                } else {
+                  postData.publicText = document
+                    .getElementById("post-public-text")
+                    .value.trim();
+                  if (postData.type === "image_post") {
+                    postData.imageUrl =
+                      document.getElementById("post-image-preview").src;
+                    postData.imageDescription = document
+                      .getElementById("post-image-description")
+                      .value.trim();
+                  } else if (postData.type === "text_image") {
+                    postData.hiddenContent = document
+                      .getElementById("post-hidden-text")
+                      .value.trim();
+                  }
+                }
+                await db.qzonePosts.put(postData);
+              } else {
+                const basePostData = {
+                  timestamp: Date.now(),
+                  authorId: "user",
+                  areCommentsVisible: areCommentsVisible,
+                  visibleGroupIds: visibleGroupIds,
+                };
+
+                if (mode === "shuoshuo") {
+                  const content = document
+                    .getElementById("post-public-text")
+                    .value.trim();
+                  if (!content) return alert("说说内容不能为空哦！");
+                  postData = {
+                    ...basePostData,
+                    type: "shuoshuo",
+                    content: content,
+                  };
+                } else {
+                  const publicText = document
+                    .getElementById("post-public-text")
+                    .value.trim();
+                  const isImageModeActive = document
+                    .getElementById("image-mode-content")
+                    .classList.contains("active");
+                  if (isImageModeActive) {
+                    const imageUrl =
+                      document.getElementById("post-image-preview").src;
+                    const imageDescription = document
+                      .getElementById("post-image-description")
+                      .value.trim();
+                    if (
+                      !imageUrl ||
+                      !(
+                        imageUrl.startsWith("http") ||
+                        imageUrl.startsWith("data:")
+                      )
+                    )
+                      return alert("请先添加一张图片再发布动态哦！");
+                    if (!imageDescription)
+                      return alert(
+                        "请为你的图片添加一个简单的描述（必填，给AI看的）！",
+                      );
+                    postData = {
+                      ...basePostData,
+                      type: "image_post",
+                      publicText,
+                      imageUrl,
+                      imageDescription,
+                    };
+                  } else {
+                    const hiddenText = document
+                      .getElementById("post-hidden-text")
+                      .value.trim();
+                    if (!hiddenText) return alert("请输入文字图描述！");
+                    postData = {
+                      ...basePostData,
+                      type: "text_image",
+                      publicText,
+                      hiddenContent: hiddenText,
+                    };
+                  }
+                }
+                const newPostId = await db.qzonePosts.add(postData);
+                postData.id = newPostId;
+              }
+
+              let postSummary =
+                postData.content ||
+                postData.publicText ||
+                postData.imageDescription ||
+                postData.hiddenContent ||
+                "（无文字内容）";
+              postSummary =
+                postSummary.substring(0, 50) +
+                (postSummary.length > 50 ? "..." : "");
+              for (const chatId in state.chats) {
+                const chat = state.chats[chatId];
+                if (chat.isGroup) continue;
+                const historyMessage = {
+                  role: "system",
+                  content: `[系统提示：用户${editingId ? "编辑了" : "发布了"}一条动态(ID: ${
+                    editingId || postData.id
+                  })，内容摘要是：“${postSummary}”。]`,
+                  timestamp: Date.now(),
+                  isHidden: true,
+                };
+                chat.history.push(historyMessage);
+                await db.chats.put(chat);
+              }
+
+              await renderQzonePosts();
+              modal.classList.remove("visible");
+              delete modal.dataset.editingPostId;
+              delete modal.dataset.mode;
+              alert(`动态${editingId ? "编辑" : "发布"}成功！`);
+            });
+
+          // 为全局聊天背景的上传按钮绑定事件
+          document
+            .getElementById("global-bg-upload-input")
+            .addEventListener("change", async (event) => {
+              const file = event.target.files[0];
+              if (file) {
+                const dataUrl = await new Promise((res) => {
+                  const reader = new FileReader();
+                  reader.onload = () => res(reader.result);
+                  reader.readAsDataURL(file);
+                });
+                newGlobalBgBase64 = dataUrl; // 将新背景存入临时变量
+                // 实时更新预览
+                const preview = document.getElementById("global-bg-preview");
+                preview.style.backgroundImage = `url(${dataUrl})`;
+                preview.textContent = "";
+              }
+            });
+
+          // 为全局聊天背景的移除按钮绑定事件
+          document
+            .getElementById("remove-global-bg-btn")
+            .addEventListener("click", () => {
+              newGlobalBgBase64 = "REMOVED"; // 用一个特殊标记表示“移除”
+              const preview = document.getElementById("global-bg-preview");
+              preview.style.backgroundImage = "none";
+              preview.textContent = "已移除";
+              alert("全局背景将在点击“保存”后被移除。");
+            });
+
+          // 为“一键清空单人背景”按钮绑定事件
+          document
+            .getElementById("clear-all-single-bgs-btn")
+            .addEventListener("click", clearAllSingleChatBackgrounds);
+
+          const postsList = document.getElementById("qzone-posts-list");
+          let swipeState = {
+            isDragging: false,
+            startX: 0,
+            startY: 0,
+            currentX: 0,
+            activeContainer: null,
+            swipeDirection: null,
+            isClick: true,
+          };
+
+          function resetAllSwipes(exceptThisOne = null) {
+            document
+              .querySelectorAll(".qzone-post-container")
+              .forEach((container) => {
+                if (container !== exceptThisOne) {
+                  container
+                    .querySelector(".qzone-post-item")
+                    .classList.remove("swiped");
+                }
+              });
+          }
+
+          const handleSwipeStart = (e) => {
+            const targetContainer = e.target.closest(".qzone-post-container");
+            if (!targetContainer) return;
+
+            resetAllSwipes(targetContainer);
+            swipeState.activeContainer = targetContainer;
+            swipeState.isDragging = true;
+            swipeState.isClick = true;
+            swipeState.swipeDirection = null;
+            swipeState.startX = e.type.includes("mouse")
+              ? e.pageX
+              : e.touches[0].pageX;
+            swipeState.startY = e.type.includes("mouse")
+              ? e.pageY
+              : e.touches[0].pageY;
+            swipeState.activeContainer.querySelector(
+              ".qzone-post-item",
+            ).style.transition = "none";
+          };
+
+          const handleSwipeMove = (e) => {
+            if (!swipeState.isDragging || !swipeState.activeContainer) return;
+
+            const currentX = e.type.includes("mouse")
+              ? e.pageX
+              : e.touches[0].pageX;
+            const currentY = e.type.includes("mouse")
+              ? e.pageY
+              : e.touches[0].pageY;
+            const diffX = currentX - swipeState.startX;
+            const diffY = currentY - swipeState.startY;
+            const absDiffX = Math.abs(diffX);
+            const absDiffY = Math.abs(diffY);
+            const clickThreshold = 5;
+
+            if (absDiffX > clickThreshold || absDiffY > clickThreshold) {
+              swipeState.isClick = false;
+            }
+
+            if (swipeState.swipeDirection === null) {
+              if (absDiffX > clickThreshold || absDiffY > clickThreshold) {
+                if (absDiffX > absDiffY) {
+                  swipeState.swipeDirection = "horizontal";
+                } else {
+                  swipeState.swipeDirection = "vertical";
+                }
+              }
+            }
+            if (swipeState.swipeDirection === "vertical") {
+              handleSwipeEnd(e);
+              return;
+            }
+            if (swipeState.swipeDirection === "horizontal") {
+              e.preventDefault();
+              swipeState.currentX = currentX;
+              let translation = diffX;
+              if (translation > 0) translation = 0;
+              if (translation < -90) translation = -90;
+              swipeState.activeContainer.querySelector(
+                ".qzone-post-item",
+              ).style.transform = `translateX(${translation}px)`;
+            }
+          };
+
+          const handleSwipeEnd = (e) => {
+            if (swipeState.isClick) {
+              swipeState.isDragging = false;
+              swipeState.activeContainer = null;
+              return;
+            }
+            if (!swipeState.isDragging || !swipeState.activeContainer) return;
+
+            const postItem =
+              swipeState.activeContainer.querySelector(".qzone-post-item");
+            postItem.style.transition = "transform 0.3s ease";
+
+            const finalX = e.type.includes("touchend")
+              ? e.changedTouches[0].pageX
+              : e.pageX;
+            const diffX = finalX - swipeState.startX;
+            const swipeThreshold = -40;
+
+            if (
+              swipeState.swipeDirection === "horizontal" &&
+              diffX < swipeThreshold
+            ) {
+              postItem.classList.add("swiped");
+              postItem.style.transform = "";
+            } else {
+              postItem.classList.remove("swiped");
+              postItem.style.transform = "";
+            }
+
+            swipeState.isDragging = false;
+            swipeState.startX = 0;
+            swipeState.startY = 0;
+            swipeState.currentX = 0;
+            swipeState.activeContainer = null;
+            swipeState.swipeDirection = null;
+            swipeState.isClick = true;
+          };
+
+          // --- 绑定所有滑动事件 ---
+          postsList.addEventListener("mousedown", handleSwipeStart);
+          document.addEventListener("mousemove", handleSwipeMove);
+          document.addEventListener("mouseup", handleSwipeEnd);
+          postsList.addEventListener("touchstart", handleSwipeStart, {
+            passive: false,
+          });
+          postsList.addEventListener("touchmove", handleSwipeMove, {
+            passive: false,
+          });
+          postsList.addEventListener("touchend", handleSwipeEnd);
+
+          postsList.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            const target = e.target;
+
+            const summonBtn = target.closest(".action-icon.summon-npc");
+            if (summonBtn) {
+              const postId = parseInt(summonBtn.dataset.postId);
+              const authorId = summonBtn.dataset.authorId;
+              if (!isNaN(postId) && authorId) {
+                handleNpcSummonClick(postId, authorId);
+              }
+              return; // 处理完召唤逻辑后，直接结束，不执行后续的点赞等判断
+            }
+
+            // 处理点击评论本身（用于回复）
+            const commentItem = target.closest(".comment-item");
+            // 确保点击的不是删除按钮或评论里的名字链接
+            if (
+              commentItem &&
+              !target.classList.contains("comment-delete-btn") &&
+              !target.classList.contains("commenter-name") &&
+              !target.classList.contains("reply-target-name")
+            ) {
+              const postContainer = commentItem.closest(
+                ".qzone-post-container",
+              );
+              if (postContainer) {
+                const commenterName = commentItem.dataset.commenterName;
+                const myNickname = state.qzoneSettings.nickname;
+
+                // 如果点击的是自己的评论，则不进入回复模式
+                if (commenterName !== myNickname) {
+                  const commentInput =
+                    postContainer.querySelector(".comment-input");
+                  commentInput.placeholder = `回复 ${commenterName}:`;
+                  commentInput.dataset.replyTo = commenterName; // 把要回复的人的名字，临时存起来
+                  commentInput.focus(); // 自动聚焦到输入框
+                }
+              }
+              return; // 处理完点击评论后，就不用往下执行了
+            }
+
+            if (target.classList.contains("comment-delete-btn")) {
+              const postContainer = target.closest(".qzone-post-container");
+              if (!postContainer) return;
+              const postId = parseInt(postContainer.dataset.postId);
+              const commentIndex = parseInt(target.dataset.commentIndex);
+              if (isNaN(postId) || isNaN(commentIndex)) return;
+              const post = await db.qzonePosts.get(postId);
+              if (!post || !post.comments || !post.comments[commentIndex])
+                return;
+              const commentText = post.comments[commentIndex].text;
+              const confirmed = await showCustomConfirm(
+                "删除评论",

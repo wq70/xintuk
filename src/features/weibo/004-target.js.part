@@ -1,0 +1,616 @@
+// ===================================================================
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("weibo-app-icon").addEventListener("click", () => {
+    renderWeiboProfile();
+    renderMyWeiboFeed();
+    switchToWeiboView("weibo-my-profile-view");
+    showScreen("weibo-screen");
+  });
+
+  // 【核心修改】统一的微博屏幕点击处理 (包含回复功能)
+  document
+    .getElementById("weibo-screen")
+    .addEventListener("click", async (e) => {
+      const target = e.target;
+      const postItem = target.closest(".weibo-post-item");
+
+      // 1. 获取帖子ID信息
+      let postId = null;
+      let isTempPost = false;
+
+      if (postItem && postItem.dataset.postId) {
+        if (postItem.dataset.postId.startsWith("temp_")) {
+          isTempPost = true; // 标记为临时帖子
+        } else {
+          postId = parseInt(postItem.dataset.postId); // 数据库帖子
+        }
+      }
+
+      // --- 0. 处理点击评论 (进入回复模式) ---
+      // 注意：要排除删除按钮
+      const commentItem = target.closest(".weibo-comment-item");
+      if (
+        commentItem &&
+        !target.classList.contains("comment-delete-btn") &&
+        postItem
+      ) {
+        const input = postItem.querySelector(".weibo-comment-input");
+        if (!input) return;
+
+        // 获取被点击者的名字 (去掉冒号和空格)
+        // 优先找 .weibo-commenter-name，如果没有就找整个文本的开头
+        const nameEl = commentItem.querySelector(".weibo-commenter-name");
+        let commenterName = nameEl ? nameEl.textContent : "";
+        // 如果名字里有 @，去掉 @
+        commenterName = commenterName.replace("@", "").replace(":", "").trim();
+
+        // 如果点击的是自己，或者是空的，就不回复
+        const myNickname = state.qzoneSettings.weiboNickname || "我";
+        if (commenterName === myNickname) return;
+
+        // 切换回复状态
+        if (input.dataset.replyTo === commenterName) {
+          // 取消回复
+          input.placeholder = "留下你的精彩评论吧...";
+          delete input.dataset.replyTo;
+        } else {
+          // 设置回复
+          input.placeholder = `回复 @${commenterName}:`;
+          input.dataset.replyTo = commenterName;
+          input.focus();
+        }
+        return; // 阻止继续触发其他逻辑
+      }
+
+      // --- 1. 处理删除评论 ---
+      const deleteCommentBtn = target.closest(".comment-delete-btn");
+      if (deleteCommentBtn) {
+        const commentItem = deleteCommentBtn.closest(".weibo-comment-item");
+        if (isTempPost) {
+          commentItem.remove(); // 临时帖子直接删DOM
+          // 更新评论数
+          const countSpan = postItem.querySelector(
+            ".weibo-post-actions span:nth-child(2) span",
+          );
+          if (countSpan)
+            countSpan.textContent = Math.max(
+              0,
+              parseInt(countSpan.textContent || 0) - 1,
+            );
+        } else if (postId && commentItem && commentItem.dataset.commentId) {
+          deleteWeiboComment(postId, commentItem.dataset.commentId);
+        }
+        return;
+      }
+
+      // --- 2. 处理生成评论 (AI) ---
+      const generateBtn = target.closest(".generate-comments-btn");
+      if (generateBtn && postItem) {
+        if (isTempPost) {
+          generateCommentsForTempPost(postItem);
+        } else if (postId) {
+          generateWeiboComments(postId);
+        }
+        return;
+      }
+
+      // --- 3. 处理用户发送评论 ---
+      const sendBtn = target.closest(".weibo-comment-send-btn");
+      if (sendBtn && postItem) {
+        const input = postItem.querySelector(".weibo-comment-input");
+        if (isTempPost) {
+          handleUserCommentForTempPost(postItem, input);
+        } else if (postId && input) {
+          handleWeiboComment(postId, input);
+        }
+        return;
+      }
+
+      // --- 4. 处理点赞 ---
+      const likeBtn = target.closest(".like-btn");
+      if (likeBtn && postItem) {
+        if (isTempPost) {
+          likeBtn.classList.toggle("liked");
+          const countSpan =
+            likeBtn.querySelector("span:last-child") ||
+            likeBtn.querySelector(".like-count");
+          let count = parseInt(countSpan.textContent || 0);
+          if (likeBtn.classList.contains("liked")) {
+            countSpan.textContent = count + 1;
+          } else {
+            countSpan.textContent = Math.max(0, count - 1);
+          }
+        } else if (postId) {
+          handleWeiboLike(postId);
+        }
+        return;
+      }
+
+      // --- 5. 处理删除整个帖子 ---
+      const deletePostBtn =
+        target.closest(".weibo-post-delete-btn") ||
+        target.closest(".post-actions-btn");
+      if (deletePostBtn && postItem) {
+        const confirmed = await showCustomConfirm(
+          "删除动态",
+          "确定要删除这条动态吗？",
+          { confirmButtonClass: "btn-danger" },
+        );
+        if (confirmed) {
+          if (isTempPost) {
+            postItem.remove();
+          } else if (postId) {
+            await db.weiboPosts.delete(postId);
+            await renderMyWeiboFeed();
+            await renderFollowingWeiboFeed();
+          }
+        }
+        return;
+      }
+
+      // ... 原有的跳转逻辑 ...
+      const avatarWrapper = e.target.closest(".weibo-post-avatar-clickable");
+      if (avatarWrapper) {
+        const charId = avatarWrapper.dataset.charId;
+        if (charId && charId !== "user") openWeiboCharProfile(charId);
+        return;
+      }
+
+      const navItem = target.closest(".weibo-nav-item");
+      if (navItem && navItem.dataset.view) {
+        switchToWeiboView(navItem.dataset.view);
+        return;
+      }
+    });
+
+  document
+    .getElementById("weibo-profile-page")
+    .addEventListener("click", async (e) => {
+      const target = e.target;
+
+      if (
+        target.id === "weibo-avatar-img" ||
+        target.closest(".weibo-avatar-container")
+      ) {
+        const choice = await showChoiceModal("编辑头像", [
+          { text: "更换头像图片", value: "avatar" },
+          { text: "更换头像框", value: "frame" },
+        ]);
+
+        if (choice === "avatar") {
+          editWeiboAvatar();
+        } else if (choice === "frame") {
+          openFrameSelectorModal("weibo_profile");
+        }
+        return;
+      } else if (target.id === "weibo-nickname") {
+        editWeiboNickname();
+      } else if (target.id === "weibo-user-profession-display") {
+        openWeiboUserSettingsModal();
+      } else if (target.id === "weibo-background-img") {
+        editWeiboBackground();
+      } else if (target.closest("#weibo-fans-item")) {
+        editWeiboFansCount();
+      }
+    });
+
+  document
+    .getElementById("weibo-following-btn")
+    .addEventListener("click", showFollowingList);
+  document
+    .getElementById("create-weibo-post-btn")
+    .addEventListener("click", openWeiboPublisherClean);
+  document
+    .getElementById("close-following-list-btn")
+    .addEventListener("click", () => {
+      document
+        .getElementById("weibo-following-modal")
+        .classList.remove("visible");
+    });
+  document
+    .getElementById("clear-following-feed-btn")
+    .addEventListener("click", clearFollowingFeed);
+
+  document
+    .getElementById("edit-weibo-profile-btn")
+    .addEventListener("click", openWeiboUserSettingsModal);
+  document
+    .getElementById("cancel-weibo-user-settings-btn")
+    .addEventListener("click", () => {
+      document
+        .getElementById("weibo-user-settings-modal")
+        .classList.remove("visible");
+    });
+  document
+    .getElementById("save-weibo-user-settings-btn")
+    .addEventListener("click", saveWeiboUserSettings);
+  document
+    .getElementById("weibo-user-preset-select")
+    .addEventListener("change", handleWeiboUserPresetSelection);
+  document
+    .getElementById("manage-weibo-user-presets-btn")
+    .addEventListener("click", openWeiboUserPresetManager);
+
+  document
+    .getElementById("generate-hot-search-btn")
+    .addEventListener("click", async () => {
+      const targets = await showMultiCharacterSelectorForWeibo();
+      if (targets) {
+        await generateHotSearch(targets);
+      }
+    });
+  document
+    .getElementById("generate-plaza-feed-btn")
+    .addEventListener("click", async () => {
+      const targets = await showMultiCharacterSelectorForWeibo();
+      if (targets) {
+        await generatePlazaFeed(null, targets);
+      }
+    });
+
+  document
+    .getElementById("back-from-hottopic-btn")
+    .addEventListener("click", () => {
+      switchToWeiboView("weibo-hot-search-view");
+    });
+
+  document
+    .getElementById("refresh-hottopic-feed-btn")
+    .addEventListener("click", () => {
+      if (currentHotTopic) {
+        generateHotSearchFeed(currentHotTopic);
+      }
+    });
+
+  // 【已修复】关注列表点击事件：区分主页按钮、操作按钮和私信
+  document
+    .getElementById("weibo-following-list-container")
+    .addEventListener("click", (e) => {
+      const item = e.target.closest(".weibo-following-item");
+      if (!item) return;
+
+      // 1. 检查是否点击了【操作图标】
+      const triggerBtn = e.target.closest(".weibo-action-trigger-btn");
+      if (triggerBtn) {
+        const targetInfo = {
+          id: triggerBtn.dataset.targetId,
+          name: triggerBtn.dataset.targetName,
+          isNpc: triggerBtn.dataset.isNpc === "true",
+          ownerId: triggerBtn.dataset.ownerId || null,
+        };
+        openWeiboActionModal(targetInfo);
+        return; // 处理完直接退出
+      }
+
+      // 2. ★★★ 核心修复：检查是否点击了【主页按钮】 ★★★
+      const profileBtn = e.target.closest(".view-profile-btn");
+      if (profileBtn) {
+        const charId = profileBtn.dataset.charId;
+        if (charId) {
+          // 关闭关注列表弹窗
+          document
+            .getElementById("weibo-following-modal")
+            .classList.remove("visible");
+          // 打开角色微博主页
+          openWeiboCharProfile(charId);
+        }
+        return; // 处理完直接退出
+      }
+
+      // 3. 如果既不是操作按钮，也不是主页按钮，则默认打开私信
+      document
+        .getElementById("weibo-following-modal")
+        .classList.remove("visible");
+
+      // 为了打开私信，我们需要获取这一行绑定的数据（通常存在 actionBtn 上）
+      const actionBtn = item.querySelector(".weibo-action-trigger-btn");
+      if (actionBtn) {
+        const targetInfo = {
+          id: actionBtn.dataset.targetId,
+          name: actionBtn.dataset.targetName,
+          isNpc: actionBtn.dataset.isNpc === "true",
+          ownerId: actionBtn.dataset.ownerId || null,
+        };
+        openWeiboDms(targetInfo);
+      }
+    });
+
+  document
+    .getElementById("cancel-weibo-action-btn")
+    .addEventListener("click", () => {
+      document.getElementById("weibo-action-modal").classList.remove("visible");
+    });
+
+  document
+    .getElementById("confirm-weibo-action-btn")
+    .addEventListener("click", handleWeiboAiAction);
+
+  const userDmBtn = document.getElementById("weibo-my-dms-btn");
+  if (userDmBtn) {
+    userDmBtn.addEventListener("click", openUserDmListScreen);
+  }
+
+  document
+    .getElementById("back-from-user-dm-list")
+    .addEventListener("click", () => {
+      showScreen("weibo-screen");
+      switchToWeiboView("weibo-my-profile-view");
+    });
+
+  document
+    .getElementById("generate-new-user-dms-btn")
+    .addEventListener("click", () => generateUserDms(true));
+  document
+    .getElementById("clear-all-user-dms-btn")
+    .addEventListener("click", handleClearAllUserDms);
+
+  document
+    .getElementById("user-dm-list-container")
+    .addEventListener("click", (e) => {
+      const item = e.target.closest(".dm-list-item");
+      if (item && item.dataset.fanIndex) {
+        openUserDmDetail(parseInt(item.dataset.fanIndex));
+      }
+    });
+
+  document
+    .getElementById("back-from-dm-detail")
+    .addEventListener("click", () => {
+      showScreen("user-dm-list-screen");
+    });
+  // 补丁：修复User私信详情页返回按钮失效的问题
+  const backBtnUserDm = document.getElementById("back-from-user-dm-detail");
+  if (backBtnUserDm) {
+    backBtnUserDm.addEventListener("click", () => {
+      showScreen("user-dm-list-screen");
+    });
+  }
+
+  document
+    .getElementById("user-dm-send-btn")
+    .addEventListener("click", handleSendUserDm);
+  document.getElementById("user-dm-input").addEventListener("keypress", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      document.getElementById("user-dm-send-btn").click();
+    }
+  });
+
+  document
+    .getElementById("user-dm-trigger-ai-btn")
+    .addEventListener("click", handleTriggerUserDmAiReply);
+  document
+    .getElementById("user-dm-reroll-btn")
+    .addEventListener("click", handleUserDmReroll);
+
+  document
+    .getElementById("user-dm-messages-container")
+    .addEventListener("click", (e) => {
+      const deleteBtn = e.target.closest(".user-dm-message-delete-btn");
+      if (deleteBtn) {
+        const messageIndex = parseInt(deleteBtn.dataset.messageIndex);
+        if (currentUserDmFanIndex !== null && !isNaN(messageIndex)) {
+          handleDeleteUserDmMessage(currentUserDmFanIndex, messageIndex);
+        }
+      }
+    });
+
+  const userDmListEl = document.getElementById("user-dm-list-container");
+  let userDmSwipeState = { isDragging: false, startX: 0, activeContent: null };
+
+  function resetAllUserDmSwipes(exceptThisOne = null) {
+    document
+      .querySelectorAll(".user-dm-list-item-content.swiped")
+      .forEach((content) => {
+        if (content !== exceptThisOne) {
+          content.classList.remove("swiped");
+        }
+      });
+  }
+
+  userDmListEl.addEventListener("mousedown", (e) => {
+    const content = e.target.closest(".user-dm-list-item-content");
+    if (content) {
+      resetAllUserDmSwipes(content);
+      userDmSwipeState = {
+        isDragging: true,
+        startX: e.pageX,
+        activeContent: content,
+      };
+      e.preventDefault();
+    }
+  });
+  userDmListEl.addEventListener(
+    "touchstart",
+    (e) => {
+      const content = e.target.closest(".user-dm-list-item-content");
+      if (content) {
+        resetAllUserDmSwipes(content);
+        userDmSwipeState = {
+          isDragging: true,
+          startX: e.touches[0].pageX,
+          activeContent: content,
+        };
+      }
+    },
+    { passive: true },
+  );
+
+  document.addEventListener("mousemove", (e) => {
+    if (!userDmSwipeState.isDragging || !userDmSwipeState.activeContent) return;
+    const diffX = e.pageX - userDmSwipeState.startX;
+    if (diffX < 0 && diffX > -90) {
+      userDmSwipeState.activeContent.style.transition = "none";
+      userDmSwipeState.activeContent.style.transform = `translateX(${diffX}px)`;
+    }
+  });
+  document.addEventListener(
+    "touchmove",
+    (e) => {
+      if (!userDmSwipeState.isDragging || !userDmSwipeState.activeContent)
+        return;
+      const diffX = e.touches[0].pageX - userDmSwipeState.startX;
+      if (diffX < 0 && diffX > -90) {
+        userDmSwipeState.activeContent.style.transition = "none";
+        userDmSwipeState.activeContent.style.transform = `translateX(${diffX}px)`;
+      }
+    },
+    { passive: true },
+  );
+
+  const handleUserDmSwipeEnd = (e) => {
+    if (!userDmSwipeState.isDragging || !userDmSwipeState.activeContent) return;
+
+    const content = userDmSwipeState.activeContent;
+    content.style.transition = "transform 0.3s ease";
+    const transformStyle = window.getComputedStyle(content).transform;
+    const currentTranslateX = new DOMMatrix(transformStyle).m41;
+
+    if (currentTranslateX < -40) {
+      content.classList.add("swiped");
+    } else {
+      content.classList.remove("swiped");
+    }
+    content.style.transform = "";
+
+    userDmSwipeState = { isDragging: false, activeContent: null };
+  };
+  document.addEventListener("mouseup", handleUserDmSwipeEnd);
+  document.addEventListener("touchend", handleUserDmSwipeEnd);
+
+  userDmListEl.addEventListener("click", (e) => {
+    if (
+      e.target.classList.contains("swipe-action-btn") &&
+      e.target.classList.contains("delete")
+    ) {
+      const fanIndex = parseInt(e.target.dataset.fanIndex);
+      if (!isNaN(fanIndex)) {
+        handleDeleteUserDmConversation(fanIndex);
+      }
+    }
+  });
+
+  document.getElementById("back-from-dm-list").addEventListener("click", () => {
+    showScreen("weibo-screen");
+    switchToWeiboView("weibo-my-profile-view");
+  });
+
+  document
+    .getElementById("back-from-dm-detail")
+    .addEventListener("click", () => {
+      showScreen("weibo-dm-list-screen");
+    });
+
+  document
+    .getElementById("generate-more-dms-btn")
+    .addEventListener("click", handleGenerateMoreDms);
+  document
+    .getElementById("clear-all-dms-btn")
+    .addEventListener("click", handleClearAllDms);
+
+  document.getElementById("weibo-dm-list").addEventListener("click", (e) => {
+    const item = e.target.closest(".dm-list-item");
+    if (item && item.dataset.fanIndex) {
+      openDmDetail(parseInt(item.dataset.fanIndex));
+    }
+  });
+
+  document
+    .getElementById("weibo-dm-messages")
+    .addEventListener("click", (e) => {
+      const deleteBtn = e.target.closest(".dm-message-delete-btn");
+      if (deleteBtn) {
+        const fanIndex = parseInt(
+          document.querySelector(".dm-list-item.active")?.dataset.fanIndex ??
+            document.getElementById("weibo-dm-detail-screen").dataset
+              .currentFanIndex,
+        );
+        const messageIndex = parseInt(deleteBtn.dataset.messageIndex);
+
+        const conversation = state.chats[
+          currentViewingDmsFor.isNpc
+            ? currentViewingDmsFor.ownerId
+            : currentViewingDmsFor.id
+        ].weiboDms.find(
+          (convo) =>
+            convo.fanName ===
+            document.getElementById("weibo-dm-detail-title").textContent,
+        );
+        const fanIdx =
+          state.chats[
+            currentViewingDmsFor.isNpc
+              ? currentViewingDmsFor.ownerId
+              : currentViewingDmsFor.id
+          ].weiboDms.indexOf(conversation);
+
+        if (!isNaN(fanIdx) && !isNaN(messageIndex)) {
+          handleDeleteWeiboDm(fanIdx, messageIndex);
+        }
+      }
+    });
+
+  document
+    .getElementById("back-from-char-profile")
+    .addEventListener("click", () => {
+      showScreen("weibo-screen");
+    });
+
+  document
+    .getElementById("edit-char-weibo-profile-btn")
+    .addEventListener("click", openCharWeiboEditor);
+
+  document
+    .getElementById("char-weibo-editor-modal")
+    .addEventListener("click", (e) => {
+      if (e.target.classList.contains("change-frame-btn")) {
+        const type = e.target.dataset.type;
+        const targetId = currentViewingWeiboProfileId;
+        openFrameSelectorModal(type, targetId);
+      } else if (e.target.id === "cancel-char-weibo-editor-btn") {
+        document
+          .getElementById("char-weibo-editor-modal")
+          .classList.remove("visible");
+      } else if (e.target.id === "save-char-weibo-editor-btn") {
+        saveCharWeiboProfile();
+      }
+    });
+
+  document
+    .getElementById("weibo-char-profile-page")
+    .addEventListener("click", async (e) => {
+      if (!currentViewingWeiboProfileId) return;
+      const chat = state.chats[currentViewingWeiboProfileId];
+      if (!chat) return;
+
+      if (e.target.closest("#weibo-char-following-item")) {
+        const newFollowing = await showCustomPrompt(
+          "编辑关注数",
+          "请输入新的关注数:",
+          chat.settings.weiboFollowingCount,
+        );
+        if (newFollowing !== null) {
+          chat.settings.weiboFollowingCount = newFollowing.trim() || "0";
+          await db.chats.put(chat);
+          await renderWeiboCharProfile(currentViewingWeiboProfileId);
+        }
+      } else if (e.target.closest("#weibo-char-fans-item")) {
+        const newFans = await showCustomPrompt(
+          "编辑粉丝数",
+          "请输入新的粉丝数 (支持'万'/'亿'):",
+          chat.settings.weiboFansCount,
+        );
+        if (newFans !== null) {
+          chat.settings.weiboFansCount = newFans.trim() || "0";
+          await db.chats.put(chat);
+          await renderWeiboCharProfile(currentViewingWeiboProfileId);
+        }
+      }
+    });
+
+  setupFileUpload("char-weibo-editor-avatar-input", (base64) => {
+    document.getElementById("char-weibo-editor-avatar-preview").src = base64;
+  });
+  setupFileUpload("char-weibo-editor-bg-input", (base64) => {
+    document.getElementById("char-weibo-editor-bg-preview").src = base64;
+  });
+});

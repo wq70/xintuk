@@ -1,0 +1,921 @@
+              let hasCompressed = false;
+              for (const key in obj) {
+                if (
+                  typeof obj[key] === "string" &&
+                  obj[key].startsWith("data:image")
+                ) {
+                  const originalUrl = obj[key];
+                  const compressedUrl = await compressImage(
+                    originalUrl,
+                    quality,
+                  );
+                  if (originalUrl !== compressedUrl) {
+                    obj[key] = compressedUrl;
+                    hasCompressed = true;
+                    compressedCount++; // 记录压缩了多少张图片
+                  }
+                } else if (typeof obj[key] === "object" && obj[key] !== null) {
+                  if (await findAndCompressImagesInObject(obj[key])) {
+                    hasCompressed = true;
+                  }
+                }
+              }
+              return hasCompressed;
+            };
+
+            const allTables = db.tables.map((table) => table.name);
+            for (const tableName of allTables) {
+              loadingText.textContent = `正在扫描表: ${tableName}...`;
+              const itemsToUpdate = [];
+              const allItems = await db[tableName].toArray();
+
+              for (const item of allItems) {
+                if (await findAndCompressImagesInObject(item)) {
+                  itemsToUpdate.push(item);
+                }
+                itemsProcessed++;
+                if (itemsProcessed % 20 === 0) {
+                  loadingText.textContent = `已处理 ${itemsProcessed} 条数据... 压缩了 ${compressedCount} 张图片...`;
+                }
+              }
+
+              if (itemsToUpdate.length > 0) {
+                loadingText.textContent = `正在保存 ${tableName} 的压缩结果...`;
+                await db[tableName].bulkPut(itemsToUpdate);
+                console.log(
+                  `表 ${tableName} 中有 ${itemsToUpdate.length} 条记录的图片被压缩。`,
+                );
+              }
+            }
+
+            loadingOverlay.classList.remove("visible");
+
+            const newTotalSize = await calculateTotalImageSize();
+            const savedSize = originalTotalSize - newTotalSize;
+
+            await showCustomAlert(
+              "压缩完成！",
+              `操作成功！\n原始大小: ${formatBytes(originalTotalSize)}\n压缩后大小: ${formatBytes(
+                newTotalSize,
+              )}\n成功为您节省了 ${formatBytes(savedSize)} 的空间！\n\n应用即将刷新以应用所有更改。`,
+            );
+
+            setTimeout(() => window.location.reload(), 2000);
+          } catch (error) {
+            // 出错时也要确保加载动画被隐藏
+            loadingOverlay.classList.remove("visible");
+            console.error("压缩全部图片时出错:", error);
+            await showCustomAlert(
+              "压缩失败",
+              `发生了一个错误: ${error.message}`,
+            );
+          }
+        }
+
+        /**
+         * 流式导出函数 (大数据专用)
+         * 原理：不再一次性读取所有数据库表到内存，而是逐个表读取、写入，
+         * 利用 ReadableStream 和 Response 流式传输给用户，从而极大降低内存占用。
+         */
+        async function exportDataStream() {
+          await showCustomAlert(
+            "请稍候...",
+            "正在准备流式导出，这可能需要一些时间，但不会使浏览器崩溃。",
+          );
+
+          // 定义所有需要备份的数据库表名
+          const tablesToExport = [
+            "chats",
+            "apiConfig",
+            "globalSettings",
+            "userStickers",
+            "charStickers",
+            "worldBooks",
+            "musicLibrary",
+            "personaPresets",
+            "qzoneSettings",
+            "qzonePosts",
+            "qzoneAlbums",
+            "qzonePhotos",
+            "favorites",
+            "qzoneGroups",
+            "memories",
+            "worldBookCategories",
+            "callRecords",
+            "customAvatarFrames",
+            "themes",
+            "apiPresets",
+            "bubbleStylePresets",
+            "fontPresets",
+            "homeScreenPresets",
+            "weiboPosts",
+            "forumGroups",
+            "forumPosts",
+            "forumComments",
+            "forumCategories",
+            "forumSeries",
+            "forumChapters",
+            "tarotReadings",
+            "pomodoroSessions",
+            "scriptKillScripts",
+            "taobaoProducts",
+            "taobaoOrders",
+            "taobaoCart",
+            "userWalletTransactions",
+            "userStickerCategories",
+            "datingScenes",
+            "datingPresets",
+            "datingSpriteGroups",
+            "datingSprites",
+            "datingHistory",
+          ];
+
+          const stream = new ReadableStream({
+            async start(controller) {
+              const encoder = new TextEncoder();
+
+              // 1. 写入JSON文件的开头
+              controller.enqueue(encoder.encode("{\n"));
+
+              // 2. 添加版本和时间戳元数据
+              const metaData = `"version": 1,\n"timestamp": ${Date.now()},\n`;
+              controller.enqueue(encoder.encode(metaData));
+
+              // 3. 逐个处理数据库表
+              for (let i = 0; i < tablesToExport.length; i++) {
+                const tableName = tablesToExport[i];
+                console.log(`流式导出：正在处理表 ${tableName}...`);
+
+                try {
+                  // 1. 定义哪些表是单个对象的设置表
+                  const singleObjectTables = [
+                    "apiConfig",
+                    "globalSettings",
+                    "musicLibrary",
+                    "qzoneSettings",
+                    "tukeyUserSettings",
+                    "tukeyCustomConfig",
+                    "tukeyAccountingGroups",
+                  ];
+
+                  let tableData;
+                  // 2. 判断当前表是否是单个对象的设置表
+                  if (singleObjectTables.includes(tableName)) {
+                    // 如果是，就只获取第一个（也可能是唯一一个）对象
+                    tableData = await db[tableName].toCollection().first();
+                    // 如果表是空的，first()会返回undefined，JSON.stringify(undefined)会出问题，所以转为null
+                    if (tableData === undefined) {
+                      tableData = null;
+                    }
+                  } else {
+                    // 如果是普通的多条记录表，就还是获取整个数组
+                    tableData = await db[tableName].toArray();
+                  }
+
+                  const jsonString = JSON.stringify(tableData);
+
+                  // 写入 "tableName": [...] 或 "tableName": {...}
+                  controller.enqueue(
+                    encoder.encode(`"${tableName}": ${jsonString}`),
+                  );
+
+                  // 如果不是最后一个表，就加上逗号和换行符
+                  if (i < tablesToExport.length - 1) {
+                    controller.enqueue(encoder.encode(",\n"));
+                  } else {
+                    controller.enqueue(encoder.encode("\n"));
+                  }
+                } catch (e) {
+                  console.error(`流式导出时，处理表 ${tableName} 失败:`, e);
+                  // 即使某个表失败，也继续尝试下一个
+                }
+              }
+
+              // 4. 写入JSON文件的结尾
+              controller.enqueue(encoder.encode("}"));
+
+              // 5. 通知流已经结束
+              controller.close();
+              console.log("流式导出：所有数据写入完成。");
+            },
+          });
+
+          // 6. 使用 Response 将流包装成可下载的文件
+          const response = new Response(stream, {
+            headers: { "Content-Type": "application/json" },
+          });
+
+          // 7. 创建并触发下载链接
+          const url = URL.createObjectURL(await response.blob());
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = `EPhone-Stream-Backup-${new Date().toISOString().split("T")[0]}.json`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+
+          // 关闭“请稍候”的弹窗
+          hideCustomModal();
+        }
+        /**
+         * 恢复所有App名称为默认值
+         */
+        async function resetAppNamesToDefault() {
+          // 1. 弹出确认框，防止误操作
+          const confirmed = await showCustomConfirm(
+            "恢复默认名称",
+            "确定要将所有App的名称恢复为默认设置吗？此操作不可撤销。",
+            { confirmButtonClass: "btn-danger" },
+          );
+
+          if (confirmed) {
+            // 2. 清空存储自定义名称的对象
+            state.globalSettings.appLabels = {};
+
+            // 3. 将更改保存到数据库
+            await db.globalSettings.put(state.globalSettings);
+
+            // 4. 立即应用更改到UI
+            applyAppLabels(); // 更新主屏幕上App的显示名称
+            renderAppNameSettings(); // 刷新外观设置页面的输入框，显示回默认名
+
+            // 5. 给出成功提示
+            await showCustomAlert("操作成功", "所有App名称已恢复为默认。");
+          }
+        }
+
+        window.activeGroupId = null;
+
+        const SYMBOL_THRESHOLDS = [
+          {
+            id: "first_heartbeat",
+            level: 100,
+            symbol:
+              "https://i.postimg.cc/DZSsNzMB/5BF06FFB38AAF2B394F89F6270D328D5.png",
+            name: "初识心动",
+            description: "心跳是故事的开始。",
+          },
+          {
+            id: "shining_star",
+            level: 300,
+            symbol:
+              "https://i.postimg.cc/L47gJRb3/7227080E4BF5950D1B182043D1F734DB.png",
+            name: "星光闪烁",
+            description: "你们的关系像星光一样开始闪耀。",
+          },
+          {
+            id: "burning_passion",
+            level: 700,
+            symbol:
+              "https://i.postimg.cc/yNQcnRvT/BD0C0CC3C6692D736014BACE73C07F8E.png",
+            name: "热情如火",
+            description: "每一次互动都让感情升温。",
+          },
+          {
+            id: "only_crown",
+            level: 1500,
+            symbol:
+              "https://i.postimg.cc/B6jDzvVh/92DD1E30EFEEC589E3BE0FFB630F8B4E.png",
+            name: "唯一王冠",
+            description: "在彼此的世界里，对方是独一无二的存在。",
+          },
+          {
+            id: "eternal_diamond",
+            level: 5000,
+            symbol:
+              "https://i.postimg.cc/C1RD2KQc/B0E2B3034728540DA4198357D5B8131C.png",
+            name: "永恒之钻",
+            description: "你们的关系如钻石般坚固而璀璨。",
+          },
+        ];
+
+        /**
+         * 核心：计算亲密值
+         * @param {object} chat - 聊天对象
+         * @returns {number} - 计算出的亲密值分数
+         */
+        function calculateIntimacy(chat) {
+          if (!chat || !chat.settings.streak) return 0;
+
+          // 基础分：火花天数，每天都很重要！
+          const streakDays = chat.settings.streak.currentDays || 0;
+          const streakScore = streakDays * 15; // 每天火花提供15点基础分
+
+          // 互动分：累计消息总数
+          const stats = chat.interactionStats || {};
+          const totalMessages = Object.values(stats).reduce(
+            (sum, count) => sum + count,
+            0,
+          );
+          const messageScore = totalMessages * 0.2; // 每条消息提供0.2点互动分
+
+          const intimacy = streakScore + messageScore;
+          return Math.floor(intimacy); // 返回整数
+        }
+
+        /**
+         * 核心：检查并解锁新的徽章
+         * @param {object} chat - 聊天对象
+         * @param {number} intimacyValue - 当前的亲密值
+         * @returns {Promise<boolean>} - 如果有新徽章解锁，返回true
+         */
+        async function checkAndUnlockSymbols(chat, intimacyValue) {
+          let newUnlock = false;
+          if (!chat.unlockedSymbols) chat.unlockedSymbols = [];
+
+          SYMBOL_THRESHOLDS.forEach((threshold) => {
+            // 检查：亲密值是否达标？这个徽章是不是还没解锁过？
+            if (
+              intimacyValue >= threshold.level &&
+              !chat.unlockedSymbols.some((s) => s.symbol === threshold.symbol)
+            ) {
+              // 如果都满足，就解锁！
+              chat.unlockedSymbols.push({
+                symbol: threshold.symbol,
+                name: threshold.name,
+                unlockedAt: Date.now(), // 记录解锁的精确时间
+              });
+              newUnlock = true;
+              console.log(
+                `徽章解锁！角色: ${chat.name}, 徽章: ${threshold.name}`,
+              );
+            }
+          });
+
+          // 如果有新解锁的徽章，就更新数据库并弹窗提示
+          if (newUnlock) {
+            await db.chats.put(chat);
+            // 找到最新解锁的那个徽章来显示通知
+            const latestUnlock =
+              chat.unlockedSymbols[chat.unlockedSymbols.length - 1];
+            await showCustomAlert(
+              "新徽章已解锁！",
+              `恭喜你和“${chat.name}”解锁了新的亲密徽章：${latestUnlock.name}`,
+            );
+          }
+          return newUnlock;
+        }
+
+        async function openIntimacyPanel(chatId) {
+          const chat = state.chats[chatId];
+          if (!chat) return;
+
+          // --- 数据计算 ---
+          const intimacyValue = calculateIntimacy(chat);
+          await checkAndUnlockSymbols(chat, intimacyValue);
+
+          // --- 填充UI (这部分逻辑不变) ---
+          document.getElementById("intimacy-score-display").textContent =
+            intimacyValue;
+          const today = new Date().toISOString().split("T")[0];
+          const todayMsgs = chat.interactionStats?.[today] || 0;
+          const totalMsgs = Object.values(chat.interactionStats || {}).reduce(
+            (sum, count) => sum + count,
+            0,
+          );
+          document.getElementById("intimacy-streak-days").textContent =
+            `${chat.settings.streak?.currentDays || 0} 天`;
+          document.getElementById("intimacy-today-msgs").textContent =
+            `${todayMsgs} 条`;
+          document.getElementById("intimacy-total-msgs").textContent =
+            `${totalMsgs} 条`;
+
+          // --- 渲染可点击的徽章列表 ---
+          const symbolListContainer = document.getElementById(
+            "symbol-list-container",
+          );
+          symbolListContainer.innerHTML = "";
+
+          // 添加一个“不佩戴”的选项
+          const noneItem = document.createElement("div");
+          noneItem.className = "symbol-item unlocked"; // 让它总是可点击
+          if (!chat.settings.selectedIntimacyBadge) {
+            noneItem.classList.add("selected"); // 如果当前没佩戴，就高亮这个
+          }
+          noneItem.innerHTML = `<div class="symbol-icon no-badge">🚫</div><div class="symbol-name">不佩戴</div>`;
+          noneItem.onclick = () => selectIntimacyBadge(chatId, ""); // 点击时，传入空字符串表示不佩戴
+          symbolListContainer.appendChild(noneItem);
+
+          // 渲染所有可解锁的徽章
+          SYMBOL_THRESHOLDS.forEach((threshold) => {
+            const isUnlocked = intimacyValue >= threshold.level;
+            const isSelected =
+              chat.settings.selectedIntimacyBadge === threshold.symbol;
+
+            const item = document.createElement("div");
+            item.className = `symbol-item ${isUnlocked ? "unlocked" : ""} ${isSelected ? "selected" : ""}`;
+
+            // 使用 <img> 标签来显示图片
+            item.innerHTML = `
+			            <div class="symbol-icon ${!isUnlocked ? "not-unlocked" : ""}">
+			                <img src="${threshold.symbol}" alt="${threshold.name}">
+			            </div>
+			            <div class="symbol-name">${threshold.name}</div>
+			            <div class="symbol-level">${isUnlocked ? "已解锁" : `${threshold.level}分解锁`}</div>
+			        `;
+
+            // 只有解锁了的徽章才能点击
+            if (isUnlocked) {
+              item.onclick = () =>
+                selectIntimacyBadge(chatId, threshold.symbol);
+            }
+
+            symbolListContainer.appendChild(item);
+          });
+
+          // --- 渲染解锁记录 ---
+          const recordsContainer = document.getElementById(
+            "unlocked-symbols-record",
+          );
+          recordsContainer.innerHTML = "";
+          if (chat.unlockedSymbols && chat.unlockedSymbols.length > 0) {
+            const sortedRecords = [...chat.unlockedSymbols].sort(
+              (a, b) => b.unlockedAt - a.unlockedAt,
+            );
+            sortedRecords.forEach((record) => {
+              const recordItem = document.createElement("div");
+              recordItem.className = "record-item";
+              recordItem.innerHTML = `<span class="symbol"><img src="${
+                record.symbol
+              }" style="height:1em; vertical-align:middle;"></span><span>${
+                record.name
+              }</span><span class="date">${new Date(record.unlockedAt).toLocaleDateString()}</span>`;
+              recordsContainer.appendChild(recordItem);
+            });
+          } else {
+            recordsContainer.innerHTML =
+              '<p style="text-align:center; color:#999; font-size:13px;">暂无已解锁的徽章</p>';
+          }
+
+          // --- 显示面板 ---
+          document.getElementById("intimacy-panel").classList.add("visible");
+        }
+
+        /**
+         * 选择并佩戴一个亲密徽章
+         * @param {string} chatId - 角色ID
+         * @param {string} symbol - 要佩戴的徽章符号，或''表示不佩戴
+         */
+        async function selectIntimacyBadge(chatId, symbol) {
+          const chat = state.chats[chatId];
+          if (!chat) return;
+
+          // 更新选择
+          chat.settings.selectedIntimacyBadge = symbol;
+
+          // 保存到数据库
+          await db.chats.put(chat);
+
+          // 重新渲染面板，更新高亮状态
+          await openIntimacyPanel(chatId);
+
+          // 重新渲染聊天列表，让徽章立刻显示出来
+          await renderChatList();
+        }
+
+        /**
+         * 核心：为指定聊天的今天消息数+1
+         * @param {string} chatId - 聊天ID
+         */
+        async function incrementMessageCount(chatId) {
+          const chat = state.chats[chatId];
+          // 只为单人聊天计数
+          if (!chat || chat.isGroup) return;
+
+          const today = new Date().toISOString().split("T")[0]; // 获取 YYYY-MM-DD 格式的日期
+
+          if (!chat.interactionStats) {
+            chat.interactionStats = {};
+          }
+
+          chat.interactionStats[today] =
+            (chat.interactionStats[today] || 0) + 1;
+
+          // 将更新后的聊天数据保存回数据库
+          await db.chats.put(chat);
+        }
+
+        /**
+         * 获取或生成当前设备的唯一设备码
+         * @returns {string} - 一长串唯一的设备码
+         */
+        function getDeviceCode() {
+          const deviceIdKey = "ephone-device-code"; // 使用一个新的键名
+          let deviceId = localStorage.getItem(deviceIdKey);
+          if (!deviceId) {
+            deviceId = crypto.randomUUID();
+            localStorage.setItem(deviceIdKey, deviceId);
+          }
+          return deviceId;
+        }
+
+        /**
+         * 根据设备码生成对应的PIN码 (这个函数必须和 get_pin.html 中的完全一致！)
+         * @param {string} deviceCode - 设备码
+         * @returns {string} - 6位大写的PIN码
+         */
+        function generatePinFromDeviceCode(deviceCode) {
+          if (!deviceCode || deviceCode.length < 6) return "INVALID";
+          // 算法：将设备码反转，取前6位，转大写
+          return deviceCode
+            .split("")
+            .reverse()
+            .join("")
+            .substring(0, 6)
+            .toUpperCase();
+        }
+        /**
+         * 清空所有好友动态（不包括微博和圈子）
+         */
+        async function clearAllQzonePosts() {
+          // 1. 弹出确认框，防止用户误操作
+          const confirmed = await showCustomConfirm(
+            "确认清空",
+            "此操作将永久删除所有好友动态（不包括微博和圈子），且无法恢复。确定要继续吗？",
+            { confirmButtonClass: "btn-danger" }, // 使用红色按钮警示
+          );
+
+          if (!confirmed) {
+            return; // 如果用户点击“取消”，则不执行任何操作
+          }
+
+          try {
+            // 2. 清空数据库中的 `qzonePosts` 表，这是存储所有动态的地方
+            await db.qzonePosts.clear();
+            console.log("`qzonePosts` table has been cleared.");
+
+            // 3. 清理所有角色的历史记录，移除与动态相关的系统通知，保持数据一致性
+            const allChats = Object.values(state.chats);
+            const chatsToUpdate = [];
+            for (const chat of allChats) {
+              const originalHistoryLength = chat.history.length;
+              // 筛选掉内容包含“发布了”的系统消息
+              chat.history = chat.history.filter(
+                (msg) =>
+                  !(
+                    msg.role === "system" &&
+                    msg.content &&
+                    msg.content.includes("发布了")
+                  ),
+              );
+              if (chat.history.length < originalHistoryLength) {
+                chatsToUpdate.push(chat);
+              }
+            }
+            if (chatsToUpdate.length > 0) {
+              await db.chats.bulkPut(chatsToUpdate);
+              console.log(
+                `已从 ${chatsToUpdate.length} 个角色的历史记录中移除动态通知。`,
+              );
+            }
+
+            // 4. 重新渲染动态列表，界面会显示为空
+            await renderQzonePosts();
+
+            // 5. 给出成功提示
+            alert("所有好友动态已清空！");
+          } catch (error) {
+            console.error("清空好友动态时出错:", error);
+            await showCustomAlert(
+              "操作失败",
+              `清空动态时发生错误: ${error.message}`,
+            );
+          }
+        }
+
+        /**
+         * 切换世界书的编辑模式
+         */
+        async function toggleWorldBookEditMode() {
+          isWorldBookEditMode = !isWorldBookEditMode;
+
+          const screen = document.getElementById("world-book-screen");
+          const listEl = document.getElementById("world-book-list");
+          const editBtn = document.getElementById(
+            "toggle-world-book-edit-mode-btn",
+          );
+          const manageBtn = document.getElementById(
+            "manage-categories-in-edit-mode-btn",
+          );
+          const addBtn = document.getElementById("add-world-book-btn");
+          const importBtn = document.getElementById("import-world-book-btn");
+
+          const deleteBtn = document.getElementById(
+            "world-book-delete-selected-btn",
+          );
+
+          screen.classList.toggle("selection-mode", isWorldBookEditMode);
+          listEl.classList.toggle("selection-mode", isWorldBookEditMode);
+
+          if (isWorldBookEditMode) {
+            editBtn.textContent = "完成";
+            manageBtn.style.display = "inline-block";
+            deleteBtn.style.display = "inline-flex"; // 让删除按钮显示
+            addBtn.style.display = "none";
+            importBtn.style.display = "none";
+          } else {
+            editBtn.textContent = "编辑模式";
+            manageBtn.style.display = "none";
+            deleteBtn.style.display = "none"; // 让删除按钮隐藏
+            addBtn.style.display = "inline-block";
+            importBtn.style.display = "inline-block";
+            selectedWorldBooks.clear();
+            updateWorldBookDeleteButton();
+          }
+
+          await renderWorldBookScreen();
+        }
+
+        /**
+         * 处理世界书列表项的点击事件（兼容普通模式和编辑模式）
+         */
+        function handleWorldBookListClick(e) {
+          const item = e.target.closest(".list-item");
+          if (!item) return;
+
+          const bookId = item.dataset.bookId;
+          if (!bookId) return;
+
+          if (isWorldBookEditMode) {
+            // 编辑模式：处理选择/取消选择
+            item.classList.toggle("selected");
+            if (selectedWorldBooks.has(bookId)) {
+              selectedWorldBooks.delete(bookId);
+            } else {
+              selectedWorldBooks.add(bookId);
+            }
+            updateWorldBookDeleteButton();
+          } else {
+            // 普通模式：打开编辑器
+            openWorldBookEditor(bookId);
+          }
+        }
+
+        /**
+         * 更新头部删除按钮的状态和计数
+         */
+        function updateWorldBookDeleteButton() {
+          const deleteBtn = document.getElementById(
+            "world-book-delete-selected-btn",
+          );
+          const countSpan = document.getElementById("world-book-delete-count");
+          const count = selectedWorldBooks.size;
+
+          // 更新按钮旁边的数字
+          if (count > 0) {
+            countSpan.textContent = `(${count})`;
+          } else {
+            countSpan.textContent = "";
+          }
+
+          // 切换按钮的禁用状态
+          deleteBtn.disabled = count === 0;
+        }
+
+        /**
+         * 处理批量删除世界书的逻辑
+         */
+        async function handleBulkDeleteWorldBooks() {
+          if (selectedWorldBooks.size === 0) return;
+
+          const confirmed = await showCustomConfirm(
+            "确认删除",
+            `确定要永久删除选中的 ${selectedWorldBooks.size} 本世界书吗？此操作不可恢复。`,
+            { confirmButtonClass: "btn-danger" },
+          );
+
+          if (confirmed) {
+            const idsToDelete = Array.from(selectedWorldBooks);
+            await db.worldBooks.bulkDelete(idsToDelete);
+
+            state.worldBooks = state.worldBooks.filter(
+              (wb) => !idsToDelete.includes(wb.id),
+            );
+
+            // 退出编辑模式
+            await toggleWorldBookEditMode();
+
+            await showCustomAlert(
+              "删除成功",
+              `${idsToDelete.length} 本世界书已删除。`,
+            );
+          }
+        }
+
+        /**
+         * 删除一个世界书分类（现在会弹出选项）
+         */
+        async function deleteCategory(categoryId) {
+          const category = await db.worldBookCategories.get(categoryId);
+          if (!category) return;
+
+          const choice = await showChoiceModal(`删除分类 "${category.name}"`, [
+            { text: "删除分类及其所有世界书", value: "delete_all" },
+            {
+              text: "仅删除分类 (书变为未分类)",
+              value: "delete_category_only",
+            },
+          ]);
+
+          if (!choice) return;
+
+          if (choice === "delete_all") {
+            const confirmed = await showCustomConfirm(
+              "危险操作",
+              `你确定要永久删除分类 "${category.name}" 以及其中的【所有】世界书吗？此操作无法恢复！`,
+              { confirmButtonClass: "btn-danger" },
+            );
+            if (!confirmed) return;
+
+            const booksToDelete = await db.worldBooks
+              .where("categoryId")
+              .equals(categoryId)
+              .toArray();
+            const bookIdsToDelete = booksToDelete.map((book) => book.id);
+            if (bookIdsToDelete.length > 0) {
+              await db.worldBooks.bulkDelete(bookIdsToDelete);
+              state.worldBooks = state.worldBooks.filter(
+                (wb) => !bookIdsToDelete.includes(wb.id),
+              );
+            }
+            await db.worldBookCategories.delete(categoryId);
+            await showCustomAlert(
+              "删除成功",
+              `分类 "${category.name}" 及其下的所有世界书已被删除。`,
+            );
+          } else if (choice === "delete_category_only") {
+            const booksToUpdate = await db.worldBooks
+              .where("categoryId")
+              .equals(categoryId)
+              .toArray();
+            if (booksToUpdate.length > 0) {
+              for (const book of booksToUpdate) {
+                book.categoryId = null;
+              }
+              await db.worldBooks.bulkPut(booksToUpdate);
+              booksToUpdate.forEach((updatedBook) => {
+                const bookInState = state.worldBooks.find(
+                  (wb) => wb.id === updatedBook.id,
+                );
+                if (bookInState) bookInState.categoryId = null;
+              });
+            }
+            await db.worldBookCategories.delete(categoryId);
+            await showCustomAlert(
+              "删除成功",
+              `分类 "${category.name}" 已被删除。`,
+            );
+          }
+
+          await renderCategoryListInManager();
+          await renderWorldBookScreen();
+        }
+
+        /**
+         * 渲染世界书列表的辅助函数（移除了旧的点击事件绑定）
+         */
+        function createWorldBookGroup(groupName, books) {
+          const groupContainer = document.createElement("div");
+          groupContainer.className = "world-book-group-container";
+
+          groupContainer.innerHTML = `
+			        <div class="world-book-group-header">
+			            <span class="arrow">▼</span>
+			            <span class="group-name">${groupName}</span>
+			        </div>
+			        <div class="world-book-group-content"></div>
+			    `;
+
+          const headerEl = groupContainer.querySelector(
+            ".world-book-group-header",
+          );
+          const contentEl = groupContainer.querySelector(
+            ".world-book-group-content",
+          );
+
+          headerEl.classList.add("collapsed");
+          contentEl.classList.add("collapsed");
+
+          books.sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
+          books.forEach((book) => {
+            const item = document.createElement("div");
+            item.className = "list-item";
+            item.dataset.bookId = book.id;
+            item.innerHTML = `<div class="item-title">${book.name}</div><div class="item-content">${(
+              book.content || "暂无内容..."
+            ).substring(0, 50)}</div>`;
+
+            // 旧的 item.addEventListener('click', ...) 已被移除，由事件委托统一处理
+
+            addLongPressListener(item, async () => {
+              const confirmed = await showCustomConfirm(
+                "删除世界书",
+                `确定要删除《${book.name}》吗？此操作不可撤销。`,
+                { confirmButtonClass: "btn-danger" },
+              );
+              if (confirmed) {
+                await db.worldBooks.delete(book.id);
+                state.worldBooks = state.worldBooks.filter(
+                  (wb) => wb.id !== book.id,
+                );
+                renderWorldBookScreen();
+              }
+            });
+            contentEl.appendChild(item);
+          });
+
+          return groupContainer;
+        }
+
+        // 快捷回复功能核心逻辑
+
+        /**
+         * 打开快捷回复弹窗
+         */
+        function openQuickReplyModal() {
+          renderQuickReplyList();
+          document.getElementById("quick-reply-modal").classList.add("visible");
+        }
+
+        /**
+         * 渲染快捷回复列表 (带编辑功能)
+         */
+        function renderQuickReplyList() {
+          const listEl = document.getElementById("quick-reply-list");
+          listEl.innerHTML = "";
+
+          const replies = state.globalSettings.quickReplies || [];
+
+          if (replies.length === 0) {
+            listEl.innerHTML =
+              '<p style="text-align:center; color:var(--text-secondary); padding:20px;">列表为空，点击右上角 "+" 添加。</p>';
+            return;
+          }
+
+          replies.forEach((item, index) => {
+            const div = document.createElement("div");
+            div.className = "quick-reply-item";
+
+            // 兼容处理
+            let type = typeof item === "string" ? "text" : item.type;
+            let content = typeof item === "string" ? item : item.content;
+
+            // 标签生成
+            let typeBadge = "";
+            if (type === "voice_message")
+              typeBadge =
+                '<span style="background:#4CAF50; color:white; padding:2px 6px; border-radius:4px; font-size:12px; margin-right:5px;">语音</span>';
+            else if (type === "ai_image")
+              typeBadge =
+                '<span style="background:#FF9800; color:white; padding:2px 6px; border-radius:4px; font-size:12px; margin-right:5px;">图片</span>';
+            else if (type === "transfer")
+              typeBadge =
+                '<span style="background:#E91E63; color:white; padding:2px 6px; border-radius:4px; font-size:12px; margin-right:5px;">转账</span>';
+            else if (type === "waimai_request")
+              typeBadge =
+                '<span style="background:#2196F3; color:white; padding:2px 6px; border-radius:4px; font-size:12px; margin-right:5px;">外卖</span>';
+
+            div.innerHTML = `
+      <!-- 左侧：点击发送区域 -->
+      <div class="quick-reply-content" style="flex:1; display:flex; align-items:center; overflow:hidden; cursor:pointer;" title="点击发送">
+        ${typeBadge}
+        <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${content}</span>
+      </div>
+      
+      <!-- 右侧：操作按钮区域 -->
+      <div class="quick-reply-actions">
+        <!-- 编辑图标 (铅笔) -->
+        <span class="quick-reply-action-btn btn-edit" title="编辑" data-index="${index}">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+        </span>
+        <!-- 删除图标 (垃圾桶) -->
+        <span class="quick-reply-action-btn btn-delete" title="删除" data-index="${index}">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+        </span>
+      </div>
+    `;
+
+            // 绑定事件：发送
+            div
+              .querySelector(".quick-reply-content")
+              .addEventListener("click", () => {
+                sendQuickReply(item);
+              });
+
+            // 绑定事件：编辑
+            div.querySelector(".btn-edit").addEventListener("click", (e) => {
+              e.stopPropagation(); // 防止触发发送
+              editQuickReply(index);
+            });
+
+            // 绑定事件：删除
+            div.querySelector(".btn-delete").addEventListener("click", (e) => {
+              e.stopPropagation(); // 防止触发发送
+              deleteQuickReply(index);
+            });
+
+            listEl.appendChild(div);
+          });
+        }
+        /**

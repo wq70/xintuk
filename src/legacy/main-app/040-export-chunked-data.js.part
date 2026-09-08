@@ -1,0 +1,940 @@
+              cb.checked = e.target.checked;
+            });
+          });
+
+          // 3. 显示模态框
+          document
+            .getElementById("advanced-transfer-modal")
+            .classList.add("visible");
+        }
+
+        /**
+         * 执行分块导出 (v3.0)
+         */
+        async function exportChunkedData() {
+          await showCustomAlert("请稍候...", "正在打包您选择的数据...");
+
+          const backupData = {
+            type: "EPhoneChunkedBackup",
+            version: 3,
+            exportedAt: Date.now(),
+            contains: [],
+            data: {},
+          };
+
+          try {
+            const appCheckboxes = document.querySelectorAll(
+              ".export-app-checkbox:checked",
+            );
+            const charCheckboxes = document.querySelectorAll(
+              ".export-char-checkbox:checked",
+            );
+
+            if (appCheckboxes.length === 0 && charCheckboxes.length === 0) {
+              alert("请至少选择一项要导出的内容！");
+              hideCustomModal();
+              return;
+            }
+
+            const appsToExportMap = {
+              weibo: { tables: ["weiboPosts", "qzoneSettings"] },
+              forum: {
+                tables: [
+                  "forumGroups",
+                  "forumPosts",
+                  "forumComments",
+                  "forumCategories",
+                  "forumSeries",
+                  "forumChapters",
+                ],
+              },
+              taobao: {
+                tables: [
+                  "taobaoProducts",
+                  "taobaoOrders",
+                  "taobaoCart",
+                  "userWalletTransactions",
+                ],
+              },
+              worldBooks: { tables: ["worldBooks", "worldBookCategories"] },
+
+              dateALive: {
+                tables: [
+                  "datingScenes",
+                  "datingPresets",
+                  "datingSpriteGroups",
+                  "datingSprites",
+                  "datingHistory",
+                ],
+              },
+
+              tukeyAccounting: {
+                tables: [
+                  "tukeyAccounts",
+                  "tukeyAccountingGroups",
+                  "tukeyAccountingRecords",
+                  "tukeyAccountingReplies",
+                  "tukeyUserSettings",
+                  "tukeyCustomConfig",
+                ],
+              },
+
+              studio: {
+                tables: ["studioScripts", "studioHistory"],
+              },
+
+              userStickers: {
+                tables: ["userStickers", "userStickerCategories"],
+              },
+              charStickers: { tables: ["charStickers"] },
+              gameData: {
+                tables: [
+                  "scriptKillScripts",
+                  "ludoQuestionBanks",
+                  "ludoQuestions",
+                ],
+              },
+              appearance: {
+                tables: [
+                  "themes",
+                  "fontPresets",
+                  "homeScreenPresets",
+                  "customAvatarFrames",
+                  "apiPresets",
+                  "bubbleStylePresets",
+                ],
+              },
+            };
+
+            // 1. 导出选中的App数据
+            for (const checkbox of appCheckboxes) {
+              const appId = checkbox.value;
+              const appInfo = appsToExportMap[appId];
+              if (appInfo) {
+                backupData.contains.push(appId);
+                for (const tableName of appInfo.tables) {
+                  backupData.data[tableName] = await db[tableName].toArray();
+                  console.log(`已打包App数据表: ${tableName}`);
+                }
+              }
+            }
+
+            // 2. 导出选中的角色数据
+            const charIds = Array.from(charCheckboxes).map((cb) => cb.value);
+            if (charIds.length > 0) {
+              backupData.data.chats = await db.chats.bulkGet(charIds);
+              backupData.contains.push(
+                ...charIds.map((id) => `character_${id}`),
+              );
+
+              // 打包所有与这些角色关联的数据
+              const relatedDataTables = [
+                "memories",
+                "callRecords",
+                "qzonePosts",
+                "weiboPosts",
+                "datingHistory",
+                "pomodoroSessions",
+              ];
+              const relatedKey = {
+                memories: "chatId",
+                callRecords: "chatId",
+                qzonePosts: "authorId",
+                weiboPosts: "authorId",
+                datingHistory: "characterId",
+                pomodoroSessions: "chatId",
+              };
+
+              for (const tableName of relatedDataTables) {
+                const items = await db[tableName]
+                  .where(relatedKey[tableName])
+                  .anyOf(charIds)
+                  .toArray();
+                if (items.length > 0) {
+                  if (!backupData.data[tableName])
+                    backupData.data[tableName] = [];
+                  // 使用Set去重，防止因多角色关联同一数据而重复打包
+                  const existingIds = new Set(
+                    backupData.data[tableName].map((i) => i.id),
+                  );
+                  items.forEach((item) => {
+                    if (!existingIds.has(item.id)) {
+                      backupData.data[tableName].push(item);
+                      existingIds.add(item.id);
+                    }
+                  });
+                }
+              }
+              console.log(`已打包 ${charIds.length} 个角色的核心及关联数据。`);
+            }
+
+            // 3. 创建JSON文件并触发下载
+            const blob = new Blob([JSON.stringify(backupData, null, 2)], {
+              type: "application/json",
+            });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `EPhone-Partial-Backup-${new Date().toISOString().split("T")[0]}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            await showCustomAlert("导出成功", "已成功导出您选中的数据！");
+          } catch (error) {
+            console.error("分块导出失败:", error);
+            await showCustomAlert("导出失败", `发生错误: ${error.message}`);
+          } finally {
+            document
+              .getElementById("advanced-transfer-modal")
+              .classList.remove("visible");
+          }
+        }
+
+        /**
+         * 执行补充式导入
+         * @param {File} file - 用户选择的JSON文件
+         */
+        async function importChunkedData(file) {
+          if (!file) return;
+
+          let data;
+          try {
+            const text = await file.text();
+            data = JSON.parse(text);
+          } catch (error) {
+            await showCustomAlert(
+              "导入失败",
+              "文件读取或解析失败，请确保文件是有效的JSON格式。",
+            );
+            return;
+          }
+
+          if (data.type !== "EPhoneChunkedBackup") {
+            const confirmed = await showCustomConfirm(
+              "文件类型不匹配",
+              "这是一个【全量备份】文件，继续导入将会【覆盖】所有数据！是否要继续？",
+              { confirmButtonClass: "btn-danger" },
+            );
+            if (confirmed) importBackup(file);
+            return;
+          }
+
+          const contentList = data.contains
+            .map((item) => {
+              const appNameMap = {
+                weibo: "微博",
+                forum: "圈子",
+                taobao: "桃宝",
+                worldBooks: "世界书",
+
+                dateALive: "约会大作战数据",
+
+                tukeyAccounting: "兔k记账数据",
+
+                studio: "小剧场数据",
+
+                userStickers: "我的表情包",
+                charStickers: "角色通用表情包",
+                gameData: "游戏大厅数据",
+                appearance: "通用外观预设",
+              };
+              if (item.startsWith("character_")) {
+                const charId = item.replace("character_", "");
+                const charData = data.data.chats?.find((c) => c.id === charId);
+                return `角色数据：${charData ? charData.name : "未知角色"}`;
+              }
+              return appNameMap[item] || item;
+            })
+            .join("\n- ");
+
+          const confirmed = await showCustomConfirm(
+            "确认导入",
+            `即将导入以下内容：\n\n- ${contentList}\n\n注意：如果现有数据中已存在相同ID的内容（如同名角色），他们的数据将会被导入的数据【完全覆盖】。此操作不可撤销！`,
+          );
+
+          if (!confirmed) return;
+
+          await showCustomAlert("请稍候...", "正在导入数据，请勿关闭页面...");
+
+          try {
+            // 1. 获取导入文件中有哪些数据表
+            const tablesInBackup = Object.keys(data.data);
+
+            // 2. 获取当前数据库中实际存在的所有数据表名称
+            const validTableNames = db.tables.map((t) => t.name);
+
+            // 3. 找出二者的交集，这才是我们真正需要操作的数据表
+            const tablesToUpdate = tablesInBackup.filter((t) =>
+              validTableNames.includes(t),
+            );
+
+            console.log("即将操作的有效数据表:", tablesToUpdate);
+
+            // 4. 只对这些有效的数据表开启一个数据库事务
+            await db.transaction("rw", tablesToUpdate, async () => {
+              for (const tableName of tablesToUpdate) {
+                if (Array.isArray(data.data[tableName])) {
+                  console.log(
+                    `正在向表格 "${tableName}" 中补充/覆盖 ${data.data[tableName].length} 条数据...`,
+                  );
+                  await db[tableName].bulkPut(data.data[tableName]);
+                }
+              }
+            });
+
+            await loadAllDataFromDB();
+            await renderChatList();
+
+            await showCustomAlert(
+              "导入成功",
+              "数据已成功补充！应用将刷新以确保所有数据正确加载。",
+            );
+            setTimeout(() => window.location.reload(), 1500);
+          } catch (error) {
+            console.error("补充式导入失败:", error);
+            await showCustomAlert(
+              "导入失败",
+              `写入数据库时发生错误: ${error.message}`,
+            );
+          } finally {
+            document
+              .getElementById("advanced-transfer-modal")
+              .classList.remove("visible");
+          }
+        }
+
+        /**
+         * 【兼容330】将当前App的数据导出为兼容EPhone 330的格式
+         */
+        async function exportDataFor330() {
+          await showCustomAlert("请稍候...", "正在为你准备兼容性备份文件...");
+
+          const backupData = {
+            version: 3, // 将版本号强制写为3，让330版本能识别
+            timestamp: Date.now(),
+            data: {},
+          };
+
+          try {
+            const [
+              chatsFromDB,
+              worldBooksFromDB,
+              userStickersFromDB,
+              apiConfigFromDB,
+              globalSettingsFromDB,
+              qzonePostsFromDB,
+              qzoneAlbumsFromDB,
+              qzonePhotosFromDB,
+              qzoneSettingsFromDB,
+              personaPresetsFromDB,
+              memoriesFromDB,
+              apiPresetsFromDB,
+              favoritesFromDB,
+              worldBookCategoriesFromDB,
+              callRecordsFromDB,
+              stickerCategoriesFromDB,
+            ] = await Promise.all([
+              db.chats.toArray(),
+              db.worldBooks.toArray(),
+              db.userStickers.toArray(),
+              db.apiConfig.get("main"),
+              db.globalSettings.get("main"),
+              db.qzonePosts.toArray(),
+              db.qzoneAlbums.toArray(),
+              db.qzonePhotos.toArray(),
+              db.qzoneSettings.get("main"),
+              db.personaPresets.toArray(),
+              db.memories.toArray(),
+              db.apiPresets.toArray(),
+              db.favorites.toArray(),
+              db.worldBookCategories.toArray(),
+              db.callRecords.toArray(),
+              db.userStickerCategories.toArray(),
+            ]);
+
+            const transformedWorldBooks = worldBooksFromDB.map((book) => {
+              const newBookFor330 = { ...book };
+              if (
+                typeof newBookFor330.content === "string" &&
+                newBookFor330.content.trim()
+              ) {
+                newBookFor330.content = [
+                  {
+                    keys: [book.name],
+                    comment: `从 EPhone 导入的条目`,
+                    content: book.content,
+                    enabled: true,
+                  },
+                ];
+              } else {
+                newBookFor330.content = [];
+              }
+              return newBookFor330;
+            });
+
+            const transformedChats = chatsFromDB.map((chat) => {
+              if (chat.isGroup) return chat;
+              const settingsFor330 = {
+                ...chat.settings,
+                "ai-persona": chat.settings.aiPersona,
+                "my-persona": chat.settings.myPersona,
+                "ai-avatar": chat.settings.aiAvatar,
+                "my-avatar": chat.settings.myAvatar,
+              };
+              return { ...chat, settings: settingsFor330 };
+            });
+
+            const transformedNpcs = [];
+            const npcIdSet = new Set();
+            for (const chat of chatsFromDB) {
+              if (!chat.isGroup && Array.isArray(chat.npcLibrary)) {
+                chat.npcLibrary.forEach((npc) => {
+                  if (!npcIdSet.has(npc.id)) {
+                    transformedNpcs.push({
+                      id: npc.id,
+                      name: npc.name,
+                      avatar: npc.avatar,
+                      persona: npc.persona,
+                      associatedWith: [chat.id],
+                    });
+                    npcIdSet.add(npc.id);
+                  } else {
+                    const existingNpc = transformedNpcs.find(
+                      (n) => n.id === npc.id,
+                    );
+                    if (existingNpc) existingNpc.associatedWith.push(chat.id);
+                  }
+                });
+              }
+            }
+
+            const transformedQzoneSettings = {
+              id: "main",
+              nickname: qzoneSettingsFromDB?.nickname || "你的昵称",
+              avatar:
+                qzoneSettingsFromDB?.avatar ||
+                "https://files.catbox.moe/q6z5fc.jpeg",
+              banner:
+                qzoneSettingsFromDB?.banner ||
+                "https://files.catbox.moe/r5heyt.gif",
+            };
+
+            const transformedDoubanPosts = qzonePostsFromDB
+              .filter((p) => p.authorId !== "user")
+              .map((p) => ({
+                id: p.id,
+                timestamp: p.timestamp,
+                groupName: "从动态导入的小组",
+                postTitle: (p.publicText || p.content || "无标题").substring(
+                  0,
+                  50,
+                ),
+                authorName: state.chats[p.authorId]?.name || "未知作者",
+                authorOriginalName: state.chats[p.authorId]?.name || "未知作者",
+                content: p.content || p.publicText || "[图片]",
+                likesCount: p.likes?.length || 0,
+                commentsCount: p.comments?.length || 0,
+                comments: (p.comments || []).map((c) => ({
+                  commenter: c.commenterName,
+                  text: c.text,
+                })),
+              }));
+
+            backupData.data = {
+              chats: transformedChats,
+              npcs: transformedNpcs,
+              worldBooks: transformedWorldBooks,
+              worldBookCategories: worldBookCategoriesFromDB,
+              userStickers: userStickersFromDB,
+              stickerCategories: stickerCategoriesFromDB,
+              apiConfig: apiConfigFromDB ? [apiConfigFromDB] : [],
+              globalSettings: globalSettingsFromDB
+                ? [globalSettingsFromDB]
+                : [],
+              qzoneSettings: [transformedQzoneSettings],
+              qzonePosts: qzonePostsFromDB,
+              qzoneAlbums: qzoneAlbumsFromDB,
+              qzonePhotos: qzonePhotosFromDB,
+              personaPresets: personaPresetsFromDB,
+              memories: memoriesFromDB,
+              apiPresets: apiPresetsFromDB,
+              favorites: favoritesFromDB,
+              doubanPosts: transformedDoubanPosts,
+              callRecords: callRecordsFromDB,
+            };
+
+            const blob = new Blob([JSON.stringify(backupData, null, 2)], {
+              type: "application/json",
+            });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            const dateStr = new Date().toISOString().split("T")[0];
+            link.href = url;
+            link.download = `EPhone-Compatible-Backup-v330-${dateStr}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            await showCustomAlert(
+              "导出成功",
+              "已成功生成兼容330版本的备份文件！现在你可以去330版本导入它了。",
+            );
+          } catch (error) {
+            console.error("兼容性导出失败:", error);
+            await showCustomAlert(
+              "导出失败",
+              `发生了一个错误: ${error.message}`,
+            );
+          } finally {
+            const modal = document.getElementById("advanced-transfer-modal");
+            if (modal) {
+              modal.classList.remove("visible");
+            }
+          }
+        }
+
+        /**
+         * 处理并导入来自330版本格式的备份文件
+         * @param {File} file - 用户选择的330格式的JSON文件
+         */
+        async function importFrom330Format(file) {
+          if (!file) return;
+
+          const confirmed = await showCustomConfirm(
+            "严重警告！",
+            "您正在从330版本导入数据，这将【完全覆盖】您当前的所有数据！此操作不可撤销！确定要继续吗？",
+            { confirmButtonClass: "btn-danger" },
+          );
+          if (!confirmed) return;
+
+          await showCustomAlert("请稍候...", "正在解析并转换330版本的数据...");
+
+          try {
+            const text = await file.text();
+            const importedData = JSON.parse(text);
+
+            if (importedData.version !== 3) {
+              throw new Error(
+                `文件版本不匹配！需要版本3，但提供的是版本 ${importedData.version}。`,
+              );
+            }
+
+            const data330 = importedData.data;
+
+            // 这是一个安全列表，确保我们只操作您数据库中存在的表
+            const existingTables = [
+              "chats",
+              "worldBooks",
+              "worldBookCategories",
+              "userStickers",
+              "userStickerCategories",
+              "apiConfig",
+              "globalSettings",
+              "qzonePosts",
+              "qzoneAlbums",
+              "qzonePhotos",
+              "qzoneSettings",
+              "personaPresets",
+              "memories",
+              "apiPresets",
+              "favorites",
+              "musicLibrary",
+              "callRecords",
+              "customAvatarFrames",
+              "themes",
+              "bubbleStylePresets",
+              "fontPresets",
+              "homeScreenPresets",
+              "weiboPosts",
+              "forumGroups",
+              "forumPosts",
+              "forumComments",
+              "forumCategories",
+              "forumSeries",
+              "forumChapters",
+              "tarotReadings",
+              "pomodoroSessions",
+              "scriptKillScripts",
+              "taobaoProducts",
+              "taobaoOrders",
+              "taobaoCart",
+              "userWalletTransactions",
+              "ludoQuestionBanks",
+              "ludoQuestions",
+              "datingScenes",
+              "datingPresets",
+              "datingSpriteGroups",
+              "datingSprites",
+              "datingHistory",
+            ];
+
+            await db.transaction("rw", existingTables, async () => {
+              for (const tableName of existingTables) {
+                if (db[tableName]) {
+                  await db[tableName].clear();
+                }
+              }
+              console.log("330导入：已清空共有的数据表，准备导入...");
+
+              // 世界书导入逻辑
+              // 不再合并，而是将330的每个词条拆分成独立的世界书条目
+              if (data330.worldBooks && Array.isArray(data330.worldBooks)) {
+                const allNewWorldBookEntries = []; // 创建一个新数组来收集所有拆分后的条目
+                let entryCounter = 0; // 用于生成唯一ID
+
+                // 1. 遍历330的每一个“世界书合集”
+                data330.worldBooks.forEach((book_330) => {
+                  if (Array.isArray(book_330.content)) {
+                    // 2. 遍历合集中的每一个词条
+                    book_330.content.forEach((entry) => {
+                      entryCounter++;
+
+                      // 3. 为每个词条生成新的独立世界书名称
+                      // 优先使用词条的 `keys` 作为名称，其次是 `comment`，最后是自动生成
+                      let newName = `导入条目 ${entryCounter}`;
+                      if (entry.keys && entry.keys.length > 0) {
+                        newName = entry.keys.join(", "); // 用关键词作为新名称
+                      } else if (entry.comment) {
+                        newName = entry.comment; // 其次用备注作为新名称
+                      }
+
+                      // 4. 为每个词条创建一个全新的、独立的世界书对象
+                      const newBookEntry = {
+                        id: `imported_wb_${Date.now()}_${entryCounter}`, // 生成唯一ID
+                        name: newName,
+                        content: entry.content || "", // 内容就是词条的内容
+                        categoryId: book_330.categoryId || 0, // 继承原合集的分类ID
+                        isEnabled: entry.enabled !== false, // 继承启用状态，默认为true
+                      };
+
+                      // 5. 将这个全新的独立条目添加到我们的收集中
+                      allNewWorldBookEntries.push(newBookEntry);
+                    });
+                  }
+                });
+
+                // 6. 一次性将所有拆分后的新条目写入数据库
+                await db.worldBooks.bulkPut(allNewWorldBookEntries);
+                console.log(
+                  `330导入：成功“拆分”并导入 ${allNewWorldBookEntries.length} 条独立世界书条目。`,
+                );
+              }
+              // 分类信息保持不变，正常导入
+              if (data330.worldBookCategories)
+                await db.worldBookCategories.bulkPut(
+                  data330.worldBookCategories,
+                );
+
+              // 转换并导入【聊天和NPC】
+              if (data330.chats && Array.isArray(data330.chats)) {
+                const chatsToImport = [...data330.chats];
+                const npcs = data330.npcs || [];
+                chatsToImport.forEach((chat) => {
+                  if (!chat.isGroup) {
+                    chat.npcLibrary = [];
+                    npcs.forEach((npc) => {
+                      if (
+                        npc.associatedWith &&
+                        npc.associatedWith.includes(chat.id)
+                      ) {
+                        chat.npcLibrary.push({
+                          id: npc.id,
+                          name: npc.name,
+                          persona: npc.persona,
+                          avatar: npc.avatar,
+                        });
+                      }
+                    });
+                  }
+                });
+                await db.chats.bulkPut(chatsToImport);
+                console.log(
+                  `330导入：成功转换并导入 ${chatsToImport.length} 个聊天。`,
+                );
+              }
+
+              // 转换并导入【豆瓣/圈子】数据
+              if (data330.doubanPosts && Array.isArray(data330.doubanPosts)) {
+                const groupMap = new Map();
+                for (const post of data330.doubanPosts) {
+                  let groupId;
+                  if (groupMap.has(post.groupName)) {
+                    groupId = groupMap.get(post.groupName);
+                  } else {
+                    const newGroup = {
+                      name: post.groupName,
+                      description: "从330导入的小组",
+                      icon: "📖",
+                    };
+                    groupId = await db.forumGroups.add(newGroup);
+                    groupMap.set(post.groupName, groupId);
+                  }
+                  await db.forumPosts.add({
+                    id: post.id,
+                    groupId: groupId,
+                    title: post.postTitle,
+                    content: post.content,
+                    authorNickname: post.authorName,
+                    timestamp: post.timestamp,
+                    lengthType: "short",
+                    likes: post.likesCount || 0,
+                  });
+                  if (post.comments && post.comments.length > 0) {
+                    const commentsToSave = post.comments.map((c) => ({
+                      postId: post.id,
+                      author: c.commenter,
+                      content: c.text,
+                      timestamp: Date.now(),
+                    }));
+                    await db.forumComments.bulkAdd(commentsToSave);
+                  }
+                }
+                console.log(
+                  `330导入：成功转换并导入 ${data330.doubanPosts.length} 条圈子帖子。`,
+                );
+              }
+
+              // 转换并导入单对象设置
+              if (data330.apiConfig?.[0])
+                await db.apiConfig.put(data330.apiConfig[0]);
+              if (data330.globalSettings?.[0])
+                await db.globalSettings.put(data330.globalSettings[0]);
+              if (data330.qzoneSettings?.[0])
+                await db.qzoneSettings.put(data330.qzoneSettings[0]);
+              if (data330.musicLibrary?.[0])
+                await db.musicLibrary.put(data330.musicLibrary[0]);
+
+              // 直接导入其他结构相同的【共有】数据表
+              const directImportTables = [
+                "userStickers",
+                "personaPresets",
+                "qzonePosts",
+                "qzoneAlbums",
+                "qzonePhotos",
+                "favorites",
+                "memories",
+                "callRecords",
+                "apiPresets",
+                "stickerCategories",
+                "customAvatarFrames",
+              ];
+              for (const tableName of directImportTables) {
+                if (
+                  data330[tableName] &&
+                  Array.isArray(data330[tableName]) &&
+                  db[tableName]
+                ) {
+                  await db[tableName].bulkPut(data330[tableName]);
+                  console.log(
+                    `330导入：成功导入 ${data330[tableName].length} 条数据到 ${tableName}。`,
+                  );
+                }
+              }
+            });
+
+            // 导入成功后刷新页面
+            await showCustomAlert(
+              "导入成功",
+              "来自330版本的数据已成功导入！应用即将刷新以应用所有更改。",
+            );
+            setTimeout(() => {
+              window.location.reload();
+            }, 1500);
+          } catch (error) {
+            console.error("从330格式导入失败:", error);
+            await showCustomAlert(
+              "导入失败",
+              `文件格式不正确或数据已损坏: ${error.message}`,
+            );
+          }
+        }
+
+        /**
+         * 压缩图片至指定质量并返回Base64，同时跳过GIF
+         * @param {string} base64Str - 原始图片的Base64字符串 (data:...)
+         * @param {number} quality - 压缩质量 (0.1 - 1.0)
+         * @returns {Promise<string>} - 返回压缩后的JPEG格式的Base64字符串，或原始的GIF/PNG字符串
+         */
+        function compressImage(base64Str, quality) {
+          return new Promise((resolve, reject) => {
+            // 如果是 GIF，或者质量设置为1.0（不压缩），直接返回原图，不进行任何处理。
+            if (
+              base64Str.startsWith("data:image/gif") ||
+              quality >= 1.0 ||
+              !base64Str.startsWith("data:image")
+            ) {
+              resolve(base64Str);
+              return;
+            }
+
+            const img = new Image();
+            img.src = base64Str;
+
+            img.onload = () => {
+              const canvas = document.createElement("canvas");
+              const ctx = canvas.getContext("2d");
+              canvas.width = img.width;
+              canvas.height = img.height;
+              ctx.drawImage(img, 0, 0);
+
+              // 确保 PNG 和其他静态图能被正确压缩。
+              const compressedBase64 = canvas.toDataURL("image/jpeg", quality);
+              resolve(compressedBase64);
+            };
+
+            img.onerror = (err) => {
+              console.error("图片加载失败，无法压缩:", err);
+              reject(new Error("图片加载失败，无法压缩"));
+            };
+          });
+        }
+
+        /**
+         * 通用文件上传并压缩处理函数
+         * @param {File} file - 用户选择的文件
+         * @returns {Promise<string>} - 返回压缩后的Base64字符串
+         */
+        async function handleImageUploadAndCompress(file) {
+          const base64Url = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+
+          const quality = state.globalSettings.imageCompressionQuality || 0.7;
+          console.log(`准备压缩图片，质量: ${quality}`);
+
+          const compressedBase64 = await compressImage(base64Url, quality);
+          console.log(
+            `图片压缩完成。原始大小: ${base64Url.length}, 压缩后大小: ${compressedBase64.length}`,
+          );
+
+          return compressedBase64;
+        }
+        window.handleImageUploadAndCompress = handleImageUploadAndCompress;
+        /**
+         * 计算Base64字符串的近似文件大小
+         * @param {string} base64Str - Base64字符串 (可以带'data:...'前缀)
+         * @returns {number} - 字节大小
+         */
+        function getBase64Size(base64Str) {
+          if (
+            !base64Str ||
+            typeof base64Str !== "string" ||
+            !base64Str.startsWith("data:image")
+          )
+            return 0;
+          const base64 = base64Str.split(",")[1] || base64Str;
+          const padding = base64.endsWith("==")
+            ? 2
+            : base64.endsWith("=")
+              ? 1
+              : 0;
+          return (base64.length * 3) / 4 - padding;
+        }
+
+        /**
+         * 将字节数格式化为易读的字符串 (KB, MB, GB)
+         * @param {number} bytes - 字节数
+         * @returns {string} - 格式化后的字符串
+         */
+        function formatBytes(bytes) {
+          if (bytes === 0) return "0 Bytes";
+          const k = 1024;
+          const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
+          const i = Math.floor(Math.log(bytes) / Math.log(k));
+          return (
+            parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
+          );
+        }
+
+        /**
+         * 计算并显示数据库中所有图片的总大小，并返回数值
+         * @returns {Promise<number>} - 返回总字节数
+         */
+        async function calculateTotalImageSize() {
+          const displayEl = document.getElementById("image-data-size-display");
+          displayEl.textContent = "正在计算中...";
+
+          let totalSize = 0;
+          const processedUrls = new Set();
+
+          const calculateSize = (url) => {
+            if (
+              !url ||
+              typeof url !== "string" ||
+              !url.startsWith("data:image") ||
+              processedUrls.has(url)
+            ) {
+              return 0;
+            }
+            const size = getBase64Size(url);
+            processedUrls.add(url);
+            return size;
+          };
+
+          try {
+            const allTables = db.tables.map((table) => table.name);
+            for (const tableName of allTables) {
+              try {
+                const items = await db[tableName].toArray();
+                for (const item of items) {
+                  const findImagesRecursive = (obj) => {
+                    for (const key in obj) {
+                      if (typeof obj[key] === "string") {
+                        totalSize += calculateSize(obj[key]);
+                      } else if (
+                        typeof obj[key] === "object" &&
+                        obj[key] !== null
+                      ) {
+                        findImagesRecursive(obj[key]);
+                      }
+                    }
+                  };
+                  findImagesRecursive(item);
+                }
+              } catch (e) {
+                console.warn(`扫描表 ${tableName} 出错:`, e);
+              }
+            }
+
+            displayEl.textContent = `当前图片数据总量约: ${formatBytes(totalSize)}`;
+            return totalSize; // 返回计算出的总大小
+          } catch (error) {
+            console.error("计算图片大小时出错:", error);
+            displayEl.textContent = "计算失败，请查看控制台。";
+            return 0;
+          }
+        }
+
+        /**
+         * 一键压缩数据库中所有图片的核心函数
+         */
+        async function compressAllImagesInDB() {
+          const confirmed = await showCustomConfirm(
+            "高风险操作确认",
+            "此操作将扫描并【永久性地】压缩数据库中的【所有静态图片（PNG/JPG等）】。<br><br>【GIF动图会被自动跳过，不会被压缩】。<br><br>压缩是不可逆的，建议在操作前先【导出数据】进行备份！<br><br>确定要继续吗？",
+            { confirmButtonClass: "btn-danger" },
+          );
+
+          if (!confirmed) return;
+
+          const loadingOverlay = document.getElementById("generation-overlay");
+          const loadingText = loadingOverlay.querySelector("p");
+          loadingText.textContent = "正在全力压缩图片，请耐心等待...";
+          loadingOverlay.classList.add("visible");
+
+          try {
+            const quality =
+              parseFloat(
+                document.getElementById("image-quality-slider").value,
+              ) || 0.7;
+            const originalTotalSize = await calculateTotalImageSize();
+            let itemsProcessed = 0;
+            let compressedCount = 0;
+
+            const findAndCompressImagesInObject = async (obj) => {

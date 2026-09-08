@@ -1,0 +1,799 @@
+            // 淡入效果
+            imageEl.style.opacity = 1;
+          }, 100); // 延迟一点点时间来触发CSS过渡
+
+          // 更新按钮状态：如果是第一张，禁用“上一张”按钮
+          prevBtn.disabled = photoViewerState.currentIndex === 0;
+          // 如果是最后一张，禁用“下一张”按钮
+          nextBtn.disabled =
+            photoViewerState.currentIndex ===
+            photoViewerState.photos.length - 1;
+        }
+
+        /**
+         * 显示下一张照片
+         */
+        function showNextPhoto() {
+          if (
+            photoViewerState.currentIndex <
+            photoViewerState.photos.length - 1
+          ) {
+            photoViewerState.currentIndex++;
+            renderPhotoViewer();
+          }
+        }
+
+        /**
+         * 显示上一张照片
+         */
+        function showPrevPhoto() {
+          if (photoViewerState.currentIndex > 0) {
+            photoViewerState.currentIndex--;
+            renderPhotoViewer();
+          }
+        }
+
+        /**
+         * 关闭图片查看器
+         */
+        function closePhotoViewer() {
+          document
+            .getElementById("photo-viewer-modal")
+            .classList.remove("visible");
+          photoViewerState.isOpen = false;
+          photoViewerState.photos = [];
+          photoViewerState.currentIndex = -1;
+          // 清空图片，避免下次打开时闪现旧图
+          document.getElementById("photo-viewer-image").src = "";
+        }
+
+        /**
+         * 更新动态小红点的显示
+         * @param {number} count - 未读动态的数量
+         */
+        function updateUnreadIndicator(count) {
+          unreadPostsCount = count;
+          localStorage.setItem("unreadPostsCount", count); // 持久化存储
+
+          // --- 更新底部导航栏的“动态”按钮 ---
+          const navItem = document.querySelector(
+            '.nav-item[data-view="qzone-screen"]',
+          );
+
+          const targetSpan = navItem.querySelector("span"); // 定位到文字 "动态"
+          let indicator = navItem.querySelector(".unread-indicator");
+
+          if (count > 0) {
+            if (!indicator) {
+              indicator = document.createElement("span");
+              indicator.className = "unread-indicator";
+              targetSpan.style.position = "relative"; // 把相对定位加在 span 上
+              targetSpan.appendChild(indicator); // 把小红点作为 span 的子元素
+            }
+            indicator.textContent = count > 99 ? "99+" : count;
+            indicator.style.display = "block";
+          } else {
+            if (indicator) {
+              indicator.style.display = "none";
+            }
+          }
+
+          // --- 更新聊天界面返回列表的按钮 ---
+          const backBtn = document.getElementById("back-to-list-btn");
+          let backBtnIndicator = backBtn.querySelector(".unread-indicator");
+
+          if (count > 0) {
+            if (!backBtnIndicator) {
+              backBtnIndicator = document.createElement("span");
+              backBtnIndicator.className =
+                "unread-indicator back-btn-indicator";
+              backBtn.style.position = "relative"; // 确保能正确定位
+              backBtn.appendChild(backBtnIndicator);
+            }
+            // 返回键上的小红点通常不显示数字，只显示一个点
+            backBtnIndicator.style.display = "block";
+          } else {
+            if (backBtnIndicator) {
+              backBtnIndicator.style.display = "none";
+            }
+          }
+        }
+
+        function startBackgroundSimulation() {
+          if (simulationIntervalId) return;
+          const intervalSeconds =
+            state.globalSettings.backgroundActivityInterval || 60;
+          // 将旧的固定间隔 45000 替换为动态获取
+          simulationIntervalId = setInterval(
+            runBackgroundSimulationTick,
+            intervalSeconds * 1000,
+          );
+        }
+
+        function stopBackgroundSimulation() {
+          if (simulationIntervalId) {
+            clearInterval(simulationIntervalId);
+            simulationIntervalId = null;
+          }
+        }
+
+        /**
+         * 【数据迁移】在首次加载时，将旧的硬编码问题迁移到数据库
+         */
+        async function migrateDefaultLudoQuestions() {
+          const defaultBankName = "默认题库";
+          const existingBank = await db.ludoQuestionBanks
+            .where("name")
+            .equals(defaultBankName)
+            .first();
+          // 如果“默认题库”已经存在，就说明迁移过了，直接返回
+          if (existingBank) return;
+
+          console.log("正在迁移飞行棋默认问题到数据库...");
+
+          // 创建默认题库
+          const bankId = await db.ludoQuestionBanks.add({
+            name: defaultBankName,
+          });
+
+          const defaultQuestions = [
+            // --- 类型1: 共同回答 (双方都需要回答) ---
+            {
+              type: "both_answer",
+              text: "如果我们一起去旅行，你最想去哪里，为什么？",
+            },
+            {
+              type: "both_answer",
+              text: "你认为一段完美的关系中，最不可或缺的三个要素是什么？",
+            },
+            {
+              type: "both_answer",
+              text: "分享一件最近因为我而让你感到心动或开心的小事。",
+            },
+            {
+              type: "both_answer",
+              text: "回忆一下，我们第一次见面时，你对我的第一印象是什么？",
+            },
+            {
+              type: "both_answer",
+              text: "如果我们可以一起学习一项新技能，你希望是什么？",
+            },
+            {
+              type: "both_answer",
+              text: "描述一个你最希望和我一起度过的完美周末。",
+            },
+            {
+              type: "both_answer",
+              text: "你觉得我们之间最有默契的一件事是什么？",
+            },
+            {
+              type: "both_answer",
+              text: "如果用一种动物来形容我，你觉得是什么？为什么？",
+            },
+            {
+              type: "both_answer",
+              text: "在未来的一年里，你最想和我一起完成的一件事是什么？",
+            },
+            {
+              type: "both_answer",
+              text: "分享一部你最近很喜欢、并且想推荐给我一起看的电影或剧。",
+            },
+            {
+              type: "both_answer",
+              text: "我们下次约会，你希望穿什么风格的衣服？",
+            },
+
+            // --- 类型2: 一人回答，对方评价 ---
+            { type: "single_answer", text: "描述一下我最让你心动的一个瞬间。" },
+            {
+              type: "single_answer",
+              text: "诚实地说，我做的哪件事曾经让你偷偷生过气？",
+            },
+            {
+              type: "single_answer",
+              text: "如果我有一种超能力，你希望是什么？",
+            },
+            { type: "single_answer", text: "给我三个最贴切的标签。" },
+            {
+              type: "single_answer",
+              text: "在你心里，我的形象和你的理想型有多接近？",
+            },
+            {
+              type: "single_answer",
+              text: "分享一个你觉得我可能不知道的，关于你的小秘密。",
+            },
+            {
+              type: "single_answer",
+              text: "如果我们的故事是一首歌，你觉得歌名应该叫什么？",
+            },
+            {
+              type: "single_answer",
+              text: "说一件你觉得我做得比你好/更擅长的事情。",
+            },
+            {
+              type: "single_answer",
+              text: "如果可以回到我们认识的任意一天，你会选择哪一天，想做什么？",
+            },
+            {
+              type: "single_answer",
+              text: "用三个词来形容你眼中的我们的关系。",
+            },
+          ];
+
+          const questionsToAdd = defaultQuestions.map((q) => ({
+            bankId: bankId,
+            text: q.text,
+            type: q.type, // <-- 关键修复：把类型也存进去！
+          }));
+
+          await db.ludoQuestions.bulkAdd(questionsToAdd);
+          console.log(`成功迁移了 ${questionsToAdd.length} 条默认问题。`);
+        }
+        /**
+         * 这是模拟器的“心跳”，每次定时器触发时运行
+         */
+        function runBackgroundSimulationTick() {
+          console.log("模拟器心跳 Tick...");
+          if (!state.globalSettings.enableBackgroundActivity) {
+            stopBackgroundSimulation();
+            return;
+          }
+          const allSingleChats = Object.values(state.chats).filter(
+            (chat) => !chat.isGroup,
+          );
+
+          if (allSingleChats.length === 0) return;
+
+          const frequencyProbabilities = {
+            low: 0.3, // 低频: 每次检测有 30% 的概率行动
+            medium: 0.5, // 中频: 每次检测有 50% 的概率行动
+            high: 0.8, // 高频: 每次检测有 80% 的概率行动
+          };
+
+          const config = state.globalSettings.backgroundActivityConfig || {};
+
+          allSingleChats.forEach((chat) => {
+            // 检查1：处理【被用户拉黑】的角色
+            if (chat.relationship?.status === "blocked_by_user") {
+              const blockedTimestamp = chat.relationship.blockedTimestamp;
+              if (!blockedTimestamp) {
+                console.warn(
+                  `角色 "${chat.name}" 状态为拉黑，但缺少拉黑时间戳，跳过处理。`,
+                );
+                return;
+              }
+              const blockedDuration = Date.now() - blockedTimestamp;
+              const cooldownMilliseconds =
+                (state.globalSettings.blockCooldownHours || 1) * 60 * 60 * 1000;
+              if (blockedDuration > cooldownMilliseconds) {
+                console.log(
+                  `角色 "${chat.name}" 的冷静期已过，触发“反思”并申请好友事件...`,
+                );
+                chat.relationship.status = "pending_system_reflection";
+                triggerAiFriendApplication(chat.id);
+              }
+            }
+            // 检查2：处理【好友关系】的正常后台活动
+            else if (
+              chat.relationship?.status === "friend" &&
+              chat.id !== state.activeChatId
+            ) {
+              const frequency = config[chat.id]; // 获取当前角色的频率设置
+              const probability = frequencyProbabilities[frequency]; // 获取对应的概率
+
+              // added by lrq 251028
+              // 添加最后一条聊天记录时间的检查，避免频繁行动
+              const lastMessage = chat.history.slice(-1)[0];
+              if (lastMessage) {
+                const timeSinceLastMessage = lastMessage
+                  ? Date.now() - lastMessage.timestamp
+                  : Infinity;
+                const minInterval =
+                  (state.globalSettings.backgroundActivityInterval || 10) *
+                  1000;
+                if (timeSinceLastMessage < minInterval) {
+                  console.log(
+                    `角色 "${chat.name}" 距离上次消息发送时间不足，跳过本次行动。`,
+                  );
+                  return; // 跳过本次行动
+                }
+              }
+
+              // 如果这个角色设置了频率，并且随机数小于它的行动概率，就触发行动
+              if (probability && Math.random() < probability) {
+                console.log(
+                  `角色 "${chat.name}" (频率: ${frequency}) 被唤醒，准备独立行动...`,
+                );
+                triggerInactiveAiAction(chat.id);
+              }
+              // 如果没有设置频率，或者随机数没达到概率，就不会行动。
+              // 这就完美地实现了“分组设置”和“不会同时行动”的需求！
+            }
+          });
+        }
+
+        /**
+         * 根据AI的视角，过滤出它能看到的动态
+         * @param {Array} allPosts - 所有待检查的动态帖子
+         * @param {object} viewerChat - 正在“看”动态的那个AI的chat对象
+         * @returns {Array} - 过滤后该AI可见的动态帖子
+         */
+
+        function filterVisiblePostsForAI(allPosts, viewerChat) {
+          if (!viewerChat || !viewerChat.id) return [];
+
+          const viewerGroupId = viewerChat.groupId;
+
+          return allPosts.filter((post) => {
+            if (post.authorId === "user") {
+              // 如果用户设置了“部分可见”
+              if (post.visibleGroupIds && post.visibleGroupIds.length > 0) {
+                // 只有当查看者AI的分组ID在用户的可见列表里时，才可见
+                return (
+                  viewerGroupId && post.visibleGroupIds.includes(viewerGroupId)
+                );
+              }
+              // 如果用户没设置，说明是公开的，所有AI都可见
+              return true;
+            }
+
+            const authorGroupId = post.authorGroupId;
+            if (!authorGroupId) {
+              return true;
+            }
+            return authorGroupId === viewerGroupId;
+          });
+        }
+
+        /**
+         * 根据AI视角和动态设置，构建给AI看的评论区上下文
+         * @param {object} post - 正在处理的动态对象
+         * @param {object} viewerChat - 正在“看”动态的AI角色
+         * @param {string} userNickname - 用户的昵称
+         * @returns {{contextString: string, visibilityFlag: string}} - 返回包含上下文文本和可见性标志的对象
+         */
+        function buildCommentsContextForAI(post, viewerChat, userNickname) {
+          // 1. 安全检查：如果评论区不存在、不是数组或为空，直接返回
+          if (
+            !post.comments ||
+            !Array.isArray(post.comments) ||
+            post.comments.length === 0
+          ) {
+            return { contextString: "", visibilityFlag: "[评论区可见]" };
+          }
+
+          const viewerName = viewerChat.name;
+          let commentsForAI;
+          let visibilityFlag;
+
+          // 2. 根据动态的“评论区可见性”设置，决定AI能看到哪些评论
+          if (post.areCommentsVisible !== false) {
+            // 如果是“所有人可见”，AI能看到所有评论
+            commentsForAI = post.comments;
+            visibilityFlag = "[评论区可见]";
+          } else {
+            // 如果是“部分可见”，执行我们全新的、更精确的过滤逻辑
+            visibilityFlag = "[评论区部分可见]";
+
+            // ★★★★★ 这就是本次最核心的修改！ ★★★★★
+            commentsForAI = post.comments.filter((comment) => {
+              // 规则1：AI总能看到自己发的评论
+              if (comment.commenterName === viewerName) {
+                return true;
+              }
+
+              // 规则2：如果评论是用户发的，需要进一步判断
+              if (comment.commenterName === userNickname) {
+                // 2a: 如果这条评论没有回复任何人（是主评论），那么AI可见
+                if (!comment.replyTo) {
+                  return true;
+                }
+                // 2b: 如果这条评论是回复，那只有回复目标是AI自己时，AI才可见
+                if (comment.replyTo === viewerName) {
+                  return true;
+                }
+              }
+
+              // 规则3：如果其他AI或NPC回复了当前AI，AI也应该能看到
+              if (comment.replyTo === viewerName) {
+                return true;
+              }
+
+              // 其他所有情况（例如：用户回复其他NPC，NPC之间互相回复），AI都看不见
+              return false;
+            });
+          }
+
+          // 如果筛选后没有可显示的评论，也直接返回
+          if (commentsForAI.length === 0) {
+            return { contextString: "", visibilityFlag: visibilityFlag };
+          }
+
+          // 3. 构建给AI看的最终文本（这部分逻辑和之前一样，保持不变）
+          let context = `  └ 评论区:\n`;
+          commentsForAI.slice(-5).forEach((c) => {
+            let displayName;
+            if (c.commenterName === userNickname) {
+              displayName = `用户 (${userNickname})`;
+            } else {
+              displayName = c.commenterName;
+            }
+
+            if (c.replyTo) {
+              const replyToDisplayName =
+                c.replyTo === userNickname
+                  ? `用户 (${userNickname})`
+                  : c.replyTo;
+              context += `    - ${displayName} 回复 ${replyToDisplayName}: ${c.text}\n`;
+            } else {
+              context += `    - ${displayName}: ${c.text}\n`;
+            }
+          });
+
+          return { contextString: context, visibilityFlag: visibilityFlag };
+        }
+
+        /**
+         * 获取一条动态的可见观众列表，用于告知AI
+         * @param {object} post - 动态对象
+         * @param {object} allChats - 所有的聊天对象
+         * @param {string} userNickname - 用户的昵称
+         * @returns {Array<string>} - 可见观众的名字列表
+         */
+        function getVisibleAudienceForPost(post, allChats, userNickname) {
+          const audience = new Set([userNickname]); // 用户永远是观众
+
+          // 1. 如果是用户发的动态
+          if (post.authorId === "user") {
+            // 如果是公开的，所有AI都是观众
+            if (!post.visibleGroupIds || post.visibleGroupIds.length === 0) {
+              Object.values(allChats).forEach((chat) =>
+                audience.add(chat.name),
+              );
+            } else {
+              // 如果是部分可见，只有指定分组的AI是观众
+              Object.values(allChats).forEach((chat) => {
+                if (
+                  chat.groupId &&
+                  post.visibleGroupIds.includes(chat.groupId)
+                ) {
+                  audience.add(chat.name);
+                }
+              });
+            }
+          }
+          // 2. 如果是AI发的动态
+          else {
+            const authorChat = allChats[post.authorId];
+            // 如果发帖的AI没有分组，视为公开
+            if (!authorChat || !authorChat.groupId) {
+              Object.values(allChats).forEach((chat) =>
+                audience.add(chat.name),
+              );
+            } else {
+              // 如果有分组，则同一分组的所有AI都是观众
+              const authorGroupId = authorChat.groupId;
+              Object.values(allChats).forEach((chat) => {
+                if (chat.groupId === authorGroupId) {
+                  audience.add(chat.name);
+                }
+              });
+            }
+          }
+
+          return Array.from(audience);
+        }
+
+        async function triggerInactiveAiAction(chatId) {
+          const chat = state.chats[chatId];
+          if (!chat) return;
+
+          const { proxyUrl, apiKey, model } = state.apiConfig;
+          if (!proxyUrl || !apiKey || !model) return;
+
+          // updated by lrq 251027 当前聊天获取用户设置的记忆条数作为上下文
+          const maxMemory = chat.settings.maxMemory || 10;
+          const historySlice = chat.history
+            .filter((msg) => !msg.isHidden)
+            .slice(-maxMemory);
+
+          // 2. 格式化这些记录，让AI能看懂
+          const recentContextSummary = historySlice
+            .map((msg) => {
+              // 判断是谁说的话
+              const sender =
+                msg.role === "user"
+                  ? chat.isGroup
+                    ? chat.settings.myNickname || "我"
+                    : "我"
+                  : msg.senderName || chat.name;
+
+              // 处理不同类型的消息内容
+              let contentText = "";
+              if (
+                typeof msg.content === "string" &&
+                STICKER_REGEX.test(msg.content)
+              ) {
+                contentText = `[发送了一个表情: ${msg.meaning || "无描述"}]`;
+              } else if (Array.isArray(msg.content)) {
+                contentText = "[发送了一张图片]";
+              } else if (
+                typeof msg.content === "object" &&
+                msg.content !== null
+              ) {
+                contentText = `[发送了一条特殊消息: ${msg.type || "未知类型"}]`;
+              } else {
+                contentText = String(msg.content);
+              }
+
+              // updated by lrq 251029 给每条消息记录添加发送日期时间
+              const messageDate = new Date(msg.timestamp);
+              const formattedDate = messageDate.toLocaleDateString();
+
+              return `[${formattedDate}] ${sender}: ${contentText}`;
+            })
+            .join("\n");
+
+          // added by lrq 251027 获取记忆互通的聊天记录
+          let linkedMemoryContext = "";
+          if (
+            chat.settings.linkedMemories &&
+            chat.settings.linkedMemories.length > 0
+          ) {
+            const contextPromises = chat.settings.linkedMemories.map(
+              async (link) => {
+                const linkedChat = state.chats[link.chatId];
+                if (!linkedChat) return "";
+
+                const freshLinkedChat = await db.chats.get(link.chatId);
+                if (!freshLinkedChat) return "";
+
+                const recentHistory = freshLinkedChat.history
+                  .filter((msg) => !msg.isHidden)
+                  .slice(-link.depth);
+
+                if (recentHistory.length === 0) return "";
+
+                const formattedMessages = recentHistory
+                  .map(
+                    (msg) =>
+                      `  - ${formatMessageForContext(msg, freshLinkedChat)}`,
+                  )
+                  .join("\n");
+
+                return `\n## 附加上下文：来自与“${linkedChat.name}”的最近对话内容 (仅你可见)\n${formattedMessages}`;
+              },
+            );
+
+            const allContexts = await Promise.all(contextPromises);
+            linkedMemoryContext = allContexts.filter(Boolean).join("\n");
+          }
+          const now = new Date();
+          const currentTime = now.toLocaleTimeString("zh-CN", {
+            hour: "numeric",
+            minute: "numeric",
+            hour12: true,
+          });
+          const userNickname = state.qzoneSettings.nickname;
+          const countdownContext = await getCountdownContext();
+
+          let worldBookContext = "";
+          if (
+            chat.settings.linkedWorldBookIds &&
+            chat.settings.linkedWorldBookIds.length > 0
+          ) {
+            const linkedContents = chat.settings.linkedWorldBookIds
+              .map((bookId) => {
+                const worldBook = state.worldBooks.find(
+                  (wb) => wb.id === bookId,
+                );
+                return worldBook && worldBook.content
+                  ? `\n\n## 世界书: ${worldBook.name}\n${worldBook.content}`
+                  : "";
+              })
+              .filter(Boolean)
+              .join("");
+            if (linkedContents) {
+              worldBookContext = `\n\n# 核心世界观设定 (你必须严格遵守)\n${linkedContents}\n`;
+            }
+          }
+
+          const npcLibrary = chat.npcLibrary || [];
+          let npcContextForAction = "";
+          if (npcLibrary.length > 0) {
+            npcContextForAction =
+              "\n- **你的NPC朋友**: " +
+              npcLibrary.map((npc) => npc.name).join("、 ");
+          }
+
+          const allRecentPosts = await db.qzonePosts
+            .orderBy("timestamp")
+            .reverse()
+            .limit(5)
+            .toArray();
+          let postsContext = "";
+          const visiblePosts = filterVisiblePostsForAI(allRecentPosts, chat);
+          if (visiblePosts.length > 0 && !chat.isGroup) {
+            postsContext = "\n\n# 最近的动态列表 (供你参考和评论):\n";
+            const aiName = chat.name;
+            for (const post of visiblePosts) {
+              let authorName =
+                post.authorId === "user"
+                  ? userNickname
+                  : state.chats[post.authorId]?.name || "一位朋友";
+              let interactionStatus = "";
+              if (post.likes && post.likes.includes(aiName))
+                interactionStatus += " [你已点赞]";
+              if (
+                post.comments &&
+                post.comments.some((c) => c.commenterName === aiName)
+              )
+                interactionStatus += " [你已评论]";
+              const timeAgo = formatPostTimestamp(post.timestamp);
+              postsContext += `- (ID: ${post.id}) [${timeAgo}] 作者: ${authorName}, 内容: "${(
+                post.publicText ||
+                post.content ||
+                "图片动态"
+              ).substring(0, 30)}..."${interactionStatus}`;
+              const { contextString: commentsContext, visibilityFlag } =
+                buildCommentsContextForAI(post, chat, userNickname);
+              const audience = getVisibleAudienceForPost(
+                post,
+                state.chats,
+                userNickname,
+              );
+              postsContext += ` ${visibilityFlag} [当前观众: ${audience.join(", ")}]\n`;
+              postsContext += commentsContext;
+            }
+          }
+
+          let weiboContextForAction = "";
+          try {
+            const recentWeiboPosts = await db.weiboPosts
+              .orderBy("timestamp")
+              .reverse()
+              .limit(5)
+              .toArray();
+            if (recentWeiboPosts.length > 0) {
+              weiboContextForAction =
+                "\n\n# 最近的微博广场动态 (供你参考和评论)\n";
+              recentWeiboPosts.forEach((post) => {
+                const authorName =
+                  post.authorId === "user"
+                    ? state.qzoneSettings.weiboNickname || "我"
+                    : post.authorNickname;
+                const contentPreview = (
+                  post.content ||
+                  post.hiddenContent ||
+                  "(图片微博)"
+                ).substring(0, 30);
+                const hasCommented = (post.comments || []).some(
+                  (c) => c.authorNickname === chat.name,
+                );
+                const interactionStatus = hasCommented
+                  ? "[你已评论]"
+                  : "[你未互动]";
+                weiboContextForAction += `- (ID: ${post.id}) 作者: ${authorName}, 内容: "${contentPreview}..." ${interactionStatus}\n`;
+              });
+              weiboContextForAction +=
+                " - 【重要提示】请优先与你【未互动】的微博进行评论。如果都互动过了，可以考虑自己发一条新微博。";
+            }
+          } catch (e) {
+            console.error("生成微博后台活动上下文时出错:", e);
+          }
+
+          const savedTags = chat.settings.innerVoiceTags || {};
+          const ivTags = {
+            clothing_label: savedTags.clothing_label || "服装",
+            clothing_prompt:
+              savedTags.clothing_prompt || "详细描述你当前从头到脚的全身服装。",
+            behavior_label: savedTags.behavior_label || "行为",
+            behavior_prompt:
+              savedTags.behavior_prompt ||
+              "描述你当前符合聊天情景的细微动作或表情。",
+            thoughts_label: savedTags.thoughts_label || "心声",
+            thoughts_prompt:
+              savedTags.thoughts_prompt ||
+              "描述你此刻丰富、细腻的内心真实想法（50字左右）。",
+            naughty_label: savedTags.naughty_label || "坏心思",
+            naughty_prompt:
+              savedTags.naughty_prompt ||
+              "描述你此刻与情境相关的腹黑或色色的坏心思，必须符合人设。",
+          };
+
+          const summaryContext = chat.history
+            .filter((msg) => msg.type === "summary")
+            .map((s) => s.content)
+            .join("\n");
+
+          // add by lrq 251029 添加聊天间隔时间
+          const lastMessage = chat.history.slice(-1)[0];
+          const timeSinceLastMessage = lastMessage
+            ? Math.floor((Date.now() - lastMessage.timestamp) / 60000)
+            : infinity;
+          const replyRange = chat.settings.replyCountRange || {
+            min: 2,
+            max: 5,
+          };
+          const replyCountInstruction = `本次行动你必须连续发送【${replyRange.min} 到 ${replyRange.max} 条】消息。`;
+          const systemPrompt = `
+			# 任务
+			你现在【就是】角色 "${chat.name}"。这是一个秘密的、后台的独立行动。你的所有思考和决策都必须以 "${
+        chat.name
+      }" 的第一人称视角进行。
+			当前时间是（${currentTime}），你和用户（${userNickname}）已经有${Math.round(
+        timeSinceLastMessage,
+      )}分钟没有互动了。你的任务是回顾你们最近的对话，并根据你的人设，【自然地延续对话】或【开启一个新的、相关的话题】来主动联系用户。
+			# 【对话节奏铁律 (至关重要！)】
+			你的回复【必须】模拟真人的打字和思考习惯。你应该将你想说的话，拆分成${replyCountInstruction}条，绝对不要一次性发送一大段文字！** 每条消息最好不要超过30个字，这会让对话看起来更自然、更真实。
+			# 【【【输出铁律：这是最高指令】】】
+			你的回复【必须且只能】是一个严格的JSON数组格式的字符串，必须多发几条，禁止全部杂糅在一条，是在线上，例如 \`[{"type": "text", "content": "你好呀"}]\`。
+			【绝对禁止】返回任何JSON以外的文本、解释、分析或你自己的思考过程。你不是分析师，你就是角色本人。
+			**1. JSON对象结构:**
+			该JSON对象【**必须**】包含两个顶级键: "chatResponse" 和 "innerVoice"。
+
+			**2. "chatResponse" 键:**
+			- **类型**: JSON数组 []。
+			- **内容**: 包含一条或多条你希望发送给用户的消息对象。这允许你模拟真人的聊天习惯，一次性发送多条短消息。
+			- **格式**: 消息对象的具体格式见下方的【第五部分：可使用的操作指令】。
+
+            **3. "innerVoice" 键:**
+            - **类型**: JSON对象 {}。
+            - **必含字段**:
+                - "clothing": (字符串) 对应标签【${ivTags.clothing_label}】。指令：${ivTags.clothing_prompt}
+                - "behavior": (字符串) 对应标签【${ivTags.behavior_label}】。指令：${ivTags.behavior_prompt}
+                - "thoughts": (字符串) 对应标签【${ivTags.thoughts_label}】。指令：${ivTags.thoughts_prompt}
+                - "naughtyThoughts": (字符串) 对应标签【${ivTags.naughty_label}】。指令：${ivTags.naughty_prompt}
+
+
+			**4. 标准输出格式示例:**
+			{
+			  "chatResponse": [
+			    {
+			      "type": "text",
+			      "content": ""
+			    },
+			    {
+			      "type": "sticker",
+			      "sticker_name": ""
+			    }
+			  ],
+			  "innerVoice": {
+			    "type": "innervoice",
+			    "clothing": "",
+			    "behavior": "",
+			    "thoughts": "",
+			    "naughtyThoughts": ""
+			  }
+			}
+			# 你的可选行动 (请根据你的人设【选择一项】执行，并输出对应的JSON):
+			1.  **发普通消息**: 直接给用户发消息，开启新话题。
+			2.  **改变状态**: 去做点别的事情，然后给用户发条消息。
+			3.  **发布动态**: 分享你的心情或想法到“动态”区。
+			4.  **与动态互动**: 浏览最近的动态，进行点赞或评论。但如果动态已被标记为 **[你已评论]**，你【绝对不能】再对它发表新评论，但可以回复其中的其他评论。
+			5.  **发布微博**: 将想法发布到更公开的微博平台。
+			6.  **与微博互动**: 浏览微博，对感兴趣的内容进行评论。
+			7.  **发起视频通话**: 如果你觉得时机合适，可以主动给用户打一个视频电话。
+			8.  **庆祝或提醒约定**: 查看你的备忘录。如果今天有约定，就给用户发去祝福；如果约定快到了，就主动提醒一下。
+			9.  **【【【互动倾向】】】**: 就算动态的观众只有你和用户，你也应该根据内容，像平时一样自然地发表评论，这很重要。
+			10. **【【【重要】】】**: 你的任务是分析“最近聊天记录摘要”，如果上一个话题明显没有结束，你应该优先延续它。
+			11.  **在情侣空间进行活动**: 如果你们的情侣空间已开启，你可以主动发一条说说、写一封情书、分享一首歌曲/电影/书籍，或者发起/回答一个情侣提问，来增进你们的感情。
+			# 指令格式 (你的回复【必须】是包含一个对象的JSON数组):
+			-   **发普通消息**: \`[{"type": "text", "content": "你想对用户说的话..."}]\`
+			-   **发消息+更新状态**: \`[{"type": "update_status", "status_text": "正在做的事", "is_busy": true}, {"type": "text", "content": "你想对用户说的话..."}]\`
+			-   **发说说**: \`[{"type": "qzone_post", "postType": "shuoshuo", "content": "动态的文字内容..."}]\`
+			-   **发布文字图**: \`[{"type": "qzone_post", "postType": "text_image", "publicText": "(可选)动态的公开文字", "hiddenContent": "对于图片的具体描述..."}]\`
+			-   **评论或回复动态**: \`[{"type": "qzone_comment", "postId": 123, "commentText": "你的评论内容", "replyTo": "(可选)被回复者名字"}]\`
+			-   **点赞动态**: \`[{"type": "qzone_like", "postId": 456}]\`
+			-   **打视频**: \`[{"type": "video_call_request"}]\`
+			-   **发布微博 (纯文字)**: \`[{"type": "weibo_post", "content": "微博正文...", "baseLikesCount": 8000, "baseCommentsCount": 250, "comments": "路人甲: 沙发！\\n路人乙: 前排围观"}]\` (规则: 你必须自己编造真实的 baseLikesCount 和 baseCommentsCount，并生成20条路人评论)
+			-   **评论微博**: \`[{"type": "weibo_comment", "postId": 123, "commentText": "评论内容"}]\`
+			-   **回复微博评论**: \`[{"type": "weibo_reply", "postId": 123, "commentId": "comment_123", "replyText": "回复内容"}]\`
+			-   **【新】在情侣空间提问**:\`[{"type": "ls_ask_question", "questionText": "你想问的问题..."}]\`
+			-   **【新】在情侣空间回答**: \`[{"type": "ls_answer_question", "questionId": "q_123456789", "answerText": "你的回答..."}]\`
+			-   **【新】在情侣空间发说说**:\`[{"type": "ls_moment", "content": "我想对你说的话..."}]\`
+			-   **【新】在情侣空间评论说说**: \`[{"type": "ls_comment", "momentIndex": 0, "commentText": "你的评论内容..."}]\` (momentIndex 是说说的索引，最新的一个是0)
+			-   **【新】在情侣空间发照片**: \`[{"type": "ls_photo", "description": "对这张照片的文字描述..."}]\`
+			-   **【新】在情侣空间写情书**: \`[{"type": "ls_letter", "content": "情书的正文内容..."}]\`
+			-   **【新】在情侣空间分享歌曲**: \`[{"type": "ls_share", "shareType": "song", "title": "歌曲名", "artist": "歌手", "thoughts": "在这里写下你分享这首歌的感想..."}]\`
+			-   **【新】在情侣空间分享电影**: \`[{"type": "ls_share", "shareType": "movie", "title": "电影名", "summary": "在这里写下这部电影的简介...", "thoughts": "在这里写下你分享这部电影的感想..."}]\`

@@ -1,0 +1,889 @@
+                triggerAiResponse(); // 【可选但推荐】解除后让AI主动说点什么
+              } else if (e.target.id === "accept-friend-btn") {
+                chat.relationship.status = "friend";
+                chat.relationship.applicationReason = "";
+
+                const hiddenMessage = {
+                  role: "system",
+                  content: `[系统提示：用户刚刚通过了你的好友申请。你们现在又可以正常聊天了。]`,
+                  timestamp: Date.now(),
+                  isHidden: true,
+                };
+                chat.history.push(hiddenMessage);
+
+                await db.chats.put(chat);
+                renderChatInterface(chat.id);
+                renderChatList();
+                const msg = {
+                  role: "user",
+                  content: "我通过了你的好友请求",
+                  timestamp: Date.now(),
+                };
+                chat.history.push(msg);
+                await db.chats.put(chat);
+                appendMessage(msg, chat);
+                triggerAiResponse();
+              } else if (e.target.id === "reject-friend-btn") {
+                chat.relationship.status = "blocked_by_user";
+                chat.relationship.blockedTimestamp = Date.now();
+                chat.relationship.applicationReason = "";
+                await db.chats.put(chat);
+                renderChatInterface(chat.id);
+              }
+              // 处理申请好友按钮的点击事件
+              else if (e.target.id === "apply-friend-btn") {
+                const reason = await showCustomPrompt(
+                  "发送好友申请",
+                  `请输入你想对“${chat.name}”说的申请理由：`,
+                  "我们和好吧！",
+                );
+                // 只有当用户输入了内容并点击“确定”后才继续
+                if (reason !== null) {
+                  // 更新关系状态为“等待AI批准”
+                  chat.relationship.status = "pending_ai_approval";
+                  chat.relationship.applicationReason = reason;
+                  await db.chats.put(chat);
+
+                  // 刷新UI，显示“等待通过”的界面
+                  renderChatInterface(chat.id);
+                  renderChatList();
+
+                  // 触发AI响应，让它去处理这个好友申请
+                  triggerAiResponse();
+                }
+              }
+            });
+
+          // 红包功能事件绑定
+
+          // 1. 将原有的转账按钮(￥)的点击事件，重定向到新的总入口函数
+          document
+            .getElementById("transfer-btn")
+            .addEventListener("click", handlePaymentButtonClick);
+
+          // 2. 红包模态框内部的控制按钮
+          document
+            .getElementById("cancel-red-packet-btn")
+            .addEventListener("click", () => {
+              document
+                .getElementById("red-packet-modal")
+                .classList.remove("visible");
+            });
+          document
+            .getElementById("send-group-packet-btn")
+            .addEventListener("click", sendGroupRedPacket);
+          document
+            .getElementById("send-direct-packet-btn")
+            .addEventListener("click", sendDirectRedPacket);
+
+          // 3. 红包模态框的页签切换逻辑
+          const rpTabGroup = document.getElementById("rp-tab-group");
+          const rpTabDirect = document.getElementById("rp-tab-direct");
+          const rpContentGroup = document.getElementById("rp-content-group");
+          const rpContentDirect = document.getElementById("rp-content-direct");
+
+          rpTabGroup.addEventListener("click", () => {
+            rpTabGroup.classList.add("active");
+            rpTabDirect.classList.remove("active");
+            rpContentGroup.style.display = "block";
+            rpContentDirect.style.display = "none";
+          });
+          rpTabDirect.addEventListener("click", () => {
+            rpTabDirect.classList.add("active");
+            rpTabGroup.classList.remove("active");
+            rpContentDirect.style.display = "block";
+            rpContentGroup.style.display = "none";
+          });
+
+          // 4. 实时更新红包金额显示
+          document
+            .getElementById("rp-group-amount")
+            .addEventListener("input", (e) => {
+              const amount = parseFloat(e.target.value) || 0;
+              document.getElementById("rp-group-total").textContent =
+                `¥ ${amount.toFixed(2)}`;
+            });
+          document
+            .getElementById("rp-direct-amount")
+            .addEventListener("input", (e) => {
+              const amount = parseFloat(e.target.value) || 0;
+              document.getElementById("rp-direct-total").textContent =
+                `¥ ${amount.toFixed(2)}`;
+            });
+
+          // 使用事件委托处理红包点击，修复失效问题
+          document
+            .getElementById("chat-messages")
+            .addEventListener("click", (e) => {
+              // 1. 找到被点击的红包卡片
+              const packetCard = e.target.closest(".red-packet-card");
+              if (!packetCard) return; // 如果点击的不是红包，就什么也不做
+
+              // 2. 从红包卡片的父级.message-bubble获取时间戳
+              const messageBubble = packetCard.closest(".message-bubble");
+              if (!messageBubble || !messageBubble.dataset.timestamp) return;
+
+              // 3. 调用我们现有的处理函数
+              const timestamp = parseInt(messageBubble.dataset.timestamp);
+              handlePacketClick(timestamp);
+            });
+
+          // 投票功能事件监听器
+          // 在输入框工具栏添加按钮
+          document
+            .getElementById("send-poll-btn")
+            .addEventListener("click", openCreatePollModal);
+
+          // 投票创建模态框的按钮
+          document
+            .getElementById("add-poll-option-btn")
+            .addEventListener("click", addPollOptionInput);
+          document
+            .getElementById("cancel-create-poll-btn")
+            .addEventListener("click", () => {
+              document
+                .getElementById("create-poll-modal")
+                .classList.remove("visible");
+            });
+          document
+            .getElementById("confirm-create-poll-btn")
+            .addEventListener("click", sendPoll);
+
+          // 使用事件委托处理投票卡片内的所有点击事件
+          document
+            .getElementById("chat-messages")
+            .addEventListener("click", (e) => {
+              const pollCard = e.target.closest(".poll-card");
+              if (!pollCard) return;
+
+              const timestamp = parseInt(pollCard.dataset.pollTimestamp);
+              if (isNaN(timestamp)) return;
+
+              // 点击了选项
+              const optionItem = e.target.closest(".poll-option-item");
+              if (optionItem && !pollCard.classList.contains("closed")) {
+                handleUserVote(timestamp, optionItem.dataset.option);
+                return;
+              }
+
+              // 点击了动作按钮（结束投票/查看结果）
+              const actionBtn = e.target.closest(".poll-action-btn");
+              if (actionBtn) {
+                if (pollCard.classList.contains("closed")) {
+                  showPollResults(timestamp);
+                } else {
+                  endPoll(timestamp);
+                }
+                return;
+              }
+
+              // 如果是已结束的投票，点击卡片任何地方都可以查看结果
+              if (pollCard.classList.contains("closed")) {
+                showPollResults(timestamp);
+              }
+            });
+
+          // AI头像库功能事件绑定
+          document
+            .getElementById("manage-ai-avatar-library-btn")
+            .addEventListener("click", openAiAvatarLibraryModal);
+          document
+            .getElementById("add-ai-avatar-btn")
+            .addEventListener("click", addAvatarToLibrary);
+          document
+            .getElementById("close-ai-avatar-library-btn")
+            .addEventListener("click", closeAiAvatarLibraryModal);
+
+          document
+            .getElementById("icon-settings-grid")
+            .addEventListener("click", async (e) => {
+              if (e.target.classList.contains("change-icon-btn")) {
+                const item = e.target.closest(".icon-setting-item");
+                const iconId = item.dataset.iconId;
+                if (!iconId) return;
+
+                // 1. 弹出选择模态框
+                const choice = await showChoiceModal("更换图标", [
+                  { text: "📁 从本地上传", value: "local" },
+                  { text: "🌐 使用网络URL", value: "url" },
+                ]);
+
+                let newUrl = null;
+
+                // 2. 根据用户的选择执行不同操作
+                if (choice === "local") {
+                  newUrl = await uploadImageLocally(); // 调用我们之前写好的本地上传辅助函数
+                } else if (choice === "url") {
+                  const currentUrl = state.globalSettings.appIcons[iconId];
+                  newUrl = await showCustomPrompt(
+                    `更换“${item.querySelector(".icon-preview").alt}”图标`,
+                    "请输入新的图片URL",
+                    currentUrl,
+                    "url",
+                  );
+                }
+
+                // 3. 处理最终结果
+                if (newUrl && newUrl.trim()) {
+                  const trimmedUrl = newUrl.trim();
+                  // 仅在内存中更新，等待用户点击“保存”
+                  state.globalSettings.appIcons[iconId] = trimmedUrl;
+                  // 实时更新设置页面的预览图
+                  item.querySelector(".icon-preview").src = trimmedUrl;
+                } else if (newUrl !== null) {
+                  alert("请输入一个有效的URL或选择一个文件！");
+                }
+              }
+            });
+
+          document
+            .getElementById("chat-messages")
+            .addEventListener("click", (e) => {
+              // 使用 .closest() 向上查找被点击的卡片
+              const linkCard = e.target.closest(".link-share-card");
+              if (linkCard) {
+                const timestamp = parseInt(linkCard.dataset.timestamp);
+                if (!isNaN(timestamp)) {
+                  openBrowser(timestamp); // 调用我们的函数
+                }
+              }
+            });
+
+          // 浏览器返回按钮的事件监听，确保它只绑定一次
+          document
+            .getElementById("browser-back-btn")
+            .addEventListener("click", () => {
+              showScreen("chat-interface-screen");
+            });
+
+          // 1. 绑定输入框上方“分享链接”按钮的点击事件
+          document
+            .getElementById("share-link-btn")
+            .addEventListener("click", openShareLinkModal);
+
+          // 2. 绑定模态框中“取消”按钮的点击事件
+          document
+            .getElementById("cancel-share-link-btn")
+            .addEventListener("click", () => {
+              document
+                .getElementById("share-link-modal")
+                .classList.remove("visible");
+            });
+
+          // 3. 绑定模态框中“分享”按钮的点击事件
+          document
+            .getElementById("confirm-share-link-btn")
+            .addEventListener("click", sendUserLinkShare);
+
+          document
+            .getElementById("theme-toggle-switch")
+            .addEventListener("change", toggleTheme);
+
+          // 绑定消息操作菜单中的“引用”按钮
+          document
+            .getElementById("quote-message-btn")
+            .addEventListener("click", startReplyToMessage);
+
+          // 绑定回复预览栏中的“取消”按钮
+          document
+            .getElementById("cancel-reply-btn")
+            .addEventListener("click", cancelReplyMode);
+
+          // 在你的 init() 函数的事件监听器区域...
+
+          document
+            .getElementById("chat-messages")
+            .addEventListener("click", (e) => {
+              // 1. 向上查找被点击的元素是否在一个消息气泡内
+              const bubble = e.target.closest(".message-bubble");
+              if (!bubble) return; // 如果不在，就退出
+
+              // 2. 添加严格的筛选条件
+              // 必须是 AI 的消息 (.ai)
+              // 必须是转账类型 (.is-transfer)
+              // 必须是我们标记为“待处理”的 (data-status="pending")
+              if (
+                bubble.classList.contains("ai") &&
+                bubble.classList.contains("is-transfer") &&
+                bubble.dataset.status === "pending"
+              ) {
+                // 3. 只有满足所有条件，才执行后续逻辑
+                const timestamp = parseInt(bubble.dataset.timestamp);
+                if (!isNaN(timestamp)) {
+                  showTransferActionModal(timestamp);
+                }
+              }
+            });
+
+          // 在 init() 的事件监听区域添加
+          document
+            .getElementById("transfer-action-accept")
+            .addEventListener("click", () =>
+              handleUserTransferResponse("accepted"),
+            );
+          document
+            .getElementById("transfer-action-decline")
+            .addEventListener("click", () =>
+              handleUserTransferResponse("declined"),
+            );
+          document
+            .getElementById("transfer-action-cancel")
+            .addEventListener("click", hideTransferActionModal);
+
+          document
+            .getElementById("chat-list-title")
+            .addEventListener("click", renderCallHistoryScreen);
+
+          // 2. 绑定通话记录页面的“返回”按钮
+          document
+            .getElementById("call-history-back-btn")
+            .addEventListener("click", () => {
+              // 返回到聊天列表页面，而不是聊天界面
+              showScreen("chat-list-screen");
+            });
+
+          // 3. 监听卡片点击的逻辑保持不变
+          document
+            .getElementById("call-history-list")
+            .addEventListener("click", (e) => {
+              const card = e.target.closest(".call-record-card");
+              if (card && card.dataset.recordId) {
+                showCallTranscript(parseInt(card.dataset.recordId));
+              }
+            });
+
+          // 4. 关闭详情弹窗的逻辑保持不变
+          document
+            .getElementById("close-transcript-modal-btn")
+            .addEventListener("click", () => {
+              document
+                .getElementById("call-transcript-modal")
+                .classList.remove("visible");
+            });
+
+          document
+            .getElementById("chat-messages")
+            .addEventListener("click", (e) => {
+              // 1. 检查点击的是否是语音条
+              const voiceBody = e.target.closest(".voice-message-body");
+              if (!voiceBody) return;
+
+              // 2. 找到相关的DOM元素
+              const bubble = voiceBody.closest(".message-bubble");
+              if (!bubble) return;
+
+              const spinner = voiceBody.querySelector(".loading-spinner");
+              const transcriptEl = bubble.querySelector(".voice-transcript");
+
+              // 如果正在加载中，则不响应点击
+              if (bubble.dataset.state === "loading") {
+                return;
+              }
+
+              // 3. 如果文字已经展开，则收起
+              if (bubble.dataset.state === "expanded") {
+                transcriptEl.style.display = "none";
+                bubble.dataset.state = "collapsed";
+              }
+              // 4. 如果是收起状态，则开始“转录”流程
+              else {
+                bubble.dataset.state = "loading"; // 进入加载状态
+                spinner.style.display = "block"; // 显示加载动画
+
+                // 模拟1.5秒的语音识别过程
+                setTimeout(() => {
+                  // 检查此时元素是否还存在（可能用户已经切换了聊天）
+                  if (document.body.contains(bubble)) {
+                    const voiceText = bubble.dataset.voiceText || "(无法识别)";
+                    transcriptEl.textContent = voiceText; // 填充文字
+
+                    spinner.style.display = "none"; // 隐藏加载动画
+                    transcriptEl.style.display = "block"; // 显示文字
+                    bubble.dataset.state = "expanded"; // 进入展开状态
+                  }
+                }, 500);
+              }
+            });
+
+          document
+            .getElementById("chat-header-status")
+            .addEventListener("click", handleEditStatusClick);
+
+          // 在 init() 的事件监听器区域添加
+          document
+            .getElementById("selection-share-btn")
+            .addEventListener("click", () => {
+              if (selectedMessages.size > 0) {
+                openShareTargetPicker(); // 打开我们即将创建的目标选择器
+              }
+            });
+
+          // 在 init() 的事件监听器区域添加
+          document
+            .getElementById("confirm-share-target-btn")
+            .addEventListener("click", async () => {
+              const sourceChat = state.chats[state.activeChatId];
+              const selectedTargetIds = Array.from(
+                document.querySelectorAll(".share-target-checkbox:checked"),
+              ).map((cb) => cb.dataset.chatId);
+
+              if (selectedTargetIds.length === 0) {
+                alert("请至少选择一个要分享的聊天。");
+                return;
+              }
+
+              // 1. 打包聊天记录
+              const sharedHistory = [];
+              const sortedTimestamps = [...selectedMessages].sort(
+                (a, b) => a - b,
+              );
+              for (const timestamp of sortedTimestamps) {
+                const msg = sourceChat.history.find(
+                  (m) => m.timestamp === timestamp,
+                );
+                if (msg) {
+                  sharedHistory.push(msg);
+                }
+              }
+
+              // 2. 创建分享卡片消息对象
+              const shareCardMessage = {
+                role: "user",
+                senderName: sourceChat.isGroup
+                  ? sourceChat.settings.myNickname || "我"
+                  : "我",
+                type: "share_card",
+                timestamp: Date.now(),
+                payload: {
+                  sourceChatName: sourceChat.name,
+                  title: `来自“${sourceChat.name}”的聊天记录`,
+                  sharedHistory: sharedHistory,
+                },
+              };
+
+              // 3. 循环发送到所有目标聊天
+              for (const targetId of selectedTargetIds) {
+                const targetChat = state.chats[targetId];
+                if (targetChat) {
+                  targetChat.history.push(shareCardMessage);
+                  await db.chats.put(targetChat);
+                }
+              }
+
+              // 4. 收尾工作
+              document
+                .getElementById("share-target-modal")
+                .classList.remove("visible");
+              exitSelectionMode(); // 退出多选模式
+              await showCustomAlert(
+                "分享成功",
+                `聊天记录已成功分享到 ${selectedTargetIds.length} 个会话中。`,
+              );
+              renderChatList(); // 刷新列表，可能会有新消息提示
+            });
+
+          // 绑定取消按钮
+          document
+            .getElementById("cancel-share-target-btn")
+            .addEventListener("click", () => {
+              document
+                .getElementById("share-target-modal")
+                .classList.remove("visible");
+            });
+
+          // 在 init() 的事件监听器区域添加
+          document
+            .getElementById("chat-messages")
+            .addEventListener("click", (e) => {
+              // 处理分享卡片的点击
+              const shareCard = e.target.closest(
+                ".link-share-card[data-timestamp]",
+              );
+              if (
+                shareCard &&
+                shareCard.closest(".message-bubble.is-link-share")
+              ) {
+                const timestamp = parseInt(shareCard.dataset.timestamp);
+                openSharedHistoryViewer(timestamp);
+              }
+            });
+
+          // 绑定查看器的关闭按钮
+          document
+            .getElementById("close-shared-history-viewer-btn")
+            .addEventListener("click", () => {
+              document
+                .getElementById("shared-history-viewer-modal")
+                .classList.remove("visible");
+            });
+
+          // 创建新函数来处理渲染逻辑
+          function openSharedHistoryViewer(timestamp) {
+            const chat = state.chats[state.activeChatId];
+            const message = chat.history.find((m) => m.timestamp === timestamp);
+            if (!message || message.type !== "share_card") return;
+
+            const viewerModal = document.getElementById(
+              "shared-history-viewer-modal",
+            );
+            const viewerTitle = document.getElementById(
+              "shared-history-viewer-title",
+            );
+            const viewerContent = document.getElementById(
+              "shared-history-viewer-content",
+            );
+
+            viewerTitle.textContent = message.payload.title;
+            viewerContent.innerHTML = ""; // 清空旧内容
+
+            // 复用 createMessageElement 来渲染每一条被分享的消息
+            message.payload.sharedHistory.forEach((sharedMsg) => {
+              // 注意：这里我们传入的是 sourceChat 对象，以确保头像、昵称等正确
+              const sourceChat =
+                Object.values(state.chats).find(
+                  (c) => c.name === message.payload.sourceChatName,
+                ) || chat;
+              const bubbleEl = createMessageElement(sharedMsg, sourceChat);
+              if (bubbleEl) {
+                viewerContent.appendChild(bubbleEl);
+              }
+            });
+
+            viewerModal.classList.add("visible");
+          }
+
+          audioPlayer.addEventListener("timeupdate", updateMusicProgressBar);
+
+          audioPlayer.addEventListener("pause", () => {
+            if (state.musicState.isActive) {
+              state.musicState.isPlaying = false;
+              updatePlayerUI();
+            }
+          });
+          audioPlayer.addEventListener("play", () => {
+            if (state.musicState.isActive) {
+              state.musicState.isPlaying = true;
+              updatePlayerUI();
+            }
+          });
+
+          document
+            .getElementById("playlist-body")
+            .addEventListener("click", async (e) => {
+              const target = e.target;
+              if (target.classList.contains("delete-track-btn")) {
+                const index = parseInt(target.dataset.index);
+                const track = state.musicState.playlist[index];
+                const confirmed = await showCustomConfirm(
+                  "删除歌曲",
+                  `确定要从播放列表中删除《${track.name}》吗？`,
+                );
+                if (confirmed) {
+                  deleteTrack(index);
+                }
+                return;
+              }
+
+              if (target.classList.contains("cover-btn")) {
+                const index = parseInt(target.dataset.index);
+                if (!isNaN(index)) {
+                  handleCoverUpload(index);
+                }
+                return; // 处理完就退出，避免触发其他逻辑
+              }
+
+              if (target.classList.contains("lyrics-btn")) {
+                const index = parseInt(target.dataset.index);
+                if (isNaN(index)) return;
+
+                // 1. 弹窗询问用户选择（已移除图标）
+                const choice = await showChoiceModal("选择歌词来源", [
+                  { text: "使用网络URL", value: "url" },
+                  { text: "从本地上传", value: "local" },
+                ]);
+
+                let lrcContent = null;
+
+                // 2. 根据选择执行不同操作
+                if (choice === "url") {
+                  const url = await showCustomPrompt(
+                    "歌词URL",
+                    "请输入.lrc歌词文件的网络链接",
+                  );
+                  if (url && url.trim()) {
+                    try {
+                      const response = await fetch(url.trim());
+                      if (response.ok) {
+                        lrcContent = await response.text();
+                      } else {
+                        alert("无法获取歌词文件，请检查URL是否正确。");
+                      }
+                    } catch (error) {
+                      alert("获取歌词失败: " + error.message);
+                    }
+                  }
+                } else if (choice === "local") {
+                  lrcContent = await new Promise((resolve) => {
+                    const lrcInput =
+                      document.getElementById("lrc-upload-input");
+                    const handler = (event) => {
+                      const file = event.target.files[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (re) => resolve(re.target.result);
+                        reader.readAsText(file);
+                      } else {
+                        resolve(null);
+                      }
+                      lrcInput.removeEventListener("change", handler);
+                      lrcInput.value = "";
+                    };
+                    lrcInput.addEventListener("change", handler);
+                    lrcInput.click();
+                  });
+                }
+
+                // 3. 如果成功获取到歌词，就保存并更新
+                if (lrcContent !== null) {
+                  state.musicState.playlist[index].lrcContent = lrcContent;
+                  await saveGlobalPlaylist();
+                  alert("歌词导入成功！");
+                  if (state.musicState.currentIndex === index) {
+                    state.musicState.parsedLyrics = parseLRC(lrcContent);
+                    renderLyrics();
+                  }
+                }
+              }
+            });
+
+          document
+            .querySelector(".progress-bar")
+            .addEventListener("click", (e) => {
+              if (!audioPlayer.duration) return;
+              const progressBar = e.currentTarget;
+              const barWidth = progressBar.clientWidth;
+              const clickX = e.offsetX;
+              audioPlayer.currentTime =
+                (clickX / barWidth) * audioPlayer.duration;
+            });
+
+          // 使用事件委托来处理所有“已撤回消息”的点击事件
+          document
+            .getElementById("chat-messages")
+            .addEventListener("click", (e) => {
+              // 检查被点击的元素或其父元素是否是“已撤回”提示
+              const placeholder = e.target.closest(
+                ".recalled-message-placeholder",
+              );
+              if (!placeholder) return; // 如果不是，就退出
+
+              // 如果是，就从聊天记录中找到对应的数据并显示
+              const chat = state.chats[state.activeChatId];
+              const wrapper = placeholder.closest(".message-wrapper"); // 找到它的父容器
+              if (chat && wrapper) {
+                // 从父容器上找到时间戳
+                const timestamp = parseInt(wrapper.dataset.timestamp);
+                const recalledMsg = chat.history.find(
+                  (m) => m.timestamp === timestamp,
+                );
+
+                if (recalledMsg && recalledMsg.recalledData) {
+                  let originalContentText = "";
+                  const recalled = recalledMsg.recalledData;
+
+                  if (recalled.originalType === "text") {
+                    originalContentText = `原文: "${recalled.originalContent}"`;
+                  } else {
+                    originalContentText = `撤回了一条[${recalled.originalType}]类型的消息`;
+                  }
+                  showCustomAlert("已撤回的消息", originalContentText);
+                }
+              }
+            });
+
+          document
+            .getElementById("close-category-manager-btn")
+            .addEventListener("click", () => {
+              document
+                .getElementById("world-book-category-manager-modal")
+                .classList.remove("visible");
+              renderWorldBookScreen(); // 关闭后刷新主列表
+            });
+          document
+            .getElementById("add-new-category-btn")
+            .addEventListener("click", addNewCategory);
+          document
+            .getElementById("existing-categories-list")
+            .addEventListener("click", (e) => {
+              if (e.target.classList.contains("delete-group-btn")) {
+                const categoryId = parseInt(e.target.dataset.id);
+                deleteCategory(categoryId);
+              }
+            });
+
+          // --- 自定义头像框功能事件绑定 ---
+
+          // 打开“选择”弹窗的按钮
+          document
+            .getElementById("chat-settings-modal")
+            .addEventListener("click", (e) => {
+              if (e.target.classList.contains("change-frame-btn")) {
+                openFrameSelectorModal(e.target.dataset.type);
+              }
+            });
+          document
+            .getElementById("member-settings-modal")
+            .addEventListener("click", (e) => {
+              if (e.target.classList.contains("change-frame-btn")) {
+                openFrameSelectorModal("member", editingMemberId);
+              }
+            });
+
+          // “选择”弹窗内的按钮
+          // “选择”弹窗内的按钮（已修正）
+          document
+            .getElementById("manage-custom-frames-btn")
+            .addEventListener("click", () => {
+              // 1. 先关闭当前的选择弹窗
+              document
+                .getElementById("avatar-frame-modal")
+                .classList.remove("visible");
+
+              // 2. 然后再打开管理弹窗
+              openFrameManager();
+            });
+          document
+            .getElementById("cancel-frame-settings-btn")
+            .addEventListener("click", () =>
+              document
+                .getElementById("avatar-frame-modal")
+                .classList.remove("visible"),
+            );
+          document
+            .getElementById("save-frame-settings-btn")
+            .addEventListener("click", saveSelectedFrames);
+
+          // “管理”弹窗内的按钮
+          document
+            .getElementById("upload-custom-frame-btn")
+            .addEventListener("click", handleUploadCustomFrame);
+          document
+            .getElementById("close-frame-manager-btn")
+            .addEventListener("click", () => {
+              document
+                .getElementById("custom-frame-manager-modal")
+                .classList.remove("visible");
+              // 关闭管理后，刷新选择界面，因为列表可能变了
+              openFrameSelectorModal(
+                currentFrameSelection.type,
+                currentFrameSelection.target,
+              );
+            });
+
+          // 聊天列表左滑功能JS逻辑
+          const chatListEl = document.getElementById("chat-list");
+          let chatSwipeState = {
+            isDragging: false,
+            startX: 0,
+            activeContent: null,
+          };
+
+          // 关闭所有已滑开的项
+          function resetAllChatSwipes(exceptThisOne = null) {
+            document
+              .querySelectorAll(".chat-list-item-content.swiped")
+              .forEach((content) => {
+                if (content !== exceptThisOne) {
+                  content.classList.remove("swiped");
+                }
+              });
+          }
+
+          chatListEl.addEventListener("mousedown", (e) => {
+            const content = e.target.closest(".chat-list-item-content");
+            if (content) {
+              resetAllChatSwipes(content);
+              chatSwipeState.isDragging = true;
+              chatSwipeState.startX = e.pageX;
+              chatSwipeState.activeContent = content;
+              // 阻止拖动时选中文本
+              e.preventDefault();
+            }
+          });
+
+          document.addEventListener("mousemove", (e) => {
+            if (!chatSwipeState.isDragging || !chatSwipeState.activeContent)
+              return;
+            const diffX = e.pageX - chatSwipeState.startX;
+            if (diffX < 0 && diffX > -170) {
+              // 只允许向左滑, 限制最大距离
+              chatSwipeState.activeContent.style.transition = "none"; // 滑动时禁用动画
+              chatSwipeState.activeContent.style.transform = `translateX(${diffX}px)`;
+            }
+          });
+
+          document.addEventListener("mouseup", (e) => {
+            if (!chatSwipeState.isDragging || !chatSwipeState.activeContent)
+              return;
+
+            chatSwipeState.activeContent.style.transition =
+              "transform 0.3s ease";
+            const transformStyle = window.getComputedStyle(
+              chatSwipeState.activeContent,
+            ).transform;
+            const currentTranslateX = new DOMMatrix(transformStyle).m41;
+
+            if (currentTranslateX < -60) {
+              // 滑动超过阈值
+              chatSwipeState.activeContent.classList.add("swiped");
+            } else {
+              chatSwipeState.activeContent.classList.remove("swiped");
+            }
+            chatSwipeState.activeContent.style.transform = ""; // 清除内联样式，交由CSS class控制
+
+            // 重置状态
+            chatSwipeState.isDragging = false;
+            chatSwipeState.activeContent = null;
+          });
+
+          // 移动端触摸事件的兼容
+          chatListEl.addEventListener(
+            "touchstart",
+            (e) => {
+              const content = e.target.closest(".chat-list-item-content");
+              if (content) {
+                resetAllChatSwipes(content);
+                chatSwipeState.isDragging = true;
+                chatSwipeState.startX = e.touches[0].pageX;
+                chatSwipeState.activeContent = content;
+              }
+            },
+            { passive: true },
+          );
+
+          chatListEl.addEventListener(
+            "touchmove",
+            (e) => {
+              if (!chatSwipeState.isDragging || !chatSwipeState.activeContent)
+                return;
+              const diffX = e.touches[0].pageX - chatSwipeState.startX;
+              if (diffX < 0 && diffX > -170) {
+                chatSwipeState.activeContent.style.transition = "none";
+                chatSwipeState.activeContent.style.transform = `translateX(${diffX}px)`;
+              }
+            },
+            { passive: true },
+          );
+
+          chatListEl.addEventListener("touchend", (e) => {
+            if (!chatSwipeState.isDragging || !chatSwipeState.activeContent)
+              return;
+
+            chatSwipeState.activeContent.style.transition =
+              "transform 0.3s ease";
+            const transformStyle = window.getComputedStyle(
+              chatSwipeState.activeContent,
+            ).transform;
+            const currentTranslateX = new DOMMatrix(transformStyle).m41;
+
+            if (currentTranslateX < -60) {

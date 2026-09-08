@@ -1,0 +1,58 @@
+              class="form-button-secondary"
+              style="margin-top: 0; padding: 12px; width: auto"
+            >
+              管理题库
+            </button>
+          </div>
+        </div>
+
+        <button id="start-ludo-game-btn" class="form-button">开始游戏</button>
+      </div>
+    </div>
+
+    <!-- 2. 飞行棋游戏主界面 -->
+    <div id="ludo-game-screen" class="screen">
+      <div class="header">
+        <span class="back-btn" id="exit-ludo-game-btn">‹ 退出</span>
+        <span>心动飞行棋</span>
+        <!-- 这里可以放一个重置游戏的按钮 -->
+        <span class="action-btn" id="restart-ludo-game-btn" title="重新开始">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+          </svg>
+        </span>
+      </div>
+      <!-- 游戏主内容区 -->
+      <div id="ludo-game-content">
+        <!-- 棋盘区域 -->
+        <div id="ludo-board-container">
+          <div id="ludo-board">
+            <!-- 棋盘格子将由JS动态生成 -->
+          </div>
+          <!-- 玩家棋子 -->
+          <div id="ludo-user-piece" class="ludo-piece user"></div>
+          <div id="ludo-char-piece" class="ludo-piece char"></div>
+        </div>
+
+        <!-- 游戏日志区域 -->
+        <div id="ludo-log-container">
+          <div id="ludo-game-log"></div>
+        </div>
+
+        <!-- 玩家操作区 -->
+        <div id="ludo-action-area"></div>
+      </div>
+    </div>
+
+    <!-- 微博私信列表页面 -->

@@ -1,0 +1,1013 @@
+      <div id="chat-list-screen" class="screen">
+        <!-- 主头部 (只在消息列表显示) -->
+        <div class="header" id="main-chat-list-header">
+          <span class="back-btn" onclick="showScreen('home-screen')">‹</span>
+          <span id="chat-list-title">消息</span>
+          <div class="header-actions">
+            <span class="action-btn" id="add-group-chat-btn" title="创建群聊">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M17.5 17.5C19.1569 17.5 20.5 16.1569 20.5 14.5C20.5 12.8431 19.1569 11.5 17.5 11.5C15.8431 11.5 14.5 12.8431 14.5 14.5C14.5 16.1569 15.8431 17.5 17.5 17.5Z"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="M21 21L19 19"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="M8.5 11.5C10.1569 11.5 11.5 10.1569 11.5 8.5C11.5 6.84315 10.1569 5.5 8.5 5.5C6.84315 5.5 5.5 6.84315 5.5 8.5C5.5 10.1569 6.84315 11.5 8.5 11.5Z"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="M12.5 14.5H4.5C3.39543 14.5 2.5 15.3954 2.5 16.5V18.5H12.5"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </span>
+
+            <span
+              class="action-btn"
+              id="import-character-card-btn"
+              title="导入角色卡"
+            >
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+              </svg>
+            </span>
+
+            <span class="action-btn" id="add-chat-btn">+</span>
+          </div>
+        </div>
+
+        <!-- 消息列表视图 -->
+        <div id="messages-view" class="chat-list-view active">
+          <div id="chat-list">
+            <!-- JS会在这里生成聊天列表 -->
+          </div>
+        </div>
+
+        <!-- 动态界面视图 -->
+        <div id="qzone-screen" class="chat-list-view">
+          <div class="qzone-header">
+            <span class="back-btn" id="qzone-back-btn">‹</span>
+            <!-- 这个按钮现在只负责从动态返回 -->
+            <span>好友动态</span>
+
+            <div class="header-actions">
+              <span
+                class="action-btn"
+                id="clear-qzone-posts-btn"
+                title="清空动态"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path
+                    d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+                  />
+                </svg>
+              </span>
+            </div>
+          </div>
+          <div class="qzone-content">
+            <div class="qzone-profile-header">
+              <div id="qzone-banner-container" class="qzone-banner-container">
+                <img
+                  id="qzone-banner-img"
+                  src="https://files.catbox.moe/r5heyt.gif"
+                  alt="背景"
+                />
+                <input
+                  type="file"
+                  id="qzone-banner-input"
+                  accept="image/*"
+                  hidden
+                />
+              </div>
+              <div class="qzone-user-info">
+                <div id="qzone-avatar-container" class="qzone-avatar-container">
+                  <img
+                    id="qzone-avatar-img"
+                    src="https://files.catbox.moe/q6z5fc.jpeg"
+                    alt="头像"
+                  />
+                  <input
+                    type="file"
+                    id="qzone-avatar-input"
+                    accept="image/*"
+                    hidden
+                  />
+                </div>
+                <span id="qzone-nickname">{{user}}</span>
+              </div>
+            </div>
+            <div class="qzone-actions-bar">
+              <div class="action-item" id="create-shuoshuo-btn">
+                <span>说说</span>
+              </div>
+              <div class="action-item" id="create-post-btn">
+                <span>动态</span>
+              </div>
+              <div class="action-item" id="open-album-btn">
+                <span>相册</span>
+              </div>
+            </div>
+            <div id="qzone-posts-list"></div>
+          </div>
+        </div>
+
+        <!-- 收藏界面视图 -->
+        <div id="favorites-view" class="chat-list-view">
+          <div class="header">
+            <span class="back-btn" id="favorites-back-btn">‹</span>
+            <span>我的收藏</span>
+            <!-- 新增的编辑按钮 -->
+            <span class="action-btn" id="favorites-edit-btn">编辑</span>
+          </div>
+
+          <!-- 搜索栏容器 -->
+          <div class="search-bar-container">
+            <input
+              type="search"
+              id="favorites-search-input"
+              placeholder="搜索收藏的标题、内容或作者..."
+            />
+            <button
+              id="favorites-search-clear-btn"
+              class="search-clear-btn"
+              style="display: none"
+            >
+              ×
+            </button>
+          </div>
+
+          <div id="favorites-list" class="list-container">
+            <!-- 收藏内容将由JS动态生成在这里 -->
+          </div>
+
+          <!-- 新增：收藏页底部操作栏 -->
+          <div id="favorites-action-bar" style="display: none">
+            <button id="favorites-delete-selected-btn" class="action-bar-btn">
+              删除 (0)
+            </button>
+          </div>
+        </div>
+
+        <div id="memories-view" class="chat-list-view">
+          <div class="header">
+            <span class="back-btn" id="memories-back-btn">‹</span>
+            <span>我们的回忆</span>
+            <span class="action-btn" id="add-countdown-btn">+</span>
+          </div>
+          <div
+            id="memories-list"
+            class="list-container"
+            style="
+              padding: 15px;
+              display: flex;
+              flex-direction: column;
+              gap: 15px;
+            "
+          >
+            <!-- 回忆卡片将由JS动态生成在这里 -->
+          </div>
+        </div>
+
+        <!-- 底部导航栏 -->
+        <div id="chat-list-bottom-nav">
+          <div class="nav-item active" data-view="messages-view">
+            <span>消息</span>
+          </div>
+          <div class="nav-item" data-view="qzone-screen">
+            <span>动态</span>
+          </div>
+
+          <div class="nav-item" data-view="memories-view">
+            <span>回忆</span>
+          </div>
+
+          <div class="nav-item" data-view="favorites-view">
+            <span>收藏</span>
+          </div>
+        </div>
+      </div>
+
+      <div id="album-screen" class="screen">
+        <!-- 1. 页面头部，包含返回按钮和标题 -->
+        <div class="header">
+          <span class="back-btn" id="album-back-btn">‹</span>
+          <span>我的相册</span>
+          <span class="action-btn" id="create-album-btn-page">+</span>
+        </div>
+
+        <!-- 2. 页面内容容器 -->
+        <div class="list-container">
+          <div id="album-grid-page">
+            <!-- 相册列表将由 JS 动态生成在这里 -->
+          </div>
+        </div>
+      </div>
+
+      <div id="album-photos-screen" class="screen">
+        <!-- 1. 页面头部 -->
+        <div class="header">
+          <span class="back-btn" id="album-photos-back-btn">‹</span>
+          <span id="album-photos-title">相册名称</span>
+          <span class="action-btn" id="album-upload-photo-btn">上传</span>
+        </div>
+
+        <!-- 2. 页面内容容器 -->
+        <div class="list-container">
+          <div id="photos-grid-page">
+            <!-- 照片列表将由 JS 动态生成在这里 -->
+          </div>
+
+          <div id="photo-viewer-modal" class="modal">
+            <!-- 1. 关闭按钮 -->
+            <button id="photo-viewer-close-btn">×</button>
+
+            <!-- 2. 上一张照片按钮 -->
+            <button id="photo-viewer-prev-btn" class="nav-arrow">‹</button>
+
+            <!-- 3. 图片容器 -->
+            <div class="photo-viewer-content">
+              <img id="photo-viewer-image" src="" alt="全屏照片预览" />
+            </div>
+
+            <!-- 4. 下一张照片按钮 -->
+            <button id="photo-viewer-next-btn" class="nav-arrow">›</button>
+          </div>
+        </div>
+      </div>
+
+      <input
+        type="file"
+        id="album-photo-input"
+        accept="image/*"
+        multiple
+        hidden
+      />
+
+      <div id="chat-interface-screen" class="screen">
+        <div class="header">
+          <!-- 默认控件：包含标题、状态栏和常规按钮 -->
+          <div class="default-controls">
+            <span class="back-btn" id="back-to-list-btn">‹</span>
+
+            <!-- 标题和状态的容器 -->
+            <div id="chat-header-title-wrapper">
+              <div id="chat-header-main-line">
+                <span id="chat-header-title">聊天对象</span>
+                <!-- 【全新】群公告按钮 -->
+                <span id="group-announcement-btn" title="群公告">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <rect
+                      x="3"
+                      y="3"
+                      width="18"
+                      height="18"
+                      rx="2"
+                      ry="2"
+                    ></rect>
+                    <line x1="7" y1="15" x2="17" y2="15"></line>
+                  </svg>
+                </span>
+              </div>
+              <div id="chat-header-status">
+                <span class="status-dot"></span>
+                <span class="status-text">在线</span>
+              </div>
+            </div>
+
+            <div class="header-actions">
+              <!-- 心声按钮 -->
+              <span
+                class="action-btn"
+                id="char-heart-btn"
+                title="心声"
+                style="display: none; cursor: pointer"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="#ff4d6d"
+                  stroke="#ffc3d0"
+                  stroke-width="1.5"
+                >
+                  <path
+                    d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
+                  />
+                </svg>
+              </span>
+              <span class="action-btn" id="listen-together-btn" title="一起听"
+                ><img
+                  src="https://i.postimg.cc/CxjpF6gK/yi-qi-ting.png"
+                  alt="一起听"
+              /></span>
+              <span class="action-btn" id="chat-settings-btn" title="聊天设置"
+                ><img
+                  src="https://i.postimg.cc/bvPq64cv/CCA834-BA-5-A90-408-D-94-FA-7-EE156-B6-A765.png"
+                  alt="设置"
+              /></span>
+            </div>
+          </div>
+
+          <!-- 多选模式控件 -->
+          <div class="selection-controls">
+            <span id="selection-cancel-btn">取消</span>
+            <span id="selection-count"></span>
+            <div class="header-actions">
+              <span id="selection-favorite-btn" class="action-btn">收藏</span>
+              <span id="selection-share-btn" class="action-btn">分享</span>
+              <span
+                id="selection-delete-btn"
+                class="action-btn"
+                style="color: #ff3b30"
+                >删除</span
+              >
+            </div>
+          </div>
+        </div>
+
+        <div
+          id="chat-pet-container"
+          style="
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            z-index: 10;
+          "
+        >
+          <div
+            id="chat-pet"
+            style="
+              display: none;
+              position: absolute;
+              cursor: grab;
+              user-select: none;
+              pointer-events: all;
+              font-size: 80px;
+              line-height: 1;
+              text-align: center;
+            "
+          >
+            <!-- 宠物会显示在这里 -->
+          </div>
+        </div>
+
+        <!-- 聊天消息区域 (保持不变) -->
+        <div id="chat-messages">
+          <div id="typing-indicator">对方正在输入...</div>
+        </div>
+
+        <!-- 输入区域 (这是修改后的最终版本) -->
+        <div id="chat-input-area">
+          <div id="reply-preview-bar">
+            <div class="reply-preview-content">
+              <div class="sender">回复 xxx:</div>
+              <div class="text">被引用的消息内容...</div>
+            </div>
+            <span id="cancel-reply-btn">×</span>
+          </div>
+
+          <div id="chat-input-actions-top">
+            <button
+              id="open-sticker-panel-btn"
+              class="chat-action-icon-btn action-button"
+              title="表情面板"
+            >
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+            </button>
+
+            <!-- “重新生成回复”按钮的新家 -->
+            <button id="reroll-btn" class="action-button" title="重新生成回复">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+              </svg>
+            </button>
+
+            <button
+              id="quick-reply-btn"
+              class="chat-action-icon-btn action-button"
+              title="快捷回复"
+            >
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <!-- 气泡轮廓 -->
+                <path
+                  d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
+                ></path>
+                <!-- 里面的两行文字线，代表预设内容 -->
+                <line x1="8" y1="9" x2="16" y2="9"></line>
+                <line x1="8" y1="13" x2="14" y2="13"></line>
+              </svg>
+            </button>
+
+            <button
+              id="send-photo-btn"
+              class="chat-action-icon-btn action-button"
+              title="发送照片"
+            >
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"
+                />
+                <circle cx="12" cy="13" r="4" />
+              </svg>
+            </button>
+            <button
+              id="upload-image-btn"
+              class="chat-action-icon-btn action-button"
+              title="上传图片"
+            >
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M21 3.5H3C2.44772 3.5 2 3.94772 2 4.5V19.5C2 20.0523 2.44772 20.5 3 20.5H21C21.5523 20.5 22 20.0523 22 19.5V4.5C22 3.94772 21.5523 3.5 21 3.5Z"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="M16.5 13.5C17.6046 13.5 18.5 12.6046 18.5 11.5C18.5 10.3954 17.6046 9.5 16.5 9.5C15.3954 9.5 14.5 10.3954 14.5 11.5C14.5 12.6046 15.3954 13.5 16.5 13.5Z"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="M22 14.5L18 10.5L10.3333 18.5M12.5 16L9 12.5L2 19.5"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </button>
+            <button
+              id="transfer-btn"
+              class="chat-action-icon-btn action-button"
+              title="转账"
+            >
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M7 4L12 12L17 4M12 12V20M8 10H16M8 13H16"></path>
+              </svg>
+            </button>
+            <button
+              id="voice-message-btn"
+              class="chat-action-icon-btn action-button"
+              title="发送语音"
+            >
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"
+                />
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                <path d="M12 19v4" />
+                <path d="M8 23h8" />
+              </svg>
+            </button>
+            <button
+              id="send-waimai-request-btn"
+              class="chat-action-icon-btn action-button"
+              title="发起外卖请求"
+            >
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <path d="M16 10a4 4 0 0 1-8 0" />
+              </svg>
+            </button>
+            <button
+              id="video-call-btn"
+              class="chat-action-icon-btn action-button"
+              title="视频通话"
+            >
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+              </svg>
+            </button>
+            <button
+              id="group-video-call-btn"
+              class="chat-action-icon-btn action-button"
+              title="群视频通话"
+            >
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+              </svg>
+            </button>
+            <button
+              id="send-poll-btn"
+              class="chat-action-icon-btn action-button"
+              title="发起投票"
+            >
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M8 6h10" />
+                <path d="M6 6h.01" />
+                <path d="M8 12h10" />
+                <path d="M6 12h.01" />
+                <path d="M8 18h10" />
+                <path d="M6 18h.01" />
+              </svg>
+            </button>
+            <button
+              id="share-link-btn"
+              class="chat-action-icon-btn action-button"
+              title="分享链接"
+            >
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.72"
+                ></path>
+                <path
+                  d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.72-1.72"
+                ></path>
+              </svg>
+            </button>
+
+            <button
+              id="send-location-btn"
+              class="chat-action-icon-btn action-button"
+              title="发送定位"
+            >
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                <circle cx="12" cy="10" r="3"></circle>
+              </svg>
+            </button>
+
+            <!-- 时间轴/存档按钮 (放入工具栏) -->
+            <button
+              id="timeline-branch-btn"
+              class="chat-action-icon-btn action-button"
+              title="时间轴/存档"
+            >
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <!-- 这是一个分叉线的图标 -->
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M12 21v-6"></path>
+                <path d="M12 9V3"></path>
+                <path
+                  d="M7 3.3a9.8 9.8 0 0 0-4.7 8.7c0 5.5 4.5 10 10 10s10-4.5 10-10a9.8 9.8 0 0 0-4.7-8.7"
+                ></path>
+              </svg>
+            </button>
+
+            <button
+              id="open-tarot-btn"
+              class="chat-action-icon-btn action-button"
+              title="塔罗占卜"
+            >
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <!-- 背景左侧卡牌 -->
+                <path
+                  d="M7 6.5L4 7.5V17.5L7 16.5V6.5Z"
+                  stroke="currentColor"
+                  stroke-width="2.6"
+                  stroke-linejoin="round"
+                />
+                <!-- 背景右侧卡牌 -->
+                <path
+                  d="M17 6.5L20 7.5V17.5L17 16.5V6.5Z"
+                  stroke="currentColor"
+                  stroke-width="2.6"
+                  stroke-linejoin="round"
+                />
+                <!-- 前方中心卡牌 -->
+                <rect
+                  x="7"
+                  y="5"
+                  width="10"
+                  height="15"
+                  rx="1.5"
+                  stroke="currentColor"
+                  stroke-width="2.6"
+                />
+                <!-- 中心卡牌的星星 -->
+                <path
+                  d="M12 9.5L13.12 11.79L15.61 12.17L13.8 13.92L14.24 16.4L12 15.2L9.76 16.4L10.2 13.92L8.39 12.17L10.88 11.79L12 9.5Z"
+                  fill="currentColor"
+                />
+              </svg>
+            </button>
+
+            <button
+              id="pet-action-btn"
+              class="chat-action-icon-btn action-button"
+              title="我的宠物"
+            >
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <!-- 主体轮廓: 耳朵不对称，营造歪头效果 -->
+                <path
+                  d="M3.5 14.5C3.5 20.5 20.5 20.5 20.5 14.5C20.5 9 17.5 5.5 12.5 8.7C6.5 4.5 3.5 9 3.5 14.5Z"
+                  stroke="currentColor"
+                  stroke-width="2.6"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <!-- 眼睛 -->
+                <circle cx="8.5" cy="15" r="1.5" fill="currentColor" />
+                <circle cx="15.5" cy="15" r="1.5" fill="currentColor" />
+                <!-- 左边两根小胡须 -->
+                <path
+                  d="M4.5 14.3L2.5 13.3"
+                  stroke="currentColor"
+                  stroke-width="2.6"
+                  stroke-linecap="round"
+                />
+                <path
+                  d="M4.5 15.7L2.5 16.7"
+                  stroke="currentColor"
+                  stroke-width="2.6"
+                  stroke-linecap="round"
+                />
+                <!-- 右边两根小胡须 -->
+                <path
+                  d="M19.5 14.3L21.5 13.3"
+                  stroke="currentColor"
+                  stroke-width="2.6"
+                  stroke-linecap="round"
+                />
+                <path
+                  d="M19.5 15.7L21.5 16.7"
+                  stroke="currentColor"
+                  stroke-width="2.6"
+                  stroke-linecap="round"
+                />
+              </svg>
+            </button>
+            <!-- 极光多媒体按钮 (已改为单色) -->
+            <button
+              id="aurora-media-btn"
+              class="chat-action-icon-btn action-button"
+              title="漫游共赏 (视频/小说)"
+            >
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M12 3C7.03 3 3 7.03 3 12C3 16.97 7.03 21 12 21C16.97 21 21 16.97 21 12C21 7.03 16.97 3 12 3Z"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="M15 9L9 15M9 9L15 15"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="M12 8V16"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </button>
+          </div>
+          <div id="chat-input-main-row">
+            <textarea
+              id="chat-input"
+              rows="1"
+              placeholder="输入消息..."
+            ></textarea>
+            <div id="input-actions-wrapper">
+              <button id="wait-reply-btn" title="等待回复">
+                <img
+                  src="https://i.postimg.cc/q72zq80N/ECE92-BBC-BE57-48-E9-BB2-C-345-B6019-C4-B2.png"
+                  alt="等待回复"
+                />
+              </button>
+              <button id="send-btn" class="action-button">发送</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="chat-lock-overlay">
+          <div id="chat-lock-content"></div>
+        </div>
+
+        <div id="sticker-panel">
+          <div id="sticker-panel-header">
+            <span class="panel-btn" id="close-sticker-panel-btn">取消</span>
+            <span class="title">表情包</span>
+            <!-- “编辑”和“完成”按钮 -->
+            <div style="display: flex; gap: 10px">
+              <span class="panel-btn" id="edit-user-stickers-btn">编辑</span>
+              <span
+                class="panel-btn"
+                id="done-user-stickers-btn"
+                style="display: none"
+                >完成</span
+              >
+              <span class="panel-btn" id="add-sticker-btn">添加</span>
+              <span class="panel-btn" id="upload-sticker-btn">上传</span>
+            </div>
+          </div>
+          <div id="sticker-grid"></div>
+
+          <!-- 在 #sticker-panel 中，找到 id="sticker-panel-footer" -->
+
+          <div id="sticker-category-tabs">
+            <!-- 分类胶囊将由JS动态生成在这里 -->
+          </div>
+
+          <div id="sticker-panel-footer" style="display: none">
+            <!-- 移动表情按钮 -->
+            <button id="move-selected-stickers-btn">移动到分类...</button>
+            <!-- 删除表情按钮 -->
+            <button id="delete-selected-user-stickers-btn">删除已选 (0)</button>
+          </div>
+        </div>
+
+        <input
+          type="file"
+          id="sticker-upload-input"
+          accept="image/*"
+          style="display: none"
+          multiple
+        />
+        <input
+          type="file"
+          id="image-upload-input"
+          accept="image/*"
+          style="display: none"
+        />
+
+        <!-- 音乐播放器 (保持不变) -->
+        <div id="music-player-overlay">
+          <div class="music-player-window">
+            <!-- 1. 顶部头像区域 -->
+            <div id="music-avatars-container">
+              <img id="music-char-avatar" src="" alt="角色头像" />
+              <svg id="heartbeat-line" viewBox="0 0 80 30">
+                <path
+                  class="heartbeat-path"
+                  d="M 5 15 Q 20 0 30 15 T 55 15 L 75 15"
+                ></path>
+                <path
+                  class="heartbeat-heart"
+                  d="M 0 -2 a 2 2 0 0 1 4 0 v 2 a 2 2 0 0 1 -4 0 z"
+                ></path>
+              </svg>
+              <img id="music-user-avatar" src="" alt="用户头像" />
+            </div>
+
+            <div id="music-time-counter">已经一起听了0.0小时</div>
+
+            <!-- 2. 顶部操作按钮 -->
+            <div class="music-player-top-actions">
+              <div class="top-left-cluster">
+                <button id="music-return-btn">‹</button>
+                <button id="music-exit-btn">×</button>
+              </div>
+              <span id="music-playlist-btn">☰</span>
+            </div>
+
+            <!-- 3. 封面和歌词的切换容器 -->
+            <div id="music-display-area">
+              <img
+                id="music-album-cover"
+                src="https://i.postimg.cc/pT2xKzPz/album-cover-placeholder.png"
+                alt="歌曲封面"
+              />
+              <div id="music-lyrics-container">
+                <div id="music-lyrics-list">
+                  <div class="lyric-line">♪ 暂无歌词 ♪</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 4. 歌曲信息 -->
+            <div id="music-player-song-title">请添加歌曲</div>
+            <div id="music-player-artist">...</div>
+
+            <!-- 5. 播放控制区 (保持不变) -->
+            <div class="music-player-controls-wrapper">
+              <div class="music-progress-bar-container">
+                <div id="music-current-time" class="time-display">0:00</div>
+                <div class="progress-bar">
+                  <div id="music-progress-fill" class="progress-bar-fill"></div>
+                </div>
+                <div id="music-total-time" class="time-display">0:00</div>
+              </div>
+              <div class="music-controls">
+                <button id="music-prev-btn">◀</button>
+                <button id="music-play-pause-btn" class="play-pause-btn">
+                  ▶

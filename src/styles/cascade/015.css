@@ -1,0 +1,1503 @@
+
+#tukey-save-from-card-btn {
+  width: 100%;
+  padding: 12px;
+  background-color: var(--accent-color);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+}
+/* ▲▲▲ CSS样式结束 ▲▲▲ */
+/* ▼▼▼ 【兔k记账】V3版记账卡片新增/修改的CSS样式 ▼▼▼ */
+
+#tukey-record-input-card .card-body {
+  padding: 10px 15px; /* 调整内边距 */
+}
+
+#tukey-record-input-card .input-fields {
+  padding-top: 10px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #f0f0f0; /* 将分割线移到金额区域下方 */
+  margin-bottom: 15px;
+}
+.dark-mode #tukey-record-input-card .input-fields {
+  border-bottom-color: #38383a;
+}
+
+#tukey-record-input-card .amount-input-wrapper {
+  align-items: center; /* 垂直居中 */
+}
+
+#tukey-card-amount-input {
+  border-bottom: none; /* 移除金额输入框的下划线 */
+}
+
+#tukey-card-remarks-input {
+  padding: 8px 0; /* 增加备注输入框的上下内边距 */
+}
+
+/* 【新增】已选分类显示区 */
+#tukey-card-selected-category {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 15px;
+  padding: 6px 12px;
+  background-color: #f0f2f5;
+  border-radius: 16px;
+  font-size: 14px;
+}
+.dark-mode #tukey-card-selected-category {
+  background-color: #3a3a3c;
+}
+#tukey-card-selected-category img {
+  width: 20px;
+  height: 20px;
+}
+
+/* 【新增】账户和时间选择器区域 */
+.additional-options {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding: 0 10px 15px 10px;
+}
+.option-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+.option-item select,
+.option-item input {
+  background: none;
+  border: none;
+  outline: none;
+  font-size: 14px;
+  color: var(--text-primary);
+  max-width: 120px; /* 限制宽度防止过长 */
+}
+
+/* 【修改】卡片底部按钮 */
+#tukey-record-input-card .card-footer {
+  padding: 10px 15px;
+  border-top: 1px solid #f0f0f0;
+}
+.dark-mode #tukey-record-input-card .card-footer {
+  border-top-color: #38383a;
+}
+
+/* ▲▲▲ CSS样式结束 ▲▲▲ */
+/* --- 兔k记账 - 报表功能专属样式 --- */
+#tukey-reports-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: #f7f7f7;
+}
+.report-controls {
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  background-color: #fff;
+  border-bottom: 1px solid #e0e0e0;
+  flex-shrink: 0;
+}
+.report-controls select {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background-color: #fff;
+}
+#report-display-area {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 10px;
+}
+.report-view {
+  display: none;
+}
+.report-view.active {
+  display: block;
+}
+.report-day-group {
+  background-color: #fff;
+  border-radius: 10px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+.day-header {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 15px;
+  background-color: #fafafa;
+  border-bottom: 1px solid #f0f0f0;
+}
+.day-header .date {
+  font-weight: 500;
+}
+.day-header .day-summary {
+  font-size: 13px;
+  color: #666;
+}
+.day-header .day-summary .income {
+  color: #4caf50;
+  margin-left: 8px;
+}
+.day-header .day-summary .expense {
+  color: #f44336;
+}
+.transaction-list .tukey-record-bubble {
+  margin: 0;
+  border-radius: 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+.transaction-list .tukey-record-bubble:last-child {
+  border-bottom: none;
+}
+.report-placeholder {
+  text-align: center;
+  color: #999;
+  padding-top: 50px;
+}
+#monthly-summary-card {
+  display: flex;
+  justify-content: space-around;
+  background: #fff;
+  padding: 15px;
+  border-radius: 10px;
+  margin-bottom: 15px;
+  text-align: center;
+}
+#monthly-summary-card .summary-item {
+  display: flex;
+  flex-direction: column;
+}
+#monthly-summary-card .summary-item .label {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 5px;
+}
+#monthly-summary-card .summary-item .value {
+  font-size: 20px;
+  font-weight: 600;
+}
+#monthly-summary-card .summary-item .value.income {
+  color: #4caf50;
+}
+#monthly-summary-card .summary-item .value.expense {
+  color: #f44336;
+}
+.chart-container {
+  background-color: #fff;
+  border-radius: 10px;
+  padding: 15px;
+  margin-bottom: 15px;
+}
+.chart-container h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 500;
+}
+/* --- 兔k记账 - 用户记账气泡样式 (V2版) --- */
+
+/* 这是新的外层包裹容器，负责布局 */
+.tukey-record-wrapper.user-record {
+  display: flex;
+  justify-content: flex-end; /* 整体靠右 */
+  align-items: flex-start; /* 顶部对齐 */
+  gap: 10px;
+  margin: 10px 0;
+  width: 100%;
+}
+
+/* 这是用户的气泡本体 */
+.tukey-record-wrapper.user-record .tukey-record-bubble {
+  background-color: #a9e87a; /* 用户的气泡颜色 */
+  max-width: 75%;
+  order: 1; /* 让气泡在flex布局中排在第1位 */
+}
+
+/* 这是用户的头像 */
+.tukey-record-wrapper.user-record .record-user-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  order: 2; /* 让头像在flex布局中排在第2位 */
+}
+
+/* 旧的AI回复容器也需要调整，以保持对齐 */
+.tukey-replies-container {
+  align-self: flex-start;
+  max-width: 85%;
+}
+/* ▼▼▼ 请将这段新CSS添加到你的样式文件中 ▼▼▼ */
+.tukey-account-item .account-info {
+  display: flex;
+  align-items: center; /* 垂直居中对齐 */
+  gap: 12px; /* 图标和文字之间的间距 */
+}
+
+.tukey-account-item .account-icon {
+  width: 32px; /* 图标宽度 */
+  height: 32px; /* 图标高度 */
+  border-radius: 50%; /* 让它变成圆形 */
+  object-fit: cover; /* 确保图片不变形 */
+}
+/* ▲▲▲ 添加结束 ▲▲▲ */
+/* ▼▼▼ 【全新】“kk查岗”功能样式 ▼▼▼ */
+
+/* 房屋总览 */
+#kk-house-view-screen {
+  display: flex;
+  flex-direction: column;
+  color: white;
+}
+#kk-house-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  filter: blur(5px) brightness(0.7);
+  transform: scale(1.1);
+}
+#kk-house-info-panel {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 20px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+  text-align: center;
+}
+#kk-house-location {
+  margin: 0 0 10px;
+  font-size: 24px;
+  font-weight: bold;
+}
+#kk-house-description {
+  margin: 0 0 20px;
+  font-size: 14px;
+  opacity: 0.9;
+}
+#kk-house-areas {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+.kk-area-button {
+  padding: 12px 25px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background-color: rgba(255, 255, 255, 0.1);
+  color: white;
+  border-radius: 20px;
+  cursor: pointer;
+  backdrop-filter: blur(5px);
+}
+
+/* 区域探索 */
+#kk-area-view-screen {
+  display: flex;
+  flex-direction: column;
+}
+#kk-area-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  filter: brightness(0.6);
+}
+.kk-item-list-container {
+  position: relative;
+  z-index: 1;
+  margin-top: 60px;
+  padding: 20px;
+  color: white;
+  flex-grow: 1;
+  overflow-y: auto;
+}
+#kk-area-description {
+  font-size: 18px;
+  margin: 0 0 10px;
+  font-weight: 500;
+}
+.kk-instruction-text {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 20px;
+}
+#kk-area-items-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 15px;
+}
+.kk-item-button {
+  padding: 20px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background-color: rgba(0, 0, 0, 0.4);
+  color: white;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 16px;
+  backdrop-filter: blur(3px);
+  transition: background-color 0.2s;
+}
+.kk-item-button:hover {
+  background-color: rgba(0, 0, 0, 0.6);
+}
+
+/* 电脑界面 */
+#kk-computer-desktop {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  padding: 20px;
+  align-content: flex-start;
+}
+.kk-desktop-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 70px;
+  cursor: pointer;
+  text-align: center;
+}
+.kk-desktop-icon img {
+  width: 60px;
+  height: 60px;
+  border-radius: 12px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+.kk-desktop-icon span {
+  font-size: 13px;
+  color: #333;
+}
+
+/* --- “kk查岗” 电脑功能专属样式 --- */
+#kk-computer-desktop {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 20px;
+  gap: 25px;
+  height: 100%;
+  backdrop-filter: blur(5px);
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.kk-desktop-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  width: 60px;
+}
+
+.kk-desktop-icon img {
+  width: 50px;
+  height: 50px;
+  border-radius: 12px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.kk-desktop-icon span {
+  font-size: 13px;
+  color: white;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+
+/* 私人文件列表 */
+#kk-file-list {
+  display: flex;
+  flex-direction: column;
+}
+.kk-file-item {
+  padding: 15px;
+  border-bottom: 1px solid var(--border-color);
+  cursor: pointer;
+  font-size: 15px;
+  position: relative;
+  padding-left: 40px;
+}
+.kk-file-item::before {
+  content: "📄"; /* 文件图标 */
+  position: absolute;
+  left: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.kk-file-item:hover {
+  background-color: var(--secondary-bg-hover);
+}
+/* ▼▼▼ 把下面这段新代码粘贴到这里 ▼▼▼ */
+#kk-area-description {
+  background-color: rgba(0, 0, 0, 0.45); /* 半透明黑色背景 */
+  -webkit-backdrop-filter: blur(8px); /* 针对Safari的毛玻璃效果 */
+  backdrop-filter: blur(8px); /* 标准的毛玻璃效果 */
+  color: #ffffff; /* 保证文字在毛玻璃上清晰可见 */
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6); /* 给文字加一点阴影，更易读 */
+  padding: 10px 15px; /* 增加一些内边距，让它更好看 */
+  border-radius: 12px; /* 圆角效果 */
+  margin: 0 15px 10px; /* 增加一些外边距，与其他元素分隔开 */
+  font-size: 14px; /* 调整一下字体大小，让它更协调 */
+  line-height: 1.6; /* 增加行高，提升可读性 */
+}
+/* ▲▲▲ 粘贴结束 ▲▲▲ */
+/* 在你的 CSS 中添加这行 */
+.kk-file-item {
+  cursor: pointer;
+}
+/* --- ▼▼▼ 【增强版 V2】kk查岗-监控功能样式 ▼▼▼ --- */
+
+/* 修复监控图标：去掉圆圈和悬浮，让它融入顶部栏 */
+#kk-surveillance-icon {
+  position: static; /* 取消绝对定位，让它自动排列 */
+  top: auto;
+  left: auto;
+
+  width: auto; /* 大小自动适应 */
+  height: auto;
+
+  border: none; /* 去掉边框 */
+  border-radius: 0; /* 去掉圆角 */
+  background: transparent; /* 背景透明 */
+
+  backdrop-filter: none; /* 去掉毛玻璃模糊 */
+  -webkit-backdrop-filter: none;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 4px; /* 跟其他按钮保持一点距离 */
+}
+
+#kk-surveillance-icon:hover {
+  transform: scale(1.1);
+}
+
+/* 2. 监控画面的网格布局 (保持不变) */
+#kk-monitor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  padding: 15px;
+  align-content: start;
+}
+
+/* 7. 动画定义 */
+@keyframes blink {
+  50% {
+    opacity: 0.2;
+  }
+}
+/* ★★★★★ 新增的橙色脉冲动画 ★★★★★ */
+@keyframes pulse-orange {
+  0% {
+    box-shadow: 0 0 5px rgba(255, 87, 34, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(255, 87, 34, 1);
+  }
+  100% {
+    box-shadow: 0 0 5px rgba(255, 87, 34, 0.5);
+  }
+}
+
+/* --- ▲▲▲ 样式添加结束 ▲▲▲ --- */
+/* --- kk查岗 监控界面全新样式 --- */
+
+#kk-monitor-grid {
+  display: grid;
+  /* 让监控画面自动排列，每行放一个或多个，取决于屏幕宽度 */
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+  padding: 15px;
+  height: 100%;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.kk-monitor-item {
+  position: relative;
+  height: 450px;
+  border-radius: 16px;
+  background-size: cover;
+  background-position: center;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer; /* <-- 新增这一行，增加点击提示 */
+}
+
+/* 监控画面顶部的区域名和REC红点 */
+.kk-monitor-item .monitor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 15px;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.7), transparent);
+  color: white;
+  font-weight: bold;
+  font-size: 16px;
+  text-shadow: 0 1px 3px black;
+}
+
+.kk-monitor-item .rec-dot {
+  width: 12px;
+  height: 12px;
+  background-color: #ff3b30;
+  border-radius: 50%;
+  animation: pulse 1.5s infinite; /* 呼吸灯动画 */
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+    box-shadow: 0 0 5px #ff3b30;
+  }
+  50% {
+    opacity: 0.4;
+    box-shadow: 0 0 15px #ff3b30;
+  }
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 5px #ff3b30;
+  }
+}
+
+/* 关键的毛玻璃面板 */
+.frosted-glass-panel {
+  margin: 15px;
+  background-color: rgba(0, 0, 0, 0.25); /* 半透明黑色背景 */
+  backdrop-filter: blur(20px); /* 这是实现毛玻璃效果的核心 */
+  -webkit-backdrop-filter: blur(20px); /* 兼容Safari浏览器 */
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 15px;
+  color: white;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.monitor-content-text {
+  font-size: 14px;
+  line-height: 1.7;
+  max-height: 120px; /* 限制文本高度，留出空间给按钮 */
+  overflow-y: auto;
+  margin-bottom: 10px;
+}
+
+/* 互动按钮的容器 */
+.monitor-interaction-controls {
+  margin-top: 15px;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  padding-top: 12px;
+}
+
+/* 圆形按钮统一样式 */
+.monitor-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  font-size: 22px;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: background-color 0.2s;
+}
+
+.monitor-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* 如果角色在该区域，给一个特殊的高亮边框 */
+.kk-monitor-item.active-character-location {
+  border: 2px solid #00ff80;
+  box-shadow: 0 0 20px rgba(0, 255, 128, 0.5);
+}
+
+/* ▲▲▲ “kk查岗”样式结束 ▲▲▲ */
+/*
+ * ========================================
+ * == 全新：世界书编辑模式样式
+ * ========================================
+ */
+/* 世界书删除按钮在禁用时的样式 */
+#world-book-delete-selected-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* 编辑模式下，为列表项左侧留出空间 */
+#world-book-list.selection-mode .list-item {
+  cursor: pointer;
+  padding-left: 55px;
+  position: relative;
+}
+
+/* 复选框的外圈 */
+#world-book-list.selection-mode .list-item::before {
+  content: "";
+  position: absolute;
+  left: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--text-secondary);
+  border-radius: 50%;
+  box-sizing: border-box;
+  transition: all 0.2s ease-in-out;
+}
+
+/* 选中状态下，复选框的背景和边框 */
+#world-book-list.selection-mode .list-item.selected::before {
+  background-color: var(--accent-color);
+  border-color: var(--accent-color);
+}
+
+/* 选中状态下，复选框中间的“√” */
+#world-book-list.selection-mode .list-item.selected::after {
+  content: "✔";
+  position: absolute;
+  left: 25px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: white;
+  font-size: 16px;
+  font-weight: bold;
+}
+/* ▼▼▼ 视频通话最小化功能样式 ▼▼▼ */
+/* ▼▼▼ 修复后的最小化按钮样式 ▼▼▼ */
+.video-minimize-btn {
+  background: rgba(0, 0, 0, 0.4); /* 稍微加深一点背景 */
+  backdrop-filter: blur(4px); /* 增加一点毛玻璃效果，更像iOS */
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  width: 40px; /*稍微加大一点触控区域*/
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+
+  /* 核心修复：使用 fixed 或 absolute 定位，并强制提升层级 */
+  position: absolute;
+  left: 20px;
+  top: 50px; /* 向下移动一点，避开状态栏 */
+
+  /* ★★★ 关键：设置为极大的 z-index，确保在视频层、气泡层之上 ★★★ */
+  z-index: 10000 !important;
+
+  /* ★★★ 关键：确保能够接收点击事件 ★★★ */
+  pointer-events: auto;
+
+  /* 添加点击反馈 */
+  transition: transform 0.1s;
+}
+
+.video-minimize-btn:active {
+  transform: scale(0.9);
+  background: rgba(0, 0, 0, 0.6);
+}
+/* ▲▲▲ 样式结束 ▲▲▲ */
+
+/* 悬浮球容器 */
+#video-call-floating-bubble {
+  position: fixed;
+  top: 150px;
+  right: 20px; /* 默认在右侧 */
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  z-index: 99999; /* 确保在最顶层 */
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.1s; /* 拖动时的平滑 */
+  touch-action: none; /* 防止触摸滚动 */
+}
+
+/* 悬浮球内的头像 */
+#video-call-floating-bubble img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 悬浮球正在通话中的动画效果（呼吸灯边框） */
+#video-call-floating-bubble::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 50%;
+  border: 3px solid #4caf50; /* 绿色代表通话中 */
+  animation: pulse-border 1.5s infinite;
+  box-sizing: border-box;
+}
+
+@keyframes pulse-border {
+  0% {
+    border-color: rgba(76, 175, 80, 1);
+    box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7);
+  }
+  70% {
+    border-color: rgba(76, 175, 80, 0.5);
+    box-shadow: 0 0 0 10px rgba(76, 175, 80, 0);
+  }
+  100% {
+    border-color: rgba(76, 175, 80, 1);
+    box-shadow: 0 0 0 0 rgba(76, 175, 80, 0);
+  }
+}
+/* ▲▲▲ 样式结束 ▲▲▲ */
+/* 快捷回复列表项样式 */
+.quick-reply-item {
+  padding: 12px 15px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between; /* 内容和按钮分居两侧 */
+  align-items: center;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.quick-reply-item:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+/* 右侧操作按钮组 */
+.quick-reply-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px; /* 按钮之间的间距 */
+  margin-left: 10px;
+  flex-shrink: 0; /* 防止按钮被挤压 */
+}
+
+/* 按钮图标样式 */
+.quick-reply-action-btn {
+  cursor: pointer;
+  opacity: 0.5;
+  transition: all 0.2s;
+  font-size: 16px; /* 图标大小 */
+  display: flex;
+  align-items: center;
+}
+
+.quick-reply-action-btn:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.btn-edit {
+  color: #2196f3;
+} /* 编辑是蓝色 */
+.btn-delete {
+  color: #f44336;
+} /* 删除是红色 */
+/* 存档列表项样式 */
+.branch-item {
+  background-color: var(--card-bg, #fff);
+  padding: 12px;
+  margin: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #eee);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+.branch-info {
+  flex-grow: 1;
+  overflow: hidden;
+}
+.branch-name {
+  font-weight: bold;
+  font-size: 14px;
+  margin-bottom: 4px;
+  color: var(--text-primary, #333);
+}
+.branch-meta {
+  font-size: 12px;
+  color: var(--text-secondary, #999);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.branch-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: 10px;
+}
+.branch-action-btn {
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color, #ccc);
+  background: transparent;
+  cursor: pointer;
+}
+.branch-load {
+  color: #007bff;
+  border-color: #007bff;
+}
+.branch-delete {
+  color: #ff3b30;
+  border-color: #ff3b30;
+}
+/* ▲▲▲ 样式结束 ▲▲▲ */
+/* 删除按钮的交互效果 */
+.delete-record-btn:active {
+  background-color: #ff3b30 !important;
+  color: white !important;
+  transform: scale(0.95);
+}
+/* --- 核心修复：锁定分页容器的基准 --- */
+/* 这一步至关重要！它确保里面的组件是相对于“当前页面”定位，而不是相对于整个屏幕乱跑 */
+.home-page {
+  position: relative !important; /* 强制设置为定位基准 */
+  width: 100%;
+  height: 100%;
+  overflow: hidden; /* 防止内容溢出导致布局崩坏 */
+  box-sizing: border-box;
+}
+/* ▼▼▼ 透明猫爪加载动画样式 ▼▼▼ */
+#generation-overlay {
+  /* 关键修改：不要白色背景，只要微微的半透明黑，让背景变暗一点点 */
+  background-color: rgba(0, 0, 0, 0.1) !important;
+  /* 强力毛玻璃效果，让背后的界面模糊 */
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px); /* 兼容苹果手机 */
+  z-index: 2000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+#generation-overlay.visible {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.loading-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 25px;
+}
+
+/* 猫爪容器 */
+.cat-paw {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  animation: pawBeat 1.5s infinite ease-in-out;
+}
+
+/* 肉球公共样式 */
+.pad {
+  background-color: #ffb7c5; /* 樱花粉 */
+  border-radius: 50%;
+  position: absolute;
+  box-shadow: 0 0 15px rgba(255, 183, 197, 0.6); /* 粉色光晕 */
+}
+
+/* 主肉球 (掌心) */
+.pad.main {
+  width: 45px;
+  height: 40px;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-radius: 40% 40% 45% 45%;
+}
+
+/* 脚趾肉球 */
+.pad.toe {
+  width: 20px;
+  height: 25px;
+  top: 0;
+}
+
+.pad.t1 {
+  left: 0;
+  transform: rotate(-20deg);
+}
+.pad.t2 {
+  left: 50%;
+  transform: translateX(-50%) translateY(-5px);
+}
+.pad.t3 {
+  right: 0;
+  transform: rotate(20deg);
+}
+
+/* 文字样式 */
+#generation-text {
+  font-size: 16px;
+  color: #ffb7c5; /* 文字也是粉色的 */
+  font-weight: bold;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* 微微的阴影让文字更清晰 */
+  letter-spacing: 2px;
+  margin: 0;
+  animation: textFade 1.5s infinite ease-in-out;
+}
+
+/* 夜间模式微调：文字变亮一点 */
+.dark-mode #generation-text {
+  color: #ffcdd2;
+}
+
+/* 动画：猫爪呼吸跳动 */
+@keyframes pawBeat {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+}
+
+/* 动画：文字闪烁 */
+@keyframes textFade {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+/* === ✨ V2.0 极致复古书架样式 ✨ === */
+
+/* 1. 整体背景：深邃的胡桃木色调，带暗角氛围 */
+#aurora-bookshelf-screen {
+  background-color: #1a120b !important; /* 极深褐色 */
+  /* 模拟老式墙纸或木纹背景 */
+  background-image:
+    repeating-linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.02) 0px,
+      rgba(255, 255, 255, 0.02) 1px,
+      transparent 1px,
+      transparent 10px
+    ),
+    radial-gradient(
+      circle at center,
+      rgba(0, 0, 0, 0) 0%,
+      rgba(0, 0, 0, 0.6) 100%
+    );
+}
+
+#bookshelf-container {
+  padding: 30px 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 25px; /* 层板间距加大，更显大气 */
+}
+
+/* 2. 书架层板：厚重的实木质感 */
+.bookshelf-row {
+  display: flex;
+  align-items: flex-end; /* 底部对齐 */
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 4px; /* 书籍排列稍微紧凑一点 */
+  padding: 15px 20px 14px 20px; /* 调整内边距 */
+
+  /* 复杂的渐变模拟木质凹槽阴影 */
+  background: linear-gradient(
+    to bottom,
+    #150f0b 0%,
+    #2d1e16 20%,
+    #2d1e16 80%,
+    #150f0b 100%
+  );
+
+  /* 实木层板厚度与投影 */
+  border-bottom: 12px solid #3e2723;
+  border-left: 8px solid #281a15;
+  border-right: 8px solid #281a15;
+
+  /* 深度阴影，制造“盒子”感 */
+  box-shadow:
+    inset 0 10px 30px rgba(0, 0, 0, 0.8),
+    /* 内部深邃阴影 */ 0 15px 20px rgba(0, 0, 0, 0.5); /* 外部投影 */
+
+  border-radius: 4px;
+  min-height: 135px; /* 稍微增高 */
+  position: relative;
+}
+
+/* 层板边缘的高光，增加立体感 */
+.bookshelf-row::before {
+  content: "";
+  position: absolute;
+  bottom: -12px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  pointer-events: none;
+}
+
+/* 3. 书籍样式：精装皮革质感 */
+.retro-book {
+  width: 38px; /* 稍微加宽 */
+  height: 110px; /* 加高 */
+  border-radius: 3px 5px 5px 3px; /* 书脊圆角 */
+  cursor: pointer;
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  /* 竖排文字设置 */
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+
+  /* 文字样式：更精致的衬线体，金色 */
+  color: #e6c88a; /* 哑光金 */
+  font-size: 11px;
+  font-family: "Songti SC", "SimSun", "Georgia", serif; /* 宋体/衬线体 */
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8); /* 文字凹陷感 */
+
+  padding: 8px 0;
+  overflow: hidden;
+
+  /* ★★★ 核心：模拟书脊的圆柱体光影 + 皮革纹理 ★★★ */
+  box-shadow:
+    inset 3px 0 5px rgba(255, 255, 255, 0.15),
+    /* 左侧高光 */ inset -3px 0 8px rgba(0, 0, 0, 0.6),
+    /* 右侧阴影 */ 3px 5px 8px rgba(0, 0, 0, 0.6); /* 外部投影 */
+}
+
+/* 烫金装饰线：复古书必备 */
+.retro-book::before,
+.retro-book::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  /* 金色渐变，模拟金属反光 */
+  background: linear-gradient(90deg, #b88a4d, #ffe082, #b88a4d);
+  opacity: 0.8;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.5);
+}
+.retro-book::before {
+  top: 12px;
+}
+.retro-book::after {
+  bottom: 12px;
+}
+
+/* 悬停效果：浮起 + 变亮 */
+.retro-book:hover {
+  transform: translateY(-12px) scale(1.02);
+  z-index: 100;
+  box-shadow:
+    inset 3px 0 5px rgba(255, 255, 255, 0.25),
+    inset -3px 0 8px rgba(0, 0, 0, 0.6),
+    5px 15px 20px rgba(0, 0, 0, 0.7); /* 悬浮时的深阴影 */
+  margin: 0 3px; /* 挤开旁边的书 */
+}
+
+/* 4. 书籍颜色：低饱和度的高级复古色 */
+
+/* 勃艮第红 */
+.book-color-1 {
+  background-color: #4a1a1a;
+  background-image: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.2));
+}
+/* 皇家蓝 */
+.book-color-2 {
+  background-color: #1a2a3a;
+  background-image: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.3));
+}
+/* 森林绿 */
+.book-color-3 {
+  background-color: #1e3324;
+  background-image: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.2));
+}
+/* 皮革棕 */
+.book-color-4 {
+  background-color: #3e2723;
+  background-image: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.2));
+}
+/* 炭灰黑 */
+.book-color-5 {
+  background-color: #263238;
+  background-image: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.3));
+}
+
+/* 书名标签限制 */
+.book-spine-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-height: 75%; /* 给上下金线留出位置 */
+  pointer-events: none;
+}
+
+/* 5. 头部 Header 的特殊适配 */
+/* 当打开书架时，强制改变头部的样式，使其融入背景 */
+#aurora-bookshelf-screen .header {
+  background-color: #251812 !important;
+  border-bottom: 1px solid #3e2723 !important;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+}
+#aurora-bookshelf-screen .header span {
+  color: #d7ccc8 !important;
+  font-family: serif;
+  letter-spacing: 1px;
+}
+/* ▼▼▼ 【萌系设置页面专属样式】请粘贴到CSS末尾 ▼▼▼ */
+
+/* 1. 页面背景：柔和的米色 */
+.moe-theme {
+  background-color: #fffdf5 !important; /* 温暖的米白色 */
+}
+.dark-mode .moe-theme {
+  background-color: #1a1a1a !important;
+}
+
+/* 2. 卡片样式：牛奶玻璃 + 大圆角 */
+.moe-card {
+  background-color: rgba(255, 255, 255, 0.8);
+  border-radius: 24px; /* 超大圆角 */
+  padding: 20px;
+  margin-bottom: 20px;
+  border: 2px solid #fff; /* 白色描边 */
+  box-shadow: 0 8px 20px rgba(233, 213, 255, 0.4); /* 粉紫色柔光阴影 */
+  backdrop-filter: blur(10px);
+}
+.dark-mode .moe-card {
+  background-color: rgba(40, 40, 40, 0.8);
+  border-color: #333;
+  box-shadow: none;
+}
+
+/* 3. 卡片标题：可爱图标 + 颜色 */
+.moe-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 2px dashed #ffe4e1; /* 虚线分割 */
+}
+.dark-mode .moe-card-header {
+  border-bottom-color: #444;
+}
+.moe-card-header .icon {
+  font-size: 24px;
+}
+.moe-card-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #ff8fab; /* 樱花粉标题 */
+  font-weight: 700;
+}
+
+/* 4. 输入框美化：圆润 + 粉色聚焦 */
+.moe-input {
+  width: 100%;
+  padding: 12px 15px;
+  border-radius: 15px;
+  border: 2px solid #f0f0f0;
+  background-color: #fff;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
+  color: #555;
+}
+.moe-input:focus {
+  border-color: #ffb7c5; /* 聚焦变粉 */
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 183, 197, 0.2);
+}
+.center-text {
+  text-align: center;
+}
+.dark-mode .moe-input {
+  background-color: #2c2c2e;
+  border-color: #444;
+  color: #fff;
+}
+
+/* 5. 按钮美化 */
+.moe-btn-secondary {
+  width: 100%;
+  padding: 10px;
+  border-radius: 15px;
+  border: 2px solid #f0f0f0;
+  background-color: #fff;
+  color: #666;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+.moe-btn-secondary:active {
+  transform: scale(0.98);
+  background-color: #f9f9f9;
+}
+.moe-btn-danger {
+  width: 100%;
+  padding: 10px;
+  border-radius: 15px;
+  border: none;
+  background-color: #ffeff0;
+  color: #ff5252;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+.moe-btn-group {
+  display: flex;
+  gap: 8px;
+  margin-top: 5px;
+}
+.moe-btn-mini {
+  flex: 1;
+  padding: 8px;
+  border-radius: 12px;
+  border: 1px solid #eee;
+  background-color: #fff;
+  color: #555;
+  font-size: 12px;
+  cursor: pointer;
+}
+.moe-btn-small {
+  padding: 8px 15px;
+  border-radius: 12px;
+  border: 1px solid #eee;
+  background-color: #fff;
+  color: #555;
+  font-size: 13px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* 6. ★★★ 核心：萌系悬浮保存球 ★★★ */
+.moe-fab-save {
+  position: absolute; /* 绝对定位相对于 screen */
+  bottom: 30px; /* 距离底部 */
+  right: 25px; /* 距离右侧 */
+  width: 65px;
+  height: 65px;
+  border-radius: 50%; /* 正圆 */
+  background: linear-gradient(135deg, #ff9a9e, #ffc3a0); /* 少女粉渐变 */
+  color: white;
+  border: 4px solid rgba(255, 255, 255, 0.6); /* 半透明白边 */
+  box-shadow: 0 6px 20px rgba(255, 105, 135, 0.4);
+  font-size: 24px;
+  cursor: pointer;
+  z-index: 100; /* 保证在最上层 */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* 弹性动画 */
+}
+
+.moe-fab-save:hover {
+  transform: scale(1.1) rotate(5deg);
+}
+.moe-fab-save:active {
+  transform: scale(0.9);
+}
+
+/* 7. 滑动条美化 */
+.moe-slider {
+  width: 100%;
+  height: 6px;
+  background: #ffe4e1;
+  border-radius: 3px;
+  outline: none;
+  -webkit-appearance: none;
+}
+.moe-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  background: #ff8fab;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+/* 8. 分割线 */
+.moe-divider {
+  height: 1px;
+  border-top: 2px dashed #f0f0f0;
+  margin: 20px 0;
+}
+
+/* 9. 列表盒子 */
+.moe-list-box {
+  background: #fff;
+  border-radius: 12px;
+  padding: 10px;
+  border: 1px solid #eee;
+  max-height: 150px;
+  overflow-y: auto;
+}
+.dark-mode .moe-list-box {
+  background: #2c2c2e;
+  border-color: #444;
+}
+/* ======================================== */
+/* === 全新：圈子小组列表 (高级横条SVG版) === */
+/* ======================================== */
+
+/* 1. 列表容器：强制单列垂直排列 */
+#forum-group-list {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important; /* 条目之间的间距 */
+  padding: 15px 20px !important;
+  background-color: var(--secondary-bg);
+}
+
+/* 2. 单个小组横条卡片 */
+.forum-group-item {
+  display: flex !important; /* 开启Flex布局 */
+  align-items: center !important; /* 垂直居中 */
+  width: 100% !important;
+  box-sizing: border-box !important;
+
+  /* 视觉样式：清透毛玻璃 */
+  background-color: rgba(255, 255, 255, 0.75) !important;
+  backdrop-filter: blur(15px) saturate(120%);
+  -webkit-backdrop-filter: blur(15px) saturate(120%);
+
+  padding: 15px !important;
+  border-radius: 20px !important; /* 圆润的角 */
+  border: 1px solid rgba(255, 255, 255, 0.6) !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03) !important;
+
+  /* 移除之前的居中对齐设置 */
+  flex-direction: row !important;
+  text-align: left !important;
+  transition: all 0.2s ease !important;
+}
+
+/* 悬停效果 */
+.forum-group-item:hover {
+  transform: scale(1.02);
+  background-color: rgba(255, 255, 255, 0.9) !important;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* 3. 左侧图标容器 (用来放SVG) */
+.forum-group-icon-wrapper {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0; /* 防止被压缩 */
+  border-radius: 14px; /* 方圆形 */
+
+  /* 高级渐变背景 */
+  background: linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%);
+  color: white;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 15px; /* 与文字的间距 */
+  box-shadow: 0 4px 10px rgba(142, 197, 252, 0.4);
+}
+
+/* 针对不同类型的小组，我们可以给图标容器不同的颜色 (可选) */
+/* 这是一个小技巧：使用 nth-child 让列表颜色丰富起来 */
+.forum-group-item:nth-child(4n + 1) .forum-group-icon-wrapper {
+  background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%); /* 粉色 */
+  box-shadow: 0 4px 10px rgba(255, 154, 158, 0.4);
+}
+.forum-group-item:nth-child(4n + 2) .forum-group-icon-wrapper {
+  background: linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%); /* 紫色 */
+  box-shadow: 0 4px 10px rgba(161, 140, 209, 0.4);
+}
+.forum-group-item:nth-child(4n + 3) .forum-group-icon-wrapper {
+  background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%); /* 绿色 */
+  box-shadow: 0 4px 10px rgba(132, 250, 176, 0.4);
+}
+
+/* SVG 图标本身 */
+.forum-group-icon-wrapper svg {
+  width: 26px;
+  height: 26px;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.1));
+}
+
+/* 4. 中间文字区域 */
+.forum-group-info {
+  flex-grow: 1; /* 占据剩余空间 */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden; /* 防止文字溢出 */
+}
+
+/* 小组名字 (大) */
+.forum-group-name {
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  color: #333 !important;
+  margin-bottom: 4px !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

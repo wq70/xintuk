@@ -1,0 +1,875 @@
+                    const parentStyle = window.getComputedStyle(parent);
+                    if (parentStyle.position === "static") {
+                      parent.style.position = "relative";
+                    }
+                    if (
+                      parent.clientHeight < 50 &&
+                      parent.id !== "phone-screen"
+                    ) {
+                      parent.style.minHeight = "100px";
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        function captureVideoFrame(videoElement) {
+          if (!videoElement || videoElement.paused || videoElement.ended)
+            return null;
+          try {
+            const canvas = document.createElement("canvas");
+            // 限制一下尺寸，防止token消耗过大或传输过慢，宽设置为 512px 左右足够了
+            const scale = 512 / videoElement.videoWidth;
+            canvas.width = 512;
+            canvas.height = videoElement.videoHeight * scale;
+
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+            // 返回 jpeg 格式，质量 0.6
+            return canvas.toDataURL("image/jpeg", 0.6);
+          } catch (e) {
+            console.error("截图失败:", e);
+            return null;
+          }
+        }
+
+        // 4. 初始化函数 init()
+        // ===================================================================
+        async function init() {
+          // ▼▼▼▼▼▼▼▼▼▼▼▼ 修改：注册真正的 sw.js 文件 ▼▼▼▼▼▼▼▼▼▼▼▼
+          if ("serviceWorker" in navigator) {
+            try {
+              // 这一行变了：直接加载根目录的 sw.js
+              const registration =
+                await navigator.serviceWorker.register("sw.js");
+              console.log(
+                "ServiceWorker 注册成功 (File Mode), Scope:",
+                registration.scope,
+              );
+
+              // 等待激活
+              await navigator.serviceWorker.ready;
+            } catch (error) {
+              console.error("ServiceWorker 注册失败:", error);
+              // 提示用户可能的原因
+              console.warn(
+                "提示：请确保 sw.js 文件位于网站根目录，且通过 HTTPS 或 localhost 访问。",
+              );
+            }
+          }
+          // ▲▲▲▲▲▲▲▲▲▲▲▲ 修改结束 ▲▲▲▲▲▲▲▲▲▲▲▲
+
+          const savedTheme = localStorage.getItem("ephone-theme") || "light"; // 默认为日间模式
+          applyTheme(savedTheme);
+
+          const customBubbleStyleTag = document.createElement("style");
+          customBubbleStyleTag.id = "custom-bubble-style";
+          document.head.appendChild(customBubbleStyleTag);
+
+          const previewBubbleStyleTag = document.createElement("style");
+          previewBubbleStyleTag.id = "preview-bubble-style";
+          document.head.appendChild(previewBubbleStyleTag);
+
+          applyScopedCss("", "#chat-messages", "custom-bubble-style"); // 清除真实聊天界面的自定义样式
+          applyScopedCss("", "#settings-preview-area", "preview-bubble-style"); // 清除预览区的自定义样式
+
+          window.showScreen = showScreen;
+          window.openLoversSpaceFromCard = openLoversSpaceFromCard;
+          window.renderChatListProxy = renderChatList;
+          window.renderApiSettingsProxy = renderApiSettings;
+          window.renderWallpaperScreenProxy = renderWallpaperScreen;
+          window.renderWorldBookScreenProxy = renderWorldBookScreen;
+          const keepAliveUnlocker = () => {
+            const player = document.getElementById("strong-keep-alive-player");
+            if (player) {
+              player.volume = 0; // 确保静音
+              player
+                .play()
+                .then(() => {
+                  console.log("🔥 强力保活模式已激活：静音音频正在循环播放");
+                })
+                .catch((e) => {
+                  console.warn("保活启动失败 (需用户交互):", e);
+                });
+            }
+            document.removeEventListener("click", keepAliveUnlocker);
+            document.removeEventListener("touchstart", keepAliveUnlocker);
+          };
+
+          document.addEventListener("click", keepAliveUnlocker);
+          document.addEventListener("touchstart", keepAliveUnlocker);
+
+          await loadAllDataFromDB();
+          // 添加启动时加载CSS的逻辑
+          // 优先应用保存在 activeCustomCss 里的代码
+          if (state.globalSettings.activeCustomCss) {
+            applyThemeCss(state.globalSettings.activeCustomCss);
+          }
+          // 如果没有自定义CSS，再尝试应用上次选中的主题
+          else if (state.globalSettings.activeThemeId) {
+            const activeTheme = await db.themes.get(
+              state.globalSettings.activeThemeId,
+            );
+            if (activeTheme) {
+              console.log(`正在应用已保存的主题: "${activeTheme.name}"`);
+              applyThemeCss(activeTheme.css);
+            }
+          }
+
+          if (
+            typeof state.globalSettings.notificationSoundUrl === "undefined"
+          ) {
+            state.globalSettings.notificationSoundUrl =
+              "https://files.catbox.moe/k369mf.mp3";
+          }
+
+          renderHomeScreenProfileFrame(); // 初始化时渲染主页头像框
+
+          applyHomeIconWidgetTextColor(
+            state.globalSettings.homeIconWidgetTextColor,
+          );
+          await loadAllFontPresetsOnStartup();
+          await migrateDefaultLudoQuestions();
+          await addDefaultDarkModeThemeIfNeeded();
+          applyWidgetData();
+
+          if (state.globalSettings.homeIconWidgetTextColor) {
+            applyHomeIconWidgetTextColor(
+              state.globalSettings.homeIconWidgetTextColor,
+            );
+          }
+
+          // 2. 应用已保存的“去除阴影”设置
+          document
+            .getElementById("phone-screen")
+            .classList.toggle(
+              "no-home-font-shadow",
+              !!state.globalSettings.removeHomeFontShadow,
+            );
+
+          // 初始化未读动态计数
+          const storedCount =
+            parseInt(localStorage.getItem("unreadPostsCount")) || 0;
+          updateUnreadIndicator(storedCount);
+
+          if (state.globalSettings && state.globalSettings.fontUrl) {
+            applyCustomFont(state.globalSettings.fontUrl);
+          }
+
+          // 初始化时，自动加载并应用已保存的主题
+          if (state.globalSettings.activeThemeId) {
+            const activeTheme = await db.themes.get(
+              state.globalSettings.activeThemeId,
+            );
+            if (activeTheme) {
+              console.log(`正在应用已保存的主题: "${activeTheme.name}"`);
+              applyThemeCss(activeTheme.css);
+            }
+          }
+
+          updateClock();
+          setInterval(updateClock, 1000 * 30);
+          applyGlobalWallpaper();
+          initBatteryManager();
+
+          applyAppIcons();
+          applyAppLabels();
+
+          initDraggableLyricsBar(); // 初始化悬浮歌词栏的拖动功能
+
+          // ==========================================================
+          // --- 各种事件监听器 ---
+          // ==========================================================
+
+          // “查角色手机”功能事件监听器
+
+          // 1. 绑定主屏幕上的“查手机”APP图标
+          document
+            .getElementById("check-phone-btn")
+            .addEventListener("click", openCharacterSelectionScreen);
+
+          // 2. 角色选择列表的点击事件 (事件委托)
+          document
+            .getElementById("character-selection-list")
+            .addEventListener("click", (e) => {
+              const item = e.target.closest(".character-select-item");
+              if (item && item.dataset.chatId) {
+                openCharacterPhone(item.dataset.chatId);
+              }
+            });
+
+          // 3. 角色手机顶部的“刷新”和“清空”按钮
+          document
+            .getElementById("generate-character-data-btn")
+            .addEventListener("click", generateCharacterPhoneData);
+          document
+            .getElementById("clear-character-data-btn")
+            .addEventListener("click", clearCharacterPhoneData);
+
+          document
+            .getElementById("character-phone-container")
+            .addEventListener("click", (e) => {
+              const backBtn = e.target.closest(".back-btn");
+              const actionBtn = e.target.closest(".action-btn");
+
+              // 1. 处理返回按钮
+              if (backBtn) {
+                if (backBtn.dataset.targetPage) {
+                  showCharacterPhonePage(backBtn.dataset.targetPage);
+                } else if (backBtn.dataset.targetScreen) {
+                  showScreen(backBtn.dataset.targetScreen);
+                }
+                return;
+              }
+
+              // 2. 处理所有操作按钮（生成 + 删除）
+              if (actionBtn) {
+                switch (actionBtn.id) {
+                  // --- 单独生成按钮 ---
+                  case "generate-chat-message-btn":
+                    openChatGenerationModal();
+                    break;
+                  case "generate-cart-item-btn":
+                    generateCharacterPhoneDataSegment("shoppingCart");
+                    break;
+                  case "generate-memo-btn":
+                    generateCharacterPhoneDataSegment("memos");
+                    break;
+                  case "generate-browser-history-btn":
+                    generateCharacterPhoneDataSegment("browserHistory");
+                    break;
+                  case "generate-album-photo-btn":
+                    generateCharacterPhoneDataSegment("photoAlbum");
+                    break;
+                  case "generate-bank-transaction-btn":
+                    generateCharacterPhoneDataSegment("bank");
+                    break;
+                  case "generate-trajectory-btn":
+                    generateCharacterPhoneDataSegment("trajectory");
+                    break;
+                  case "generate-app-usage-btn":
+                    generateCharacterPhoneDataSegment("appUsage");
+                    break;
+                  case "generate-diary-entry-btn":
+                    generateCharacterPhoneDataSegment("diary");
+                    break;
+
+                  // --- ★★★ 这就是我们新增的全部删除按钮的逻辑 ★★★ ---
+                  case "clear-npc-chats-btn":
+                    handleClearCharacterDataSegment("chats");
+                    break;
+                  case "clear-cart-items-btn":
+                    handleClearCharacterDataSegment("shoppingCart");
+                    break;
+                  case "clear-memos-btn":
+                    handleClearCharacterDataSegment("memos");
+                    break;
+                  case "clear-browser-history-btn":
+                    handleClearCharacterDataSegment("browserHistory");
+                    break;
+                  case "clear-album-photos-btn":
+                    handleClearCharacterDataSegment("photoAlbum");
+                    break;
+                  case "clear-bank-transactions-btn":
+                    handleClearCharacterDataSegment("bank.transactions");
+                    break;
+                  case "clear-trajectory-btn":
+                    handleClearCharacterDataSegment("trajectory");
+                    break;
+                  case "clear-app-usage-btn":
+                    handleClearCharacterDataSegment("appUsage");
+                    break;
+                  case "clear-diary-entries-btn":
+                    handleClearCharacterDataSegment("diary");
+                    break;
+                }
+              }
+            });
+
+          // 主屏幕预设功能事件绑定
+          document
+            .getElementById("home-preset-selector")
+            .addEventListener("change", handleHomePresetSelection);
+          document
+            .getElementById("apply-home-preset-btn")
+            .addEventListener("click", applySelectedHomeScreenPreset);
+
+          document
+            .getElementById("save-home-preset-btn")
+            .addEventListener("click", saveCurrentHomeScreenAsPreset);
+          document
+            .getElementById("update-home-preset-btn")
+            .addEventListener("click", updateSelectedHomeScreenPreset); // <-- 新增这一行
+          document
+            .getElementById("rename-home-preset-btn")
+            .addEventListener("click", renameSelectedHomeScreenPreset);
+          document
+            .getElementById("delete-home-preset-btn")
+            .addEventListener("click", deleteSelectedHomeScreenPreset);
+          document
+            .getElementById("export-home-preset-btn")
+            .addEventListener("click", exportHomeScreenPreset);
+          document
+            .getElementById("import-home-preset-btn")
+            .addEventListener("click", () =>
+              document.getElementById("import-home-preset-input").click(),
+            );
+          document
+            .getElementById("import-home-preset-input")
+            .addEventListener("change", (e) => {
+              importHomeScreenPreset(e.target.files[0]);
+              e.target.value = null;
+            });
+
+          document
+            .getElementById("theme-toggle-switch")
+            .addEventListener("change", toggleTheme);
+          // 聊天记录搜索功能事件绑定
+          document
+            .getElementById("search-chat-btn")
+            .addEventListener("click", openChatSearchScreen);
+
+          document
+            .getElementById("search-back-btn")
+            .addEventListener("click", () => {
+              // 返回时，重新打开聊天设置弹窗
+              showScreen("chat-interface-screen");
+              document.getElementById("chat-settings-btn").click();
+            });
+
+          document
+            .getElementById("perform-search-btn")
+            .addEventListener("click", performChatSearch);
+
+          // 使用事件委托来处理所有搜索结果的点击
+          document
+            .getElementById("chat-search-results-list")
+            .addEventListener("click", (e) => {
+              const item = e.target.closest(".search-result-item");
+              if (item && item.dataset.timestamp) {
+                jumpToMessage(parseInt(item.dataset.timestamp));
+              }
+            });
+
+          document
+            .getElementById("create-weibo-post-btn")
+            .addEventListener("click", openWeiboPublisherClean);
+
+          document
+            .getElementById("delete-expired-songs-btn")
+            .addEventListener("click", deleteExpiredSearchedSongs);
+
+          // 角色表情包管理功能事件绑定
+          document
+            .getElementById("chat-settings-modal")
+            .addEventListener("click", (e) => {
+              if (e.target.id === "manage-char-stickers-btn") {
+                document
+                  .getElementById("chat-settings-modal")
+                  .classList.remove("visible");
+                openCharStickerManager();
+              }
+            });
+
+          document
+            .getElementById("back-from-sticker-manager")
+            .addEventListener("click", () => {
+              showScreen("chat-interface-screen");
+              document.getElementById("chat-settings-btn").click();
+            });
+
+          const stickerTabExclusive = document.getElementById(
+            "sticker-tab-exclusive",
+          );
+          const stickerTabCommon =
+            document.getElementById("sticker-tab-common");
+          const stickerContentExclusive = document.getElementById(
+            "sticker-content-exclusive",
+          );
+          const stickerContentCommon = document.getElementById(
+            "sticker-content-common",
+          );
+
+          stickerTabExclusive.addEventListener("click", () => {
+            stickerTabExclusive.classList.add("active");
+            stickerTabCommon.classList.remove("active");
+            stickerContentExclusive.classList.add("active");
+            stickerContentCommon.classList.remove("active");
+            // 切换时如果处于选择模式，需要重新渲染
+            if (isCharStickerSelectionMode) renderCharStickers("exclusive");
+          });
+
+          stickerTabCommon.addEventListener("click", () => {
+            stickerTabCommon.classList.add("active");
+            stickerTabExclusive.classList.remove("active");
+            stickerContentCommon.classList.add("active");
+            stickerContentExclusive.classList.remove("active");
+            // 切换时如果处于选择模式，需要重新渲染
+            if (isCharStickerSelectionMode) renderCharStickers("common");
+          });
+
+          // 绑定各种添加/上传按钮
+          document
+            .getElementById("add-exclusive-sticker-btn")
+            .addEventListener("click", () => bulkAddCharStickers("exclusive"));
+          document
+            .getElementById("upload-exclusive-sticker-btn")
+            .addEventListener("click", () =>
+              uploadCharStickersLocal("exclusive"),
+            );
+          document
+            .getElementById("add-common-sticker-btn")
+            .addEventListener("click", () => bulkAddCharStickers("common"));
+          document
+            .getElementById("upload-common-sticker-btn")
+            .addEventListener("click", () => uploadCharStickersLocal("common"));
+
+          // 心声历史记录删除功能事件绑定
+          document
+            .getElementById("clear-all-history-btn")
+            .addEventListener("click", clearAllInnerVoiceHistory);
+
+          // 使用事件委托处理单条删除
+          document
+            .getElementById("inner-voice-history-list")
+            .addEventListener("click", (e) => {
+              if (e.target.classList.contains("history-item-delete-btn")) {
+                const timestamp = parseInt(e.target.dataset.timestamp);
+                if (!isNaN(timestamp)) {
+                  deleteSingleInnerVoice(timestamp);
+                }
+              }
+            });
+
+          document
+            .getElementById("import-character-card-btn")
+            .addEventListener("click", async () => {
+              const unlockKey = "isCharacterImportUnlocked";
+
+              // 1. 检查是否已经解锁
+              if (localStorage.getItem(unlockKey) === "true") {
+                document.getElementById("character-card-input").click();
+                return;
+              }
+
+              // 2. 如果未解锁，获取设备码
+              const deviceCode = getDeviceCode();
+
+              // 3. 构建一个包含设备码和输入框的HTML内容
+              const modalHtmlContent = `
+			        <p style="margin-bottom: 15px;">请前往取PIN网站，使用下面的设备码获取PIN。</p>
+			        <div style="background: #eee; padding: 10px; border-radius: 6px; margin-bottom: 15px; user-select: all; cursor: copy;" title="点击复制设备码">
+			            <strong>设备码:</strong> <span id="device-code-to-copy">${deviceCode}</span>
+			        </div>
+			        <p id="copy-device-code-feedback" style="height: 15px; font-size: 12px; color: green;"></p>
+			    `;
+
+              // 4. 使用 showCustomPrompt 弹出增强版模态框
+              const userPin = await window.showCustomPrompt(
+                "功能解锁",
+                "请在此输入获取到的PIN码...", // 这是输入框的placeholder
+                "",
+                "text",
+                modalHtmlContent, // 这是我们额外添加的HTML内容
+              );
+
+              // 5. 如果用户点击了取消，则直接返回
+              if (userPin === null) return;
+
+              // 6. 验证PIN码
+              const correctPin = generatePinFromDeviceCode(deviceCode);
+              if (userPin.trim().toUpperCase() === correctPin) {
+                localStorage.setItem(unlockKey, "true");
+                await showCustomAlert(
+                  "解锁成功！",
+                  "导入功能已解锁，此设备无需再次输入PIN码。",
+                );
+                document.getElementById("character-card-input").click();
+              } else {
+                await showCustomAlert(
+                  "解锁失败",
+                  "PIN码错误，请重新获取或输入。",
+                );
+              }
+            });
+
+          // 为自定义模态框添加点击复制设备码的功能
+          document
+            .getElementById("custom-modal-body")
+            .addEventListener("click", (e) => {
+              const codeElement = e.target.closest("#device-code-to-copy");
+              if (codeElement) {
+                const deviceCode = codeElement.textContent;
+                const feedbackEl = document.getElementById(
+                  "copy-device-code-feedback",
+                );
+                navigator.clipboard
+                  .writeText(deviceCode)
+                  .then(() => {
+                    if (feedbackEl) feedbackEl.textContent = "设备码已复制！";
+                    setTimeout(() => {
+                      if (feedbackEl) feedbackEl.textContent = "";
+                    }, 2000);
+                  })
+                  .catch((err) => {
+                    if (feedbackEl)
+                      feedbackEl.textContent = "复制失败，请手动复制。";
+                  });
+              }
+            });
+
+          document
+            .getElementById("character-card-input")
+            .addEventListener("change", (event) => {
+              const file = event.target.files[0];
+              if (file) {
+                // 当用户选择了文件后，调用我们的总处理函数
+                handleCharacterImport(file);
+              }
+              // 清空选择，这样用户下次还能选择同一个文件
+              event.target.value = null;
+            });
+
+          document
+            .getElementById("phone-screen")
+            .addEventListener("click", unlockAudioContext, { once: true });
+
+          document
+            .getElementById("custom-modal-cancel")
+            .addEventListener("click", hideCustomModal);
+          document
+            .getElementById("custom-modal-overlay")
+            .addEventListener("click", (e) => {
+              if (e.target === modalOverlay) hideCustomModal();
+            });
+          document
+            .getElementById("clear-orphaned-data-btn")
+            .addEventListener("click", clearOrphanedData);
+          const repairBtn = document.getElementById("repair-data-btn");
+          if (repairBtn) {
+            repairBtn.addEventListener("click", repairAllData);
+          }
+
+          const factoryResetBtn = document.getElementById("factory-reset-btn");
+          if (factoryResetBtn) {
+            factoryResetBtn.addEventListener("click", handleFactoryReset);
+          }
+          document
+            .getElementById("export-data-btn")
+            .addEventListener("click", exportBackup);
+          document
+            .getElementById("import-btn")
+            .addEventListener("click", () =>
+              document.getElementById("import-data-input").click(),
+            );
+          document
+            .getElementById("import-data-input")
+            .addEventListener("change", (e) => importBackup(e.target.files[0]));
+          document
+            .getElementById("back-to-list-btn")
+            .addEventListener("click", () => {
+              stopPetDecayTimer();
+
+              applyScopedCss("", "#chat-messages", "custom-bubble-style"); // 清除真实聊天界面的自定义样式
+              applyScopedCss(
+                "",
+                "#settings-preview-area",
+                "preview-bubble-style",
+              ); // 清除预览区的自定义样式
+
+              exitSelectionMode();
+              state.activeChatId = null;
+              // 【心声功能】返回列表时，隐藏心形按钮
+              document.getElementById("char-heart-btn").style.display = "none";
+              showScreen("chat-list-screen");
+            });
+
+          // 为歌曲封面/歌词区域绑定点击切换事件
+          document
+            .getElementById("music-display-area")
+            .addEventListener("click", () => {
+              const displayArea = document.getElementById("music-display-area");
+              // 直接切换 .show-lyrics 这个类，CSS会自动处理显示/隐藏
+              displayArea.classList.toggle("show-lyrics");
+            });
+
+          document
+            .getElementById("add-chat-btn")
+            .addEventListener("click", async () => {
+              const name = await showCustomPrompt(
+                "创建新聊天",
+                "请输入Ta的名字",
+              );
+              if (name && name.trim()) {
+                const newChatId = "chat_" + Date.now();
+
+                const newChat = {
+                  id: newChatId,
+                  name: name.trim(),
+                  isGroup: false,
+                  isPinned: false,
+                  npcLibrary: [], // 角色专属NPC库
+                  relationship: {
+                    status: "friend",
+                    blockedTimestamp: null,
+                    applicationReason: "",
+                  },
+                  status: {
+                    text: "在线",
+                    lastUpdate: Date.now(),
+                    isBusy: false,
+                  },
+                  settings: {
+                    aiPersona: "你是谁呀。",
+                    myPersona: "我是谁呀。",
+                    maxMemory: 10,
+                    aiAvatar: defaultAvatar,
+                    myAvatar: defaultAvatar,
+                    background: "",
+                    theme: "default",
+                    fontSize: 13,
+                    customCss: "",
+                    linkedWorldBookIds: [],
+                    aiAvatarLibrary: [],
+                    stickerLibrary: [], // 专属表情库
+                    // === 以下是本次修复新增的初始化属性 ===
+                    linkedMemories: [], // 【修复核心】初始化记忆互通数组
+                    offlineMode: {
+                      enabled: false,
+                      prompt: "",
+                      style: "",
+                      wordCount: 300,
+                      presets: [],
+                    }, // 初始化线下模式
+                    timePerceptionEnabled: true, // 初始化时间感知
+                    customTime: "", // 初始化自定义时间
+                    isCoupleAvatar: false, // 初始化情侣头像开关
+                    coupleAvatarDescription: "", // 初始化情侣头像描述
+                    weiboProfession: "", // 初始化微博职业
+                    weiboInstruction: "", // 初始化微博指令
+                  },
+                  history: [],
+                  musicData: { totalTime: 0 },
+                  // 手机数据也保持完整
+                  characterPhoneData: {
+                    lastGenerated: null,
+                    chats: {},
+                    shoppingCart: [],
+                    memos: [],
+                    browserHistory: [],
+                    photoAlbum: [],
+                    bank: { balance: 0, transactions: [] },
+                    trajectory: [],
+                    appUsage: [],
+                    diary: [],
+                  },
+                  houseData: null,
+                };
+
+                state.chats[newChatId] = newChat;
+                await db.chats.put(newChat);
+                renderChatList();
+              }
+            });
+
+          // 创建群聊按钮现在打开联系人选择器
+          document
+            .getElementById("add-group-chat-btn")
+            .addEventListener("click", openContactPickerForGroupCreate);
+
+          document
+            .getElementById("transfer-cancel-btn")
+            .addEventListener("click", () =>
+              document
+                .getElementById("transfer-modal")
+                .classList.remove("visible"),
+            );
+          document
+            .getElementById("transfer-confirm-btn")
+            .addEventListener("click", sendUserTransfer);
+          document
+            .getElementById("listen-together-btn")
+            .addEventListener("click", handleListenTogetherClick);
+          document
+            .getElementById("music-exit-btn")
+            .addEventListener("click", () => endListenTogetherSession(true));
+          document
+            .getElementById("music-return-btn")
+            .addEventListener("click", returnToChat);
+          document
+            .getElementById("music-play-pause-btn")
+            .addEventListener("click", togglePlayPause);
+          document
+            .getElementById("music-next-btn")
+            .addEventListener("click", playNext);
+          document
+            .getElementById("music-prev-btn")
+            .addEventListener("click", playPrev);
+          document
+            .getElementById("music-mode-btn")
+            .addEventListener("click", changePlayMode);
+          document
+            .getElementById("music-playlist-btn")
+            .addEventListener("click", () => {
+              updatePlaylistUI();
+              document
+                .getElementById("music-playlist-panel")
+                .classList.add("visible");
+            });
+          document
+            .getElementById("close-playlist-btn")
+            .addEventListener("click", () =>
+              document
+                .getElementById("music-playlist-panel")
+                .classList.remove("visible"),
+            );
+          document
+            .getElementById("add-song-url-btn")
+            .addEventListener("click", addSongFromURL);
+          document
+            .getElementById("add-song-local-btn")
+            .addEventListener("click", () =>
+              document.getElementById("local-song-upload-input").click(),
+            );
+          document
+            .getElementById("local-song-upload-input")
+            .addEventListener("change", addSongFromLocal);
+          // BGM搜索功能事件绑定
+          document
+            .getElementById("add-song-search-btn")
+            .addEventListener("click", addSongFromSearch);
+
+          document
+            .getElementById("cancel-music-search-btn")
+            .addEventListener("click", () => {
+              document
+                .getElementById("music-search-results-modal")
+                .classList.remove("visible");
+            });
+
+          document
+            .getElementById("search-results-list")
+            .addEventListener("click", (e) => {
+              const item = e.target.closest(".search-result-item");
+              if (item && item.dataset.songJson) {
+                const songData = JSON.parse(item.dataset.songJson);
+                handleSearchResultClick(songData);
+              }
+            });
+
+          // 播放结束监听器（保活音频强制死循环）
+          audioPlayer.addEventListener("ended", () => {
+            const currentTrack =
+              state.musicState.playlist[state.musicState.currentIndex];
+
+            // 如果是保活音频，强制重播，无视任何模式
+            if (currentTrack && currentTrack.isKeepAlive) {
+              console.log("保活音频循环中...");
+              audioPlayer.currentTime = 0;
+              audioPlayer.play().catch((e) => console.error("重播失败:", e));
+            } else {
+              // 正常歌曲走正常逻辑
+              playNext();
+            }
+          });
+
+          // 20分钟强制循环监听器
+          audioPlayer.addEventListener("timeupdate", () => {
+            const currentTrack =
+              state.musicState.playlist[state.musicState.currentIndex];
+
+            // 检查：1.是否存在当前歌曲 2.是否是保活音频 3.是否超过20分钟(1200秒)
+            if (
+              currentTrack &&
+              currentTrack.isKeepAlive &&
+              audioPlayer.currentTime > 600
+            ) {
+              console.log("保活音频已播放20分钟，执行循环...");
+              // 强制拉回 0 秒
+              audioPlayer.currentTime = 0;
+              // 确保继续播放
+              if (audioPlayer.paused) {
+                audioPlayer
+                  .play()
+                  .catch((e) => console.error("循环重播失败:", e));
+              }
+            }
+          });
+
+          const chatInput = document.getElementById("chat-input");
+
+          document
+            .getElementById("send-btn")
+            .addEventListener("click", async () => {
+              const content = chatInput.value.trim();
+              if (!content || !state.activeChatId) return;
+
+              const chat = state.chats[state.activeChatId];
+
+              // 旁白拦截逻辑
+              // 检查是否以 <旁白> 开头
+              if (content.startsWith("<旁白>")) {
+                // 提取旁白内容
+                const narrativeContent = content.replace(/^<旁白>/, "").trim();
+
+                if (narrativeContent) {
+                  const msg = {
+                    role: "system", // 设置为 system 角色，不属于用户
+                    type: "narrative", // 设置专门的类型
+                    content: narrativeContent,
+                    timestamp: Date.now(),
+                  };
+
+                  chat.history.push(msg);
+                  await db.chats.put(chat);
+                  appendMessage(msg, chat);
+
+                  // 清空输入框
+                  chatInput.value = "";
+                  chatInput.style.height = "auto";
+                  chatInput.focus();
+
+                  return; // 拦截成功，不再执行后续的普通发送逻辑
+                }
+              }
+
+              try {
+                const command = JSON.parse(content);
+                // 检查：这是否是一个让角色发微博的指令？
+                if (command && command.type === "weibo_post") {
+                  const chat = state.chats[state.activeChatId];
+                  if (chat.isGroup) {
+                    alert("不能在群聊中为单个角色发布微博。");
+                    return;
+                  }
+
+                  // 创建一个新的微博帖子对象
+                  const newPost = {
+                    authorId: chat.id, // 关键！作者ID是当前角色的ID，而不是'user'
+                    authorType: "char",
+                    authorNickname: chat.name,
+                    authorAvatar: chat.settings.aiAvatar || defaultAvatar,
+                    content: command.content || "",
+                    timestamp: Date.now(),
+                    likes: [],
+                    comments: [],
+                    baseLikesCount: command.baseLikesCount || 0,
+                    baseCommentsCount: command.baseCommentsCount || 0,
+                  };
+
+                  // 如果JSON里有路人评论，就解析并添加
+                  if (
+                    command.comments &&
+                    typeof command.comments === "string"
+                  ) {
+                    newPost.comments = command.comments
+                      .split("\n")
+                      .map((c) => {
+                        const parts = c.split(/[:：]/);
+                        const commenter = parts.shift() || "路人";
+                        const commentText = parts.join(":").trim();
+                        return {
+                          commentId: "comment_" + Date.now() + Math.random(),
+                          authorNickname: commenter,

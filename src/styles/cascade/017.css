@@ -1,0 +1,1501 @@
+
+#phone-screen.dark-mode #fanfic-preference-bar {
+  background: rgba(40, 40, 40, 0.95) !important;
+  border-color: #444 !important;
+}
+/* === 【修复版】外观设置页面样式 v2.1 === */
+
+/* 1. 滚动容器调整 */
+.settings-scroll-container {
+  padding: 20px;
+  padding-bottom: 100px !important; /* 为悬浮按钮留出空间 */
+  background-color: #f7f8fa; /* 浅灰底色 */
+  /* ★ 修复：强制使用Flex纵向布局，并拉伸子元素 */
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+#phone-screen.dark-mode .settings-scroll-container {
+  background-color: #000;
+}
+
+/* 2. 卡片式分组 - 强制宽度统一 */
+.settings-group-card {
+  /* ★ 核心修复：强制占满容器宽度 */
+  width: 100% !important;
+  box-sizing: border-box !important;
+
+  background-color: #ffffff;
+  border-radius: 20px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+#phone-screen.dark-mode .settings-group-card {
+  background-color: #1c1c1e;
+  border: 1px solid #333;
+  box-shadow: none;
+}
+
+/* 3. 分组标题 */
+.settings-section-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--accent-color);
+  margin-bottom: 15px;
+  padding-bottom: 8px;
+  border-bottom: 2px dashed #f0f0f0;
+}
+#phone-screen.dark-mode .settings-section-title {
+  border-bottom-color: #333;
+}
+
+/* 4. 行布局 */
+.setting-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+.setting-row .setting-label {
+  font-size: 15px;
+  color: #333;
+  font-weight: 500;
+}
+.setting-row .toggle-switch-label {
+  padding: 0;
+  width: auto;
+  margin: 0; /* 修复开关自带的margin */
+}
+#phone-screen.dark-mode .setting-row .setting-label {
+  color: #eee;
+}
+
+/* 5. 块级项目 */
+.setting-item {
+  margin-bottom: 20px;
+}
+.setting-item label {
+  display: block;
+  font-size: 13px;
+  color: #888;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+/* 6. 预览与上传组合 */
+.preview-upload-box {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  background-color: #f9f9f9;
+  padding: 10px;
+  border-radius: 15px;
+}
+#phone-screen.dark-mode .preview-upload-box {
+  background-color: #2c2c2e;
+}
+.btn-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-grow: 1;
+}
+
+.mini-preview {
+  width: 60px;
+  height: 100px;
+  background-color: #eee;
+  border-radius: 8px;
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 10px;
+  color: #999;
+  border: 1px solid #e0e0e0;
+  flex-shrink: 0;
+}
+.mini-preview.landscape {
+  width: 100px;
+  height: 60px;
+}
+
+/* 7. 按钮美化 */
+.upload-btn-pill {
+  flex-grow: 1;
+  padding: 10px;
+  background-color: white;
+  border: 1px solid var(--accent-color);
+  color: var(--accent-color);
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.upload-btn-pill:active {
+  transform: scale(0.95);
+  background-color: var(--accent-color);
+  color: white;
+}
+.upload-btn-pill.danger {
+  border-color: #ff3b30;
+  color: #ff3b30;
+}
+.upload-btn-pill.primary {
+  background-color: var(--accent-color);
+  color: white;
+}
+.upload-btn-pill.secondary {
+  border-color: #ccc;
+  color: #666;
+}
+#phone-screen.dark-mode .upload-btn-pill {
+  background-color: #333;
+  border-color: var(--accent-color);
+}
+
+/* 8. 颜色选择器 */
+.color-picker-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background-color: #f9f9f9;
+  padding: 8px;
+  border-radius: 12px;
+}
+#phone-screen.dark-mode .color-picker-wrapper {
+  background-color: #2c2c2e;
+}
+#home-icon-widget-text-color-picker {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  overflow: hidden;
+  cursor: pointer;
+  padding: 0;
+  background: none;
+}
+/* 9. 紧凑网格 */
+.icon-grid-compact {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+  gap: 10px;
+}
+.icon-setting-item {
+  flex-direction: column;
+  gap: 5px;
+  text-align: center;
+}
+.icon-setting-item .change-icon-btn {
+  width: 100%;
+  border-radius: 12px;
+  font-size: 10px;
+  padding: 4px 0;
+}
+
+.name-grid-compact {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.app-rename-input {
+  width: 100%;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  font-size: 13px;
+  box-sizing: border-box;
+  background-color: #f9f9f9;
+}
+#phone-screen.dark-mode .app-rename-input {
+  background-color: #2c2c2e;
+  border-color: #444;
+  color: #fff;
+}
+
+/* 10. 杂项 */
+.small-btn {
+  width: 100%;
+  border-radius: 12px;
+  padding: 8px;
+  font-size: 13px;
+  margin-top: 10px;
+}
+.danger-text {
+  color: #ff3b30;
+  border-color: #ff3b30;
+  background-color: #fff5f5;
+}
+.css-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+.btn-icon {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  background: #fff;
+  cursor: pointer;
+}
+
+/* 11. 输入框复用 */
+.moe-input {
+  width: 100%;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid #e0e0e0;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+.code-area {
+  font-family: monospace;
+  font-size: 13px;
+  background-color: #f7f9fc;
+  color: #333333;
+  border: 1px solid #e0e0e0;
+  line-height: 1.5;
+}
+
+/* === 夜间模式适配 === */
+#phone-screen.dark-mode .code-area {
+  background-color: #282c34;
+  color: #abb2bf;
+  border-color: #444;
+}
+
+/* 颜色输入框微调 */
+/* 1. 设置页背景：给一个柔和的高级渐变底色 */
+#wallpaper-screen {
+  background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%) !important;
+}
+#phone-screen.dark-mode #wallpaper-screen {
+  background: #000 !important;
+}
+
+/* 2. 卡片容器：毛玻璃 + 悬浮感 + 大圆角 */
+.settings-group-card {
+  width: 100% !important;
+  box-sizing: border-box !important;
+
+  /* 核心美化：半透明白底 + 毛玻璃 */
+  background-color: rgba(255, 255, 255, 0.65) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+
+  border-radius: 24px !important; /* 更大的圆角 */
+  padding: 20px !important;
+  margin-bottom: 20px;
+
+  /* 柔和的彩色阴影 */
+  box-shadow:
+    0 10px 30px -10px rgba(0, 0, 0, 0.05),
+    0 4px 10px rgba(200, 200, 255, 0.2) !important;
+  border: 1px solid rgba(255, 255, 255, 0.8) !important;
+}
+
+#phone-screen.dark-mode .settings-group-card {
+  background-color: rgba(30, 30, 30, 0.6) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  box-shadow: none !important;
+}
+
+/* 3. 分组标题：更精致的排版 */
+.settings-section-title {
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  color: var(--accent-color);
+  margin-bottom: 18px !important;
+  padding-bottom: 10px !important;
+  border-bottom: 2px dashed rgba(0, 0, 0, 0.05) !important; /* 虚线更可爱 */
+  letter-spacing: 0.5px;
+}
+
+/* 4. 【核心修改】壁纸预览区域 (变小、精致) */
+.preview-upload-box {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background-color: rgba(255, 255, 255, 0.5);
+  padding: 15px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+}
+
+/* ★★★ 重点：把预览图改小 ★★★ */
+#wallpaper-preview,
+#lockscreen-wallpaper-preview,
+#global-bg-preview {
+  width: 90px !important; /* 原来是180px，现在改小 */
+  height: 160px !important; /* 按比例改小 */
+
+  background-color: #eef2f5;
+  border-radius: 12px !important;
+  border: 2px solid white !important;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1) !important;
+
+  /* 字体调整 */
+  font-size: 12px !important;
+  color: #aaa !important;
+  flex-shrink: 0; /* 防止被挤压 */
+}
+
+/* 5. 按钮美化：胶囊形状 */
+.upload-btn-pill {
+  border-radius: 25px !important;
+  padding: 10px 20px !important;
+  font-size: 13px !important;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+  background: white;
+}
+.upload-btn-pill:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.08);
+}
+
+/* 6. 【核心修改】颜色选择器区域 */
+.color-picker-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background-color: rgba(255, 255, 255, 0.5);
+  padding: 10px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+}
+
+/* 圆形颜色球 */
+#home-icon-widget-text-color-picker {
+  width: 45px !important;
+  height: 45px !important;
+  border: 3px solid white !important;
+  border-radius: 50% !important;
+  padding: 0 !important;
+  background: none;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* 新增：颜色代码输入框样式 */
+#home-icon-widget-text-color-input {
+  flex-grow: 1;
+  border: none;
+  background: transparent;
+  font-family: monospace; /* 等宽字体，适合显示代码 */
+  font-size: 16px;
+  color: #555;
+  text-transform: uppercase;
+  outline: none;
+  text-align: center;
+  letter-spacing: 1px;
+}
+
+/* 7. 标签文字 */
+.setting-item label {
+  color: #666 !important;
+  font-size: 13px !important;
+  margin-bottom: 10px !important;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+/* ▼▼▼ 【全新精简版】精致滑动开关样式 ▼▼▼ */
+
+.toggle-switch-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* 文字和开关两端对齐 */
+  cursor: pointer;
+  user-select: none;
+  width: 100%;
+  padding: 12px 0; /* 增加一点点击区域，更易触控 */
+  /* 移除可能导致错位的默认边距 */
+  margin: 0;
+}
+
+.toggle-switch-text {
+  font-size: 15px; /* 字体稍微调小一点，更显精致 */
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+/* 隐藏原始的 checkbox */
+.toggle-switch-label input[type="checkbox"] {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+  pointer-events: none;
+}
+
+/* --- 开关的轨道 (底座) --- */
+.toggle-switch-slider {
+  position: relative;
+  display: inline-block;
+  /* ★ 修改：缩小尺寸 (原: 51x31 -> 现: 42x24) */
+  width: 42px;
+  height: 24px;
+  background-color: #e0e0e0; /* 默认灰色背景更柔和 */
+  border-radius: 24px; /* 胶囊形状 */
+  transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1); /* 更顺滑的动画 */
+  flex-shrink: 0; /* 防止被压缩 */
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1); /* 增加内阴影，更有质感 */
+}
+
+/* --- 开关的滑块 (圆点) --- */
+.toggle-switch-slider::before {
+  content: "";
+  position: absolute;
+  height: 20px;
+  width: 20px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  border-radius: 50%;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* --- 选中状态 --- */
+.toggle-switch-label input:checked + .toggle-switch-slider {
+  background-color: var(--accent-color, #34c759);
+  box-shadow: none;
+}
+
+/* --- 选中时的滑块移动 --- */
+.toggle-switch-label input:checked + .toggle-switch-slider::before {
+  transform: translateX(18px);
+}
+
+/* 夜间模式适配 */
+#phone-screen.dark-mode .toggle-switch-slider {
+  background-color: #4a4a4a;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+/* --- 新增样式 --- */
+#context-token-count-display {
+  cursor: pointer;
+  text-decoration: underline;
+  color: var(--accent-color) !important; /* 使用主题色 */
+  font-weight: bold;
+}
+#context-token-count-display:hover {
+  opacity: 0.8;
+}
+/* === 萌系设置页面 CSS (全功能修复版) === */
+
+/* 1. 弹窗容器美化 */
+.moe-settings-content {
+  height: 95% !important;
+  max-height: 95% !important;
+  border-radius: 24px !important;
+  background-color: #f4f7f9 !important; /* 柔和的背景色 */
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
+}
+#phone-screen.dark-mode .moe-settings-content {
+  background-color: #1a1a1a !important;
+  border-color: #333;
+}
+
+/* 2. 头部样式 */
+.moe-modal-header {
+  background: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(12px);
+  padding: 18px !important;
+  text-align: center !important;
+  font-size: 18px !important;
+  font-weight: 800 !important;
+  color: var(--accent-color) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05) !important;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
+  z-index: 10;
+}
+#phone-screen.dark-mode .moe-modal-header {
+  background: rgba(30, 30, 30, 0.9) !important;
+  border-bottom-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* 3. 滚动区域 */
+.moe-settings-body {
+  padding: 20px !important;
+  overflow-y: auto !important;
+  flex-grow: 1;
+}
+
+/* 4. 卡片通用样式 */
+.moe-card {
+  background: #ffffff !important;
+  border-radius: 20px !important;
+  padding: 18px !important;
+  margin-bottom: 20px !important;
+  box-shadow: 0 4px 15px rgba(149, 157, 165, 0.1) !important;
+  border: 1px solid rgba(255, 255, 255, 0.5) !important;
+}
+#phone-screen.dark-mode .moe-card {
+  background: #252525 !important;
+  border-color: #333 !important;
+  box-shadow: none !important;
+}
+
+/* 5. 标题样式 */
+.settings-section-title {
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  color: var(--accent-color) !important;
+  margin-bottom: 15px !important;
+  padding-bottom: 10px !important;
+  border-bottom: 2px dashed rgba(var(--accent-color-rgb), 0.15) !important;
+  opacity: 0.9;
+}
+
+/* 6. 输入框美化 */
+.moe-input {
+  width: 100%;
+  padding: 10px 12px !important;
+  border: 1px solid #e1e5e9 !important;
+  border-radius: 12px !important;
+  background-color: #fcfdfe !important;
+  font-size: 14px !important;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+  color: #333;
+}
+.moe-input:focus {
+  border-color: var(--accent-color) !important;
+  background-color: #fff !important;
+  box-shadow: 0 0 0 3px rgba(var(--accent-color-rgb), 0.15) !important;
+  outline: none;
+}
+#phone-screen.dark-mode .moe-input {
+  background-color: #2c2c2e !important;
+  border-color: #444 !important;
+  color: #eee;
+}
+
+/* 7. 布局辅助 */
+.moe-grid-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+.input-with-btn-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.avatar-upload-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.preview-img {
+  width: 65px !important;
+  height: 65px !important;
+  border-radius: 14px !important;
+  object-fit: cover;
+  border: 3px solid #fff;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+.btn-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+}
+
+/* 8. 按钮样式 */
+.moe-btn-mini {
+  padding: 6px !important;
+  font-size: 11px !important;
+  border-radius: 8px !important;
+  border: 1px solid #e0e0e0 !important;
+  background: #fff !important;
+  color: #666 !important;
+  cursor: pointer;
+  width: 100%;
+  font-weight: 600 !important;
+  transition: all 0.2s;
+}
+.moe-btn-small {
+  padding: 8px 12px !important;
+  border-radius: 10px !important;
+  border: 1px solid #e0e0e0 !important;
+  background: #fff !important;
+  color: #555 !important;
+  cursor: pointer;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  white-space: nowrap;
+}
+.moe-btn-secondary {
+  width: 100%;
+  padding: 12px !important;
+  border-radius: 14px !important;
+  border: 1px solid var(--accent-color) !important;
+  background-color: #fff !important;
+  color: var(--accent-color) !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 10px !important;
+}
+.moe-btn-secondary:active {
+  background-color: var(--accent-color) !important;
+  color: white !important;
+}
+.moe-btn-danger {
+  width: 100%;
+  padding: 12px !important;
+  border-radius: 14px !important;
+  border: 1px solid #ffcdd2 !important;
+  background-color: #fff5f5 !important;
+  color: #e53935 !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  cursor: pointer;
+  margin-top: 10px !important;
+}
+
+/* 9. 详情盒子 (折叠展开区域) */
+.moe-details-box {
+  background-color: rgba(var(--accent-color-rgb), 0.03);
+  border: 1px dashed rgba(var(--accent-color-rgb), 0.2);
+  border-radius: 12px;
+  padding: 12px;
+  margin-top: 10px;
+}
+#phone-screen.dark-mode .moe-details-box {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* 10. 视频预览框 */
+.video-preview-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  border: 1px dashed #ccc;
+  border-radius: 10px;
+  padding: 5px;
+  background: #fff;
+}
+.video-preview-box img {
+  width: 60px;
+  height: 90px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+.video-preview-box span {
+  font-size: 10px;
+  color: #999;
+  margin-top: 2px;
+}
+
+/* 11. 背景预览 */
+.bg-upload-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f9f9f9;
+  padding: 10px;
+  border-radius: 12px;
+}
+.bg-preview-wrapper {
+  position: relative;
+}
+.bg-preview-img {
+  width: 80px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 8px;
+  background: #eee;
+  border: 1px solid #ddd;
+}
+#remove-bg-btn {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ff5252;
+  color: white;
+  border: 2px solid white;
+  font-weight: bold;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+/* 12. 标签与信息 */
+.info-tags {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+}
+.tag {
+  font-size: 11px;
+  color: #888;
+  background: #f0f0f0;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+/* 13. 悬浮按钮 (FAB) */
+.moe-fab-save,
+.moe-fab-cancel {
+  position: absolute;
+  bottom: 25px;
+  width: 60px !important;
+  height: 60px !important;
+  border-radius: 30px !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15) !important;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  font-size: 20px !important;
+  cursor: pointer;
+  z-index: 100;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: auto;
+}
+.moe-fab-save {
+  right: 25px;
+  background: linear-gradient(
+    135deg,
+    #a1c4fd,
+    #c2e9fb
+  ) !important; /* 蓝色渐变 */
+  color: white !important;
+  border: 3px solid rgba(255, 255, 255, 0.5) !important;
+}
+.moe-fab-cancel {
+  left: 25px;
+  background: #fff !important;
+  color: #555 !important;
+  border: 1px solid #eee !important;
+}
+.moe-fab-save:active,
+.moe-fab-cancel:active {
+  transform: scale(0.9);
+}
+#custom-modal-body {
+  max-height: 50vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  word-wrap: break-word;
+  padding: 10px;
+}
+.moe-card:has(.checkboxes-container.visible) {
+  z-index: 1000 !important;
+  position: relative !important; /* 确保 z-index 生效 */
+}
+
+.form-group:has(.checkboxes-container.visible) {
+  z-index: 1000 !important;
+  position: relative !important;
+}
+
+/* 3. 优化下拉菜单本身的样式 */
+.checkboxes-container {
+  z-index: 2000 !important; /* 确保它比卡片层级更高 */
+
+  /* 限制最大高度，防止菜单太长超出屏幕底部导致无法滚动 */
+  max-height: 250px !important;
+
+  /* 开启内部滚动，确保所有选项都能选到 */
+  overflow-y: auto !important;
+
+  /* 加强阴影，让它看起来更像悬浮在最上层 */
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25) !important;
+
+  /* 稍微调整边框，更清晰 */
+  border: 1px solid var(--accent-color) !important;
+}
+
+/* 适配夜间模式的阴影 */
+#phone-screen.dark-mode .checkboxes-container {
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5) !important;
+}
+/* 圈子评论项设置为相对定位，以便定位删除按钮 */
+.post-comment-item {
+  position: relative;
+  padding-right: 30px; /* 右边留出空间给删除按钮 */
+}
+
+.forum-comment-delete-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 20px;
+  height: 20px;
+  line-height: 18px;
+  text-align: center;
+  color: #ccc;
+  font-size: 18px;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: all 0.2s;
+  font-family: Arial, sans-serif;
+  z-index: 10;
+}
+
+.forum-comment-delete-btn:hover {
+  color: #ff3b30;
+  background-color: rgba(255, 59, 48, 0.1);
+}
+#dating-bgm-playlist .dating-bgm-item {
+  padding: 12px 15px;
+  border-bottom: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+#dating-bgm-playlist .dating-bgm-item:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+#dating-bgm-playlist .dating-bgm-item.playing {
+  background-color: var(--accent-color-light, #e0f7ff);
+  color: var(--accent-color, #007bff);
+  font-weight: 600;
+}
+
+.dark-mode #dating-bgm-playlist .dating-bgm-item.playing {
+  background-color: rgba(var(--accent-color-rgb), 0.2);
+}
+
+#dating-bgm-playlist .dating-bgm-item .title {
+  font-size: 15px;
+}
+
+#dating-bgm-playlist .dating-bgm-item .artist {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+#dating-bgm-modal .modal-content {
+  background-color: #f7f3f8;
+  border: 1px solid #e1dbe6;
+  height: 65% !important;
+  max-width: 320px;
+}
+
+#dating-bgm-modal .modal-header span {
+  color: #6a4c95;
+}
+
+#dating-bgm-modal .bgm-controls {
+  margin-bottom: 20px !important;
+}
+
+#dating-bgm-modal .form-button-secondary {
+  border-color: #d8c1e8 !important;
+  background-color: #fff !important;
+  color: #6a4c95 !important;
+  border-radius: 20px !important;
+  font-weight: 600 !important;
+}
+
+#dating-bgm-modal .form-button-secondary:active {
+  background-color: #f7f3f8 !important;
+}
+
+#dating-bgm-modal .form-group label {
+  color: #8e809c;
+}
+#dating-bgm-modal input[type="range"] {
+  -webkit-appearance: none;
+  background: #e1dbe6;
+}
+#dating-bgm-modal input[type="range"]::-webkit-slider-thumb {
+  background: #a98bc4;
+}
+
+#dating-bgm-playlist .dating-bgm-item {
+  border-bottom-color: #e1dbe6;
+  transition: all 0.2s;
+}
+
+#dating-bgm-playlist .dating-bgm-item:hover {
+  background-color: rgba(255, 255, 255, 0.7);
+}
+
+#dating-bgm-playlist .dating-bgm-item.playing {
+  background-color: #e9e0f3;
+  border-left: 4px solid #a98bc4;
+  padding-left: 11px;
+}
+
+#dating-bgm-playlist .dating-bgm-item.playing .title {
+  color: #6a4c95;
+  font-weight: 700;
+}
+#date-a-live-screen {
+  background: linear-gradient(135deg, #fff0f5 0%, #e6e6fa 100%) !important;
+}
+
+#dating-scene-content {
+  background: transparent !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 25px !important;
+  padding: 25px 20px !important;
+  min-height: 0;
+  flex-grow: 1;
+  overflow-y: auto;
+}
+
+.dating-scene-card {
+  box-sizing: border-box !important;
+
+  width: 100% !important;
+  background-color: #ffffff !important;
+  border-radius: 20px !important;
+  padding: 12px !important;
+  box-shadow: 0 8px 25px rgba(230, 159, 181, 0.25) !important;
+  border: 1px solid rgba(255, 192, 203, 0.5) !important;
+  position: relative;
+  overflow: visible !important;
+  transition:
+    transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.dating-scene-card:hover {
+  transform: translateY(-5px) !important;
+  box-shadow: 0 12px 30px rgba(230, 159, 181, 0.35) !important;
+}
+
+.dating-scene-card::before {
+  content: "💖";
+  position: absolute;
+  top: -15px;
+  left: 20px;
+  font-size: 28px;
+  transform: rotate(-20deg);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  opacity: 0.9;
+}
+
+.dating-scene-image-container {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  border-radius: 12px !important;
+  overflow: hidden;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08) !important;
+  border: 2px solid white;
+  box-sizing: border-box;
+}
+
+.dating-scene-image-container img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.4s ease;
+}
+
+.dating-scene-card:hover .dating-scene-image-container img {
+  transform: scale(1.05);
+}
+
+.dating-scene-info {
+  padding: 15px 5px 5px 5px !important;
+  text-align: center;
+}
+
+.dating-scene-info .name {
+  font-size: 17px !important;
+  font-weight: 700 !important;
+  color: #4a4a4a !important;
+}
+
+.dating-scene-info .cost {
+  font-size: 15px !important;
+  color: #ff69b4 !important;
+  font-weight: bold !important;
+  margin-top: 8px !important;
+}
+.dating-scene-info .cost::after {
+  content: " 🪙";
+}
+
+.dating-scene-delete-btn {
+  background-color: rgba(255, 255, 255, 0.8) !important;
+  color: #ff8fab !important;
+  border-radius: 50% !important;
+  width: 28px !important;
+  height: 28px !important;
+  font-size: 18px !important;
+  line-height: 28px !important;
+  border: 1px solid rgba(0, 0, 0, 0.05) !important;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1) !important;
+}
+.dating-scene-delete-btn:hover {
+  background-color: #ff69b4 !important;
+  color: white !important;
+}
+
+#phone-screen.dark-mode .dating-scene-card {
+  background-color: #2c1e22 !important;
+  border-color: #583d47 !important;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3) !important;
+}
+#phone-screen.dark-mode .dating-scene-info .name {
+  color: #fce4ec !important;
+}
+#dating-game-screen {
+  background-color: #000;
+  color: white;
+}
+
+#dating-game-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  transition: all 0.5s ease-in-out;
+  filter: blur(8px) brightness(0.7);
+  transform: scale(1.1);
+  z-index: 1;
+}
+
+#dating-game-sprite-container {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80%;
+  height: auto;
+  max-height: 80%;
+  pointer-events: none;
+  transition: all 0.5s ease-in-out;
+  z-index: 2;
+}
+#dating-game-sprite-container img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 5px 15px rgba(0, 0, 0, 0.5));
+  transition: opacity 0.3s ease-in-out;
+}
+
+.dating-game-ui-overlay {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding-bottom: calc(15px + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+  z-index: 3;
+}
+#dating-game-screen .header {
+  position: absolute;
+  top: 0;
+  width: 100%;
+  box-sizing: border-box;
+  background-color: rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  color: white;
+}
+#dating-game-screen .header .back-btn,
+#dating-game-screen .header .action-btn svg {
+  color: white !important;
+}
+
+.dating-game-textbox {
+  background-color: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(25px) saturate(180%);
+  -webkit-backdrop-filter: blur(25px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 24px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  padding: 20px;
+  margin: 0 15px 15px 15px;
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  line-height: 1.7;
+  font-size: 16px;
+  color: white;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.dating-game-textbox #dating-game-text-content {
+  transition: opacity 0.2s ease-in-out;
+}
+.dating-game-textbox #dating-game-text-content.fade-out {
+  opacity: 0;
+}
+
+.dating-game-textbox .continue-indicator {
+  display: block;
+  text-align: right;
+  margin-top: 10px;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.5);
+  animation: pulse-indicator 1.5s infinite;
+}
+@keyframes pulse-indicator {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.dating-game-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 15px;
+  margin-bottom: 15px;
+}
+
+.dating-game-choice-btn {
+  background-color: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50px;
+  padding: 16px;
+  color: #f2f2f7;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.dating-game-choice-btn:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+.dating-game-choice-btn:active {
+  transform: scale(0.98);
+}
+
+.dating-game-choice-btn.input-action {
+  background-color: rgba(255, 136, 178, 0.8);
+  border-color: rgba(255, 136, 178, 1);
+  color: white;
+}
+
+#dating-values-container,
+#dating-completion-bar-container {
+  background-color: rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+#dating-values-container {
+  padding: 6px 10px;
+  border-radius: 15px;
+}
+
+#dating-completion-bar-container {
+  height: 12px;
+  border-radius: 6px;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+#dating-completion-bar-fill {
+  background: linear-gradient(90deg, #ff8fab, #fb6f92);
+}
+#dating-completion-text {
+  font-size: 10px;
+}
+.moe-settings-content {
+  position: relative !important;
+}
+#chat-settings-modal .modal-footer {
+  position: static !important;
+  padding: 0 !important;
+  border: none !important;
+  height: 0 !important;
+  pointer-events: none;
+}
+.moe-fab-save,
+.moe-fab-cancel {
+  position: absolute !important;
+  bottom: 25px !important;
+  pointer-events: auto !important;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.moe-fab-save:hover,
+.moe-fab-cancel:hover {
+  transform: scale(1.08) rotate(-5deg);
+}
+.moe-fab-save {
+  right: 25px !important;
+}
+
+.moe-fab-cancel {
+  left: 25px !important;
+}
+#dating-game-settings-modal .modal-content {
+  background-color: rgba(255, 255, 255, 0.8) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 24px !important;
+  border: 1px solid rgba(255, 255, 255, 0.5) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1) !important;
+}
+
+#dating-game-settings-modal .modal-header {
+  text-align: center;
+  font-size: 18px;
+  font-weight: 700;
+  color: #a786df;
+  border-bottom: 1px dashed #e1dbe6;
+  padding-bottom: 15px;
+}
+
+#dating-game-settings-modal .form-group {
+  margin-bottom: 18px;
+}
+
+#dating-game-settings-modal label {
+  font-weight: 600;
+  color: #6a526f;
+  font-size: 14px;
+  margin-bottom: 8px;
+  letter-spacing: 0.5px;
+}
+
+#dating-game-settings-modal input[type="text"],
+#dating-game-settings-modal textarea,
+#dating-game-settings-modal select {
+  background-color: #f9f5f6 !important;
+  border: 1px solid #f0e6e8 !important;
+  border-radius: 12px !important;
+  padding: 12px !important;
+  font-size: 14px;
+  color: #555;
+  transition: all 0.3s ease;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.02);
+}
+
+#dating-game-settings-modal input:focus,
+#dating-game-settings-modal textarea:focus,
+#dating-game-settings-modal select:focus {
+  border-color: #ffb7c5 !important;
+  background-color: white !important;
+  box-shadow: 0 0 0 3px rgba(255, 183, 197, 0.3) !important;
+  outline: none;
+}
+
+#dating-game-settings-modal .modal-footer {
+  gap: 12px;
+}
+
+#dating-game-settings-modal #cancel-dating-settings-btn {
+  background-color: #f0e6f2;
+  color: #827693;
+  border: none;
+  font-weight: 600;
+  border-radius: 20px;
+  transition: all 0.2s ease;
+}
+
+#dating-game-settings-modal #cancel-dating-settings-btn:hover {
+  background-color: #e1dbe6;
+}
+
+#dating-game-settings-modal #save-dating-settings-btn {
+  background: linear-gradient(135deg, #ff9a9e 0%, #ffc3a0 100%);
+  color: white;
+  border: none;
+  font-weight: bold;
+  border-radius: 20px;
+  box-shadow: 0 4px 15px rgba(255, 154, 158, 0.4);
+  transition: all 0.2s ease;
+}
+#dating-game-settings-modal .modal-footer button:active {
+  transform: scale(0.97);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+#phone-screen.dark-mode #dating-game-settings-modal .modal-content {
+  background-color: rgba(30, 30, 30, 0.8) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4) !important;
+}
+
+#phone-screen.dark-mode #dating-game-settings-modal .modal-header {
+  border-bottom-color: #444;
+}
+
+#phone-screen.dark-mode #dating-game-settings-modal input,
+#phone-screen.dark-mode #dating-game-settings-modal textarea,
+#phone-screen.dark-mode #dating-game-settings-modal select {
+  background-color: #2c2c2e !important;
+  border-color: #444 !important;
+  color: #eee;
+}
+
+#phone-screen.dark-mode
+  #dating-game-settings-modal
+  #cancel-dating-settings-btn {
+  background-color: #3e3e42;
+  color: #ccc;
+}
+
+.avatar-upload-column {
+  width: 80px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.preview-img {
+  width: 70px !important;
+  height: 70px !important;
+  border-radius: 18px !important;
+  margin-bottom: 5px;
+}
+
+.btn-stack {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.moe-btn-mini {
+  width: 100% !important;
+  box-sizing: border-box;
+  text-align: center;
+  padding: 6px 0 !important;
+  font-size: 11px !important;
+  border-radius: 12px !important;
+  margin: 0 !important;
+  background-color: #fff !important;
+  border: 1px solid #e0e0e0 !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
+  transition: all 0.2s;
+}
+
+.moe-btn-mini:hover {
+  background-color: #f7f9fc !important;
+  border-color: var(--accent-color) !important;
+  color: var(--accent-color) !important;
+  transform: translateY(-1px);
+}
+.bg-upload-container {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 25px !important;
+
+  background-color: #f7f9fc !important;
+  padding: 20px !important;
+  border-radius: 20px !important;
+  border: 1px solid #eef2f7 !important;
+  margin-top: 10px !important;
+}
+
+#phone-screen.dark-mode .bg-upload-container {
+  background-color: #252525 !important;
+  border-color: #333 !important;
+}
+
+.bg-preview-wrapper {
+  position: relative !important;
+  flex-shrink: 0 !important;
+}
+
+.bg-preview-img {
+  display: block !important;
+  width: 108px !important;
+  height: 192px !important;
+  max-width: none !important;
+  max-height: none !important;
+
+  object-fit: cover !important;
+  border-radius: 12px !important;
+  border: 3px solid #fff !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15) !important;
+  background-color: #eee !important;
+}
+
+#phone-screen.dark-mode .bg-preview-img {
+  border-color: #444 !important;
+  background-color: #333 !important;
+}
+
+.bg-upload-container > button {
+  flex-grow: 1 !important;
+  height: 50px !important;
+  font-size: 15px !important;
+  background-color: #fff !important;
+  border: 1px dashed var(--accent-color) !important;
+  color: var(--accent-color) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05) !important;
+  margin-top: 0 !important;
+}
+
+#remove-bg-btn {
+  top: -10px !important;
+  right: -10px !important;
+  width: 26px !important;
+  height: 26px !important;
+  font-size: 16px !important;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2) !important;
+  z-index: 5 !important;
+}
+/* === KK查岗 - 线索分享卡片样式 === */
+.kk-share-card {
+  background: linear-gradient(
+    135deg,
+    #fff8e1 0%,
+    #ffecb3 100%
+  ); /* 淡黄色背景 */
+  border-radius: 12px;
+  padding: 12px 15px;
+  color: #5d4037; /* 深褐色文字 */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border: 1px solid #ffe082;
+  min-width: 200px;
+  max-width: 260px;
+  position: relative;
+}
+
+/* 卡片左侧装饰线条 */

@@ -1,0 +1,1376 @@
+let activeLoversSpaceCharId = null; // 当前情侣空间对应的角色ID
+let activeLoveLetter = null; // 当前查看或回复的情书对象
+let activeQuestionId = null; // 当前正在回答的问题ID
+let currentDiaryDate = null; // 当前编辑或查看的日记日期
+let tempUploadedPhotos = []; // 暂存待上传的照片数据
+let lsActivityTimer = null; // 今日足迹定时器ID
+let pomodoroCustomPlaylist = [];
+// 情侣空间音乐播放器状态管理器
+let lsMusicState = {
+  playlist: [], // 播放列表
+  currentIndex: -1, // 当前播放歌曲索引
+  isPlaying: false, // 是否正在播放
+};
+
+let pomodoroState = {
+  isActive: false,
+  isPaused: false,
+  timerId: null,
+  periodicTalkTimerId: null,
+  currentSession: null,
+  timeTracker: 0,
+  breakHistory: [],
+
+  // === BGM 相关 ===
+  bgmAudio: new Audio(),
+  bgmPlaylist: [],
+  bgmIndex: 0,
+  bgmSource: "none",
+};
+
+// 配置循环播放逻辑 (自动播下一首)
+pomodoroState.bgmAudio.addEventListener("ended", () => {
+  playNextPomoMusic();
+});
+// 监听播放状态改变图标
+pomodoroState.bgmAudio.addEventListener("play", updatePomoMusicUI);
+pomodoroState.bgmAudio.addEventListener("pause", updatePomoMusicUI);
+
+// 网络请求工具函数
+if (typeof Http_Get_External === "undefined") {
+  window.Http_Get_External = function (url) {
+    return new Promise((resolve) => {
+      fetch(url)
+        .then((res) => res.json().catch(() => res.text()))
+        .then(resolve)
+        .catch(() => resolve(null));
+    });
+  };
+}
+
+/**
+ * 发起HTTP GET请求
+ * @param {string} url - 请求地址
+ * @returns {Promise} 请求结果
+ */
+async function Http_Get(url) {
+  return await Http_Get_External(url);
+}
+
+/**
+ * 检查音频链接是否可以播放
+ * @param {string} url - 音频链接
+ * @returns {Promise<boolean>} 是否可以播放
+ */
+function checkAudioAvailability(url) {
+  return new Promise((resolve) => {
+    const tester = new Audio();
+    tester.addEventListener("loadedmetadata", () => resolve(true), {
+      once: true,
+    });
+    tester.addEventListener("error", () => resolve(false), { once: true });
+    tester.src = url;
+  });
+}
+
+/**
+ * 获取网络歌曲歌词
+ * @param {string} songId - 歌曲ID
+ * @param {string} source - 音乐平台来源(netease/tencent)
+ * @returns {Promise<string>} 歌词内容
+ */
+async function getLyricsForSong(songId, source) {
+  const url =
+    source === "netease"
+      ? `https://api.vkeys.cn/v2/music/netease/lyric?id=${songId}`
+      : `https://api.vkeys.cn/v2/music/tencent/lyric?id=${songId}`;
+
+  const response = await Http_Get(url);
+  if (response?.data) {
+    const lrc = response.data.lrc || response.data.lyric || "";
+    const tlyric = response.data.trans || response.data.tlyric || "";
+    return lrc + "\\n" + tlyric;
+  }
+  return "";
+}
+
+/**
+ * 解析LRC歌词格式
+ * @param {string} lrcContent - LRC歌词内容
+ * @returns {Array} 解析后的歌词数组[{time, text}]
+ */
+function parseLRC(lrcContent) {
+  if (!lrcContent) return [];
+  const lines = lrcContent.split("\n");
+  const lyrics = [];
+  const timeRegex = /\[(\d{2}):(\d{2})[.:](\d{2,3})\]/g;
+
+  for (const line of lines) {
+    const text = line.replace(timeRegex, "").trim();
+    if (!text) continue;
+    timeRegex.lastIndex = 0;
+    let match;
+    while ((match = timeRegex.exec(line)) !== null) {
+      const minutes = parseInt(match[1], 10);
+      const seconds = parseInt(match[2], 10);
+      const milliseconds = parseInt(match[3].padEnd(3, "0"), 10);
+      const time = minutes * 60 + seconds + milliseconds / 1000;
+      lyrics.push({ time, text });
+    }
+  }
+  return lyrics.sort((a, b) => a.time - b.time);
+}
+
+/**
+ * 格式化音乐时间显示
+ * @param {number} seconds - 秒数
+ * @returns {string} 格式化后的时间(mm:ss)
+ */
+function formatMusicTime(seconds) {
+  if (isNaN(seconds) || seconds < 0) return "0:00";
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = Math.floor(seconds % 60);
+  return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
+}
+
+/**
+ * 更新音乐播放进度条
+ */
+function updateMusicProgressBar() {
+  const currentTimeEl = document.getElementById("music-current-time");
+  const totalTimeEl = document.getElementById("music-total-time");
+  const progressFillEl = document.getElementById("music-progress-fill");
+  if (!audioPlayer.duration) {
+    currentTimeEl.textContent = "0:00";
+    totalTimeEl.textContent = "0:00";
+    progressFillEl.style.width = "0%";
+    return;
+  }
+  const progressPercent =
+    (audioPlayer.currentTime / audioPlayer.duration) * 100;
+  progressFillEl.style.width = `${progressPercent}%`;
+  currentTimeEl.textContent = formatMusicTime(audioPlayer.currentTime);
+  totalTimeEl.textContent = formatMusicTime(audioPlayer.duration);
+  updateActiveLyric(audioPlayer.currentTime);
+}
+
+/**
+ * 搜索网易云音乐歌曲
+ * @param {string} name - 歌曲名
+ * @param {string} singer - 歌手名
+ * @returns {Promise<Array>} 搜索结果数组
+ */
+async function searchNeteaseMusic(name, singer) {
+  try {
+    let searchTerm = name.replace(/\s/g, "");
+    if (singer) {
+      searchTerm += ` ${singer.replace(/\s/g, "")}`;
+    }
+
+    const apiUrl = `https://api.vkeys.cn/v2/music/netease?word=${encodeURIComponent(
+      searchTerm,
+    )}`;
+
+    const response = await fetch(apiUrl);
+
+    if (!response.ok) {
+      throw new Error(
+        `API request failed with status ${response.status}: ${response.statusText}`,
+      );
+    }
+
+    const result = await response.json();
+
+    if (result.code !== 200 || !result.data || result.data.length === 0) {
+      console.log("vkeys API返回无结果:", result);
+      return [];
+    }
+
+    return result.data
+      .map((song) => ({
+        name: song.song,
+        artist: song.singer,
+        id: song.id,
+        cover:
+          song.cover ||
+          "https://i.postimg.cc/pT2xKzP-album-cover-placeholder.png",
+        source: "netease",
+      }))
+      .slice(0, 15);
+  } catch (e) {
+    console.error("【vkeys API 直连】搜索失败:", e);
+    await showCustomAlert(
+      "网易云接口直连失败",
+      `如果浏览器控制台(F12)提示CORS错误，说明此API禁止直接访问。错误: ${e.message}`,
+    );
+    return [];
+  }
+}
+
+/**
+ * 搜索QQ音乐歌曲
+ * @param {string} name - 歌曲名
+ * @returns {Promise<Array>} 搜索结果数组
+ */
+async function searchTencentMusic(name) {
+  try {
+    name = name.replace(/\s/g, "");
+    const result = await Http_Get(
+      `https://api.vkeys.cn/v2/music/tencent?word=${encodeURIComponent(name)}`,
+    );
+    if (!result?.data?.length) return [];
+    return result.data
+      .map((song) => ({
+        name: song.song,
+        artist: song.singer,
+        id: song.id,
+        cover:
+          song.cover ||
+          "https://i.postimg.cc/pT2xKzPz/album-cover-placeholder.png",
+        source: "tencent",
+      }))
+      .slice(0, 5);
+  } catch (e) {
+    console.error("QQ音乐搜索API失败:", e);
+    return [];
+  }
+}
+/**
+ * 【新增】打开高级分享详情弹窗 (萌系版 - 带头像)
+ */
+function openAdvancedShareDetail(shareData) {
+  const modal = document.getElementById("ls-share-detail-modal");
+  const contentBox = modal.querySelector(".modal-content");
+
+  // 元素获取
+  const avatarEl = document.getElementById("ls-share-char-avatar");
+  const iconEl = document.getElementById("ls-share-badge-icon");
+  const titleEl = document.getElementById("ls-share-detail-title");
+  const tagEl = document.getElementById("ls-share-type-text");
+  const summaryEl = document.getElementById("ls-share-summary");
+  const thoughtsEl = document.getElementById("ls-share-thoughts");
+
+  // 1. 获取当前角色的头像
+  // activeLoversSpaceCharId 是一个全局变量，记录了当前正在查看哪个情侣空间
+  const chat = state.chats[activeLoversSpaceCharId];
+  if (chat) {
+    avatarEl.src = chat.settings.aiAvatar || defaultAvatar;
+  } else {
+    avatarEl.src = defaultAvatar;
+  }
+
+  // 配置数据 (定义图标、文字和配色主题)
+  const configMap = {
+    movie: { icon: "🎬", label: "电影推荐", class: "theme-movie" },
+    book: { icon: "📖", label: "好书分享", class: "theme-book" },
+    game: { icon: "🎮", label: "游戏安利", class: "theme-game" },
+  };
+
+  // 如果类型未知，默认用电影样式
+  const config = configMap[shareData.shareType] || configMap.movie;
+
+  // 2. 清除旧的主题Class，添加新的主题Class
+  contentBox.classList.remove("theme-movie", "theme-book", "theme-game");
+  contentBox.classList.add(config.class);
+
+  // 3. 填充内容
+  iconEl.textContent = config.icon;
+  titleEl.textContent = shareData.title || "未知标题";
+  tagEl.textContent = config.label;
+
+  // 如果有作者/歌手信息，加到标题后面
+  if (shareData.artist) {
+    titleEl.textContent += ` - ${shareData.artist}`;
+  }
+
+  // 简介内容
+  summaryEl.textContent = shareData.summary || "（Ta很神秘，没有写下简介...）";
+
+  // 感想内容 - "Char说..."
+  thoughtsEl.textContent =
+    shareData.thoughts || `推荐给你看看《${shareData.title}》！`;
+
+  // 4. 显示弹窗
+  modal.classList.add("visible");
+}
+
+/**
+ * 显示选择操作模态框
+ * @param {string} title - 模态框标题
+ * @param {Array} options - 选项数组[{text, value}]
+ * @returns {Promise<string|null>} 用户选择的值或null
+ */
+function showChoiceModal(title, options) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById("preset-actions-modal");
+    const footer = modal.querySelector(".custom-modal-footer");
+
+    footer.innerHTML = "";
+
+    options.forEach((option) => {
+      const button = document.createElement("button");
+      button.textContent = option.text;
+      button.onclick = () => {
+        modal.classList.remove("visible");
+        resolve(option.value);
+      };
+      footer.appendChild(button);
+    });
+
+    const cancelButton = document.createElement("button");
+    cancelButton.textContent = "取消";
+    cancelButton.style.marginTop = "8px";
+    cancelButton.style.borderRadius = "8px";
+    cancelButton.style.backgroundColor = "#f0f0f0";
+    cancelButton.onclick = () => {
+      modal.classList.remove("visible");
+      resolve(null);
+    };
+    footer.appendChild(cancelButton);
+
+    modal.classList.add("visible");
+  });
+}
+
+/**
+ * 打开情侣空间入口 - 根据角色数量决定直接进入或选择角色
+ */
+async function openLoversSpaceEntry() {
+  const singleChats = Object.values(state.chats).filter(
+    (chat) => !chat.isGroup,
+  );
+  if (singleChats.length === 0) {
+    alert("你还没有任何可以建立情侣空间的角色哦，先去创建一个吧！");
+    return;
+  }
+  if (singleChats.length === 1) {
+    openLoversSpace(singleChats[0].id);
+  } else {
+    openCharSelectorForLoversSpace();
+  }
+}
+
+/**
+ * 打开情侣空间角色选择器 - 显示角色列表及情侣空间开通状态
+ */
+async function openCharSelectorForLoversSpace() {
+  const modal = document.getElementById("ls-char-selector-modal");
+  const listEl = document.getElementById("ls-char-selector-list");
+  listEl.innerHTML = "";
+  const singleChats = Object.values(state.chats).filter(
+    (chat) => !chat.isGroup,
+  );
+
+  singleChats.forEach((chat) => {
+    const item = document.createElement("div");
+    item.className = "chat-list-item";
+    item.style.borderBottom = "1px solid var(--border-color)";
+    item.dataset.chatId = chat.id;
+
+    const isLoversSpaceActive = !!chat.loversSpaceData;
+    const statusText = isLoversSpaceActive
+      ? '<span style="color: green; font-weight: bold;">已开通</span>'
+      : '<span style="color: #8a8a8a;">未开启</span>';
+
+    item.innerHTML = `
+            <img src="${
+              chat.settings.aiAvatar || defaultAvatar
+            }" class="avatar">
+            <div class="info" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                <span class="name">${chat.name}</span>
+                <div class="last-msg">${statusText}</div>
+            </div>
+        `;
+    listEl.appendChild(item);
+  });
+
+  modal.classList.add("visible");
+}
+
+/**
+ * 打开指定角色的情侣空间
+ * @param {string} charId - 角色ID
+ */
+async function openLoversSpace(charId) {
+  activeLoversSpaceCharId = charId;
+  const chat = state.chats[charId];
+  if (!chat) return;
+
+  if (!chat.loversSpaceData) {
+    chat.loversSpaceData = {
+      background: "https://i.postimg.cc/k495F4W5/profile-banner.jpg",
+      relationshipStartDate: null,
+      moments: [],
+      albums: [],
+      photos: [],
+      loveLetters: [],
+      shares: [],
+      questions: [],
+      emotionDiaries: {},
+      dailyActivity: {},
+    };
+    await db.chats.put(chat);
+  }
+
+  await renderLoversSpace(chat);
+  showScreen("lovers-space-screen");
+}
+
+/**
+ * 更新情侣空间在一起天数显示
+ * @param {object} chat - 聊天对象
+ */
+function updateLoversSpaceDaysCounter(chat) {
+  const counterEl = document.getElementById("ls-days-counter");
+  const startDateString = chat.loversSpaceData.relationshipStartDate;
+
+  if (startDateString) {
+    const startDate = new Date(startDateString);
+    const today = new Date();
+    startDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+
+    const diffTime = Math.abs(today - startDate);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    counterEl.textContent = `我们已经在一起 ${diffDays} 天了`;
+  } else {
+    counterEl.innerHTML = `<a>点击右上角"设置"来记录第一天吧</a>`;
+  }
+}
+
+/**
+ * 渲染情侣空间界面
+ * @param {object} chat - 聊天对象
+ */
+async function renderLoversSpace(chat) {
+  document.getElementById("lovers-space-screen").style.backgroundImage =
+    `url(${chat.loversSpaceData.background})`;
+
+  const userNickname = state.qzoneSettings.nickname || "{{user}}";
+  document.getElementById("ls-char-name").textContent =
+    `${userNickname} & ${chat.name}`;
+
+  document.getElementById("ls-user-avatar").src =
+    chat.settings.myAvatar || defaultAvatar;
+  document.getElementById("ls-char-avatar").src =
+    chat.settings.aiAvatar || defaultAvatar;
+
+  updateLoversSpaceDaysCounter(chat);
+
+  switchLoversSpaceTab("ls-moments-view");
+  document.querySelector(".ls-tab-item.active").classList.remove("active");
+  document
+    .querySelector('.ls-tab-item[data-view="ls-moments-view"]')
+    .classList.add("active");
+
+  renderLSMoments(chat.loversSpaceData.moments, chat);
+  renderLSPhotos(chat.loversSpaceData.photos, chat);
+  renderLSLetters(chat.loversSpaceData.loveLetters, chat);
+  renderLSShares(chat.loversSpaceData.shares, chat);
+  document.getElementById("ls-shares-list").innerHTML =
+    '<p class="ls-empty-placeholder">Ta还没有分享任何内容~</p>';
+}
+
+/**
+ * 切换情侣空间页签
+ * @param {string} viewId - 视图ID
+ */
+function switchLoversSpaceTab(viewId) {
+  if (lsActivityTimer) {
+    clearInterval(lsActivityTimer);
+    lsActivityTimer = null;
+  }
+
+  document
+    .querySelectorAll(".ls-view")
+    .forEach((v) => (v.style.display = "none"));
+  const targetView = document.getElementById(viewId);
+  if (targetView) targetView.style.display = "block";
+
+  const fabMoment = document.getElementById("ls-add-moment-btn");
+  const fabAlbum = document.getElementById("ls-add-album-btn");
+  const fabLetter = document.getElementById("ls-add-letter-btn");
+  const fabQuestion = document.getElementById("ls-add-question-btn");
+  if (fabMoment) fabMoment.style.display = "none";
+  if (fabAlbum) fabAlbum.style.display = "none";
+  if (fabLetter) fabLetter.style.display = "none";
+  if (fabQuestion) fabQuestion.style.display = "none";
+  if (viewId === "ls-moments-view" && fabMoment)
+    fabMoment.style.display = "block";
+  else if (viewId === "ls-album-view" && fabAlbum)
+    fabAlbum.style.display = "block";
+  else if (viewId === "ls-letters-view" && fabLetter)
+    fabLetter.style.display = "block";
+  else if (viewId === "ls-questions-view" && fabQuestion)
+    fabQuestion.style.display = "block";
+
+  if (viewId === "ls-activity-view") {
+    const chat = state.chats[activeLoversSpaceCharId];
+    renderLSDailyActivity(chat);
+  }
+}
+
+/**
+ * 渲染今日足迹页面 - 默认显示当天
+ * @param {object} chat - 聊天对象
+ */
+function renderLSDailyActivity(chat) {
+  currentActivityDate = new Date();
+  renderLSDailyActivityForDate(chat, currentActivityDate);
+}
+
+/**
+ * 根据指定日期渲染每日足迹界面
+ * @param {object} chat - 聊天对象
+ * @param {Date} date - 指定日期
+ */
+function renderLSDailyActivityForDate(chat, date) {
+  const viewEl = document.getElementById("ls-activity-view");
+  viewEl.innerHTML = "";
+
+  if (!chat || !chat.loversSpaceData) {
+    viewEl.innerHTML =
+      '<p class="ls-empty-placeholder">数据错误，无法加载足迹。</p>';
+    return;
+  }
+
+  const header = document.createElement("div");
+  header.className = "ls-activity-header";
+  const dateStr = date.toISOString().split("T")[0];
+  const today = new Date();
+  const todayStr = today.toISOString().split("T")[0];
+
+  let dateDisplay = `${date.getFullYear()}年${
+    date.getMonth() + 1
+  }月${date.getDate()}日`;
+  if (dateStr === todayStr) {
+    dateDisplay += " (今天)";
+  }
+
+  const calendarIconSvg = `
+    <svg id="ls-activity-calendar-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M8 2V5" stroke="#4A4A4A" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M16 2V5" stroke="#4A4A4A" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M3.5 9.08997H20.5" stroke="#4A4A4A" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M21 8.5V17C21 20 19.5 22 16 22H8C4.5 22 3 20 3 17V8.5C3 5.5 4.5 3.5 8 3.5H16C19.5 3.5 21 5.5 21 8.5Z" stroke="#4A4A4A" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M15.6947 13.7H15.7037" stroke="#ff8fab" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M15.6947 16.7H15.7037" stroke="#ff8fab" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M11.9955 13.7H12.0045" stroke="#ff8fab" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M11.9955 16.7H12.0045" stroke="#ff8fab" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M8.29431 13.7H8.30331" stroke="#ff8fab" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M8.29431 16.7H8.30331" stroke="#ff8fab" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    `;
+
+  header.innerHTML = `
+    <span class="ls-activity-date-display">${dateDisplay}</span>
+    ${calendarIconSvg}
+    `;
+  viewEl.appendChild(header);
+  header.querySelector("#ls-activity-calendar-icon").onclick =
+    openActivityCalendar;
+
+  const activitiesForDate = chat.loversSpaceData.dailyActivity?.[dateStr];
+  const contentContainer = document.createElement("div");
+  viewEl.appendChild(contentContainer);
+
+  if (!activitiesForDate) {
+    if (dateStr === todayStr) {
+      contentContainer.innerHTML = `
+        <div class="ls-activity-generate-container">
+            <p>今天的足迹还是空白的...</p>
+            <button id="ls-generate-activity-btn">生成今天的足迹</button>
+            <p class="hint">（此操作每天只能进行一次）</p>
+        </div>
+    `;
+      contentContainer.querySelector("#ls-generate-activity-btn").onclick =
+        () => handleGenerateDailyActivity(chat);
+    } else {
+      contentContainer.innerHTML = `<p class="ls-empty-placeholder" style="margin-top: 50px;">这一天没有留下任何足迹哦~</p>`;
+    }
+  } else {
+    const listContainer = document.createElement("div");
+    listContainer.id = "ls-activity-list";
+    contentContainer.appendChild(listContainer);
+
+    if (lsActivityTimer) clearInterval(lsActivityTimer);
+    lsActivityTimer = null;
+
+    displayDailyActivities(activitiesForDate);
+
+    if (dateStr === todayStr) {
+      const hasAllDisplayed = displayDailyActivities(activitiesForDate);
+      if (!hasAllDisplayed) {
+        lsActivityTimer = setInterval(() => {
+          const allDone = displayDailyActivities(activitiesForDate);
+          if (allDone) {
+            clearInterval(lsActivityTimer);
+            lsActivityTimer = null;
+          }
+        }, 60 * 1000);
+      }
+    }
+  }
+}
+
+/**
+ * 打开每日足迹日历弹窗
+ * 初始化并显示足迹日历，支持月份切换和日期选择
+ */
+function openActivityCalendar() {
+  const modal = document.getElementById("ls-activity-calendar-modal");
+  const body = document.getElementById("ls-activity-calendar-body");
+  const chat = state.chats[activeLoversSpaceCharId];
+
+  const year = currentActivityDate.getFullYear();
+  const month = currentActivityDate.getMonth() + 1;
+  body.innerHTML = renderActivityCalendar(
+    year,
+    month,
+    chat.loversSpaceData.dailyActivity || {},
+  );
+
+  // 使用事件委托处理弹窗内所有点击事件
+  body.onclick = (e) => {
+    const target = e.target;
+
+    // 处理月份切换按钮点击
+    if (
+      target.closest("#ls-activity-cal-prev-btn") ||
+      target.closest("#ls-activity-cal-next-btn")
+    ) {
+      const currentDisplay = body.querySelector(
+        "#ls-activity-cal-month-display",
+      ).textContent;
+      const [y, m] = currentDisplay.match(/\d+/g).map(Number);
+      let newDate = new Date(y, m - 1, 1);
+
+      if (target.closest("#ls-activity-cal-prev-btn")) {
+        newDate.setMonth(newDate.getMonth() - 1);
+      } else {
+        newDate.setMonth(newDate.getMonth() + 1);
+      }
+      body.innerHTML = renderActivityCalendar(
+        newDate.getFullYear(),
+        newDate.getMonth() + 1,
+        chat.loversSpaceData.dailyActivity || {},
+      );
+      return;
+    }
+
+    // 处理日期格子点击
+    const dayCell = target.closest(".ls-calendar-day:not(.empty)");
+    if (dayCell && dayCell.dataset.date) {
+      const [y, m, d] = dayCell.dataset.date.split("-").map(Number);
+      currentActivityDate = new Date(y, m - 1, d);
+      renderLSDailyActivityForDate(chat, currentActivityDate);
+      modal.classList.remove("visible");
+      return;
+    }
+
+    // 处理关闭按钮点击
+    if (target.closest("#ls-activity-cal-close-btn")) {
+      modal.classList.remove("visible");
+    }
+  };
+
+  modal.classList.add("visible");
+}
+
+/**
+ * 生成足迹日历HTML
+ * @param {number} year - 年份
+ * @param {number} month - 月份
+ * @param {object} activityData - 活动数据
+ * @returns {string} 日历HTML字符串
+ */
+function renderActivityCalendar(year, month, activityData) {
+  const date = new Date(year, month - 1, 1);
+  const firstDay = date.getDay();
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const todayStr = new Date().toISOString().split("T")[0];
+
+  let calendarHtml = `
+    <div class="ls-calendar-wrapper">
+        <div class="ls-calendar-header">
+            <button id="ls-activity-cal-prev-btn">‹</button>
+            <span id="ls-activity-cal-month-display">${year}年 ${month}月</span>
+            <button id="ls-activity-cal-next-btn">›</button>
+        </div>
+        <div class="ls-calendar-weekdays">
+            <div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div>
+        </div>
+    <div class="ls-calendar-grid">
+    `;
+
+  for (let i = 0; i < firstDay; i++) {
+    calendarHtml += '<div class="ls-calendar-day empty"></div>';
+  }
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(
+      day,
+    ).padStart(2, "0")}`;
+    const hasActivity = !!activityData[dateStr];
+    const isToday = dateStr === todayStr;
+
+    let classes = "ls-calendar-day";
+    if (isToday) classes += " today";
+    if (hasActivity) classes += " has-activity";
+
+    calendarHtml += `
+        <div class="${classes}" data-date="${dateStr}" style="cursor: pointer;">
+            <div class="day-number">${day}</div>
+            ${hasActivity ? '<span class="activity-dot">🐾</span>' : ""}
+        </div>
+        `;
+  }
+  calendarHtml += `</div></div>
+    <div class="modal-footer" style="padding-top: 15px;">
+        <button class="save" id="ls-activity-cal-close-btn" style="width: 100%;">关闭</button>
+    </div>
+    `;
+  return calendarHtml;
+}
+
+/**
+ * 显示当天的活动列表
+ * @param {Array} activities - 当天所有活动的数组
+ * @returns {boolean} - 如果所有活动都已显示，返回 true
+ */
+function displayDailyActivities(activities) {
+  const listEl = document.getElementById("ls-activity-list");
+  listEl.innerHTML = "";
+  const now = Date.now();
+
+  const visibleActivities = activities.filter((act) => act.timestamp <= now);
+
+  if (visibleActivities.length === 0) {
+    listEl.innerHTML =
+      '<p class="ls-empty-placeholder">Ta今天还没开始活动呢...</p>';
+  } else {
+    visibleActivities.forEach((activity) => {
+      const itemEl = document.createElement("div");
+      itemEl.className = "ls-activity-item";
+
+      const activityTime = new Date(activity.timestamp);
+      const timeString = `${String(activityTime.getHours()).padStart(
+        2,
+        "0",
+      )}:${String(activityTime.getMinutes()).padStart(2, "0")}`;
+
+      const durationHtml = activity.duration
+        ? `<span class="activity-duration">${activity.duration}</span>`
+        : "";
+
+      itemEl.innerHTML = `
+                <span class="activity-time">${timeString}</span>
+                <div class="activity-icon">${activity.icon}</div>
+                <div class="activity-content">
+                    <p class="activity-description">${activity.description}</p>
+                    ${durationHtml}
+                </div>
+            `;
+      listEl.appendChild(itemEl);
+
+      // 渲染HTML小剧场（如果存在）
+      if (activity.html_snippet) {
+        const snippetEl = document.createElement("div");
+        snippetEl.className = "ls-activity-snippet";
+        snippetEl.innerHTML = activity.html_snippet;
+        listEl.appendChild(snippetEl);
+      }
+    });
+  }
+
+  return visibleActivities.length === activities.length;
+}
+
+/**
+ * 打开文件选择器并返回本地图片的Base64编码
+ * @returns {Promise<string|null>} - 返回图片的Base64 Data URL，如果用户取消则返回null
+ */
+function uploadImageLocally() {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+
+    input.onchange = (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (readerEvent) => {
+          resolve(readerEvent.target.result);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        resolve(null);
+      }
+    };
+
+    input.click();
+  });
+}
+
+/**
+ * 触发AI生成一整天的手机活动记录
+ * @param {object} chat - 当前角色的聊天对象
+ */
+async function handleGenerateDailyActivity(chat) {
+  await showCustomAlert("请稍候...", `AI正在为“${chat.name}”规划一天的生活...`);
+
+  const { proxyUrl, apiKey, model } = state.apiConfig;
+  if (!proxyUrl || !apiKey || !model) {
+    alert("请先配置API！");
+    return;
+  }
+
+  const systemPrompt = `
+        # 角色扮演任务
+        你是一个手机活动模拟器。你的任务是根据角色“${chat.name}”的人设，为Ta生成一整天（从午夜0点到晚上23点）的、详细且真实的手机使用记录，根据人设规定起床时间。
+
+        # 角色人设 (必须严格遵守)
+        ${chat.settings.aiPersona}
+
+        # 核心规则
+        1.  **时间连贯性**: 你的活动记录必须按时间顺序排列，覆盖全天，禁止时间过渡过于死板。
+        2.  **内容多样性**: 活动类型应丰富多样，包括但不限于应用使用、手机状态、其他（设置闹钟、查看天气等）。
+        3.  **符合人设**: 所有活动都必须与角色的性格、职业和兴趣爱好高度相关。
+        4.  **【【【全新功能：HTML小剧场】】】**:
+            -   对于某些特定的活动（例如看电影、吃饭、购物），你可以【随机且可选地】额外生成一个名为 \`html_snippet\` 的字段。
+            -   这个字段的内容是【一小段HTML代码】，用来展示一个与活动相关的视觉元素，例如电影票根、购物小票等。
+            -   你【不需要】为每个活动都生成这个字段，只需在你认为合适的、有趣的节点上随机加入，以增加趣味性。
+        5.  **格式铁律**: 你的回复【必须且只能】是一个严格的JSON数组，每个对象代表一条活动记录。
+
+        # JSON对象结构 (html_snippet 是可选的！)
+        {
+        "time": "HH:mm",
+        "description": "活动描述",
+        "duration": "(可选) 持续时长",
+        "icon": "单个emoji或svg图标",
+        "html_snippet": "(可选) 用于生成小剧场的HTML代码"
+        }
+
+        # HTML小剧场格式示例 (供你参考，你可以自由创作):
+        -   **看电影**:
+            "html_snippet": "<div class='movie-ticket'><div class='ticket-header'>EPHONE影城</div><div class='ticket-body'><h3>《你的名字》</h3><p>场次: 14:30 | 7号厅 8排5座</p></div></div>"
+        -   **吃饭**:
+            "html_snippet": "<div class='receipt'><div class='receipt-header'>温馨小馆</div><ul><li><span>拉面 x1</span><span>￥28.00</span></li><li><span>溏心蛋 x1</span><span>￥5.00</span></li></ul><div class='receipt-total'><strong>合计:</strong><strong>￥33.00</strong></div></div>"
+
+        现在，请开始为“${chat.name}”生成今天的生活记录。
+    `;
+
+  try {
+    const messagesForApi = [{ role: "user", content: systemPrompt }];
+    let isGemini = proxyUrl === GEMINI_API_URL;
+    let geminiConfig = toGeminiRequestData(
+      model,
+      apiKey,
+      systemPrompt,
+      messagesForApi,
+      isGemini,
+    );
+
+    const response = await fetch(
+      isGemini ? geminiConfig.url : `${proxyUrl}/v1/chat/completions`,
+      isGemini
+        ? geminiConfig.data
+        : {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+              model: model,
+              messages: messagesForApi,
+              temperature: 1.0,
+              response_format: { type: "json_object" },
+            }),
+          },
+    );
+
+    if (!response.ok)
+      throw new Error(
+        `API请求失败: ${response.status} - ${await response.text()}`,
+      );
+
+    const data = await response.json();
+    const rawContent = (
+      isGemini
+        ? data.candidates[0].content.parts[0].text
+        : data.choices[0].message.content
+    )
+      .replace(/^```json\s*|```$/g, "")
+      .trim();
+    console.log("【AI每日足迹 - 原始输出】:", rawContent);
+    const generatedActivities = JSON.parse(rawContent);
+
+    if (Array.isArray(generatedActivities)) {
+      const today = new Date();
+      const todayDateStr = today.toISOString().split("T")[0];
+
+      // 将AI返回的时间字符串转换为完整的时间戳
+      const processedActivities = generatedActivities.map((act) => {
+        const [hours, minutes] = act.time.split(":").map(Number);
+        const activityDate = new Date(
+          today.getFullYear(),
+          today.getMonth(),
+          today.getDate(),
+          hours,
+          minutes,
+        );
+        return { ...act, timestamp: activityDate.getTime() };
+      });
+
+      // 保存到数据库
+      if (!chat.loversSpaceData.dailyActivity) {
+        chat.loversSpaceData.dailyActivity = {};
+      }
+      chat.loversSpaceData.dailyActivity[todayDateStr] = processedActivities;
+      await db.chats.put(chat);
+
+      // 重新渲染界面
+      renderLSDailyActivity(chat);
+    } else {
+      throw new Error("AI返回的数据格式不正确。");
+    }
+  } catch (error) {
+    console.error("生成今日足迹失败:", error);
+    await showCustomAlert("生成失败", `发生了一个错误：\n${error.message}`);
+    // 失败时，恢复"生成"按钮的显示
+    const viewEl = document.getElementById("ls-activity-view");
+    viewEl.innerHTML = `
+            <div class="ls-activity-generate-container">
+                <p style="color:red;">生成失败，请重试！</p>
+                <button id="ls-generate-activity-btn">重新生成</button>
+            </div>
+        `;
+    document.getElementById("ls-generate-activity-btn").onclick = () =>
+      handleGenerateDailyActivity(chat);
+  }
+}
+
+/**
+ * 处理更换情侣空间背景的逻辑
+ */
+async function handleChangeLoversSpaceBackground() {
+  if (!activeLoversSpaceCharId) return;
+
+  // 让用户选择上传方式
+  const choice = await showChoiceModal("更换空间背景", [
+    { text: "📁 从本地上传", value: "local" },
+    { text: "🌐 使用网络URL", value: "url" },
+  ]);
+
+  let newBackgroundUrl = null;
+
+  if (choice === "local") {
+    // 从本地上传图片
+    newBackgroundUrl = await uploadImageLocally();
+  } else if (choice === "url") {
+    // 使用网络URL
+    const currentBg =
+      state.chats[activeLoversSpaceCharId].loversSpaceData.background;
+    newBackgroundUrl = await showCustomPrompt(
+      "更换背景",
+      "请输入新的图片URL",
+      currentBg,
+      "url",
+    );
+  }
+
+  // 处理新背景URL
+  if (newBackgroundUrl && newBackgroundUrl.trim()) {
+    const chat = state.chats[activeLoversSpaceCharId];
+    chat.loversSpaceData.background = newBackgroundUrl.trim();
+
+    // 保存到数据库并重新渲染
+    await db.chats.put(chat);
+    await renderLoversSpace(chat);
+
+    alert("情侣空间背景已更新！");
+  } else if (newBackgroundUrl !== null) {
+    alert("请输入一个有效的URL或选择一个文件！");
+  }
+}
+
+/**
+ * 渲染"说说"列表
+ * @param {Array} moments - 说说数组
+ * @param {object} chat - 聊天对象
+ */
+function renderLSMoments(moments, chat) {
+  const listEl = document.getElementById("ls-moments-list");
+  listEl.innerHTML = "";
+  if (!moments || moments.length === 0) {
+    listEl.innerHTML =
+      '<p class="ls-empty-placeholder">还没有任何悄悄话，快来发布第一条吧！</p>';
+    return;
+  }
+
+  // 从新到旧显示说说
+  for (let i = moments.length - 1; i >= 0; i--) {
+    const moment = moments[i];
+    const originalIndex = i;
+
+    const isUser = moment.author === "user";
+    const authorName = isUser ? chat.settings.myNickname || "我" : chat.name;
+    const authorAvatar = isUser
+      ? chat.settings.myAvatar
+      : chat.settings.aiAvatar;
+
+    // 构建评论区HTML
+    let commentsHtml = "";
+    if (moment.comments && moment.comments.length > 0) {
+      moment.comments.forEach((comment, commentIndex) => {
+        commentsHtml += `
+                    <div class="ls-comment-item">
+                        <span class="commenter-name">${comment.author}:</span>
+                        <span class="comment-text">${comment.text}</span>
+                        <button class="ls-comment-delete-btn" data-moment-index="${originalIndex}" data-comment-index="${commentIndex}">×</button>
+                    </div>
+                `;
+      });
+    }
+
+    const card = document.createElement("div");
+    card.className = "ls-moment-card";
+    // 保存原始索引用于删除操作
+    card.dataset.momentIndex = originalIndex;
+
+    // 构建说说卡片HTML
+    card.innerHTML = `
+            <img src="${authorAvatar}" class="avatar">
+            <div class="moment-main">
+                <span class="author">${authorName}</span>
+                <p class="content">${moment.content.replace(/\n/g, "<br>")}</p>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span class="timestamp">${formatPostTimestamp(
+                      moment.timestamp,
+                    )}</span>
+                </div>
+                
+                <!-- 评论区域 -->
+                <div class="ls-moment-footer">
+                    <div class="ls-moment-comments-container">
+                        ${commentsHtml}
+                    </div>
+                    <div class="ls-comment-input-area">
+                        <input type="text" placeholder="添加评论...">
+                        <button class="ls-comment-send-btn">发送</button>
+                    </div>
+                </div>
+                <!-- 评论区域结束 -->
+
+            </div>
+            <!-- 删除说说按钮 -->
+            <button class="ls-moment-delete-btn" title="删除这条说说">×</button>
+        `;
+    listEl.appendChild(card);
+  }
+}
+
+/**
+ * 渲染"分享"列表 (萌系升级版)
+ * @param {Array} shares - 分享数组
+ * @param {object} chat - 聊天对象
+ */
+function renderLSShares(shares, chat) {
+  const listEl = document.getElementById("ls-shares-list");
+  listEl.innerHTML = "";
+
+  if (!shares || shares.length === 0) {
+    listEl.innerHTML =
+      '<div class="ls-empty-state"><span style="font-size:40px;">🎐</span><p>还没有任何分享哦~<br>点击右下角分享一部喜欢的电影吧！</p></div>';
+    return;
+  }
+
+  [...shares].reverse().forEach((share) => {
+    const item = document.createElement("div");
+    item.className = "ls-list-item ls-share-item";
+    item.dataset.shareData = JSON.stringify(share);
+
+    // 1. 确定是谁分享的，获取对应头像
+    const isUser = share.author === "user";
+    const authorName = isUser ? chat.settings.myNickname || "我" : chat.name;
+    const avatarSrc = isUser
+      ? chat.settings.myAvatar || defaultAvatar
+      : chat.settings.aiAvatar || defaultAvatar;
+
+    // 2. 定义不同类型的可爱风格配置
+    const styleConfig = {
+      song: {
+        icon: "🎵",
+        color: "#FFF0F5",
+        border: "#FFB7B2",
+        label: "分享了歌曲",
+      }, // 粉色系
+      movie: {
+        icon: "🎬",
+        color: "#E3F2FD",
+        border: "#64B5F6",
+        label: "想看电影",
+      }, // 蓝色系
+      book: {
+        icon: "📖",
+        color: "#F1F8E9",
+        border: "#AED581",
+        label: "正在读",
+      }, // 绿色系
+      game: {
+        icon: "🎮",
+        color: "#FFF8E1",
+        border: "#FFB74D",
+        label: "安利游戏",
+      }, // 橙色系
+    };
+
+    const config = styleConfig[share.shareType] || styleConfig.song;
+
+    // 3. 构建内容部分
+    let contentHtml = "";
+
+    // 标题部分
+    contentHtml += `<div class="share-card-title">${config.icon} ${share.title}</div>`;
+
+    // 歌手/作者/简介信息
+    if (share.shareType === "song" && share.artist) {
+      contentHtml += `<div class="share-card-meta">歌手：${share.artist}</div>`;
+    } else if (share.summary) {
+      // 限制字数，防止太长
+      const summaryText =
+        share.summary.length > 60
+          ? share.summary.substring(0, 60) + "..."
+          : share.summary;
+      contentHtml += `<div class="share-card-desc">${summaryText}</div>`;
+    }
+
+    // 感想部分 (像便签一样贴在下面)
+    let thoughtsHtml = "";
+    if (share.thoughts) {
+      thoughtsHtml = `
+                <div class="share-card-thoughts">
+                    <span class="quote-mark">“</span>
+                    ${share.thoughts}
+                    <span class="quote-mark">”</span>
+                </div>
+            `;
+    }
+
+    // 4. 组装整体HTML (带头像的布局)
+    item.innerHTML = `
+            <div class="ls-share-wrapper ${isUser ? "is-me" : ""}">
+                <img src="${avatarSrc}" class="ls-share-avatar" alt="${authorName}">
+                
+                <div class="ls-share-bubble" style="background-color: ${config.color}; border: 2px solid ${config.border};">
+                    <div class="ls-share-header">
+                        <span class="ls-share-label" style="background:${config.border}; color:#fff;">${config.label}</span>
+                        <span class="ls-share-time">${formatPostTimestamp(share.timestamp)}</span>
+                    </div>
+                    
+                    <div class="ls-share-content-box">
+                        ${contentHtml}
+                    </div>
+                    
+                    ${thoughtsHtml}
+                </div>
+            </div>
+        `;
+
+    listEl.appendChild(item);
+  });
+}
+
+/**
+ * 渲染"照片"列表
+ * @param {Array} photos - 照片数组
+ * @param {object} chat - 聊天对象
+ */
+function renderLSPhotos(photos, chat) {
+  const listEl = document.getElementById("ls-album-list");
+  listEl.innerHTML = "";
+  if (!photos || photos.length === 0) {
+    listEl.innerHTML =
+      '<p class="ls-empty-placeholder" style="grid-column: 1 / -1;">还没有任何照片，点击右下角"上传第一张吧！</p>';
+    return;
+  }
+
+  [...photos].reverse().forEach((photo) => {
+    const item = document.createElement("div");
+    item.className = "ls-album-item";
+
+    // 为每个照片项添加时间戳，用于标识和操作特定照片
+    item.dataset.timestamp = photo.timestamp;
+
+    const imageUrl =
+      photo.type === "image"
+        ? photo.url
+        : "https://i.postimg.cc/KYr2qRCK/1.jpg";
+
+    // 修改点：使用 img 标签代替 background-image，并确保样式正确
+    item.innerHTML = `
+            <div class="cover" style="position: relative; width: 100%; height: 100%; overflow: hidden; border-radius: 8px;">
+                <img src="${imageUrl}" style="width: 100%; height: 100%; object-fit: cover; display: block;" loading="lazy">
+                <button class="ls-photo-delete-btn">×</button>
+            </div>
+        `;
+
+    listEl.appendChild(item);
+  });
+}
+// --- 新增函数开始 ---
+
+/**
+ * 打开照片详情评论弹窗
+ * @param {number} timestamp - 照片的时间戳ID
+ */
+async function openLSPhotoDetail(timestamp) {
+  const chat = state.chats[activeLoversSpaceCharId];
+  if (!chat || !chat.loversSpaceData || !chat.loversSpaceData.photos) return;
+
+  const photo = chat.loversSpaceData.photos.find(
+    (p) => p.timestamp === timestamp,
+  );
+  if (!photo) return;
+
+  // 1. 填充基本信息
+  const imgEl = document.getElementById("ls-photo-detail-img");
+  // 兼容 text_image 类型
+  if (photo.type === "text_image") {
+    imgEl.src = "https://i.postimg.cc/KYr2qRCK/1.jpg"; // 默认文字图背景
+  } else {
+    imgEl.src = photo.url;
+  }
+
+  document.getElementById("ls-photo-detail-desc").textContent =
+    photo.description || "（没有描述）";
+  document.getElementById("ls-photo-detail-meta").textContent =
+    formatPostTimestamp(photo.timestamp);
+
+  // 2. 暂存当前查看的照片时间戳，供发送按钮使用
+  document.getElementById("ls-photo-detail-modal").dataset.currentTimestamp =
+    timestamp;
+
+  // 3. 渲染评论
+  renderLSPhotoComments(photo);
+
+  // 4. 显示弹窗
+  document.getElementById("ls-photo-detail-modal").classList.add("visible");
+}
+
+/**
+ * 渲染照片评论列表 (萌系版 - 带头像)
+ */
+function renderLSPhotoComments(photo) {
+  const listEl = document.getElementById("ls-photo-comments-list");
+  listEl.innerHTML = "";
+
+  if (!photo.comments || photo.comments.length === 0) {
+    listEl.innerHTML =
+      '<div style="text-align:center; color:#eda; padding:20px; font-size:13px;">(｡•́︿•̀｡) 还没有人评论呢，快来抢沙发~</div>';
+    return;
+  }
+
+  const chat = state.chats[activeLoversSpaceCharId];
+  // 获取"我"的名字
+  const myNickname = chat.settings.myNickname || "我";
+
+  photo.comments.forEach((comment) => {
+    const item = document.createElement("div");
+    const isMe = comment.author === myNickname;
+
+    // 设置样式类名
+    item.className = `ls-photo-comment-item ${isMe ? "is-me" : ""}`;
+
+    // 确定头像
+    let avatarSrc = defaultAvatar;
+    if (isMe) {
+      avatarSrc = chat.settings.myAvatar || defaultAvatar;
+    } else if (comment.author === chat.name) {
+      avatarSrc = chat.settings.aiAvatar || defaultAvatar;
+    }
+
+    item.innerHTML = `
+            <img src="${avatarSrc}" class="ls-photo-comment-avatar">
+            <div class="ls-photo-comment-bubble">
+                <span class="ls-comment-author">${comment.author}</span>
+                ${comment.text}
+            </div>
+        `;
+    listEl.appendChild(item);
+  });
+
+  // 自动滚动到底部
+  setTimeout(() => {
+    listEl.scrollTop = listEl.scrollHeight;
+  }, 100);
+}
+
+/**
+ * 处理发送照片评论
+ */
+async function handleSendLSPhotoComment() {
+  const modal = document.getElementById("ls-photo-detail-modal");
+  const timestamp = parseInt(modal.dataset.currentTimestamp);
+  const input = document.getElementById("ls-photo-comment-input");
+  const text = input.value.trim();
+
+  if (!text) return alert("请输入评论内容");
+  if (!activeLoversSpaceCharId) return;
+
+  const chat = state.chats[activeLoversSpaceCharId];
+  const photo = chat.loversSpaceData.photos.find(
+    (p) => p.timestamp === timestamp,
+  );
+  if (!photo) return;
+
+  // 1. 初始化评论数组
+  if (!photo.comments) photo.comments = [];
+
+  // 2. 添加评论
+  const myNickname = chat.settings.myNickname || "我";
+  photo.comments.push({
+    author: myNickname,
+    text: text,
+    timestamp: Date.now(),
+  });
+
+  // 3. 保存并刷新
+  await db.chats.put(chat);
+  renderLSPhotoComments(photo);
+  input.value = ""; // 清空输入框
+
+  // 4. 【核心】触发AI回复
+  // 构造一条系统消息通知AI
+  const photoDesc = photo.description || "一张照片";
+  const hiddenMessage = {
+    role: "system",
+    content: `[系统提示：用户评论了情侣空间的一张照片。
+        照片描述：“${photoDesc}”。
+        用户的评论：“${text}”。
+        请你以"${chat.name}"的身份，针对这张照片和用户的评论进行回应。]`,
+    timestamp: Date.now(),
+    isHidden: true,
+  };
+
+  chat.history.push(hiddenMessage);
+  await db.chats.put(chat); // 再次保存聊天记录
+}
+
+// --- 新增函数结束 ---
+
+/**
+ * 打开创建说说的弹窗
+ * 清空输入框内容并显示说说创建模态框
+ */
+function openMomentCreator() {
+  document.getElementById("ls-moment-content-input").value = "";
+  document.getElementById("ls-create-moment-modal").classList.add("visible");
+}
+
+/**
+ * 用户发布说说
+ * 处理用户提交的说说内容，保存到数据库并通知AI
+ */

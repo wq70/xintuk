@@ -1,0 +1,1279 @@
+// weibo.js
+
+// ===================================================================
+// 1. Global variables for Weibo functionality
+// ===================================================================
+let currentViewingWeiboProfileId = null; // Global variable, records which character's homepage is being viewed
+let currentHotTopic = ""; // Used to store the currently viewed hot search topic
+let hotTopicFeedCache = {}; // Used to cache generated content
+let weiboHotSearchCache = [];
+let currentWeiboActionTarget = {}; // Used to store information about the target being operated on
+
+// Variables for user's own DMs
+let currentUserDmFanIndex = null; // Used to track which fan's DM is being viewed
+
+// Variables for character DMs
+let currentViewingDmsFor = null; // Used to track which character's DMs are being viewed
+
+// ===================================================================
+// 2. Weibo Function Definitions
+// ===================================================================
+
+/**
+ * 【微博】总入口：根据当前激活的视图，渲染对应的微博Feed
+ */
+async function renderWeiboFeeds(viewId) {
+  if (viewId === "weibo-my-profile-view") {
+    await renderMyWeiboFeed();
+  } else if (viewId === "weibo-following-view") {
+    await renderFollowingWeiboFeed();
+  }
+}
+/**
+ * 【核心】根据ID和名字解析头像
+ * 优先级：用户 -> 角色 -> NPC -> 全局路人库
+ */
+function resolveWeiboAvatar(id, name) {
+  // 1. 如果是用户
+  if (id === "user" || name === state.qzoneSettings.nickname) {
+    return (
+      state.qzoneSettings.weiboAvatar ||
+      state.qzoneSettings.avatar ||
+      defaultAvatar
+    );
+  }
+
+  // 2. 如果是已知角色 (Char)
+  if (state.chats[id]) {
+    return state.chats[id].settings.aiAvatar || defaultAvatar;
+  }
+
+  // 3. 尝试通过名字查找是否是已知角色 (兼容临时贴没有ID的情况)
+  const foundChar = Object.values(state.chats).find((c) => c.name === name);
+  if (foundChar) {
+    return foundChar.settings.aiAvatar || defaultAvatar;
+  }
+
+  // 4. 尝试查找是否是某个角色的NPC
+  for (const chat of Object.values(state.chats)) {
+    if (chat.npcLibrary) {
+      const foundNpc = chat.npcLibrary.find((n) => n.name === name);
+      if (foundNpc) {
+        return foundNpc.avatar || defaultGroupMemberAvatar;
+      }
+    }
+  }
+
+  // 5. 【核心】如果是路人，使用全局路人头像库 (根据名字哈希获取，保证同一人头像不变)
+  // 确保 window.getAvatarForName 存在 (在你的 main-app.js 底部定义的)
+  if (typeof window.getAvatarForName === "function") {
+    return window.getAvatarForName(name);
+  }
+
+  // 6. 兜底默认
+  return "https://i.postimg.cc/PxZrFFFL/o-o-1.jpg";
+}
+
+/**
+ * 【微博】渲染“我的主页”上的微博列表
+ */
+async function renderMyWeiboFeed() {
+  const feedEl = document.getElementById("my-weibo-feed-list");
+  const posts = await db.weiboPosts
+    .where("authorId")
+    .equals("user")
+    .reverse()
+    .toArray();
+  feedEl.innerHTML = "";
+  if (posts.length === 0) {
+    feedEl.innerHTML =
+      '<p style="text-align:center; color: var(--text-secondary);">你还没有发过微博哦，点击右上角“+”试试吧！</p>';
+    return;
+  }
+  posts.forEach((post) => {
+    // 【核心修改】调用我们新的专属函数！
+    feedEl.appendChild(createWeiboPostElement(post));
+  });
+}
+
+/**
+ * 【微博】渲染“关注的人”的微博Feed (已修复卡顿问题)
+ */
+async function renderFollowingWeiboFeed() {
+  const feedEl = document.getElementById("weibo-following-feed-list");
+
+  // 【核心优化】我们不再一次性读取所有帖子，而是直接让数据库帮我们筛选和排序，速度会快很多！
+  const posts = await db.weiboPosts
+    .where("authorId")
+    .notEqual("user") // 1. 直接在数据库层面，找出作者不是'user'的帖子
+    .reverse() // 2. 让结果按倒序排列
+    .sortBy("timestamp"); // 3. 根据时间戳排序
+
+  // 后续的渲染逻辑保持不变
+  feedEl.innerHTML = "";
+  if (posts.length === 0) {
+    feedEl.innerHTML =
+      '<p style="text-align:center; color: var(--text-secondary);">你关注的人还没有发布任何动态哦。</p>';
+    return;
+  }
+  posts.forEach((post) => {
+    feedEl.appendChild(createWeiboPostElement(post));
+  });
+}
+/**
+ * 【修复】保存微博/动态设置到数据库
+ * (修复 ReferenceError: saveQzoneSettings is not defined)
+ */
+async function saveQzoneSettings() {
+  // 确保 db 和 state.qzoneSettings 都存在
+  if (typeof db !== "undefined" && state && state.qzoneSettings) {
+    await db.qzoneSettings.put(state.qzoneSettings);
+  }
+}
+
+function createWeiboPostElement(post) {
+  const postEl = document.createElement("div");
+  postEl.className = "weibo-post-item";
+
+  postEl.dataset.postId = post.id;
+
+  let contentHtml = "";
+  if (post.content) {
+    contentHtml += `<div class="weibo-post-content">${post.content.replace(/\n/g, "<br>")}</div>`;
+  }
+
+  if (post.imageUrl) {
+    if (post.postType === "text_image") {
+      contentHtml += `<img src="${post.imageUrl}" class="weibo-post-image" style="cursor: pointer;" data-hidden-text="${
+        post.hiddenContent || ""
+      }">`;
+    } else {
+      contentHtml += `<img src="${post.imageUrl}" class="weibo-post-image">`;
+    }
+  }
+
+  let commentsHtml = "";
+  if (
+    post.comments &&
+    Array.isArray(post.comments) &&
+    post.comments.length > 0
+  ) {
+    commentsHtml += '<div class="weibo-comments-container">';
+    post.comments.forEach((comment) => {
+      if (typeof comment !== "object" || comment === null) return;
+
+      // --- 新增：获取评论者头像 ---
+      // 传入 authorId (如果有) 和 authorNickname
+      const commentAvatarUrl = resolveWeiboAvatar(
+        comment.authorId,
+        comment.authorNickname,
+      );
+
+      let replyHtml = "";
+      if (comment.replyToNickname) {
+        replyHtml = `<span class="weibo-comment-reply-tag">回复</span><span class="reply-target-name" data-reply-to-name="${comment.replyToNickname}">${comment.replyToNickname}</span>`;
+      }
+
+      // --- 修改：HTML结构加入头像 ---
+      commentsHtml += `
+                <div class="weibo-comment-item" data-comment-id="${comment.commentId}" data-commenter-name="${comment.authorNickname}">
+                    <img src="${commentAvatarUrl}" class="weibo-comment-avatar">
+                    <div class="weibo-comment-content-wrapper">
+                        <span class="weibo-commenter-name">${comment.authorNickname}</span>
+                        ${replyHtml}:
+                        <span class="weibo-comment-text">${comment.commentText}</span>
+                    </div>
+                    <button class="comment-delete-btn" title="删除此条评论">×</button>
+                </div>`;
+    });
+    commentsHtml += "</div>";
+  }
+
+  const myNickname =
+    state.qzoneSettings.weiboNickname || state.qzoneSettings.nickname || "我";
+  const isLiked = post.likes && post.likes.includes(myNickname);
+
+  let finalAuthorAvatar, finalAuthorNickname, finalAuthorAvatarFrame;
+  if (post.authorId === "user") {
+    finalAuthorAvatar =
+      state.qzoneSettings.weiboAvatar ||
+      state.qzoneSettings.avatar ||
+      defaultAvatar;
+    finalAuthorNickname =
+      state.qzoneSettings.weiboNickname || state.qzoneSettings.nickname || "我";
+    finalAuthorAvatarFrame = state.qzoneSettings.weiboAvatarFrame || "";
+  } else if (state.chats[post.authorId]) {
+    const authorChat = state.chats[post.authorId];
+    finalAuthorNickname = authorChat.settings.weiboNickname || authorChat.name;
+    finalAuthorAvatar =
+      authorChat.settings.weiboAvatar ||
+      authorChat.settings.aiAvatar ||
+      defaultAvatar;
+    finalAuthorAvatarFrame =
+      authorChat.settings.weiboAvatarFrame ||
+      authorChat.settings.aiAvatarFrame ||
+      "";
+  } else {
+    // --- 修改：如果是路人，使用路人库头像 ---
+    finalAuthorNickname = post.authorNickname || "未知用户";
+    finalAuthorAvatar = resolveWeiboAvatar(post.authorId, finalAuthorNickname); // 使用我们的新函数
+    finalAuthorAvatarFrame = "";
+  }
+
+  let avatarHtml = "";
+  if (finalAuthorAvatarFrame) {
+    avatarHtml = `
+            <div class="avatar-with-frame">
+                <img src="${finalAuthorAvatar}" class="avatar-img weibo-post-avatar">
+                <img src="${finalAuthorAvatarFrame}" class="avatar-frame">
+            </div>`;
+  } else {
+    avatarHtml = `<img src="${finalAuthorAvatar}" class="weibo-post-avatar">`;
+  }
+
+  const clickableAvatarWrapper = `
+        <div class="weibo-post-avatar-clickable" data-char-id="${post.authorId}">
+            ${avatarHtml}
+        </div>
+    `;
+
+  postEl.innerHTML = `
+        <div class="weibo-post-header">
+            ${clickableAvatarWrapper} 
+            <div class="weibo-post-info">
+                <span class="weibo-post-nickname">${finalAuthorNickname}</span>
+                <span class="weibo-post-timestamp">${formatPostTimestamp(post.timestamp)}</span>
+            </div>
+            <div class="post-actions-btn" data-post-id="${post.id}" data-author-id="${post.authorId}">…</div>
+        </div>
+        ${contentHtml}
+        <div class="weibo-post-footer">
+            <div class="weibo-post-actions">
+                <span class="weibo-action-btn like-btn ${isLiked ? "liked" : ""}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path></svg>
+                    <span>${(post.baseLikesCount || 0) + (post.likes || []).length}</span>
+                </span>
+                <span class="weibo-action-btn comment-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>           
+                    <span>${(post.comments || []).length}</span>
+                </span>
+                <span class="weibo-action-btn generate-comments-btn" title="AI生成评论">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>
+                    </svg>
+                    <span>生成评论</span>
+                </span>
+            </div>
+            ${commentsHtml}
+            <div class="weibo-comment-input-area">
+                <input type="text" class="weibo-comment-input" placeholder="留下你的精彩评论吧...">
+                <button class="weibo-comment-send-btn">发送</button>
+            </div>
+        </div>
+    `;
+
+  // 绑定发送评论按钮
+  const sendBtn = postEl.querySelector(".weibo-comment-send-btn");
+  if (sendBtn) {
+    sendBtn.addEventListener("click", () => {
+      const input = postEl.querySelector(".weibo-comment-input");
+      handleWeiboComment(post.id, input);
+    });
+  }
+
+  // 绑定AI生成评论按钮
+  const generateBtn = postEl.querySelector(".generate-comments-btn");
+  if (generateBtn) {
+    generateBtn.addEventListener("click", () => generateWeiboComments(post.id));
+  }
+
+  // 绑定点赞按钮
+  const likeBtn = postEl.querySelector(".like-btn");
+  if (likeBtn) {
+    likeBtn.addEventListener("click", () => handleWeiboLike(post.id));
+  }
+
+  // ★ 修改2：为评论区绑定一个全新的、功能更强大的点击事件监听器
+  const commentSection = postEl.querySelector(".weibo-comments-container");
+  if (commentSection) {
+    commentSection.addEventListener("click", (e) => {
+      // 阻止事件冒泡，这是解决点击无效的核心！
+      e.stopPropagation();
+
+      const target = e.target;
+      const commentItem = target.closest(".weibo-comment-item");
+      if (!commentItem) return; // 如果点击的不是评论区，就什么也不做
+
+      const input = postEl.querySelector(".weibo-comment-input");
+
+      // 检查点击的是否是删除按钮
+      if (target.closest(".comment-delete-btn")) {
+        deleteWeiboComment(post.id, commentItem.dataset.commentId);
+        return; // 删除后结束
+      }
+
+      let replyToName = "";
+      const replyToId = commentItem.dataset.commentId;
+
+      // ★ 修改3：新增逻辑，判断你点击的是谁
+      if (target.classList.contains("reply-target-name")) {
+        // 如果点击了“被回复者”的名字
+        replyToName = target.dataset.replyToName;
+      } else {
+        // 否则，默认回复这条评论的作者
+        replyToName = commentItem.dataset.commenterName;
+      }
+
+      // ★ 修改4：优化回复逻辑
+      // 如果正在回复同一个人，则取消回复
+      if (
+        input.dataset.replyToId === replyToId &&
+        input.placeholder.includes(`@${replyToName}`)
+      ) {
+        input.placeholder = "留下你的精彩评论吧...";
+        delete input.dataset.replyToId;
+        delete input.dataset.replyToNickname;
+      } else {
+        // 否则，设置为新的回复目标
+        input.placeholder = `回复 @${replyToName}:`;
+        input.dataset.replyToId = replyToId;
+        input.dataset.replyToNickname = replyToName;
+        input.focus();
+      }
+    });
+  }
+
+  return postEl;
+}
+
+/**
+ * 【微博】打开微博发布/编辑模态框
+ */
+async function openWeiboPublisher() {
+  const modal = document.getElementById("create-post-modal");
+
+  modal.dataset.mode = "weibo"; // 关键！标记为微博模式
+
+  document.getElementById("create-post-modal-title").textContent = "发微博";
+  document.getElementById("post-public-text").placeholder =
+    "有什么新鲜事想分享给大家？";
+
+  // 隐藏动态专属的控件
+  document.getElementById("post-image-desc-group").style.display = "none";
+  document.getElementById("post-comments-toggle-group").style.display = "none";
+
+  document.getElementById("post-mode-switcher").style.display = "flex"; // 微博也需要模式切换
+
+  resetCreatePostModal();
+  modal.classList.add("visible");
+}
+
+/**
+ * 【全新】智能解析带“万”或“亿”的数字字符串
+ * @param {string} str - 包含数字的字符串，例如 "30000", "3万", "1.5万"
+ * @returns {number} - 解析后的纯数字
+ */
+function parseChineseNumber(str) {
+  if (!str) return 0; // 安全检查
+
+  str = String(str).trim().toLowerCase(); // 转换为小写字符串并去除空格
+
+  let num = parseFloat(str); // 先尝试直接解析数字部分
+
+  if (str.includes("万") || str.includes("w")) {
+    // 如果包含“万”或“w”，则将数字部分乘以10000
+    num = parseFloat(str) * 10000;
+  } else if (str.includes("亿")) {
+    // 如果包含“亿”，则乘以100000000
+    num = parseFloat(str) * 100000000;
+  }
+
+  // 如果解析失败 (比如输入了纯文字)，返回0
+  return isNaN(num) ? 0 : Math.floor(num); // 返回整数，确保结果干净
+}
+
+/**
+ * 【微博 V3 - 粉丝数计算版】处理发布微博的核心函数
+ */
+async function handlePublishWeibo() {
+  const modal = document.getElementById("create-post-modal");
+
+  const mainContent = document.getElementById("post-public-text").value.trim();
+  let imageUrl = "",
+    hiddenContent = "",
+    postType = "text_only",
+    imageDescription = "";
+
+  const isImageModeActive = document
+    .getElementById("image-mode-content")
+    .classList.contains("active");
+
+  if (isImageModeActive) {
+    // 【核心修复】我们现在通过检查预览容器是否可见，来判断用户是否真的上传了图片
+    const hasImage = document
+      .getElementById("post-image-preview-container")
+      .classList.contains("visible");
+
+    if (hasImage) {
+      imageUrl = document.getElementById("post-image-preview").src;
+      postType = "image";
+      imageDescription = document
+        .getElementById("post-image-description")
+        .value.trim();
+      // 图片描述的检查逻辑保持不变
+      if (!imageDescription) {
+        alert("为了让AI能看懂图片，请务必填写图片描述哦！");
+        return;
+      }
+    }
+    // 如果 hasImage 是 false (即用户只想发纯文字)，这段代码就会被跳过，imageUrl 保持为空，postType 保持为 text_only
+  } else {
+    // 文字图模式的逻辑保持不变
+    hiddenContent = document.getElementById("post-hidden-text").value.trim();
+    if (hiddenContent) {
+      imageUrl = "https://i.postimg.cc/KYr2qRCK/1.jpg";
+      postType = "text_image";
+    }
+  }
+
+  if (!mainContent && !imageUrl) {
+    alert("微博内容不能为空哦！");
+    return;
+  }
+
+  const fansCount = parseChineseNumber(state.qzoneSettings.weiboFansCount) || 0;
+  const baseLikes = Math.floor(fansCount * (Math.random() * 0.1 + 0.1));
+  const baseComments = Math.floor(baseLikes * (Math.random() * 0.1 + 0.05));
+
+  const newPost = {
+    authorId: "user",
+    authorType: "user",
+    authorNickname:
+      state.qzoneSettings.weiboNickname || state.qzoneSettings.nickname || "我",
+    authorAvatar:
+      state.qzoneSettings.weiboAvatar ||
+      state.qzoneSettings.avatar ||
+      defaultAvatar,
+    content: mainContent,
+    imageUrl: imageUrl,
+    authorAvatarFrame: state.qzoneSettings.weiboAvatarFrame || "",
+    imageDescription: imageDescription,
+    hiddenContent: hiddenContent,
+    postType: postType,
+    timestamp: Date.now(),
+    likes: [],
+    comments: [],
+    baseLikesCount: baseLikes,
+    baseCommentsCount: baseComments,
+  };
+
+  await db.weiboPosts.add(newPost);
+  await renderMyWeiboFeed();
+  await renderWeiboProfile();
+
+  modal.classList.remove("visible");
+  alert("微博发布成功！");
+}
+
+/**
+ * 【微博】处理点赞/取消点赞
+ * @param {number} postId - 帖子ID
+ */
+async function handleWeiboLike(postId) {
+  const post = await db.weiboPosts.get(postId);
+  if (!post) return;
+
+  const myNickname = state.qzoneSettings.nickname || "我";
+  if (!post.likes) post.likes = [];
+
+  const likeIndex = post.likes.indexOf(myNickname);
+  if (likeIndex > -1) {
+    post.likes.splice(likeIndex, 1); // 取消点赞
+  } else {
+    post.likes.push(myNickname); // 点赞
+  }
+
+  await db.weiboPosts.put(post);
+  // 重新渲染两个Feed，确保数据同步
+  await renderMyWeiboFeed();
+  await renderFollowingWeiboFeed();
+}
+
+/**
+ * 【微博】处理发布评论或回复
+ * @param {number} postId - 帖子ID
+ * @param {HTMLInputElement} inputElement - 评论输入框元素
+ */
+async function handleWeiboComment(postId, inputElement) {
+  const commentText = inputElement.value.trim();
+  if (!commentText) {
+    alert("评论内容不能为空！");
+    return;
+  }
+
+  const post = await db.weiboPosts.get(postId);
+  if (!post) return;
+
+  if (!post.comments) post.comments = [];
+
+  const newComment = {
+    commentId: "comment_" + Date.now(),
+    authorId: "user",
+    authorNickname:
+      state.qzoneSettings.weiboNickname || state.qzoneSettings.nickname || "我",
+    commentText: commentText,
+    timestamp: Date.now(),
+  };
+
+  // 检查是否是回复
+  if (inputElement.dataset.replyToId) {
+    newComment.replyToId = inputElement.dataset.replyToId;
+    newComment.replyToNickname = inputElement.dataset.replyToNickname;
+  }
+
+  post.comments.push(newComment);
+  await db.weiboPosts.put(post);
+
+  // 清空输入框并重置状态
+  inputElement.value = "";
+  inputElement.placeholder = "留下你的精彩评论吧...";
+  delete inputElement.dataset.replyToId;
+  delete inputElement.dataset.replyToNickname;
+
+  // 重新渲染两个Feed
+  await renderMyWeiboFeed();
+  await renderFollowingWeiboFeed();
+}
+
+/**
+ * 【全新】微博用户人设与职业设置核心功能
+ */
+function openWeiboUserSettingsModal() {
+  const modal = document.getElementById("weibo-user-settings-modal");
+  const settings = state.qzoneSettings;
+
+  // 加载当前数据到输入框
+  document.getElementById("weibo-user-profession-modal-input").value =
+    settings.weiboUserProfession === "点击设置职业"
+      ? ""
+      : settings.weiboUserProfession;
+  document.getElementById("weibo-user-persona-modal-input").value =
+    settings.weiboUserPersona;
+
+  renderWeiboUserPresetSelector(); // 渲染预设下拉框
+  modal.classList.add("visible");
+}
+
+async function saveWeiboUserSettings() {
+  const profession = document
+    .getElementById("weibo-user-profession-modal-input")
+    .value.trim();
+  const persona = document
+    .getElementById("weibo-user-persona-modal-input")
+    .value.trim();
+
+  state.qzoneSettings.weiboUserProfession = profession || "点击设置职业";
+  state.qzoneSettings.weiboUserPersona = persona || "一个普通的微博用户。";
+
+  await saveQzoneSettings(); // 保存到数据库
+  await renderWeiboProfile(); // 刷新主页显示
+  document
+    .getElementById("weibo-user-settings-modal")
+    .classList.remove("visible");
+  alert("微博设定已保存！");
+}
+
+function renderWeiboUserPresetSelector() {
+  const select = document.getElementById("weibo-user-preset-select");
+  const presets = state.qzoneSettings.weiboUserPersonaPresets || [];
+  select.innerHTML = '<option value="">-- 选择预设 --</option>';
+  presets.forEach((preset, index) => {
+    const option = document.createElement("option");
+    option.value = index;
+    option.textContent = preset.name;
+    select.appendChild(option);
+  });
+}
+
+function handleWeiboUserPresetSelection() {
+  const select = document.getElementById("weibo-user-preset-select");
+  const presets = state.qzoneSettings.weiboUserPersonaPresets || [];
+  const selectedIndex = select.value;
+
+  if (selectedIndex !== "") {
+    const preset = presets[parseInt(selectedIndex)];
+    document.getElementById("weibo-user-profession-modal-input").value =
+      preset.profession;
+    document.getElementById("weibo-user-persona-modal-input").value =
+      preset.persona;
+  }
+}
+
+async function openWeiboUserPresetManager() {
+  const choice = await showChoiceModal("管理预设", [
+    { text: "💾 保存当前为新预设", value: "save" },
+    { text: "🗑️ 删除已选预设", value: "delete" },
+  ]);
+
+  if (choice === "save") {
+    const name = await showCustomPrompt("保存预设", "请输入预设名称");
+    if (name && name.trim()) {
+      const newPreset = {
+        name: name.trim(),
+        profession: document
+          .getElementById("weibo-user-profession-modal-input")
+          .value.trim(),
+        persona: document
+          .getElementById("weibo-user-persona-modal-input")
+          .value.trim(),
+      };
+      if (!state.qzoneSettings.weiboUserPersonaPresets)
+        state.qzoneSettings.weiboUserPersonaPresets = [];
+      state.qzoneSettings.weiboUserPersonaPresets.push(newPreset);
+      await saveQzoneSettings();
+      renderWeiboUserPresetSelector();
+      alert(`预设 "${name.trim()}" 已保存！`);
+    }
+  } else if (choice === "delete") {
+    const select = document.getElementById("weibo-user-preset-select");
+    const selectedIndex = select.value;
+    if (selectedIndex === "") {
+      alert("请先从下拉框中选择一个要删除的预设。");
+      return;
+    }
+    const presets = state.qzoneSettings.weiboUserPersonaPresets;
+    const presetName = presets[parseInt(selectedIndex)].name;
+    const confirmed = await showCustomConfirm(
+      "确认删除",
+      `确定要删除预设 "${presetName}" 吗？`,
+      {
+        confirmButtonClass: "btn-danger",
+      },
+    );
+    if (confirmed) {
+      presets.splice(parseInt(selectedIndex), 1);
+      await saveQzoneSettings();
+      renderWeiboUserPresetSelector();
+      alert("预设已删除。");
+    }
+  }
+}
+
+/**
+ * 【全新】清空所有已关注角色的微博帖子
+ */
+async function clearFollowingFeed() {
+  // 1. 弹出确认框，防止误操作
+  const confirmed = await showCustomConfirm(
+    "确认清空",
+    "此操作将永久删除所有【非你本人发布】的微博，且无法恢复。确定要继续吗？",
+    { confirmButtonClass: "btn-danger" }, // 红色按钮以示警告
+  );
+
+  if (!confirmed) {
+    return; // 如果用户取消，则不执行任何操作
+  }
+
+  try {
+    // 2. 从数据库中找出所有作者不是'user'的帖子
+    const postsToDelete = await db.weiboPosts
+      .where("authorId")
+      .notEqual("user")
+      .toArray();
+    const idsToDelete = postsToDelete.map((p) => p.id);
+
+    if (idsToDelete.length === 0) {
+      alert("目前没有可以清空的动态。");
+      return;
+    }
+
+    // 3. 批量删除这些帖子
+    await db.weiboPosts.bulkDelete(idsToDelete);
+
+    // 4. 重新渲染“关注的人”的Feed，让界面变空
+    await renderWeiboFeeds("weibo-following-view");
+
+    alert(`已成功清空 ${idsToDelete.length} 条动态！`);
+  } catch (error) {
+    console.error("清空关注动态时出错:", error);
+    alert(`操作失败: ${error.message}`);
+  }
+}
+
+/**
+ * 【全新】显示微博主页并渲染数据
+ */
+async function showWeiboScreen() {
+  // 1. 计算关注数
+  const allSingleChats = Object.values(state.chats).filter(
+    (chat) => !chat.isGroup,
+  );
+  let totalNpcCount = 0;
+  allSingleChats.forEach((chat) => {
+    if (chat.npcLibrary && chat.npcLibrary.length > 0) {
+      totalNpcCount += chat.npcLibrary.length;
+    }
+  });
+  const followingCount = allSingleChats.length + totalNpcCount;
+
+  // 2. 更新页面上的元素
+  // 从你的“动态(QZone)”设置里获取头像和昵称，保持统一
+  document.getElementById("weibo-avatar-img").src =
+    state.qzoneSettings.avatar || defaultAvatar;
+  document.getElementById("weibo-nickname").textContent =
+    state.qzoneSettings.nickname || "你的昵称";
+  document.getElementById("weibo-following-count").textContent = followingCount;
+
+  // 3. 显示微博页面
+  showScreen("weibo-screen");
+}
+
+/**
+ * 【微博专属】渲染微博个人主页的所有数据
+ */
+async function renderWeiboProfile() {
+  const settings = state.qzoneSettings || {};
+  // 【核心】所有数据都从 weibo... 字段读取！
+  document.getElementById("weibo-avatar-img").src = settings.weiboAvatar;
+  document.getElementById("weibo-nickname").textContent =
+    settings.weiboNickname;
+  document.getElementById("weibo-fans-count").textContent =
+    settings.weiboFansCount;
+  document.getElementById("weibo-background-img").src =
+    settings.weiboBackground;
+
+  // 动态计算关注数 (这部分不变)
+  const allSingleChats = Object.values(state.chats).filter(
+    (chat) => !chat.isGroup,
+  );
+  let totalNpcCount = 0;
+  allSingleChats.forEach((chat) => {
+    if (chat.npcLibrary && chat.npcLibrary.length > 0) {
+      totalNpcCount += chat.npcLibrary.length;
+    }
+  });
+  document.getElementById("weibo-following-count").textContent =
+    allSingleChats.length + totalNpcCount;
+
+  // 动态计算微博数
+  const postsCount = await db.weiboPosts
+    .where("authorId")
+    .equals("user")
+    .count();
+  document.getElementById("weibo-posts-count").textContent = postsCount;
+
+  const professionEl = document.getElementById("weibo-user-profession-display");
+  if (professionEl) {
+    professionEl.textContent = settings.weiboUserProfession || "点击设置职业";
+  }
+
+  // --- ▼▼▼ 以下是本次新增的核心代码 ▼▼▼ ---
+  // 1. 获取保存的头像框URL
+  const frameUrl = settings.weiboAvatarFrame || "";
+  // 2. 找到头像框的img元素
+  const frameImg = document.getElementById("weibo-avatar-frame");
+  if (frameImg) {
+    // 3. 如果URL存在，就显示它
+    if (frameUrl) {
+      frameImg.src = frameUrl;
+      frameImg.style.display = "block";
+    } else {
+      // 4. 如果URL为空（即选择了“无”），就隐藏它
+      frameImg.src = "";
+      frameImg.style.display = "none";
+    }
+  }
+  // --- ▲▲▲ 新增代码结束 ▲▲▲
+}
+
+/**
+ * 通用的图片编辑函数 (本地上传或URL)
+ * @param {string} title - 弹窗标题
+ * @param {string} currentUrl - 当前的图片URL
+ * @returns {Promise<string|null>} - 新的图片URL或null
+ */
+async function getNewImageUrl(title, currentUrl) {
+  const choice = await showChoiceModal(title, [
+    { text: "📁 从本地上传", value: "local" },
+    { text: "🌐 使用网络URL", value: "url" },
+  ]);
+
+  if (choice === "local") {
+    return await uploadImageLocally();
+  } else if (choice === "url") {
+    const url = await showCustomPrompt(
+      title,
+      "请输入新的图片URL",
+      currentUrl,
+      "url",
+    );
+    if (url && url.trim().startsWith("http")) {
+      return url.trim();
+    } else if (url !== null) {
+      alert("请输入一个有效的URL！");
+    }
+  }
+  return null;
+}
+
+/**
+ * 【微博专属】编辑微博头像
+ */
+async function editWeiboAvatar() {
+  const newAvatarUrl = await getNewImageUrl(
+    "更换微博头像",
+    state.qzoneSettings.weiboAvatar,
+  );
+  if (newAvatarUrl) {
+    state.qzoneSettings.weiboAvatar = newAvatarUrl; // 只修改微博头像
+    await saveQzoneSettings();
+    await renderWeiboProfile(); // 用专属函数刷新
+  }
+}
+
+/**
+ * 【微博专属】编辑微博背景图
+ */
+async function editWeiboBackground() {
+  const newBgUrl = await getNewImageUrl(
+    "更换微博背景",
+    state.qzoneSettings.weiboBackground,
+  );
+  if (newBgUrl) {
+    state.qzoneSettings.weiboBackground = newBgUrl; // 只修改微博背景
+    await saveQzoneSettings();
+    await renderWeiboProfile();
+  }
+}
+
+/**
+ * 【微博专属】编辑微博昵称
+ */
+async function editWeiboNickname() {
+  const newNickname = await showCustomPrompt(
+    "编辑微博昵称",
+    "请输入新的昵称",
+    state.qzoneSettings.weiboNickname,
+  );
+  if (newNickname !== null) {
+    state.qzoneSettings.weiboNickname = newNickname.trim() || "你的昵称"; // 只修改微博昵称
+    await saveQzoneSettings();
+    await renderWeiboProfile();
+  }
+}
+
+/**
+ * 【微博专属】编辑微博粉丝数 (已修复，支持汉字)
+ */
+async function editWeiboFansCount() {
+  // 核心修改：确保这里的第四个参数是 "text"，而不是 "number"
+  const newFans = await showCustomPrompt(
+    "编辑粉丝数",
+    "请输入新的粉丝数",
+    state.qzoneSettings.weiboFansCount,
+    "text",
+  );
+
+  if (newFans !== null) {
+    state.qzoneSettings.weiboFansCount = newFans.trim() || "0"; // 只修改微博粉丝数
+    await saveQzoneSettings();
+    await renderWeiboProfile();
+  }
+}
+
+/**
+ * 【全新】切换微博主界面中的不同页面视图
+ * @param {string} viewId - 要切换到的视图的ID
+ */
+async function switchToWeiboView(viewId) {
+  // 1. 隐藏所有微博页面
+  document.querySelectorAll(".weibo-view").forEach((view) => {
+    view.style.display = "none"; // 使用 style.display 确保隐藏
+  });
+
+  // 2. 显示目标页面
+  const targetView = document.getElementById(viewId);
+  if (targetView) {
+    targetView.style.display = "flex"; // 使用 flex 显示
+  }
+
+  // 3. 更新底部导航栏的高亮状态
+  document.querySelectorAll(".weibo-nav-item").forEach((item) => {
+    item.classList.remove("active");
+  });
+  const targetNavItem = document.querySelector(
+    `.weibo-nav-item[data-view="${viewId}"]`,
+  );
+  if (targetNavItem) {
+    targetNavItem.classList.add("active");
+  }
+
+  // --- ▼▼▼【核心修复】▼▼▼ ---
+  // 4. 根据你点击的页签，去加载并显示对应的微博内容
+  if (viewId === "weibo-following-view") {
+    // 如果是“关注的人”页，就调用渲染关注列表的函数
+    await renderFollowingWeiboFeed();
+  } else if (viewId === "weibo-my-profile-view") {
+    // 如果是“我的微博”页，就调用渲染“我”的微博的函数
+    await renderMyWeiboFeed();
+  }
+  // --- ▲▲▲【修复结束】▲▲▲ ---
+}
+
+function resetCreatePostModal() {
+  document.getElementById("post-public-text").value = "";
+  document.getElementById("post-image-preview").src = "";
+  document.getElementById("post-image-description").value = "";
+  document
+    .getElementById("post-image-preview-container")
+    .classList.remove("visible");
+  document.getElementById("post-image-desc-group").style.display = "none";
+  document.getElementById("post-local-image-input").value = "";
+  document.getElementById("post-hidden-text").value = "";
+
+  // 【核心修复】我们不再模拟点击，而是直接、安全地设置状态
+  const imageModeBtn = document.getElementById("switch-to-image-mode");
+  const textImageModeBtn = document.getElementById("switch-to-text-image-mode");
+  const imageModeContent = document.getElementById("image-mode-content");
+  const textImageModeContent = document.getElementById(
+    "text-image-mode-content",
+  );
+
+  imageModeBtn.classList.add("active");
+  textImageModeBtn.classList.remove("active");
+  imageModeContent.classList.add("active");
+  textImageModeContent.classList.remove("active");
+}
+
+function openWeiboPublisherClean() {
+  // 1. 重置并获取模态框
+  resetCreatePostModal();
+  const modal = document.getElementById("create-post-modal");
+
+  // 2. 设置为“微博”模式，并修改标题和提示语
+  modal.dataset.mode = "weibo";
+  document.getElementById("create-post-modal-title").textContent = "发微博";
+  document.getElementById("post-public-text").placeholder =
+    "有什么新鲜事想分享给大家？";
+
+  // 3. 确保所有“动态”专属的HTML元素都被隐藏
+  const imageDescGroup = document.getElementById("post-image-desc-group");
+  if (imageDescGroup) imageDescGroup.style.display = "none";
+
+  const commentsToggleGroup = document.getElementById(
+    "post-comments-toggle-group",
+  );
+  if (commentsToggleGroup) commentsToggleGroup.style.display = "none";
+
+  const visibilityGroup = document.getElementById("post-visibility-group");
+  if (visibilityGroup) visibilityGroup.style.display = "none";
+
+  // 4. 显示微博需要的控件
+  const modeSwitcher = document.getElementById("post-mode-switcher");
+  if (modeSwitcher) modeSwitcher.style.display = "flex";
+
+  // 5. 显示弹窗
+  modal.classList.add("visible");
+}
+
+/**
+ * 【总入口 V3 - 已支持多角色选择】生成微博热搜列表
+ * @param {Array|string} targets - 目标角色ID数组或字符串'all'或'none'
+ */
+async function generateHotSearch(targets = "all") {
+  await showCustomAlert("请稍候...", "正在生成微博热搜...");
+
+  const { proxyUrl, apiKey, model } = state.apiConfig;
+  if (!proxyUrl || !apiKey || !model) {
+    alert("请先配置API！");
+    return;
+  }
+
+  let publicFiguresContext = "";
+  let promptTask =
+    "你的任务是根据下方提供的“核心参考人物”信息，为他们量身打造一个包含10个热搜话题的榜单。";
+
+  let publicFigures = [];
+
+  // --- 修改点：处理 targets 的逻辑 ---
+  if (targets === "all") {
+    publicFigures = Object.values(state.chats)
+      .filter((chat) => !chat.isGroup)
+      .map((chat) => ({
+        name: chat.name,
+        persona: chat.settings.aiPersona.substring(0, 150) + "...",
+      }));
+  } else if (targets === "none") {
+    // 如果是 none，清空列表
+    publicFigures = [];
+    promptTask =
+      "你的任务是虚构一个真实感的微博热搜榜单。话题应包含社会新闻、娱乐八卦、科技数码、生活百科等，无需涉及特定角色。";
+  } else if (Array.isArray(targets)) {
+    targets.forEach((chatId) => {
+      const char = state.chats[chatId];
+      if (char) {
+        publicFigures.push({
+          name: char.name,
+          persona: char.settings.aiPersona.substring(0, 150) + "...",
+        });
+      }
+    });
+    if (publicFigures.length === 1) {
+      promptTask = `你的任务是只为下方唯一的“核心参考人物”【${publicFigures[0].name}】，量身打造一个包含10个热搜话题的榜单。所有话题【必须】与Ta强相关。`;
+    }
+  }
+
+  publicFiguresContext =
+    publicFigures.length > 0
+      ? `# 核心参考人物 (你必须围绕他们生成热搜)\n${JSON.stringify(publicFigures, null, 2)}`
+      : "当前没有特定的公众人物，请自由发挥，生成具有真实感的社会热点事件。"; // 修改后的提示词
+
+  // ... (下方的 systemPrompt 和 API 调用部分保持不变)
+  // 只需要确保上面的 publicFiguresContext 逻辑正确即可
+
+  const systemPrompt = `
+# 任务
+你是一个专业的“微博热搜榜单生成器”。${promptTask}
+# 【【【绝对禁止事项：这是必须遵守的最高指令】】】
+1.  你的所有创作内容，包括帖子、评论、故事等，【绝对禁止】将任意两个AI角色（即除了用户之外的角色）描绘成情侣关系、进行恋爱互动或存在任何形式的暧昧情感。
+2.  AI角色之间的关系只能是朋友、同事、对手、家人等，但【绝不能】是恋人。
+3.  AI角色唯一可以产生恋爱关系的对象是【用户】。违反此规则将导致生成失败。
+# 核心规则
+1.  **强相关性**: 如果提供了“核心参考人物”，生成的话题【必须】与他们的身份、职业、人设高度相关。
+2.  **【【【严禁杜撰】】】**: 绝对禁止为列表中的人物【凭空捏造】他们人设中没有的职业、身份或背景。
+3.  **真实感与多样性**: 
+    - 如果有核心人物，可以混合2-3个与他们无关的社会化虚拟热点。
+    - 如果没有核心人物，请生成10个完全不同的、涵盖娱乐、民生、科技等领域的虚拟热点。
+4.  **格式铁律**: 你的回复【必须且只能】是一个严格的JSON数组，数组中包含10个对象。每个对象【必须】包含以下三个字段:
+    -   \`"topic"\`: (字符串) 热搜的话题，必须用"#"符号包裹。
+    -   \`"heat"\`: (字符串) 热度值，例如 "345.6万"。
+    -   \`"tag"\`: (字符串) 一个标签，必须从 "热"、"新"、"荐" 中选择一个。
+${publicFiguresContext}
+`;
+  // ... (API调用部分代码省略，保持原样) ...
+  try {
+    let isGemini = proxyUrl === GEMINI_API_URL;
+    let messagesForApi = [{ role: "user", content: systemPrompt }];
+    let geminiConfig = toGeminiRequestData(
+      model,
+      apiKey,
+      systemPrompt,
+      messagesForApi,
+      isGemini,
+      state.apiConfig.temperature,
+    );
+    const response = await fetch(
+      isGemini ? geminiConfig.url : `${proxyUrl}/v1/chat/completions`,
+      isGemini
+        ? geminiConfig.data
+        : {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+              model,
+              messages: messagesForApi,
+              temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+              response_format: { type: "json_object" },
+            }),
+          },
+    );
+    if (!response.ok)
+      throw new Error(
+        `API请求失败: ${response.status} - ${await response.text()}`,
+      );
+    const data = await response.json();
+    const aiResponseContent = isGemini
+      ? data.candidates?.[0]?.content?.parts?.[0]?.text
+      : data.choices?.[0]?.message?.content;
+    if (!aiResponseContent) {
+      throw new Error(
+        "API返回了空内容，可能被安全策略拦截。请检查Prompt或更换模型。",
+      );
+    }
+    const sanitizedContent = aiResponseContent
+      .replace(/^```json\s*|```$/g, "")
+      .trim();
+    const responseData = JSON.parse(sanitizedContent);
+    const hotSearchData = responseData.hot_searches || responseData;
+    weiboHotSearchCache = hotSearchData;
+    await generatePlazaFeed(hotSearchData, targets);
+    renderHotSearchList(hotSearchData);
+    await showCustomAlert("操作成功", "热搜榜和广场均已生成完毕！");
+  } catch (error) {
+    console.error("生成热搜失败:", error);
+    await showCustomAlert("生成失败", `发生了一个错误：\n${error.message}`);
+  }
+}
+
+/**
+ * 【UI渲染】根据AI返回的数据渲染热搜列表
+ */
+function renderHotSearchList(hotSearchData) {
+  const listEl = document.getElementById("weibo-hot-search-list");
+  listEl.innerHTML = "";
+
+  if (!hotSearchData || !Array.isArray(hotSearchData)) {
+    listEl.innerHTML =
+      '<p style="text-align:center; color: #8a8a8a;">AI返回的数据格式不正确，无法渲染。</p>';
+    return;
+  }
+
+  hotSearchData.forEach((item, index) => {
+    const rank = index + 1;
+    const tagClass = { 热: "hot", 新: "new", 荐: "rec" }[item.tag] || "rec";
+
+    const itemEl = document.createElement("div");
+    itemEl.className = "hot-search-item";
+    itemEl.dataset.rank = rank;
+    itemEl.innerHTML = `
+            <span class="hot-search-rank">${rank}</span>
+            <div class="hot-search-content">
+                <span class="hot-search-topic">${item.topic}</span>
+                <span class="hot-search-tag ${tagClass}">${item.tag}</span>
+            </div>
+            <span class="hot-search-heat" style="color: var(--text-secondary); font-size: 13px;">${item.heat}</span>
+        `;
+    itemEl.addEventListener("click", () => showHotTopicFeedScreen(item.topic));
+    listEl.appendChild(itemEl);
+  });
+}
+
+/**
+ * 【总入口】显示并生成指定热搜话题的微博Feed (已增加缓存功能)
+ */
+async function showHotTopicFeedScreen(topic) {
+  currentHotTopic = topic;
+  document.getElementById("weibo-hottopic-title").textContent = topic;
+  switchToWeiboView("weibo-hottopic-feed-view");
+
+  // 【核心修改】检查“小本本”里有没有记录
+  if (hotTopicFeedCache[topic]) {
+    // 如果有，就直接显示，不重新生成
+    console.log(`从缓存加载话题: ${topic}`);
+    const feedEl = document.getElementById("weibo-hottopic-feed-list");
+    renderWeiboFeed(feedEl, hotTopicFeedCache[topic], true);
+  } else {
+    // 如果没有，才调用函数去生成新的内容
+    await generateHotSearchFeed(topic);
+  }
+}
+
+/**
+ * 【AI核心 V2 - 已修复拼写错误 & 增加缓存】调用API为指定话题生成微博Feed
+ */
+async function generateHotSearchFeed(topic) {
+  const feedEl = document.getElementById("weibo-hottopic-feed-list");
+  feedEl.innerHTML =
+    '<p style="text-align:center; color: #8a8a8a; margin-top: 50px;">正在生成内容，请稍候...</p>';
+
+  const { proxyUrl, apiKey, model } = state.apiConfig;
+  if (!proxyUrl || !apiKey || !model) {
+    alert("请先配置API！");
+    return;
+  }
+
+  const allChars = Object.values(state.chats)
+    .filter((c) => !c.isGroup)
+    .map((c) => ({
+      name: c.name,
+      persona: c.settings.aiPersona.substring(0, 100),
+    }));
+  const allNpcs = Object.values(state.chats)
+    .flatMap((c) => c.npcLibrary || [])
+    .map((npc) => ({ name: npc.name, persona: npc.persona.substring(0, 100) }));
+  const allPeople = [...allChars, ...allNpcs];
+
+  const systemPrompt = `
+# 任务
+你是一个“微博内容生成器”。你的任务是围绕一个给定的热搜话题，生成一批相关的微博帖子。
+
+# 当前热搜话题
+**${topic}**
+# 【【【绝对禁止事项：这是必须遵守的最高指令】】】
+1.  你的所有创作内容，包括帖子、评论、故事等，【绝对禁止】将任意两个AI角色（即除了用户之外的角色）描绘成情侣关系、进行恋爱互动或存在任何形式的暧昧情感。
+2.  AI角色之间的关系只能是朋友、同事、对手、家人等，但【绝不能】是恋人。
+3.  AI角色唯一可以产生恋爱关系的对象是【用户】。违反此规则将导致生成失败。
+
+# 核心规则
+1.  **数量**: 生成 5 到 10 条微博。
+2.  **相关性**: 所有微博内容【必须】与话题 **"${topic}"** 强相关，并且【必须】在内容中包含 **${topic}** 这个话题标签。
+3.  **高热度**: 生成的微博必须看起来像是热搜里的内容，所以它们的 "likes" (点赞数) 和 "comments" (评论数) 【必须】非常高。点赞数应在 10000 到 500000 之间，评论数应在 800 到 20000 之间。
+4.  **评论生成**: 为每条微博生成 8 到 10 条真实感的路人评论。评论内容应与微博内容相关，风格多样。
+5.  **作者多样性**: 微博的作者可以是下方“可用人物列表”中的角色，也可以是你虚构的路人、大V或官方媒体。如果让列表中的角色发言，内容必须符合他的人设。
+6.  **格式铁律**: 你的回复【必须且只能】是一个严格的JSON数组，数组中包含多条微博对象。每个对象【必须】包含以下字段:
+    -   \`"author"\`: (字符串) 作者昵称。
+    -   \`"content"\`: (字符串) 微博正文，必须包含话题标签 ${topic}。
+    -   \`"likes"\`: (数字) 10000到500000之间的随机高赞数。
+    -   \`"comments"\`: (数字) 800到20000之间的随机高评论数。
+    -   \`"comments_list"\`: (数组) 包含8-10个评论对象的数组，每个对象格式为 \`{"author": "评论者昵称", "text": "评论内容"}\`。
+
+# 可用人物列表 (你可以让他们发言)
+${JSON.stringify(allPeople, null, 2)}
+`;
+  try {
+    let isGemini = proxyUrl === GEMINI_API_URL;
+    let messagesForApi = [{ role: "user", content: systemPrompt }];
+    let geminiConfig = toGeminiRequestData(
+      model,
+      apiKey,
+      systemPrompt,
+      messagesForApi,
+      isGemini,
+      state.apiConfig.temperature,
+    );
+
+    const response = await fetch(
+      isGemini ? geminiConfig.url : `${proxyUrl}/v1/chat/completions`,
+      isGemini
+        ? geminiConfig.data
+        : {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+              model,
+              messages: messagesForApi,
+              temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+              response_format: { type: "json_object" },
+            }),
+          },
+    );
+    if (!response.ok)
+      throw new Error(
+        `API请求失败: ${response.status} - ${await response.text()}`,
+      );
+
+    const data = await response.json();
+    const aiResponseContent = isGemini
+      ? data.candidates?.[0]?.content?.parts?.[0]?.text
+      : data.choices?.[0]?.message?.content;
+    if (!aiResponseContent) {
+      throw new Error("API返回了空内容，可能被安全策略拦截。");
+    }
+
+    const sanitizedContent = aiResponseContent
+      .replace(/^```json\s*|```$/g, "")
+      .trim();
+    const responseData = JSON.parse(sanitizedContent);
+    const feedData = responseData.posts || responseData;
+
+    // 【核心修改】将新生成的内容，记在“小本本”上
+    hotTopicFeedCache[topic] = feedData;
+
+    renderWeiboFeed(feedEl, feedData, true);
+  } catch (error) {
+    console.error("生成热搜Feed失败:", error);
+    feedEl.innerHTML = `<p style="text-align:center; color: #ff3b30; padding: 20px;">生成失败: ${error.message}</p>`;
+  }
+}
+
+/**
+ * 【总入口 V3 - 已支持多角色选择】生成微博广场Feed
+ * @param {Array} hotTopics - (可选) 从热搜生成函数传过来的话题数组
+ * @param {Array|string} targets - (新增) 目标角色ID数组或字符串'all'或'none'
+ */

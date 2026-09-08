@@ -1,0 +1,1312 @@
+
+.search-result-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.search-result-meta .name {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+/* 消息内容 */
+.search-result-content {
+  font-size: 14px;
+  line-height: 1.5;
+  word-break: break-all; /* 确保长文本能换行 */
+}
+
+/* 【核心】关键词高亮样式 */
+.highlight {
+  background-color: #ffde5c; /* 亮黄色背景 */
+  color: #5d4037; /* 深棕色文字，对比更清晰 */
+  font-weight: bold;
+  padding: 1px 3px;
+  border-radius: 3px;
+}
+
+/* 跳转后消息的闪烁动画 */
+@keyframes flash-highlight {
+  0% {
+    background-color: transparent;
+  }
+  25% {
+    background-color: rgba(255, 222, 92, 0.7);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+.message-bubble.flash {
+  animation: flash-highlight 1.5s ease-out;
+}
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+/* ▼▼▼ 【最终修复】解决搜索结果看不见的问题 ▼▼▼ */
+#chat-search-screen .form-container {
+  padding-bottom: 20px; /* 给底部一点空间 */
+}
+
+#search-results-list {
+  flex-grow: 1; /* 核心：让结果列表占据所有剩余的垂直空间 */
+  overflow-y: auto; /* 核心：如果结果太多，让它自己出现滚动条 */
+  min-height: 0; /* 一个神奇的CSS属性，用于解决flex布局下的溢出问题 */
+  border-top: 1px solid var(--border-color); /* 在结果和按钮之间加一条分割线，更美观 */
+  margin-top: 15px; /* 和上面的按钮拉开距离 */
+  padding-top: 10px; /* 列表顶部的内边距 */
+}
+/* ▲▲▲ 修复结束 ▲▲▲ */
+/* ▼▼▼ 把这段新样式粘贴到 <style> 的末尾 ▼▼▼ */
+
+/* 统一样式，让图标和文字按钮对齐 */
+#music-playlist-panel .playlist-header .panel-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ▼▼▼ 用这块新代码替换旧的垃圾桶样式 ▼▼▼ */
+
+/* 设置垃圾桶图标的默认样式 */
+#delete-expired-songs-btn svg {
+  color: inherit; /* 核心修改1: 平时颜色继承父元素，和"本地"等文字颜色一样，保持低调 */
+  transition:
+    color 0.2s,
+    transform 0.2s; /* 添加transform过渡效果 */
+  transform: translateY(3px); /* 核心修改2: 让图标整体下移3像素，视觉上更对齐 */
+}
+
+/* 设置鼠标悬停/点击时的样式 */
+#delete-expired-songs-btn:hover svg,
+#delete-expired-songs-btn:active svg {
+  color: #ff3b30; /* 核心修改3: 鼠标放上去或点击时，才变为醒目的红色 */
+}
+
+/* ▲▲▲ 替换结束 ▲▲▲ */
+/* ▼▼▼ 把这一整块全新的CSS，粘贴到 <style> 的末尾 ▼▼▼ */
+
+/* 【核心】专门为角色手机里的日记删除按钮，重新定义位置 */
+#character-diary-list .character-data-item .item-delete-btn {
+  top: auto; /* 解除顶部的定位 */
+  right: auto; /* 解除右侧的定位 */
+  bottom: 8px; /* 定位到距离底部8像素 */
+  left: 8px; /* 定位到距离左侧8像素 */
+  opacity: 0; /* 保持默认隐藏 */
+  transition: opacity 0.2s ease; /* 保持淡入淡出动画 */
+}
+
+/* 【美化】鼠标悬停在整张日记卡片上时，才显示这个按钮 */
+#character-diary-list .character-data-item:hover .item-delete-btn {
+  opacity: 1;
+}
+
+/* ▲▲▲ 粘贴结束 ▲▲▲ */
+/* ▼▼▼ 【全新】心声功能样式 ▼▼▼ */
+
+/* 1. 跳动的心动画 */
+@keyframes heartbeat {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+#char-heart-btn svg {
+  animation: heartbeat 1.5s infinite ease-in-out;
+}
+
+/* 2. 心声面板主内容样式 (已修复) */
+#inner-voice-avatar-wrapper::after {
+  content: "";
+  position: absolute;
+  top: -3px;
+  left: -3px;
+  right: -3px;
+  bottom: -3px;
+  border: 1.5px solid transparent; /* 默认是透明边框，看不见 */
+  border-radius: 50%;
+  pointer-events: none;
+  transition: border-color 0.2s ease-in-out; /* 添加平滑过渡 */
+}
+/* 【核心】仅当没有头像框时(.has-border)，才显示红线 */
+#inner-voice-avatar-wrapper.has-border::after {
+  border-color: #ff8a80; /* 你想要的红色轮廓线 */
+}
+
+#inner-voice-content-area p {
+  white-space: pre-wrap; /* 让换行符和空格生效 */
+  word-break: break-word; /* 防止长单词溢出 */
+}
+
+/* 3. 历史记录面板样式 */
+.inner-voice-history-item {
+  background-color: #fff;
+  margin: 10px;
+  padding: 12px;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.history-item-timestamp {
+  font-size: 11px;
+  color: #999;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+}
+.history-item-content p {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #444;
+}
+.history-item-content strong {
+  font-size: 12px;
+}
+/* ▲▲▲ 心声功能样式结束 ▲▲▲ */
+/* 【全新】心声历史记录单条删除按钮样式 */
+.inner-voice-history-item {
+  position: relative; /* 让删除按钮可以相对于它定位 */
+}
+
+.history-item-delete-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background-color: #f0f0f0;
+  color: #888;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 24px;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.history-item-delete-btn:hover {
+  background-color: #ff3b30;
+  color: white;
+}
+/* ▼▼▼ 在这里开始复制：【主题色版】可爱圆润按钮样式 ▼▼▼ */
+
+/* --- 1. 再次设置通用的“可爱基础” --- */
+#save-theme-btn,
+#save-as-new-theme-btn,
+#export-theme-btn,
+#import-theme-btn,
+#rename-theme-btn,
+#delete-theme-btn {
+  border: none;
+  border-radius: 25px; /* 可爱的胶囊形状 */
+  padding: 12px 18px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s ease-in-out;
+  margin-top: 5px !important;
+}
+
+/* --- 2. 可爱的“按下”效果 --- */
+#save-theme-btn:active,
+#save-as-new-theme-btn:active,
+#export-theme-btn:active,
+#import-theme-btn:active,
+#rename-theme-btn:active,
+#delete-theme-btn:active {
+  transform: scale(0.97);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* --- 3. 【核心修改】为不同功能的按钮设置配套颜色 --- */
+
+/* “保存” 和 “另存为”：使用全局主题色！ */
+#save-theme-btn,
+#save-as-new-theme-btn {
+  background-color: var(--accent-color); /* 这就是你的主题色！ */
+  color: white;
+}
+
+/* “导出”、“导入”、“重命名”：使用柔和的次要样式 */
+#export-theme-btn,
+#import-theme-btn,
+#rename-theme-btn {
+  background-color: #f0f2f5; /* 淡淡的灰色背景 */
+  color: var(--accent-color); /* 文字使用主题色 */
+  border: 1px solid var(--accent-color); /* 再加一个主题色的边框，更精致 */
+}
+
+/* “删除”按钮：还是用可爱的粉红色来提醒，防止误触 */
+#delete-theme-btn {
+  background-color: #ffdde5; /* 淡淡的樱花粉背景 */
+  color: #ff3b30; /* 文字用醒目的红色 */
+  border: 1px solid #ffc2d1;
+}
+
+/* --- 4. 鼠标放到不同按钮上时的颜色变化 --- */
+#save-theme-btn:hover,
+#save-as-new-theme-btn:hover {
+  opacity: 0.85; /* 主题色按钮变淡一点点 */
+}
+
+#export-theme-btn:hover,
+#import-theme-btn:hover,
+#rename-theme-btn:hover {
+  background-color: #e9ecef; /* 次要按钮背景加深一点点 */
+}
+
+#delete-theme-btn:hover {
+  background-color: #ffc2d1; /* 删除按钮背景加深一点点 */
+}
+
+/* ▲▲▲ 复制到这里结束 ▲▲▲ */
+/* ▼▼▼ 请将这段新CSS粘贴到 <style> 的末尾 ▼▼▼ */
+.action-icon.summon-npc svg {
+  stroke-width: 1.5; /* 让图标线条稍微粗一点，更清晰 */
+}
+/* ▲▲▲ 新CSS粘贴结束 ▲▲▲ */
+/* ▼▼▼ 请用下面这【一整块带有详细注释】的代码，完整替换掉你旧的微博主页布局CSS ▼▼▼ */
+
+/* 1. 个人主页的滚动容器 (保持不变) */
+#weibo-profile-page {
+  flex-grow: 1;
+  overflow-y: auto;
+  background-color: #f0f2f5;
+}
+
+/* 2. 头部容器：负责背景图，并为下方内容留出空间 */
+.weibo-profile-header {
+  position: relative;
+  height: 240px;
+  /* 
+      ★★★ 手动调整区：微博内容与上方区域的【上下间距】 ★★★
+      这个值决定了你的第一条微博，和上方个人信息区域的距离。
+      - 数值越大，间距越大，微博内容离得越远。
+      - 数值越小，间距越小，微博内容离得越近。
+      我已将它从 90px 减小到了 20px，你可以根据喜好再微调。
+    */
+  margin-bottom: -5px; /* ★ 修改这里 ★ */
+}
+
+/* 3. 背景图样式 (保持不变) */
+.weibo-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 4. 头像容器：实现悬浮效果的核心 */
+.weibo-avatar-container {
+  position: absolute;
+  z-index: 3;
+  width: 80px;
+  height: 80px;
+  border: 3px solid white;
+  border-radius: 50%;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  transform: none;
+
+  /* ★★★ 手动调整区1: 头像位置 (左右 + 上下) ★★★ */
+
+  /* --- 左右位置 --- */
+  /* 数值越大，越往右。数值越小，越往左。*/
+  left: 15px; /* ★ 修改这里 */
+
+  /* --- 上下位置 --- */
+  /* 数值越小 (比如 -50px), 越往下。数值越大 (比如 -30px), 越往上。*/
+  bottom: 50px; /* ★ 修改这里 */
+}
+
+.weibo-avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+/* 5. 昵称和职业信息 */
+/* ★★★ 手动调整区2: 昵称位置 (左右 + 上下) ★★★ */
+.weibo-nickname {
+  position: absolute;
+  z-index: 2;
+  color: #1f1f1f;
+  text-shadow: none;
+  font-size: 18px;
+  font-weight: 600;
+
+  /* --- 左右位置 --- */
+  /* 数值越大，越往右。数值越小，越往左。*/
+  left: 35px; /* ★ 修改这里 */
+
+  /* --- 上下位置 --- */
+  /* 数值越小 (比如 -60px), 越往下。数值越大 (比如 -50px), 越往上。*/
+  bottom: 30px; /* ★ 修改这里 */
+}
+
+/* ▼▼▼ 用这块新CSS替换掉旧的 ▼▼▼ */
+#weibo-user-profession-display {
+  position: absolute;
+  left: 35px; /* 修改：从 left 改为 right，让它靠右对齐 */
+  bottom: -5px; /* 修改：调整垂直位置，在头像下方 */
+  z-index: 2;
+  font-size: 13px;
+  color: #8a8a8a;
+  text-shadow: none;
+  text-align: right; /* 新增：让文字本身也靠右对齐，更美观 */
+  cursor: pointer; /* 新增：鼠标放上去时显示为小手形状 */
+}
+
+/* 6. 关注/粉丝/微博数据 */
+/* ★★★ 手动调整区3: 关注/粉丝/微博 位置 (左右 + 上下) ★★★ */
+.weibo-stats {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  gap: 20px;
+
+  /* --- 左右位置 --- */
+  /* 数值越大，越往右。数值越小，越往左。*/
+  left: 35px; /* ★ 修改这里 */
+
+  /* --- 上下位置 --- */
+  /* 数值越小 (比如 -90px), 这行数据越往下。数值越大 (比如 -70px), 越往上。*/
+  bottom: 15px; /* ★ 修改这里 */
+}
+
+/* 7. 单个数据项样式 (保持不变) */
+.weibo-stat-item {
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 5px;
+}
+.weibo-stat-number {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  text-shadow: none;
+}
+.weibo-stat-label {
+  font-size: 13px;
+  color: #888;
+  text-shadow: none;
+}
+
+/* 8. 微博Feed列表 (保持不变) */
+#my-weibo-feed-list {
+  padding-top: 15px;
+}
+
+/* ▲▲▲ 微博样式替换结束 ▲▲▲ */
+
+/* ▼▼▼ 【全新】微博页面框架和底部导航样式 ▼▼▼ */
+#weibo-screen {
+  display: flex;
+  flex-direction: column;
+}
+.weibo-view {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: none; /* 默认隐藏所有页面 */
+  flex-direction: column;
+  background-color: #f0f2f5;
+}
+.weibo-view.active {
+  display: flex; /* 只显示激活的页面 */
+}
+/* ▼▼▼ 【布局统一修复版】用这块代码完整替换掉你旧的 #weibo-bottom-nav 样式 ▼▼▼ */
+#weibo-bottom-nav {
+  /* --- 核心修改 --- */
+  position: absolute; /* 1. 改为绝对定位，让它浮动起来 */
+  bottom: 0; /* 2. 固定在底部 */
+  left: 0; /* 3. 左侧对齐 */
+  width: 100%; /* 4. 宽度撑满 */
+
+  /* --- 其他样式保持不变 --- */
+  z-index: 15;
+  display: flex;
+  border-top: 1px solid var(--border-color);
+  background-color: rgba(247, 247, 247, 0.9);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+/* ▲▲▲ 替换结束 ▲▲▲ */
+
+.weibo-nav-item {
+  flex: 1;
+  text-align: center;
+  padding: 12px 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.weibo-nav-item.active {
+  color: var(--accent-color);
+  font-weight: 600;
+}
+/* ▲▲▲ 微博框架样式结束 ▲▲▲ */
+
+/* ▼▼▼ 【全新】微博关注列表弹窗样式 ▼▼▼ */
+#weibo-following-list-container {
+  height: 100%;
+  overflow-y: auto; /* 【核心】内容超出时显示垂直滚动条 */
+}
+.weibo-following-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 15px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.weibo-following-item:last-child {
+  border-bottom: none;
+}
+.weibo-following-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  margin-right: 12px;
+  object-fit: cover;
+}
+.weibo-following-name {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+/* ▲▲▲ 关注列表样式结束 ▲▲▲ */
+
+/* ▼▼▼ 【全新】让个人主页可编辑的元素有点击手势 ▼▼▼ */
+#weibo-avatar-img,
+#weibo-nickname,
+#weibo-posts-item, /* 我们让整个“微博”区域可点击 */
+#weibo-fans-item,  /* 整个“粉丝”区域可点击 */
+#weibo-background-img /* 背景图也可点击 */ {
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+#weibo-avatar-img:hover,
+#weibo-nickname:hover,
+#weibo-posts-item:hover,
+#weibo-fans-item:hover,
+#weibo-background-img:hover {
+  opacity: 0.8; /* 鼠标放上去时变淡一点，给用户反馈 */
+}
+/* ▲▲▲ 点击手势样式结束 ▲▲▲ */
+/* ▼▼▼ 请用这块新代码替换旧的 #weibo-page-container 样式 ▼▼▼ */
+#weibo-page-container {
+  flex-grow: 1;
+  position: relative;
+  overflow: hidden;
+  /* 核心修改：为绝对定位的导航栏预留出空间，防止内容被遮挡 */
+  /* 50px 是导航栏的大致高度，env() 用于适配iPhone底部的小黑条 */
+  padding-bottom: calc(50px + env(safe-area-inset-bottom));
+  box-sizing: border-box; /* 确保内边距被正确计算在内 */
+}
+/* ▲▲▲ 替换结束 ▲▲▲ */
+
+/* ▲▲▲ 替换结束 ▲▲▲ */
+
+/* 确保个人主页的内容可以滚动 */
+#weibo-profile-page {
+  overflow-y: auto;
+  height: 100%;
+}
+/* ▲▲▲ 修复CSS结束 ▲▲▲ */
+
+/* ▲▲▲ 修复CSS结束 ▲▲▲ */
+/* ▼▼▼ 【最终修复】提升微博关注列表弹窗的层级 ▼▼▼ */
+#weibo-following-modal {
+  z-index: 1001; /* 确保它能覆盖在其他页面之上 */
+}
+/* ▲▲▲ 修复结束 ▲▲▲ */
+/* ▼▼▼ 把这一整块全新的微博帖子样式，粘贴到 <style> 标签的最末尾 ▼▼▼ */
+
+/* ▼▼▼ 把这一整块全新的微博帖子样式，粘贴到 <style> 标签的最末尾 ▼▼▼ */
+
+/* === 微博帖子专属样式 (已和动态分离) === */
+/* === 微博帖子专属样式 (圆角卡片版) === */
+.weibo-post-item {
+  background-color: var(--secondary-bg);
+  border-radius: 12px; /* ★ 修改这里，增加圆角，让它变得圆润可爱 */
+  padding: 15px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06); /* ★ 新增柔和的阴影，营造卡片悬浮感 */
+  /* ★ 旧的 border-bottom 分割线已经被移除了，现在由父容器的 gap 属性负责间距 */
+}
+.weibo-post-item:last-child {
+  /* 这个规则现在也不需要了，但保留着也没关系 */
+  border-bottom: none;
+}
+
+.weibo-post-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.weibo-post-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.weibo-post-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.weibo-post-nickname {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--text-primary);
+}
+
+.weibo-post-timestamp {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.weibo-post-content {
+  font-size: 15px; /* 微博正文字体稍大 */
+  line-height: 1.7;
+  color: #333;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin-bottom: 10px;
+}
+
+.weibo-post-image {
+  width: 100%;
+  max-height: 400px;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+
+.weibo-post-footer {
+  border-top: 1px solid #f0f0f0;
+  padding-top: 8px;
+  margin-top: 10px;
+}
+
+.weibo-post-actions {
+  display: flex;
+  justify-content: space-around; /* 三个按钮均分空间 */
+  margin-bottom: 10px;
+}
+
+.weibo-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 14px;
+}
+.weibo-action-btn.liked {
+  color: #ff5252; /* 点赞后变红 */
+}
+.weibo-action-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.weibo-comments-container {
+  padding: 10px;
+  background-color: #f7f7f7;
+  border-radius: 8px;
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.weibo-comment-item .weibo-commenter-name {
+  font-weight: 600;
+  color: var(--accent-color);
+}
+.weibo-comment-item .weibo-comment-reply-tag {
+  color: var(--text-secondary);
+  margin: 0 4px;
+}
+
+.weibo-comment-input-area {
+  display: flex;
+  gap: 8px;
+}
+
+.weibo-comment-input {
+  flex-grow: 1;
+  border: none;
+  background-color: #f0f2f5;
+  border-radius: 14px;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.weibo-comment-send-btn {
+  background-color: var(--accent-color);
+  color: white;
+  border: none;
+  border-radius: 14px;
+  padding: 0 15px;
+  font-size: 13px;
+  cursor: pointer;
+}
+/* ▲▲▲ 微博专属样式结束 ▲▲▲ */
+/* ▲▲▲ 粘贴结束 ▲▲▲ */
+/* ▼▼▼ 把这段新样式粘贴到 <style> 的末尾 ▼▼▼ */
+
+/* 单条评论的容器，现在需要相对定位，并为删除按钮留出空间 */
+.weibo-comment-item {
+  position: relative;
+  padding-right: 25px;
+}
+
+/* 评论删除按钮的样式 */
+.comment-delete-btn {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  line-height: 22px;
+  text-align: center;
+  border-radius: 50%;
+  color: var(--text-secondary);
+  background-color: transparent; /* 背景透明 */
+  border: none; /* 无边框 */
+  font-size: 20px; /* 放大"×"号 */
+  cursor: pointer;
+  transition: all 0.2s ease;
+  opacity: 0; /* 默认隐藏 */
+}
+
+/* 鼠标悬停在整条评论上时，才显示删除按钮 */
+.weibo-comment-item:hover .comment-delete-btn {
+  opacity: 1;
+}
+
+/* 鼠标悬停在删除按钮上时，给一点反馈效果 */
+.comment-delete-btn:hover {
+  background-color: #f0f0f0;
+  color: #ff3b30; /* 变红色 */
+}
+
+#phone-screen.dark-mode .comment-delete-btn:hover {
+  background-color: #3a3a3c; /* 夜间模式下的悬停背景色 */
+}
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+/* ▼▼▼ 把这一整块全新的微博热搜样式，粘贴到 <style> 标签的最末尾 ▼▼▼ */
+
+/* === 微博热搜列表样式 === */
+#weibo-hot-search-list {
+  background-color: var(--secondary-bg);
+}
+
+.hot-search-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 15px;
+  border-bottom: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.hot-search-item:hover {
+  background-color: #f5f5f5;
+}
+#phone-screen.dark-mode .hot-search-item:hover {
+  background-color: #2c2c2e;
+}
+
+.hot-search-rank {
+  width: 30px;
+  font-size: 16px;
+  font-weight: bold;
+  color: var(--text-secondary);
+  text-align: center;
+  flex-shrink: 0;
+}
+/* 前三名用不同的颜色突出显示 */
+.hot-search-item[data-rank="1"] .hot-search-rank {
+  color: #f44336;
+}
+.hot-search-item[data-rank="2"] .hot-search-rank {
+  color: #ff9800;
+}
+.hot-search-item[data-rank="3"] .hot-search-rank {
+  color: #ffc107;
+}
+
+.hot-search-content {
+  flex-grow: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.hot-search-topic {
+  font-size: 15px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hot-search-tag {
+  font-size: 10px;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.hot-search-tag.hot {
+  background-color: #f44336;
+}
+.hot-search-tag.new {
+  background-color: #ff9800;
+}
+.hot-search-tag.rec {
+  background-color: #2196f3;
+}
+
+/* ▲▲▲ 微博热搜样式粘贴结束 ▲▲▲ */
+/* ▼▼▼ 把这一整块全新的CSS，粘贴到 <style> 标签的最末尾 ▼▼▼ */
+
+/* 1. 让帖子头部成为删除按钮的定位参考点 */
+.weibo-post-header {
+  position: relative; /* 关键！ */
+}
+
+/* 2. 删除按钮的样式 */
+.weibo-post-delete-btn {
+  position: absolute; /* 绝对定位，让它浮动起来 */
+  top: 10px; /* 距离顶部10像素 */
+  right: 15px; /* 距离右侧15像素 */
+  width: 26px;
+  height: 26px;
+  background-color: rgba(0, 0, 0, 0.08); /* 半透明的背景 */
+  color: var(--text-secondary); /* 使用全局的次要文字颜色 */
+  border: none;
+  border-radius: 50%; /* 圆形 */
+  font-size: 20px; /* "×"号的大小 */
+  line-height: 26px; /* 让"×"号垂直居中 */
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease; /* 添加平滑的动画效果 */
+}
+
+/* 鼠标放上去时，变成醒目的红色 */
+.weibo-post-delete-btn:hover {
+  background-color: #ff3b30;
+  color: white;
+  transform: scale(1.1); /* 轻微放大 */
+}
+
+/* ▲▲▲ 粘贴结束 ▲▲▲ */
+/* ▼▼▼ 【微博布局终极修复】真正解决所有页面滚动不到底的问题 ▼▼▼ */
+
+/* 1. 外层容器不再需要“垫子”，它的任务只是撑开空间 */
+#weibo-page-container {
+  flex-grow: 1;
+  position: relative;
+  overflow: hidden; /* 保持不变 */
+}
+
+/* 2. 【核心】把“垫子”加到真正滚动的列表自己身上！ */
+#weibo-profile-page,
+#weibo-following-feed-list,
+#weibo-hot-search-list,
+#weibo-plaza-feed-list,
+#weibo-hottopic-feed-list {
+  flex-grow: 1;
+  overflow-y: auto;
+
+  /* 
+       魔法就在这里！我们为每个列表的底部，
+       都加上一个和导航栏一样高的内边距（“垫子”）。
+       这样列表滚动到底时，最后一条评论就会被这个内边距向上推，
+       正好显示在底部导航栏的上方，不会再被挡住了！
+    */
+  padding-bottom: calc(50px + env(safe-area-inset-bottom));
+  box-sizing: border-box; /* 确保内边距被正确计算 */
+}
+
+/* ▲▲▲ 修复结束 ▲▲▲ */
+
+/* ▼▼▼ 把这段新样式粘贴到 <style> 的末尾 ▼▼▼ */
+#post-visibility-groups label {
+  display: block;
+  padding: 5px 0;
+}
+#post-visibility-groups input {
+  margin-right: 8px;
+}
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+/* ▼▼▼ 【微博布局终极修复】解决所有页面滚动不到底的问题 ▼▼▼ */
+
+/* 1. 移除外层容器上错误的多余“垫子” */
+#weibo-page-container {
+  padding-bottom: 0 !important;
+}
+
+/* 2. 【核心】把“垫子”（padding-bottom）加到真正滚动的列表自己身上！*/
+#weibo-profile-page,
+#weibo-following-feed-list,
+#weibo-hot-search-list,
+#weibo-plaza-feed-list,
+#weibo-hottopic-feed-list {
+  /* 
+       魔法就在这里！我们为每个列表的底部，
+       都加上一个和导航栏一样高的内边距（“垫子”）。
+       calc(50px + env(safe-area-inset-bottom)) 会自动计算导航栏高度和iPhone底部安全区高度。
+    */
+  padding-bottom: calc(50px + env(safe-area-inset-bottom)) !important;
+  box-sizing: border-box; /* 确保内边距被正确计算 */
+}
+/* ▼▼▼ 【问题1修复】微博编辑资料按钮强制显示 ▼▼▼ */
+/* 请将这段代码粘贴到 <style> 标签的最末尾 */
+#edit-weibo-profile-btn {
+  display: flex !important; /* 强制显示为flex容器 */
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-color) !important; /* 强制使用主题色 */
+}
+#edit-weibo-profile-btn svg {
+  stroke: currentColor !important; /* 确保SVG图标继承上面的颜色 */
+}
+/* ▲▲▲ 修复结束 ▲▲▲ */
+/* ▼▼▼ 把这一整块全新的CSS，粘贴到 <style> 的末尾 ▼▼▼ */
+
+/* 1. 让关注列表的每一行都能容纳新按钮 */
+.weibo-following-item {
+  align-items: center; /* 确保头像、名字和按钮垂直居中对齐 */
+}
+
+/* 2. 这是你新增的“操作”按钮的样式 */
+.weibo-action-trigger-btn {
+  margin-left: auto; /* 核心：让按钮自动靠到最右边 */
+  padding: 5px 8px;
+  cursor: pointer;
+  border-radius: 50%; /* 圆形按钮，更美观 */
+  transition: background-color 0.2s;
+}
+.weibo-action-trigger-btn:hover {
+  background-color: #e0e0e0;
+}
+#phone-screen.dark-mode .weibo-action-trigger-btn:hover {
+  background-color: #3a3a3c;
+}
+.weibo-action-trigger-btn svg {
+  width: 20px;
+  height: 20px;
+  stroke: var(--text-secondary); /* 图标颜色跟随主题 */
+  display: block; /* 解决一些对齐问题 */
+}
+
+/* 3. 为操作弹窗里的单选按钮美化一下 */
+#weibo-action-type-select label {
+  display: block;
+  padding: 8px;
+  border-radius: 6px;
+  transition: background-color 0.2s;
+}
+#weibo-action-type-select label:hover {
+  background-color: #f0f2f5;
+}
+#phone-screen.dark-mode #weibo-action-type-select label:hover {
+  background-color: #2c2c2e;
+}
+
+/* ▲▲▲ 新增CSS粘贴结束 ▲▲▲ */
+/* ▼▼▼ 【弹窗层级修复】粘贴这段代码到样式末尾 ▼▼▼ */
+#weibo-action-modal {
+  z-index: 1002; /* 这个值比关注列表(1001)更高，就不会被盖住了 */
+}
+/* 4. 帖子页底部输入框 */
+/* ▼▼▼ 请用这块新代码替换旧的 #post-comment-input-area 样式 ▼▼▼ */
+#post-comment-input-area {
+  /* 
+      我们移除了 position: absolute; 和相关的 bottom, left 属性，
+      让它从一个“浮动层”变回一个正常的块级元素，自然地排在内容下方。
+      其他的样式会从 .chat-input-area 类继承，无需担心。
+    */
+  width: 100%;
+  box-sizing: border-box;
+}
+/* ▲▲▲ 替换结束 ▲▲▲ */
+
+/* ▲▲▲ 论坛样式结束 ▲▲▲ */
+/* ▼▼▼ 请将这段【全新】的论坛美化CSS，粘贴到<style>标签的末尾 ▼▼▼ */
+
+/* 1. 美化帖子详情页底部的评论输入区域 */
+#post-comment-input-area {
+  padding: 10px 15px; /* 增加内边距，让它不贴边 */
+  background-color: rgba(247, 247, 247, 0.9);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-top: 1px solid var(--border-color);
+  /* 适配iPhone底部安全区 */
+  padding-bottom: calc(10px + env(safe-area-inset-bottom));
+}
+
+/* 2. 【核心】美化评论输入框本身 */
+#post-comment-input-area #post-comment-input {
+  background-color: #f0f2f5; /* 浅灰色背景，更有层次感 */
+  border: none;
+  border-radius: 18px; /* 圆角，更柔和 */
+  padding: 10px 15px;
+  font-size: 14px;
+  resize: none; /* 禁止用户拖拽大小 */
+}
+
+/* 夜间模式适配 */
+#phone-screen.dark-mode #post-comment-input-area #post-comment-input {
+  background-color: #2c2c2e;
+}
+
+/* 3. 美化发送按钮 */
+#post-comment-input-area #send-post-comment-btn {
+  height: 36px;
+  border-radius: 18px; /* 和输入框保持一致的圆角 */
+  padding: 0 20px;
+}
+
+/* 4. 【新增】AI生成评论按钮的样式 */
+.generate-comments-container {
+  padding: 10px 20px 0 20px;
+  border-bottom: 8px solid #f0f2f5;
+}
+
+#phone-screen.dark-mode .generate-comments-container {
+  border-bottom-color: #000;
+}
+
+#generate-forum-comments-btn {
+  width: 100%;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  background-color: #e9f5ff;
+  color: var(--accent-color);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+#generate-forum-comments-btn:hover {
+  background-color: #d4eaff;
+}
+/* ▲▲▲ 论坛美化CSS粘贴结束 ▲▲▲ */
+/* ▼▼▼ 【全新】论坛帖子/评论头像与楼层样式 ▼▼▼ */
+
+/* 1. 帖子作者区域：使用flex布局让头像和名字并排 */
+#post-detail-content .post-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 12px; /* 头像和右侧信息的间距 */
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 20px;
+}
+
+/* 2. 帖子作者的头像样式 */
+.post-author-avatar {
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0; /* 防止被压缩 */
+}
+
+/* 4. 移除旧的标题外边距，因为flex布局会处理间距 */
+#post-detail-content .post-detail-header h1 {
+  margin: 0;
+}
+#post-detail-content .post-detail-header h1 {
+  font-size: 18px; /* 标题可以稍微小一点，更协调 */
+  margin-bottom: 4px;
+}
+
+/* 5. 评论区每一条评论的布局 */
+.post-comment-item {
+  display: flex;
+  gap: 10px; /* 头像和右侧内容的间距 */
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+#phone-screen.dark-mode .post-comment-item {
+  border-bottom-color: #2c2c2e;
+}
+
+/* 6. 评论者的小头像 */
+.comment-avatar-small {
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+/* 7. 包裹评论所有文字内容的容器 */
+.comment-details {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
+/* 8. 评论的头部：包含名字和楼层 */
+.comment-header-line {
+  display: flex;
+  justify-content: space-between; /* 让名字靠左，楼层靠右 */
+  align-items: center;
+  margin-bottom: 5px;
+}
+
+/* 9. 评论楼层号的样式 */
+.comment-floor {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* 10. 移除旧的评论作者外边距 */
+.post-comment-item .comment-author {
+  margin-bottom: 0;
+}
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+/* ▼▼▼ 这是修复论坛评论区宽度问题的新增代码 ▼▼▼ */
+#post-comment-input-area #post-comment-input {
+  flex-grow: 1; /* ★★★ 核心代码就是这行！让输入框自动伸展，占满所有可用宽度 ★★★ */
+
+  /* 下面这些是美化样式，让它和其他输入框风格统一，这次没有修改高度哦 */
+  border: none;
+  background-color: #f0f2f5;
+  border-radius: 18px;
+  padding: 10px 15px;
+  font-size: 14px;
+  resize: none;
+  box-sizing: border-box;
+}
+
+/* 夜间模式适配 */
+#phone-screen.dark-mode #post-comment-input-area #post-comment-input {
+  background-color: #2c2c2e;
+}
+/* ▲▲▲ 新增代码结束 ▲▲▲ */
+/* ▼▼▼ 用这一整块全新的CSS，替换掉你旧的所有塔罗牌相关CSS ▼▼▼ */
+
+/* 1. 占卜结果弹窗内的样式（纯文字版） */
+#tarot-result-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+}
+.tarot-result-question {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background-color: #f0f2f5;
+  padding: 8px 12px;
+  border-radius: 8px;
+  width: 95%;
+  text-align: center;
+}
+#phone-screen.dark-mode .tarot-result-question {
+  background-color: #2c2c2e;
+}
+.tarot-spread-container {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+}
+.tarot-card-wrapper {
+  background-color: #fff;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 8px;
+  min-width: 120px;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+#phone-screen.dark-mode .tarot-card-wrapper {
+  background-color: #1c1c1e;
+}
+.tarot-card-position {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-color);
+  margin-bottom: 4px;
+}
+.tarot-card-name {
+  font-size: 14px;
+}
+
+/* 3. 历史记录样式 (保持不变) */
+#tarot-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.tarot-history-item {
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  padding: 12px;
+  position: relative;
+  border: 1px solid var(--border-color);
+}
+#phone-screen.dark-mode .tarot-history-item {
+  background-color: #2c2c2e;
+}
+.tarot-history-item .question {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.tarot-history-item .details {
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+}
+.tarot-history-delete-btn {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 24px;
+  height: 24px;
+  background-color: #e0e0e0;
+  color: #888;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 24px;
+  text-align: center;
+}
+#phone-screen.dark-mode .tarot-history-delete-btn {
+  background-color: #3e3e42;
+}
+/* ▼▼▼ 第1步：从这里开始复制替换 ▼▼▼ */
+
+#lovers-space-screen {
+  background-color: #f0f2f5; /* 保留一个备用背景色 */
+  background-size: cover; /* 背景图覆盖整个区域 */
+  background-position: center; /* 背景图居中显示 */
+  background-repeat: no-repeat; /* 背景图不重复 */
+}
+
+/* 头部 */
+#ls-header {
+  height: 220px;
+  position: relative;
+  /* 【核心修改】移除了 background-size 和 background-position */
+  color: white;
+  flex-shrink: 0;
+  background-color: transparent; /* 【核心修改】让头部背景变透明，以显示下方的全屏背景 */
+}
+
+/* ▲▲▲ 第1步：复制替换到这里结束 ▲▲▲ */
+
+/* --- 【最终修复版】修复情侣空间顶部按钮无法点击的问题 --- */
+/* --- 【最终修复版】修复遮罩层拦截点击的问题 --- */
+
+.ls-header-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+
+  /* ▼▼▼ 核心修复：让这个遮罩层对鼠标事件“透明”！ ▼▼▼ */
+  pointer-events: none;
+  /* ▲▲▲ 修复结束 ▲▲▲ */
+}
+
+/* --- 【已修复】情侣空间顶部栏层级问题 --- */
+
+.ls-header-top-bar {
+  position: relative;
+  z-index: 3; /* ★★★ 核心修改：将层级从 2 提升到 3 ★★★ */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  padding-top: calc(15px + env(safe-area-inset-top));
+}
+
+#ls-char-name {
+  font-size: 18px;
+  font-weight: 600;
+}
+#ls-switch-char-btn {
+  font-size: 16px;
+}
+
+.ls-header-avatars {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  z-index: 2;
+}
+.ls-header-avatars img {
+  width: 65px;
+  height: 65px;
+  border-radius: 50%;
+  border: 2px solid white;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+.ls-header-avatars .heart-icon {
+  font-size: 28px;
+  color: #ff4d6d;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+}
+
+/* ▼▼▼ 请用这【一整块】全新的代码，完整替换旧的 #ls-tab-bar 和 .ls-tab-item 样式 ▼▼▼ */
+
+/* 页签栏 (V2 - 悬浮撑满版) */
+/* ▼▼▼ 请用这块【悬浮胶囊最终版】代码，完整替换掉你旧的 #ls-tab-bar 样式 ▼▼▼ */
+#ls-tab-bar {
+  display: flex;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 5;
+
+  /* --- 核心修改在这里 --- */
+  /* 1. 使用 margin 实现上下左右的边距，营造悬浮感 */
+  margin: -20px 5px 10px 5px; /* 把左右的 15px 改成了 5px */
+
+  /* 2. 为所有四个角都设置圆角，形成可爱的胶囊形状 */
+  border-radius: 25px;
+
+  background-color: var(--secondary-bg);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); /* 阴影可以让悬浮感更强 */
+}
+/* ▲▲▲ 替换结束 ▲▲▲ */
+
+/* 单个页签项目 (V2) */

@@ -1,0 +1,823 @@
+        function applyGlobalWallpaper() {
+          const homeScreen = document.getElementById("home-screen");
+          const wallpaper = state.globalSettings.wallpaper;
+          if (wallpaper && wallpaper.startsWith("data:image"))
+            homeScreen.style.backgroundImage = `url(${wallpaper})`;
+          else if (wallpaper) homeScreen.style.backgroundImage = wallpaper;
+        }
+
+        async function renderWorldBookScreen() {
+          const listEl = document.getElementById("world-book-list");
+          listEl.innerHTML = "";
+
+          // 1. 同时获取所有书籍和所有分类
+          const [books, categories] = await Promise.all([
+            db.worldBooks.toArray(),
+            db.worldBookCategories.orderBy("name").toArray(),
+          ]);
+
+          state.worldBooks = books; // 确保内存中的数据是同步的
+
+          if (books.length === 0) {
+            listEl.innerHTML =
+              '<p style="text-align:center; color: #8a8a8a; margin-top: 50px;">点击右上角 "+" 创建你的第一本世界书</p>';
+            return;
+          }
+
+          // 2. 将书籍按 categoryId 分组
+          const groupedBooks = books.reduce((acc, book) => {
+            const key = book.categoryId || "uncategorized";
+            if (!acc[key]) {
+              acc[key] = [];
+            }
+            acc[key].push(book);
+            return acc;
+          }, {});
+
+          // 3. 优先渲染已分类的书籍
+          categories.forEach((category) => {
+            const booksInCategory = groupedBooks[category.id];
+            if (booksInCategory && booksInCategory.length > 0) {
+              const groupContainer = createWorldBookGroup(
+                category.name,
+                booksInCategory,
+              );
+              listEl.appendChild(groupContainer);
+            }
+          });
+
+          // 4. 最后渲染未分类的书籍
+          const uncategorizedBooks = groupedBooks["uncategorized"];
+          if (uncategorizedBooks && uncategorizedBooks.length > 0) {
+            const groupContainer = createWorldBookGroup(
+              "未分类",
+              uncategorizedBooks,
+            );
+            listEl.appendChild(groupContainer);
+          }
+
+          // 5. 为所有分组标题添加折叠事件
+          document
+            .querySelectorAll(".world-book-group-header")
+            .forEach((header) => {
+              header.addEventListener("click", () => {
+                header.classList.toggle("collapsed");
+                header.nextElementSibling.classList.toggle("collapsed");
+              });
+            });
+        }
+
+        /**
+         * 【辅助函数】创建一个分类的分组DOM
+         * @param {string} groupName - 分类名称
+         * @param {Array} books - 该分类下的书籍数组
+         * @returns {HTMLElement} - 创建好的分组容器
+         */
+        function createWorldBookGroup(groupName, books) {
+          const groupContainer = document.createElement("div");
+          groupContainer.className = "world-book-group-container";
+
+          groupContainer.innerHTML = `
+			        <div class="world-book-group-header">
+			            <span class="arrow">▼</span>
+			            <span class="group-name">${groupName}</span>
+			        </div>
+			        <div class="world-book-group-content"></div>
+			    `;
+
+          const headerEl = groupContainer.querySelector(
+            ".world-book-group-header",
+          );
+          const contentEl = groupContainer.querySelector(
+            ".world-book-group-content",
+          );
+
+          // 默认给头部和内容区都加上 collapsed 类
+          headerEl.classList.add("collapsed");
+          contentEl.classList.add("collapsed");
+
+          books.sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
+          books.forEach((book) => {
+            const item = document.createElement("div");
+            item.className = "list-item";
+            item.dataset.bookId = book.id;
+            item.innerHTML = `<div class="item-title">${book.name}</div><div class="item-content">${(
+              book.content || "暂无内容..."
+            ).substring(0, 50)}</div>`;
+            item.addEventListener("click", () => openWorldBookEditor(book.id));
+            addLongPressListener(item, async () => {
+              const confirmed = await showCustomConfirm(
+                "删除世界书",
+                `确定要删除《${book.name}》吗？此操作不可撤销。`,
+                { confirmButtonClass: "btn-danger" },
+              );
+              if (confirmed) {
+                await db.worldBooks.delete(book.id);
+                state.worldBooks = state.worldBooks.filter(
+                  (wb) => wb.id !== book.id,
+                );
+                renderWorldBookScreen();
+              }
+            });
+            contentEl.appendChild(item);
+          });
+
+          return groupContainer;
+        }
+        window.renderWorldBookScreenProxy = renderWorldBookScreen;
+
+        async function openWorldBookEditor(bookId) {
+          editingWorldBookId = bookId;
+          const [book, categories] = await Promise.all([
+            db.worldBooks.get(bookId),
+            db.worldBookCategories.toArray(),
+          ]);
+          if (!book) return;
+
+          document.getElementById("world-book-editor-title").textContent =
+            book.name;
+          document.getElementById("world-book-name-input").value = book.name;
+          document.getElementById("world-book-content-input").value =
+            book.content;
+
+          // 填充分类下拉菜单
+          const selectEl = document.getElementById(
+            "world-book-category-select",
+          );
+          selectEl.innerHTML = '<option value="">-- 未分类 --</option>'; // 默认选项
+          categories.forEach((cat) => {
+            const option = document.createElement("option");
+            option.value = cat.id;
+            option.textContent = cat.name;
+            if (book.categoryId === cat.id) {
+              option.selected = true; // 选中当前分类
+            }
+            selectEl.appendChild(option);
+          });
+
+          showScreen("world-book-editor-screen");
+        }
+
+        function renderStickerPanel() {
+          const grid = document.getElementById("sticker-grid");
+          grid.innerHTML = "";
+
+          let stickersToRender;
+
+          if (activeStickerCategoryId === "uncategorized") {
+            // 如果是“未分类”，就筛选出 categoryId 不存在或为空的表情
+            stickersToRender = state.userStickers.filter(
+              (sticker) => !sticker.categoryId,
+            );
+          } else {
+            // 否则，按具体的分类ID筛选
+            stickersToRender = state.userStickers.filter(
+              (sticker) => sticker.categoryId === activeStickerCategoryId,
+            );
+          }
+
+          if (stickersToRender.length === 0) {
+            // 根据当前选中的分类，显示不同的提示语
+            let message;
+            if (activeStickerCategoryId === "uncategorized") {
+              // 如果所有表情都有分类了，这里也会是空的
+              message = "没有未分类的表情哦~";
+            } else {
+              // 如果是在某个具体分类下，但是里面没表情
+              message = "这个分类下还没有表情哦~";
+            }
+            // 如果整个表情库都是空的，给一个初始引导
+            if (state.userStickers.length === 0) {
+              message =
+                "大人请点击右上角“添加”或“上传”来添加你的第一个表情吧！";
+            }
+
+            grid.innerHTML = `<p style="text-align:center; color: var(--text-secondary); grid-column: 1 / -1;">${message}</p>`;
+          } else {
+            stickersToRender.forEach((sticker) => {
+              // 这部分是你原来的渲染逻辑，保持不变
+              const itemContainer = document.createElement("div");
+              itemContainer.className = "sticker-item";
+
+              const imageEl = document.createElement("div");
+              imageEl.className = "sticker-image";
+              imageEl.style.backgroundImage = `url(${sticker.url})`;
+
+              const nameEl = document.createElement("span");
+              nameEl.className = "sticker-name";
+              nameEl.textContent = sticker.name;
+              nameEl.title = sticker.name;
+
+              if (isUserStickerSelectionMode) {
+                imageEl.classList.add("in-selection-mode");
+                if (selectedUserStickers.has(sticker.id)) {
+                  imageEl.classList.add("selected");
+                }
+                itemContainer.addEventListener("click", () => {
+                  imageEl.classList.toggle("selected");
+                  if (selectedUserStickers.has(sticker.id)) {
+                    selectedUserStickers.delete(sticker.id);
+                  } else {
+                    selectedUserStickers.add(sticker.id);
+                  }
+                  const deleteBtn = document.getElementById(
+                    "delete-selected-user-stickers-btn",
+                  );
+                  deleteBtn.textContent = `删除已选 (${selectedUserStickers.size})`;
+                  deleteBtn.disabled = selectedUserStickers.size === 0;
+
+                  const moveBtn = document.getElementById(
+                    "move-selected-stickers-btn",
+                  );
+                  moveBtn.disabled = selectedUserStickers.size === 0;
+                });
+              } else {
+                itemContainer.addEventListener("click", () =>
+                  sendSticker(sticker),
+                );
+                addLongPressListener(imageEl, () => {
+                  const existingDeleteBtn =
+                    imageEl.querySelector(".delete-btn");
+                  if (existingDeleteBtn) return;
+
+                  const deleteBtn = document.createElement("div");
+                  deleteBtn.className = "delete-btn";
+                  deleteBtn.innerHTML = "&times;";
+                  deleteBtn.style.display = "block";
+                  deleteBtn.onclick = async (e) => {
+                    e.stopPropagation();
+                    const confirmed = await showCustomConfirm(
+                      "删除表情",
+                      `确定要删除表情 "${sticker.name}" 吗？`,
+                      {
+                        confirmButtonClass: "btn-danger",
+                      },
+                    );
+                    if (confirmed) {
+                      await db.userStickers.delete(sticker.id);
+                      state.userStickers = state.userStickers.filter(
+                        (s) => s.id !== sticker.id,
+                      );
+                      renderStickerPanel();
+                    }
+                  };
+                  imageEl.appendChild(deleteBtn);
+                  const removeDeleteBtn = () => {
+                    if (deleteBtn) deleteBtn.remove();
+                    imageEl.removeEventListener("mouseleave", removeDeleteBtn);
+                  };
+                  imageEl.addEventListener("mouseleave", removeDeleteBtn);
+                });
+              }
+
+              itemContainer.appendChild(imageEl);
+              itemContainer.appendChild(nameEl);
+              grid.appendChild(itemContainer);
+            });
+          }
+
+          // 每次渲染表情列表后，都更新一次分类页签栏
+          renderStickerCategories();
+        }
+
+        /**
+         * 处理删除表情分类的逻辑，提供两种删除方式
+         * @param {number} categoryId - 要删除的分类ID
+         * @param {string} categoryName - 要删除的分类名称
+         */
+        async function handleDeleteStickerCategory(categoryId, categoryName) {
+          if (isNaN(categoryId) || !categoryName) {
+            alert("执行删除失败：传入的分类ID或名称无效！");
+            return;
+          }
+
+          // 弹窗让用户选择如何处理分类下的表情
+          const choice = await showChoiceModal(`删除分类 "${categoryName}"`, [
+            {
+              text: "仅删除分类 (表情移至“未分类”)",
+              value: "delete_category_only",
+            },
+            { text: "删除分类及所有表情 (不可恢复)", value: "delete_all" },
+          ]);
+
+          if (!choice) return; // 如果用户点击了取消，则不执行任何操作
+
+          try {
+            if (choice === "delete_category_only") {
+              // 找到该分类下的所有表情
+              const stickersToUpdate = state.userStickers.filter(
+                (s) => s.categoryId === categoryId,
+              );
+
+              if (stickersToUpdate.length > 0) {
+                // 将它们的分类ID设为 null 或 undefined，表示未分类
+                stickersToUpdate.forEach((sticker) => {
+                  sticker.categoryId = null;
+                });
+                await db.userStickers.bulkPut(stickersToUpdate);
+              }
+              // 从数据库删除分类本身
+              await db.userStickerCategories.delete(categoryId);
+            } else if (choice === "delete_all") {
+              // 找到该分类下的所有表情ID
+              const stickerIdsToDelete = state.userStickers
+                .filter((s) => s.categoryId === categoryId)
+                .map((s) => s.id);
+
+              if (stickerIdsToDelete.length > 0) {
+                // 从数据库批量删除这些表情
+                await db.userStickers.bulkDelete(stickerIdsToDelete);
+              }
+              // 从数据库删除分类本身
+              await db.userStickerCategories.delete(categoryId);
+            }
+
+            // 不论哪种方式，都需要从前端的 state 缓存中移除或更新数据
+            state.userStickers = await db.userStickers.toArray();
+
+            // 如果删除的是当前正在查看的分类，就切换回“未分类”
+            if (activeStickerCategoryId === categoryId) {
+              activeStickerCategoryId = "uncategorized";
+            }
+
+            // 重新渲染整个表情面板（这会自动刷新分类和表情列表）
+            renderStickerPanel();
+
+            await showCustomAlert(
+              "操作成功",
+              `分类 "${categoryName}" 已成功删除。`,
+            );
+          } catch (error) {
+            console.error("删除分类时出错:", error);
+            alert(`操作失败，发生数据库错误: ${error.message}`);
+          }
+        }
+
+        /**
+         * 处理批量删除选中的用户表情
+         */
+        async function handleBulkDeleteUserStickers() {
+          if (selectedUserStickers.size === 0) return;
+
+          const confirmed = await showCustomConfirm(
+            "确认删除",
+            `确定要删除选中的 ${selectedUserStickers.size} 个表情吗？`,
+            { confirmButtonClass: "btn-danger" },
+          );
+
+          if (confirmed) {
+            const idsToDelete = Array.from(selectedUserStickers);
+            await db.userStickers.bulkDelete(idsToDelete);
+
+            state.userStickers = state.userStickers.filter(
+              (s) => !idsToDelete.includes(s.id),
+            );
+
+            // 退出编辑模式
+            toggleUserStickerSelectionMode();
+
+            alert("选中的表情已删除。");
+          }
+        }
+
+        /**
+         * 【全新】从卡片点击后，打开情侣空间并跳转到指定页签
+         * @param {string} charId - 角色ID
+         * @param {string} viewId - 要跳转到的视图ID (例如 'ls-diary-view')
+         */
+        function openLoversSpaceFromCard(charId, viewId) {
+          // 1. 打开指定角色的情侣空间主界面
+          openLoversSpace(charId);
+
+          // 2. 等待一小会儿，确保界面已渲染
+          setTimeout(() => {
+            // 3. 找到对应的页签按钮并模拟点击它
+            const targetTab = document.querySelector(
+              `.ls-tab-item[data-view='${viewId}']`,
+            );
+            if (targetTab) {
+              targetTab.click();
+            }
+          }, 100); // 100毫秒的延迟通常足够了
+        }
+
+        function createMessageElement(msg, chat) {
+          if (msg.type === "recalled_message") {
+            const wrapper = document.createElement("div");
+            // 1. 给 wrapper 也加上 timestamp，方便事件委托时查找
+            wrapper.className = "message-wrapper system-pat";
+            wrapper.dataset.timestamp = msg.timestamp;
+
+            const bubble = document.createElement("div");
+            // 2. 让这个元素同时拥有 .message-bubble 和 .recalled-message-placeholder 两个class
+            //    这样它既能被选择系统识别，又能保持原有的居中灰色样式
+            bubble.className = "message-bubble recalled-message-placeholder";
+            // 3. 把 timestamp 放在 bubble 上，这是多选逻辑的关键
+            bubble.dataset.timestamp = msg.timestamp;
+            bubble.textContent = msg.content;
+
+            wrapper.appendChild(bubble);
+
+            // 4. 为它补上和其他消息一样的标准事件监听器
+            addLongPressListener(wrapper, () =>
+              showMessageActions(msg.timestamp),
+            );
+            wrapper.addEventListener("click", () => {
+              if (isSelectionMode) {
+                toggleMessageSelection(msg.timestamp);
+              }
+            });
+
+            // 5. 在之前的“点击查看原文”的逻辑中，我们已经使用了事件委托，所以这里不需要再单独为这个元素添加点击事件了。
+            //    init() 函数中的那个事件监听器会处理它。
+
+            return wrapper;
+          }
+
+          if (msg.isHidden) {
+            return null;
+          }
+
+          if (msg.type === "pat_message") {
+            const wrapper = document.createElement("div");
+            wrapper.className = "message-wrapper system-pat";
+            const bubble = document.createElement("div");
+            bubble.className = "message-bubble system-bubble";
+            bubble.dataset.timestamp = msg.timestamp;
+            bubble.textContent = msg.content;
+            wrapper.appendChild(bubble);
+            addLongPressListener(wrapper, () =>
+              showMessageActions(msg.timestamp),
+            );
+            wrapper.addEventListener("click", () => {
+              if (isSelectionMode) toggleMessageSelection(msg.timestamp);
+            });
+            return wrapper;
+          } else if (msg.type === "narrative") {
+            const wrapper = document.createElement("div");
+            wrapper.className = "message-wrapper system-pat"; // 复用系统消息的居中样式
+            const bubble = document.createElement("div");
+            bubble.className = "message-bubble system-bubble";
+            bubble.dataset.timestamp = msg.timestamp;
+
+            bubble.style.textAlign = "left";
+            bubble.style.display = "inline-block"; // 保持气泡自适应内容宽度
+            bubble.style.maxWidth = "100%"; // 限制最大宽度，避免太宽
+
+            // 这里给它加个小图标，让它看起来更有“剧情感”
+            bubble.innerHTML = `
+			                            <div style="font-weight:bold; color:#5f6368;">📝 旁白</div>
+			                            <div style="line-height: 1.5;">${msg.content.replace(/\n/g, "<br>")}</div>
+			                        `;
+
+            wrapper.appendChild(bubble);
+
+            // 绑定长按和点击事件（用于删除等操作）
+            addLongPressListener(wrapper, () =>
+              showMessageActions(msg.timestamp),
+            );
+            wrapper.addEventListener("click", () => {
+              if (isSelectionMode) toggleMessageSelection(msg.timestamp);
+            });
+            return wrapper;
+          }
+
+          const isUser = msg.role === "user";
+          const wrapper = document.createElement("div");
+          wrapper.className = `message-wrapper ${isUser ? "user" : "ai"}`;
+
+          if (chat.isGroup) {
+            const senderLine = document.createElement("div");
+            senderLine.className = "group-sender-line";
+
+            const tagsContainer = document.createElement("div");
+            tagsContainer.className = "group-sender-tags";
+
+            let senderDisplayName;
+
+            if (isUser) {
+              // 如果是用户自己
+              senderDisplayName = chat.settings.myNickname || "我";
+
+              // 检查用户是否是群主
+              if (chat.ownerId === "user") {
+                const roleTag = document.createElement("span");
+                roleTag.className = "group-role-tag owner";
+                roleTag.textContent = "群主";
+                tagsContainer.appendChild(roleTag);
+              }
+              // 检查用户是否被设为管理员
+              else if (chat.settings.isUserAdmin) {
+                const roleTag = document.createElement("span");
+                roleTag.className = "group-role-tag admin";
+                roleTag.textContent = "管理员";
+                tagsContainer.appendChild(roleTag);
+              }
+
+              // 检查用户是否有头衔
+              if (chat.settings.myGroupTitle) {
+                const titleTag = document.createElement("span");
+                titleTag.className = "group-title-tag";
+                titleTag.textContent = chat.settings.myGroupTitle;
+                tagsContainer.appendChild(titleTag);
+              }
+            } else {
+              // 如果是其他成员 (AI/NPC)，这部分逻辑保持不变
+              const member = chat.members.find(
+                (m) => m.originalName === msg.senderName,
+              );
+              senderDisplayName = member
+                ? member.groupNickname
+                : msg.senderName || "未知成员";
+
+              // 如果该成员被禁言了，就添加一个禁言标签
+              if (member && member.isMuted) {
+                const muteTag = document.createElement("span");
+                muteTag.className = "group-title-tag"; // 复用头衔标签的样式
+                muteTag.style.color = "#ff3b30"; // 让它变成红色
+                muteTag.style.backgroundColor = "#ffe5e5"; // 淡红色背景
+                muteTag.textContent = "🚫已禁言";
+                tagsContainer.appendChild(muteTag);
+              }
+
+              if (member && chat.ownerId === member.id) {
+                const roleTag = document.createElement("span");
+                roleTag.className = "group-role-tag owner";
+                roleTag.textContent = "群主";
+                tagsContainer.appendChild(roleTag);
+              } else if (member && member.isAdmin) {
+                const roleTag = document.createElement("span");
+                roleTag.className = "group-role-tag admin";
+                roleTag.textContent = "管理员";
+                tagsContainer.appendChild(roleTag);
+              }
+
+              if (member && member.groupTitle) {
+                const titleTag = document.createElement("span");
+                titleTag.className = "group-title-tag";
+                titleTag.textContent = member.groupTitle;
+                tagsContainer.appendChild(titleTag);
+              }
+            }
+
+            const senderNameSpan = document.createElement("span");
+            senderNameSpan.className = "sender-name";
+            senderNameSpan.textContent = senderDisplayName;
+
+            // 修复用户标签显示在右边的问题
+            if (isUser) {
+              senderLine.appendChild(tagsContainer); // 标签在左
+              senderLine.appendChild(senderNameSpan); // 昵称在右
+            } else {
+              senderLine.appendChild(senderNameSpan); // 昵称在左
+              senderLine.appendChild(tagsContainer); // 标签在右
+            }
+
+            wrapper.appendChild(senderLine);
+          }
+
+          const bubble = document.createElement("div");
+          bubble.className = `message-bubble ${isUser ? "user" : "ai"}`;
+          bubble.dataset.timestamp = msg.timestamp;
+
+          const timestampEl = document.createElement("span");
+          timestampEl.className = "timestamp";
+          timestampEl.textContent = formatTimestamp(msg.timestamp);
+
+          // 找到确定 avatarSrc 的那段代码
+          let avatarSrc,
+            avatarFrameSrc = ""; // <--- 声明两个变量
+          if (chat.isGroup) {
+            if (isUser) {
+              avatarSrc = chat.settings.myAvatar || defaultMyGroupAvatar;
+              avatarFrameSrc = chat.settings.myAvatarFrame || ""; // <--- 获取“我”的头像框
+            } else {
+              const member = chat.members.find(
+                (m) => m.originalName === msg.senderName,
+              );
+              avatarSrc = member ? member.avatar : defaultGroupMemberAvatar;
+              avatarFrameSrc = member ? member.avatarFrame || "" : ""; // <--- 获取成员的头像框
+            }
+          } else {
+            if (isUser) {
+              avatarSrc = chat.settings.myAvatar || defaultAvatar;
+              avatarFrameSrc = chat.settings.myAvatarFrame || ""; // <--- 获取“我”的头像框
+            } else {
+              avatarSrc = chat.settings.aiAvatar || defaultAvatar;
+              avatarFrameSrc = chat.settings.aiAvatarFrame || ""; // <--- 获取AI的头像框
+            }
+          }
+
+          let avatarHtml;
+          // 如果存在头像框URL
+          if (avatarFrameSrc) {
+            avatarHtml = `
+			            <div class="avatar-with-frame">
+			                <img src="${avatarSrc}" class="avatar-img">
+			                <img src="${avatarFrameSrc}" class="avatar-frame">
+			            </div>
+			        `;
+          } else {
+            // 如果没有，就使用最简单的头像结构
+            avatarHtml = `<img src="${avatarSrc}" class="avatar">`;
+          }
+
+          let contentHtml;
+
+          if (msg.type === "share_link") {
+            bubble.classList.add("is-link-share");
+
+            // onclick="openBrowser(...)" 移除，我们将在JS中动态绑定事件
+            contentHtml = `
+			            <div class="link-share-card" data-timestamp="${msg.timestamp}">
+			                <div class="title">${msg.title || "无标题"}</div>
+			                <div class="description">${msg.description || "点击查看详情..."}</div>
+			                <div class="footer">
+			                    <svg class="footer-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+			                    <span>${msg.source_name || "链接分享"}</span>
+			                </div>
+			            </div>
+			        `;
+          }
+          // ... 其他 case ...
+          else if (msg.type === "dating_summary_card") {
+            bubble.classList.add("is-dating-summary");
+            const payload = msg.payload;
+            let cardClass = "";
+
+            if (payload.ratingType === "romantic") {
+              cardClass = "romantic";
+            } else if (payload.ratingType === "passionate") {
+              cardClass = "passionate";
+            } else if (payload.ratingType === "perfect") {
+              cardClass = "perfect";
+            }
+
+            // 不再存储复杂的JSON字符串
+            contentHtml = `
+			        <div class="dating-summary-chat-card ${cardClass}" data-timestamp="${msg.timestamp}">
+			            <div class="rating">${payload.rating}</div>
+			            <div class="tip">点击查看详情</div>
+			        </div>
+			    `;
+          } else if (msg.type === "share_card") {
+            bubble.classList.add("is-link-share"); // 复用链接分享的卡片样式
+            // 把时间戳加到卡片上，方便后面点击时识别
+            contentHtml = `
+			        <div class="link-share-card" style="cursor: pointer;" data-timestamp="${msg.timestamp}">
+			            <div class="title">${msg.payload.title}</div>
+			            <div class="description">共 ${msg.payload.sharedHistory.length} 条消息</div>
+			            <div class="footer">
+			                <svg class="footer-icon" ...>...</svg> <!-- 复用链接分享的图标 -->
+			                <span>聊天记录</span>
+			            </div>
+			        </div>
+			    `;
+          } else if (msg.type === "eleme_order_notification") {
+            bubble.classList.add("is-gift-notification");
+            const payload = msg.payload;
+
+            let remarkHtml = "";
+            if (payload.remark && payload.remark.trim()) {
+              remarkHtml = `
+			            <div class="waimai-remark">
+			                <span class="remark-label">备注:</span>
+			                <span class="remark-text">${payload.remark}</span>
+			            </div>
+			        `;
+            }
+
+            // 1. 我们删除了写在HTML里的蓝色渐变样式。
+            // 2. 将卡片的 class 从 "gift-card" 改为 "waimai-meituan-card"，方便我们定制专属样式。
+            // 3. 将图标从面条 🍜 换成了外卖小摩托 🛵，更符合主题。
+            contentHtml = `
+			        <div class="waimai-meituan-card">
+			            <div class="gift-card-header">
+			                <div class="icon">🛵</div>
+			                <div class="title">一份来自 ${payload.senderName} 的外卖</div>
+			            </div>
+			            <div class="gift-card-body">
+			                <img src="${payload.foodImageUrl}" style="width: 100%; max-height: 120px; object-fit: cover; border-radius: 8px; margin-bottom: 10px;">
+			                <p class="greeting" style="font-weight: bold; font-size: 16px;">${payload.foodName}</p>
+			                <p style="font-size: 13px; color: #888;">你的专属外卖已送达</p>
+			                ${remarkHtml}
+			            </div>
+			        </div>
+			    `;
+          } else if (msg.type === "borrow_money_request") {
+            bubble.classList.add("is-borrow-request"); // 应用透明气泡样式
+            const payload = msg.payload;
+            // 直接将卡片的HTML赋给contentHtml，不再拼接任何文本
+            contentHtml = `
+			        <div class="borrow-card">
+			            <div class="borrow-header">
+			                向 <span>${payload.lenderName}</span> 借钱
+			            </div>
+			            <div class="borrow-body">
+			                <p class="label">借款金额</p>
+			                <p class="amount">¥${payload.amount.toFixed(2)}</p>
+			                <p class="reason">
+			                    <strong>借款用途:</strong><br>
+			                    ${payload.reason}
+			                </p>
+			            </div>
+			        </div>
+			    `;
+          } else if (msg.type === "repost_forum_post") {
+            bubble.classList.add("is-link-share"); // 复用链接分享的样式，省事！
+            const postPayload = msg.payload;
+            //把帖子的ID存到卡片的 data-post-id 属性里，方便以后点击跳转
+            contentHtml = `
+        <div class="link-share-card" style="cursor: pointer;" data-post-id="${postPayload.postId}">
+            <div class="title">【小组帖子】${postPayload.title}</div>
+            <div class="description">${postPayload.content}</div>
+            <div class="footer">
+                <svg class="footer-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 12c0-5.25-4.25-9.5-9.5-9.5S2.5 6.75 2.5 12s4.25 9.5 9.5 9.5c.35 0 .69-.02 1.03-.06"></path><path d="M18.5 12.5c0-1.66-1.34-3-3-3s-3 1.34-3 3 1.34 3 3 3c.83 0 1.58-.34 2.12-.88"></path></svg>
+                <span>来自小组的分享</span>
+            </div>
+        </div>
+      `;
+          } else if (msg.type === "series_share") {
+            bubble.classList.add("is-book-share");
+            const payload = msg.payload || {};
+            const titleText =
+              payload.seriesTitle ||
+              (msg.content &&
+                msg.content.split("\n")[0].replace("【连载分享】", "")) ||
+              "连载";
+            const desc = payload.summary || "连载分享";
+            const latest = payload.latestChapterIndex
+              ? `第${payload.latestChapterIndex}章 ${payload.latestTitle || ""}`
+              : "最新章节";
+            const meta = `${payload.pairing || ""} · ${payload.statusText || ""} · 共${payload.chapterCount || "?"}章`;
+            contentHtml = `
+        <div class="book-share-card" style="cursor: pointer;" data-post-id="${payload.latestPostId || ""}">
+          <div class="book-spine"></div>
+          <div class="book-body">
+            <div class="book-tag">连载</div>
+            <div class="book-title">${titleText}</div>
+            <div class="book-meta">${meta}</div>
+            <div class="book-desc">${desc}</div>
+            <div class="book-latest">最新：${latest}</div>
+          </div>
+        </div>
+      `;
+          } else if (msg.type === "kk_item_share") {
+            bubble.classList.add("is-link-share"); // 复用透明背景样式(如果已定义)，或者不加这行让它有气泡背景
+            // 如果你没有 is-link-share 样式，可以忽略上一行，或者定义 bubble.style.background = 'transparent';
+            bubble.style.background = "transparent";
+            bubble.style.padding = "0";
+
+            const payload = msg.payload;
+
+            contentHtml = `
+                <div class="kk-share-card">
+                    <div class="header">
+                        <span class="icon">🔍</span>
+                        <span>查岗线索：${payload.itemName}</span>
+                    </div>
+                    <div class="content">${payload.content}</div>
+                    <div class="footer">
+                        来源：${payload.areaName}
+                    </div>
+                </div>
+            `;
+          } else if (msg.type === "cart_share_request") {
+            bubble.classList.add("is-cart-share-request");
+            const payload = msg.payload;
+            let statusText = "等待对方处理...";
+            let cardClass = "";
+
+            if (payload.status === "paid") {
+              statusText = "对方已为你买单";
+              cardClass = "paid";
+            } else if (payload.status === "rejected") {
+              statusText = "对方拒绝了你的请求";
+              cardClass = "rejected";
+            }
+
+            contentHtml = `
+			        <div class="cart-share-card ${cardClass}">
+			            <div class="cart-share-header">
+			                <div class="icon">🛒</div>
+			                <div class="title">购物车代付请求</div>
+			            </div>
+			            <div class="cart-share-body">
+			                <div class="label">共 ${payload.itemCount} 件商品，合计</div>
+			                <div class="amount">¥${payload.totalPrice.toFixed(2)}</div>
+			                <div class="status-text">${statusText}</div>
+			            </div>
+			        </div>
+			    `;
+          } else if (msg.type === "waimai_gift_from_char") {
+            bubble.classList.add("is-gift-notification");
+            const payload = msg.payload;
+
+            contentHtml = `
+			        <div class="waimai-meituan-card">
+			            <div class="gift-card-header">
+			                <div class="icon">🛵</div>
+			                <div class="title">你的专属外卖已送达</div>
+			            </div>
+			            <div class="gift-card-body">
+			                <img src="${payload.foodImageUrl}" style="width: 100%; height: 120px; object-fit: cover; border-radius: 8px; margin-bottom: 10px;">

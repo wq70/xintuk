@@ -1,0 +1,829 @@
+                  '❌ 你的浏览器/环境完全不支持系统通知 API。\n(如果是iOS，必须点击"添加到主屏幕"作为PWA运行才支持)',
+                );
+                return;
+              }
+
+              const permission = Notification.permission;
+
+              if (permission === "granted") {
+                try {
+                  const title = "权限测试";
+                  const options = { body: "恭喜！系统通知功能正常工作。" };
+
+                  // --- 核心修复：优先使用 ServiceWorker ---
+                  if ("serviceWorker" in navigator) {
+                    const reg = await navigator.serviceWorker.getRegistration();
+                    if (reg) {
+                      // 安卓 Chrome 必须走这里
+                      await reg.showNotification(title, options);
+                    } else {
+                      // 如果没有获取到 SW，尝试注册一个空的并发送
+                      try {
+                        // 尝试现场注册一个临时的
+                        const emptyWorkerContent =
+                          "self.addEventListener('install', () => self.skipWaiting());";
+                        const blob = new Blob([emptyWorkerContent], {
+                          type: "text/javascript",
+                        });
+                        const workerUrl = URL.createObjectURL(blob);
+                        const newReg =
+                          await navigator.serviceWorker.register(workerUrl);
+                        await newReg.showNotification(title, options);
+                      } catch (e) {
+                        // 实在不行，降级尝试旧方法（在安卓上这步会抛错，但被外层catch捕获）
+                        new Notification(title, options);
+                      }
+                    }
+                  } else {
+                    // iOS 或 PC 浏览器
+                    new Notification(title, options);
+                  }
+
+                  alert(
+                    "✅ 权限状态: 已授权 (granted)\n\n系统尝试发送了一条测试通知，请查看手机通知栏。\n如果没收到，请检查手机系统的“通知管理”是否屏蔽了浏览器/本应用。",
+                  );
+                } catch (e) {
+                  alert(
+                    `⚠️ 权限显示已授权，但发送失败。\n错误信息: ${e.message}`,
+                  );
+                }
+              } else if (permission === "denied") {
+                alert(
+                  "🚫 权限状态: 已拒绝 (denied)\n\n原因：你之前点击了“禁止”或系统默认禁止。\n\n解决方法：\n1. 请在浏览器地址栏点击锁图标或设置。\n2. 找到“通知”权限并重置为“询问”或“允许”。\n3. 刷新页面重试。",
+                );
+              } else if (permission === "default") {
+                alert(
+                  "❓ 权限状态: 未询问 (default)\n\n请点击右侧开关，并在弹出的浏览器窗口中点击“允许”。",
+                );
+              }
+            });
+          }
+          // ▼▼▼ 在 check-notification-perm-btn 的监听器后面，添加这段代码 ▼▼▼
+
+          const testNotifBtn = document.getElementById(
+            "test-system-notification-btn",
+          );
+          if (testNotifBtn) {
+            // 移除旧监听器 (通过克隆)
+            const newBtn = testNotifBtn.cloneNode(true);
+            testNotifBtn.parentNode.replaceChild(newBtn, testNotifBtn);
+
+            newBtn.addEventListener("click", async () => {
+              if (!("Notification" in window)) return alert("设备不支持通知");
+              if (Notification.permission !== "granted")
+                return alert("请先点击左侧按钮授权通知！");
+
+              const title = "测试消息";
+              const options = {
+                body: "如果你看到这条消息，说明安卓弹窗修复成功！",
+                icon: "https://i.postimg.cc/Kj8JnRcp/267611-CC01-F8-A3-B4910-A2-C2-FFDE479-DC.jpg",
+              };
+
+              try {
+                if ("serviceWorker" in navigator) {
+                  const reg = await navigator.serviceWorker.getRegistration();
+                  if (reg) {
+                    await reg.showNotification(title, options);
+                    console.log("测试：通过 SW 发送成功");
+                  } else {
+                    alert(
+                      "错误：ServiceWorker 未注册，无法在安卓发送通知。请刷新页面重试。",
+                    );
+                    // 仅作为调试，尝试直接发送看看报错
+                    // new Notification(title, options);
+                  }
+                } else {
+                  new Notification(title, options);
+                }
+              } catch (e) {
+                alert("测试发送失败: " + e.message);
+              }
+            });
+          }
+
+          calculateTotalImageSize();
+        }
+
+        /**
+         * 渲染后台活动的角色选择和频率设置UI
+         */
+        function renderBackgroundFrequencySelector() {
+          const container = document.getElementById(
+            "background-activity-char-list",
+          );
+          const detailsContainer = document.getElementById(
+            "background-activity-details",
+          );
+          const masterSwitch = document.getElementById(
+            "background-activity-switch",
+          );
+
+          // 根据总开关的状态，决定是否显示详细设置
+          detailsContainer.style.display = masterSwitch.checked
+            ? "block"
+            : "none";
+
+          container.innerHTML = ""; // 清空旧列表
+          const singleChats = Object.values(state.chats).filter(
+            (chat) => !chat.isGroup,
+          );
+
+          if (singleChats.length === 0) {
+            container.innerHTML =
+              '<p style="text-align:center; color: var(--text-secondary);">还没有可以设置的角色</p>';
+            return;
+          }
+
+          const config = state.globalSettings.backgroundActivityConfig || {};
+
+          singleChats.forEach((chat) => {
+            const freq = config[chat.id] || "none"; // 获取当前角色的频率设置
+            let badgeHtml = "";
+            if (freq !== "none") {
+              const freqText = { low: "低", medium: "中", high: "高" }[freq];
+              badgeHtml = `<span class="char-freq-badge ${freq}">${freqText}</span>`;
+            }
+
+            const item = document.createElement("div");
+            item.className = "char-list-item";
+            item.innerHTML = `
+			            <input type="checkbox" class="bg-char-checkbox" data-chat-id="${chat.id}">
+			            <span class="char-name">${chat.name}</span>
+			            ${badgeHtml}
+			        `;
+            container.appendChild(item);
+          });
+        }
+
+        window.renderApiSettingsProxy = renderApiSettings;
+
+        async function renderChatList() {
+          const chatListEl = document.getElementById("chat-list");
+          chatListEl.innerHTML = "";
+
+          // 1. 获取所有聊天和分组数据
+          const allChats = Object.values(state.chats);
+          const allGroups = await db.qzoneGroups.toArray();
+
+          if (allChats.length === 0) {
+            chatListEl.innerHTML =
+              '<p style="text-align:center; color: #8a8a8a; margin-top: 50px;">点击右上角 "+" 或群组图标添加聊天</p>';
+            return;
+          }
+
+          // 2. 将聊天明确地分为“置顶”和“未置顶”两组
+          const pinnedChats = allChats.filter((chat) => chat.isPinned);
+          const unpinnedChats = allChats.filter((chat) => !chat.isPinned);
+
+          // 3. 对置顶的聊天，仅按最新消息时间排序
+          pinnedChats.sort(
+            (a, b) =>
+              (b.history.slice(-1)[0]?.timestamp || 0) -
+              (a.history.slice(-1)[0]?.timestamp || 0),
+          );
+
+          // 4. 【优先渲染】所有置顶的聊天
+          pinnedChats.forEach((chat) => {
+            const item = createChatListItem(chat);
+            chatListEl.appendChild(item);
+          });
+
+          // 5. 【接下来处理未置顶的聊天】应用之前的分组逻辑
+          // 为每个分组找到其内部最新的消息时间戳 (只在未置顶聊天中查找)
+          allGroups.forEach((group) => {
+            const latestChatInGroup = unpinnedChats
+              .filter((chat) => chat.groupId === group.id) // 找到属于这个组的聊天
+              .sort(
+                (a, b) =>
+                  (b.history.slice(-1)[0]?.timestamp || 0) -
+                  (a.history.slice(-1)[0]?.timestamp || 0),
+              )[0]; // 排序后取第一个
+
+            group.latestTimestamp = latestChatInGroup
+              ? latestChatInGroup.history.slice(-1)[0]?.timestamp || 0
+              : 0;
+          });
+
+          // 根据分组的最新时间戳，对分组本身进行排序
+          allGroups.sort((a, b) => b.latestTimestamp - a.latestTimestamp);
+
+          // 6. 遍历排序后的分组，渲染其中的【未置顶】好友
+          allGroups.forEach((group) => {
+            const groupChats = unpinnedChats
+              .filter((chat) => !chat.isGroup && chat.groupId === group.id)
+              .sort(
+                (a, b) =>
+                  (b.history.slice(-1)[0]?.timestamp || 0) -
+                  (a.history.slice(-1)[0]?.timestamp || 0),
+              );
+
+            if (groupChats.length === 0) return; // 如果这个分组里没有未置顶的好友，就跳过
+
+            const groupContainer = document.createElement("div");
+            groupContainer.className = "chat-group-container";
+
+            // 删除了 collapsed 类，这样默认就是展开的了
+            groupContainer.innerHTML = `
+			            <div class="chat-group-header">
+			                <span class="arrow">▼</span>
+			                <span class="group-name">${group.name}</span>
+			            </div>
+			            <div class="chat-group-content"></div>
+			        `;
+            const contentEl = groupContainer.querySelector(
+              ".chat-group-content",
+            );
+
+            groupChats.forEach((chat) => {
+              const item = createChatListItem(chat);
+              contentEl.appendChild(item);
+            });
+            chatListEl.appendChild(groupContainer);
+          });
+
+          // 7. 渲染所有【未置顶】的群聊和【未分组的】好友
+          const remainingChats = unpinnedChats
+            .filter((chat) => chat.isGroup || (!chat.isGroup && !chat.groupId))
+            .sort(
+              (a, b) =>
+                (b.history.slice(-1)[0]?.timestamp || 0) -
+                (a.history.slice(-1)[0]?.timestamp || 0),
+            );
+
+          remainingChats.forEach((chat) => {
+            const item = createChatListItem(chat);
+            chatListEl.appendChild(item);
+          });
+
+          // 为所有分组标题添加折叠事件
+          document.querySelectorAll(".chat-group-header").forEach((header) => {
+            header.addEventListener("click", () => {
+              header.classList.toggle("collapsed");
+              header.nextElementSibling.classList.toggle("collapsed");
+            });
+          });
+        }
+
+        function createChatListItem(chat) {
+          const lastMsgObj =
+            chat.history.filter((msg) => !msg.isHidden).slice(-1)[0] || {};
+          let lastMsgDisplay;
+
+          if (
+            !chat.isGroup &&
+            chat.relationship?.status === "pending_user_approval"
+          ) {
+            lastMsgDisplay = `<span style="color: #ff8c00;">[好友申请] ${
+              chat.relationship.applicationReason || "请求添加你为好友"
+            }</span>`;
+          } else if (
+            !chat.isGroup &&
+            chat.relationship?.status === "blocked_by_ai"
+          ) {
+            lastMsgDisplay = `<span style="color: #dc3545;">[你已被对方拉黑]</span>`;
+          } else if (chat.isGroup) {
+            if (lastMsgObj.type === "pat_message") {
+              lastMsgDisplay = `[系统消息] ${lastMsgObj.content}`;
+            } else if (lastMsgObj.type === "transfer") {
+              lastMsgDisplay = "[转账]";
+            } else if (
+              lastMsgObj.type === "ai_image" ||
+              lastMsgObj.type === "user_photo"
+            ) {
+              lastMsgDisplay = "[照片]";
+            } else if (lastMsgObj.type === "voice_message") {
+              lastMsgDisplay = "[语音]";
+            } else if (
+              typeof lastMsgObj.content === "string" &&
+              STICKER_REGEX.test(lastMsgObj.content)
+            ) {
+              lastMsgDisplay = lastMsgObj.meaning
+                ? `[表情: ${lastMsgObj.meaning}]`
+                : "[表情]";
+            } else if (Array.isArray(lastMsgObj.content)) {
+              lastMsgDisplay = `[图片]`;
+            } else {
+              lastMsgDisplay = String(lastMsgObj.content || "...").substring(
+                0,
+                20,
+              );
+            }
+            if (lastMsgObj.senderName && lastMsgObj.type !== "pat_message") {
+              const member = chat.members.find(
+                (m) => m.originalName === lastMsgObj.senderName,
+              );
+              const displayName = member
+                ? member.groupNickname
+                : lastMsgObj.senderName;
+              lastMsgDisplay = `${displayName}: ${lastMsgDisplay}`;
+            }
+          } else {
+            const statusText = chat.status?.text || "在线";
+            lastMsgDisplay = `[${statusText}]`;
+          }
+
+          const lastMsgTimestamp = lastMsgObj?.timestamp;
+          const timeDisplay = formatChatListTimestamp(lastMsgTimestamp);
+
+          const container = document.createElement("div");
+          container.className = "chat-list-item-swipe-container";
+          container.dataset.chatId = chat.id;
+
+          const content = document.createElement("div");
+          content.className = `chat-list-item-content ${chat.isPinned ? "pinned" : ""}`;
+
+          const avatar = chat.isGroup
+            ? chat.settings.groupAvatar
+            : chat.settings.aiAvatar;
+
+          let streakHtml = "";
+          let selectedBadgeHtml = "";
+
+          if (
+            !chat.isGroup &&
+            chat.settings.streak &&
+            chat.settings.streak.enabled
+          ) {
+            const streak = chat.settings.streak;
+            let isExtinguished = false;
+            if (
+              streak.lastInteractionDate &&
+              streak.extinguishThreshold !== -1
+            ) {
+              const lastDate = new Date(streak.lastInteractionDate);
+              const todayDate = new Date();
+              todayDate.setHours(0, 0, 0, 0);
+              const daysDiff = (todayDate - lastDate) / (1000 * 3600 * 24);
+              if (daysDiff >= streak.extinguishThreshold) {
+                isExtinguished = true;
+              }
+            }
+            const litIconUrl = streak.litIconUrl;
+            const extinguishedIconUrl = streak.extinguishedIconUrl;
+            const fontColor = streak.fontColor || "#ff6f00";
+            let iconHtml = "";
+            if (isExtinguished) {
+              iconHtml = extinguishedIconUrl
+                ? `<img src="${extinguishedIconUrl}" style="height: 1.2em; vertical-align: middle;">`
+                : "🧊";
+            } else if (streak.currentDays > 0 || streak.initialDays > 0) {
+              iconHtml = litIconUrl
+                ? `<img src="${litIconUrl}" style="height: 1.2em; vertical-align: middle;">`
+                : "🔥";
+            }
+            if (iconHtml) {
+              if (isExtinguished) {
+                streakHtml = `<span class="streak-indicator" style="color: ${fontColor};">${iconHtml}</span>`;
+              } else if (
+                streak.currentDays === -1 ||
+                streak.initialDays === -1
+              ) {
+                streakHtml = `<span class="streak-indicator" style="color: ${fontColor};">${iconHtml}∞</span>`;
+              } else {
+                streakHtml = `<span class="streak-indicator" style="color: ${fontColor};">${iconHtml}${streak.currentDays}</span>`;
+              }
+            }
+          }
+
+          // 使用 <img> 标签来显示佩戴的徽章图片
+          if (!chat.isGroup && chat.settings.selectedIntimacyBadge) {
+            selectedBadgeHtml = `<span class="intimacy-badge-display"><img src="${chat.settings.selectedIntimacyBadge}" alt="badge"></span>`;
+          }
+
+          content.innerHTML = `
+			        <div class="chat-list-item" data-chat-id="${chat.id}">
+			            <img src="${avatar || defaultAvatar}" class="avatar">
+			            <div class="info">
+			                <div class="name-line">
+			                    <span class="name">${
+                            !chat.isGroup && chat.settings.remarkName
+                              ? chat.settings.remarkName
+                              : chat.name
+                          }</span>
+			                    ${chat.isGroup ? '<span class="group-tag">群聊</span>' : ""}
+			                    ${streakHtml}
+			                    ${selectedBadgeHtml} <!-- 把徽章放在火花后面 -->
+			                </div>
+			                <div class="last-msg" style="color: ${
+                        chat.isGroup ? "var(--text-secondary)" : "#b5b5b5"
+                      }; font-style: italic;">${lastMsgDisplay}</div>
+			            </div>
+			            <div class="chat-list-right-column">
+			                <div class="chat-list-time">${timeDisplay}</div>
+			                <div class="unread-count-wrapper">
+			                    <span class="unread-count" style="display: none;">0</span>
+			                </div>
+			            </div>
+			        </div>
+			    `;
+
+          // ... 后续的滑动删除、事件绑定等代码保持不变 ...
+          const actions = document.createElement("div");
+          actions.className = "swipe-actions";
+          const pinButtonText = chat.isPinned ? "取消置顶" : "置顶";
+          const pinButtonClass = chat.isPinned ? "unpin" : "pin";
+          actions.innerHTML = `<button class="swipe-action-btn ${pinButtonClass}">${pinButtonText}</button><button class="swipe-action-btn delete">删除</button>`;
+
+          container.appendChild(content);
+          container.appendChild(actions);
+
+          const unreadCount = chat.unreadCount || 0;
+          const unreadEl = content.querySelector(".unread-count");
+          if (unreadCount > 0) {
+            unreadEl.textContent = unreadCount > 99 ? "99+" : unreadCount;
+            unreadEl.style.display = "inline-flex";
+          } else {
+            unreadEl.style.display = "none";
+          }
+
+          const infoEl = content.querySelector(".info");
+          if (infoEl) {
+            infoEl.addEventListener("click", () => openChat(chat.id));
+          }
+          const avatarEl = content.querySelector(".avatar, .avatar-with-frame");
+          if (avatarEl) {
+            avatarEl.addEventListener("click", (e) => {
+              e.stopPropagation();
+              handleUserPat(chat.id, chat.name);
+            });
+          }
+
+          return container;
+        }
+
+        function renderChatInterface(chatId) {
+          cleanupWaimaiTimers();
+          const chat = state.chats[chatId];
+          if (!chat) return;
+          // 群公告图标显示/隐藏逻辑
+          const announcementBtn = document.getElementById(
+            "group-announcement-btn",
+          );
+          if (chat.isGroup) {
+            announcementBtn.style.display = "inline-flex"; // 在群聊中显示
+          } else {
+            announcementBtn.style.display = "none"; // 在单聊中隐藏
+          }
+
+          exitSelectionMode();
+
+          const messagesContainer = document.getElementById("chat-messages");
+          const chatInputArea = document.getElementById("chat-input-area");
+          const lockOverlay = document.getElementById("chat-lock-overlay");
+          const lockContent = document.getElementById("chat-lock-content");
+
+          messagesContainer.dataset.theme = chat.settings.theme || "default";
+          const fontSize = chat.settings.fontSize || 13;
+          messagesContainer.style.setProperty(
+            "--chat-font-size",
+            `${fontSize}px`,
+          );
+          applyScopedCss(
+            chat.settings.customCss || "",
+            "#chat-messages",
+            "custom-bubble-style",
+          );
+          const displayName =
+            !chat.isGroup && chat.settings.remarkName
+              ? chat.settings.remarkName
+              : chat.name;
+          document.getElementById("chat-header-title").textContent =
+            displayName;
+          const statusContainer = document.getElementById("chat-header-status");
+          const statusTextEl = statusContainer.querySelector(".status-text");
+
+          if (chat.isGroup) {
+            statusContainer.style.display = "none";
+            document.getElementById(
+              "chat-header-title-wrapper",
+            ).style.justifyContent = "center";
+          } else {
+            statusContainer.style.display = "flex";
+            document.getElementById(
+              "chat-header-title-wrapper",
+            ).style.justifyContent = "flex-start";
+            statusTextEl.textContent = chat.status?.text || "在线";
+            statusContainer.classList.toggle(
+              "busy",
+              chat.status?.isBusy || false,
+            );
+          }
+
+          lockOverlay.style.display = "none";
+          chatInputArea.style.visibility = "visible";
+          lockContent.innerHTML = "";
+
+          if (!chat.isGroup && chat.relationship.status !== "friend") {
+            lockOverlay.style.display = "flex";
+            chatInputArea.style.visibility = "hidden";
+
+            let lockHtml = "";
+            switch (chat.relationship.status) {
+              case "blocked_by_user":
+                const isSimulationRunning = simulationIntervalId !== null;
+                const blockedTimestamp = chat.relationship.blockedTimestamp;
+                const cooldownHours =
+                  state.globalSettings.blockCooldownHours || 1;
+                const cooldownMilliseconds = cooldownHours * 60 * 60 * 1000;
+                const timeSinceBlock = Date.now() - blockedTimestamp;
+                const isCooldownOver = timeSinceBlock > cooldownMilliseconds;
+                const timeRemainingMinutes = Math.max(
+                  0,
+                  Math.ceil(
+                    (cooldownMilliseconds - timeSinceBlock) / (1000 * 60),
+                  ),
+                );
+
+                lockHtml = `
+			                    <span class="lock-text">你已将“${chat.name}”拉黑。</span>
+			                    <button id="unblock-btn" class="lock-action-btn">解除拉黑</button>
+			                    <div style="margin-top: 20px; padding: 10px; border: 1px dashed #ccc; border-radius: 8px; font-size: 11px; text-align: left; color: #666; background: rgba(0,0,0,0.02);">
+			                        <strong style="color: #333;">【开发者诊断面板】</strong><br>
+			                        - 后台活动总开关: ${
+                                state.globalSettings.enableBackgroundActivity
+                                  ? '<span style="color: green;">已开启</span>'
+                                  : '<span style="color: red;">已关闭</span>'
+                              }<br>
+			                        - 系统心跳计时器: ${
+                                isSimulationRunning
+                                  ? '<span style="color: green;">运行中</span>'
+                                  : '<span style="color: red;">未运行</span>'
+                              }<br>
+			                        - 当前角色状态: <strong>${chat.relationship.status}</strong><br>
+			                        - 需要冷静(小时): <strong>${cooldownHours}</strong><br>
+			                        - 冷静期是否结束: ${
+                                isCooldownOver
+                                  ? '<span style="color: green;">是</span>'
+                                  : `<span style="color: orange;">否 (还剩约 ${timeRemainingMinutes} 分钟)</span>`
+                              }<br>
+			                        - 触发条件: ${
+                                isCooldownOver &&
+                                state.globalSettings.enableBackgroundActivity
+                                  ? '<span style="color: green;">已满足，等待下次系统心跳</span>'
+                                  : '<span style="color: red;">未满足</span>'
+                              }
+			                    </div>
+			                    <button id="force-apply-check-btn" class="lock-action-btn secondary" style="margin-top: 10px;">强制触发一次好友申请检测</button>
+			                `;
+
+                break;
+              case "blocked_by_ai":
+                lockHtml = `
+			                    <span class="lock-text">你被对方拉黑了。</span>
+			                    <button id="apply-friend-btn" class="lock-action-btn">重新申请加为好友</button>
+			                `;
+                break;
+
+              case "pending_user_approval":
+                lockHtml = `
+			                    <span class="lock-text">“${chat.name}”请求添加你为好友：<br><i>“${chat.relationship.applicationReason}”</i></span>
+			                    <button id="accept-friend-btn" class="lock-action-btn">接受</button>
+			                    <button id="reject-friend-btn" class="lock-action-btn secondary">拒绝</button>
+			                `;
+                break;
+
+              case "pending_ai_approval":
+                lockHtml = `<span class="lock-text">好友申请已发送，等待对方通过...</span>`;
+                break;
+            }
+            lockContent.innerHTML = lockHtml;
+          }
+          messagesContainer.innerHTML = "";
+
+          const chatScreen = document.getElementById("chat-interface-screen");
+
+          // 核心逻辑：单人背景优先于全局背景
+          const backgroundToApply =
+            chat.settings.background ||
+            state.globalSettings.globalChatBackground;
+
+          if (backgroundToApply) {
+            chatScreen.style.backgroundImage = `url(${backgroundToApply})`;
+          } else {
+            chatScreen.style.backgroundImage = "none";
+          }
+
+          const isDarkMode = document
+            .getElementById("phone-screen")
+            .classList.contains("dark-mode");
+          chatScreen.style.backgroundColor = chat.settings.background
+            ? "transparent"
+            : isDarkMode
+              ? "#000000"
+              : "#f0f2f5";
+          const history = chat.history;
+          const totalMessages = history.length;
+          currentRenderedCount = 0;
+          const initialMessages = history.slice(-MESSAGE_RENDER_WINDOW);
+          let lastMessageTimestamp = null;
+
+          initialMessages.forEach((msg) => {
+            if (msg.isHidden) return; // 【新增】跳过隐藏消息
+
+            if (isNewDay(msg.timestamp, lastMessageTimestamp)) {
+              // 调用新的生成器函数
+              const dateStampEl = createDateStampElement(msg.timestamp);
+              messagesContainer.insertBefore(
+                dateStampEl,
+                document.getElementById("typing-indicator"),
+              );
+            }
+
+            appendMessage(msg, chat, true);
+
+            lastMessageTimestamp = msg.timestamp;
+          });
+          currentRenderedCount = initialMessages.length;
+          if (totalMessages > currentRenderedCount) {
+            prependLoadMoreButton(messagesContainer);
+          }
+          const typingIndicator = document.createElement("div");
+          typingIndicator.id = "typing-indicator";
+          typingIndicator.style.display = "none";
+          typingIndicator.textContent = "对方正在输入...";
+          messagesContainer.appendChild(typingIndicator);
+          setTimeout(
+            () =>
+              (messagesContainer.scrollTop = messagesContainer.scrollHeight),
+            0,
+          );
+          renderChatPet();
+        }
+
+        function prependLoadMoreButton(container) {
+          const button = document.createElement("button");
+          button.id = "load-more-btn";
+          button.textContent = "加载更早的记录";
+          button.addEventListener("click", loadMoreMessages);
+          container.prepend(button);
+        }
+
+        function loadMoreMessages() {
+          const messagesContainer = document.getElementById("chat-messages");
+          const chat = state.chats[state.activeChatId];
+          if (!chat) return;
+          const loadMoreBtn = document.getElementById("load-more-btn");
+          if (loadMoreBtn) loadMoreBtn.remove();
+          const totalMessages = chat.history.length;
+          const nextSliceStart =
+            totalMessages - currentRenderedCount - MESSAGE_RENDER_WINDOW;
+          const nextSliceEnd = totalMessages - currentRenderedCount;
+          const messagesToPrepend = chat.history.slice(
+            Math.max(0, nextSliceStart),
+            nextSliceEnd,
+          );
+          const oldScrollHeight = messagesContainer.scrollHeight;
+
+          // 1. 找到屏幕上已有的、最老的那条【真实消息】的时间戳
+          const firstVisibleMessage = messagesContainer.querySelector(
+            ".message-wrapper:not(.date-stamp-wrapper)",
+          );
+          let subsequentMessageTimestamp = firstVisibleMessage
+            ? parseInt(firstVisibleMessage.dataset.timestamp)
+            : null;
+
+          // 2. 从后往前（从新到旧）遍历我们要新加载的消息
+          messagesToPrepend.reverse().forEach((currentMsg) => {
+            // 检查这条新消息和它后面那条（可能是屏幕上已有的，也可能是刚加载的）消息是否跨天
+            if (
+              subsequentMessageTimestamp &&
+              isNewDay(subsequentMessageTimestamp, currentMsg.timestamp)
+            ) {
+              // 如果跨天，就为后面那条“较新”的消息创建一个日期戳
+              const dateStampEl = createDateStampElement(
+                subsequentMessageTimestamp,
+              );
+              messagesContainer.prepend(dateStampEl);
+            }
+
+            // 正常地把当前这条新消息放到最前面
+            prependMessage(currentMsg, chat);
+
+            // 更新追踪器，为下一次比较做准备
+            subsequentMessageTimestamp = currentMsg.timestamp;
+          });
+
+          // 3. 【边界处理】处理所有新加载消息的最前面（也就是整个聊天记录的最老）的那条消息
+          // 它也需要一个日期戳
+          if (subsequentMessageTimestamp) {
+            const dateStampEl = createDateStampElement(
+              subsequentMessageTimestamp,
+            );
+            messagesContainer.prepend(dateStampEl);
+          }
+
+          currentRenderedCount += messagesToPrepend.length;
+          const newScrollHeight = messagesContainer.scrollHeight;
+          messagesContainer.scrollTop += newScrollHeight - oldScrollHeight;
+          if (totalMessages > currentRenderedCount) {
+            prependLoadMoreButton(messagesContainer);
+          }
+        }
+
+        async function renderWallpaperScreen() {
+          // 锁屏开关
+          const lockScreenEnabled =
+            localStorage.getItem("lockScreenEnabled") !== "false";
+          const toggle = document.getElementById("enable-lock-screen-toggle");
+          if (toggle) {
+            toggle.checked = lockScreenEnabled;
+          }
+
+          // 主屏幕字体颜色和阴影
+          const savedColor =
+            state.globalSettings.homeIconWidgetTextColor || "#FFFFFF";
+          document.getElementById("home-icon-widget-text-color-picker").value =
+            savedColor;
+          document.getElementById("home-icon-widget-text-color-input").value =
+            savedColor;
+          document.getElementById("remove-home-font-shadow-toggle").checked =
+            !!state.globalSettings.removeHomeFontShadow;
+
+          // 主屏幕壁纸预览
+          const preview = document.getElementById("wallpaper-preview");
+          const bg = newWallpaperBase64 || state.globalSettings.wallpaper;
+          if (bg && bg.startsWith("data:image")) {
+            preview.style.backgroundImage = `url(${bg})`;
+            preview.textContent = "";
+          } else if (bg) {
+            preview.style.backgroundImage = bg;
+            preview.textContent = "当前为渐变色";
+          }
+
+          // 锁屏壁纸预览
+          const lockscreenPreview = document.getElementById(
+            "lockscreen-wallpaper-preview",
+          );
+          const lockBg =
+            newLockscreenWallpaperBase64 ||
+            state.globalSettings.lockscreenWallpaper;
+          if (lockBg && lockBg.startsWith("data:image")) {
+            lockscreenPreview.style.backgroundImage = `url(${lockBg})`;
+            lockscreenPreview.textContent = "";
+          } else if (lockBg) {
+            lockscreenPreview.style.backgroundImage = lockBg;
+            lockscreenPreview.textContent = "当前为渐变色";
+          }
+
+          // 密码输入框
+          document.getElementById("password-set-input").value =
+            state.globalSettings.password || "";
+
+          // 全局聊天背景预览
+          const globalBgPreview = document.getElementById("global-bg-preview");
+          const globalBg =
+            newGlobalBgBase64 || state.globalSettings.globalChatBackground;
+          if (globalBg && globalBg.startsWith("data:image")) {
+            globalBgPreview.style.backgroundImage = `url(${globalBg})`;
+            globalBgPreview.textContent = "";
+          } else if (globalBg) {
+            globalBgPreview.style.background = globalBg;
+            globalBgPreview.textContent = "当前为渐变色";
+          } else {
+            globalBgPreview.style.backgroundImage = "none";
+            globalBgPreview.textContent = "点击下方上传";
+          }
+
+          // 铃声和提示音
+          document.getElementById("ringtone-url-input").value =
+            state.globalSettings.ringtoneUrl || "";
+          document.getElementById("notification-sound-url-input").value =
+            state.globalSettings.notificationSoundUrl || "";
+
+          await loadThemesToDropdown(); // 确保主题列表已加载
+          const editor = document.getElementById("theme-css-editor");
+          const selector = document.getElementById("theme-selector");
+
+          // 优先加载 activeCustomCss
+          if (state.globalSettings.activeCustomCss) {
+            editor.value = state.globalSettings.activeCustomCss;
+            // 如果自定义CSS存在，则将下拉框重置为“未选择”状态
+            selector.value = "";
+          }
+          // 如果没有自定义CSS，但有选中的主题ID
+          else if (state.globalSettings.activeThemeId) {
+            const theme = await db.themes.get(
+              state.globalSettings.activeThemeId,
+            );
+            if (theme) {
+              editor.value = theme.css;
+              selector.value = theme.id; // 自动选中该主题
+            } else {
+              editor.value = THEME_CSS_TEMPLATE; // 如果ID无效，则显示模板
+            }
+          }
+          // 如果什么都没保存，显示模板
+          else {
+            editor.value = THEME_CSS_TEMPLATE;
+          }
+
+          // 渲染App图标和名称设置
+          renderIconSettings();
+          renderAppNameSettings();
+
+          // 加载预设下拉框
+          loadHomeScreenPresetsToDropdown();
+        }
+
+        window.renderWallpaperScreenProxy = renderWallpaperScreen;
+

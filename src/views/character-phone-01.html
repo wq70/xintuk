@@ -1,0 +1,986 @@
+    <div id="character-selection-screen" class="screen">
+      <div class="header">
+        <span class="back-btn" onclick="showScreen('home-screen')">‹</span>
+        <span>选择要查看的手机</span>
+        <span style="width: 30px"></span>
+      </div>
+      <div id="character-selection-list" class="list-container"></div>
+    </div>
+
+    <div id="character-phone-container" class="screen">
+      <div class="character-phone-frame">
+        <div class="character-phone-notch"></div>
+        <div class="character-phone-inner-screen">
+          <!-- 1. 角色手机的主界面 -->
+          <div id="character-phone-screen" class="character-phone-page active">
+            <div class="header character-phone-header">
+              <span
+                class="back-btn"
+                data-target-screen="character-selection-screen"
+              >
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </span>
+              <span id="character-phone-owner-name"></span>
+              <div class="header-actions">
+                <span
+                  class="action-btn"
+                  id="clear-character-data-btn"
+                  title="清空全部数据"
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path
+                      d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"
+                    />
+                  </svg>
+                </span>
+                <span
+                  class="action-btn"
+                  id="generate-character-data-btn"
+                  title="刷新全部数据"
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M23 4v6h-6M1 20v-6h6" />
+                    <path
+                      d="M3.51 9a9 9 0 0114.85-3.36L20.5 10M3.5 14a9 9 0 0114.85 3.36L20.5 14"
+                    />
+                  </svg>
+                </span>
+              </div>
+            </div>
+
+            <!-- 这是左上角的小组件 -->
+            <div id="char-phone-widget-1" class="char-phone-widget">
+              <img id="char-phone-widget-img-1" src="" />
+            </div>
+            <!-- 这是右下角的小组件 -->
+            <div id="char-phone-widget-2" class="char-phone-widget">
+              <img id="char-phone-widget-img-2" src="" />
+            </div>
+
+            <div
+              id="character-app-grid"
+              class="app-grid-standard"
+              style="padding-top: 60px"
+            ></div>
+          </div>
+
+          <!-- 2. 角色手机 - 聊天列表 -->
+          <div
+            id="character-chat-list-screen"
+            class="character-phone-page"
+            style="display: flex; flex-direction: column; height: 100%"
+          >
+            <div class="header character-phone-header" style="flex-shrink: 0">
+              <span class="back-btn" data-target-page="character-phone-screen">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </span>
+              <span>消息</span>
+              <div class="header-actions">
+                <!-- ★ 新增：消息页的删除按钮 ★ -->
+                <span
+                  class="action-btn"
+                  id="clear-npc-chats-btn"
+                  title="清空所有NPC聊天"
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path
+                      d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"
+                    />
+                  </svg>
+                </span>
+                <span
+                  class="action-btn"
+                  id="generate-chat-message-btn"
+                  title="生成新聊天"
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path
+                      d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"
+                    />
+                  </svg>
+                </span>
+              </div>
+            </div>
+
+            <div
+              id="character-chat-list"
+              class="list-container"
+              style="
+                padding: 0;
+                flex-grow: 1;
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+              "
+            ></div>
+          </div>
+
+          <!-- 3. 角色手机 - 具体聊天记录 -->
+          <div id="character-chat-history-screen" class="character-phone-page">
+            <div class="header character-phone-header">
+              <span
+                class="back-btn"
+                data-target-page="character-chat-list-screen"
+              >
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </span>
+              <span id="character-chat-with-name"></span>
+            </div>
+            <div
+              id="character-chat-history-messages"
+              class="list-container"
+              style="
+                padding: 15px;
+                display: flex;
+                flex-direction: column;
+                gap: 15px;
+                background-color: #e5ddd5;
+              "
+            ></div>
+          </div>
+
+          <!-- 4. 角色手机 - 购物车 -->
+          <div id="character-shopping-cart-screen" class="character-phone-page">
+            <div class="header character-phone-header">
+              <span class="back-btn" data-target-page="character-phone-screen">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </span>
+              <span>购物车</span>
+              <div class="header-actions">
+                <!-- ★ 新增：购物车页的删除按钮 ★ -->
+                <span
+                  class="action-btn"
+                  id="clear-cart-items-btn"
+                  title="清空购物车"
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path
+                      d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"
+                    />
+                  </svg>
+                </span>
+                <span
+                  class="action-btn"
+                  id="generate-cart-item-btn"
+                  title="添加新商品"
+                >
+                  <svg
+                    width="22"
+                    height="22"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                  </svg>
+                </span>
+              </div>
+            </div>
+            <div id="character-shopping-cart-list" class="list-container"></div>
+          </div>
+
+          <!-- 5. 角色手机 - 备忘录 -->
+          <div id="character-memos-screen" class="character-phone-page">
+            <div class="header character-phone-header">
+              <span class="back-btn" data-target-page="character-phone-screen">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </span>
+              <span>备忘录</span>
+              <div class="header-actions">
+                <!-- ★ 新增：备忘录页的删除按钮 ★ -->
+                <span
+                  class="action-btn"
+                  id="clear-memos-btn"
+                  title="清空备忘录"
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path
+                      d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"
+                    />
+                  </svg>
+                </span>
+                <span
+                  class="action-btn"
+                  id="generate-memo-btn"
+                  title="写新备忘录"
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path
+                      d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"
+                    />
+                  </svg>
+                </span>
+              </div>
+            </div>
+            <div id="character-memos-list" class="list-container"></div>
+          </div>
+
+          <!-- 6. 角色手机 - 浏览器 -->
+          <div id="character-browser-screen" class="character-phone-page">
+            <div class="header character-phone-header">
+              <span class="back-btn" data-target-page="character-phone-screen">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </span>
+              <span>浏览器</span>
+              <div class="header-actions">
+                <!-- ★ 新增：浏览器页的删除按钮 ★ -->
+                <span
+                  class="action-btn"
+                  id="clear-browser-history-btn"
+                  title="清空历史记录"
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path
+                      d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"
+                    />
+                  </svg>
+                </span>
+                <span
+                  class="action-btn"
+                  id="generate-browser-history-btn"
+                  title="生成新历史"
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path
+                      d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.72"
+                    ></path>
+                    <path
+                      d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.72-1.72"
+                    ></path>
+                  </svg>
+                </span>
+              </div>
+            </div>
+            <div id="character-browser-list" class="list-container"></div>
+          </div>
+
+          <!-- 7. 角色手机 - 浏览器搜索结果详情 -->
+          <div
+            id="character-browser-detail-screen"
+            class="character-phone-page"
+          >
+            <div class="header character-phone-header">
+              <span
+                class="back-btn"
+                data-target-page="character-browser-screen"
+              >
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </span>
+              <span id="character-browser-detail-title">搜索结果</span>
+            </div>
+            <div
+              id="character-browser-detail-content"
+              class="list-container"
+              style="padding: 15px; line-height: 1.7"
+            ></div>
+          </div>
+
+          <!-- 8. 角色手机 - 相册 -->
+          <div id="character-album-screen" class="character-phone-page">
+            <div class="header character-phone-header">
+              <span class="back-btn" data-target-page="character-phone-screen">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </span>
+              <span>相册</span>
+              <div class="header-actions">
+                <!-- ★ 新增：相册页的删除按钮 ★ -->
+                <span
+                  class="action-btn"
+                  id="clear-album-photos-btn"
+                  title="清空相册"
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path
+                      d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"
+                    />
+                  </svg>
+                </span>
+                <span
+                  class="action-btn"
+                  id="generate-album-photo-btn"
+                  title="生成新照片"
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <rect
+                      x="3"
+                      y="3"
+                      width="18"
+                      height="18"
+                      rx="2"
+                      ry="2"
+                    ></rect>
+                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                    <polyline points="21 15 16 10 5 21"></polyline>
+                  </svg>
+                </span>
+              </div>
+            </div>
+            <div id="character-album-grid" class="list-container"></div>
+          </div>
+
+          <!-- 9. 角色手机 - 银行 -->
+          <div id="character-bank-screen" class="character-phone-page">
+            <div class="header character-phone-header">
+              <span class="back-btn" data-target-page="character-phone-screen">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </span>
+              <span>钱包</span>
+              <div class="header-actions">
+                <!-- ★ 新增：钱包页的删除按钮 ★ -->
+                <span
+                  class="action-btn"
+                  id="clear-bank-transactions-btn"
+                  title="清空交易记录"
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path
+                      d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"
+                    />
+                  </svg>
+                </span>
+                <span
+                  class="action-btn"
+                  id="generate-bank-transaction-btn"
+                  title="生成新交易"
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <line x1="12" y1="1" x2="12" y2="23"></line>
+                    <path
+                      d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"
+                    ></path>
+                  </svg>
+                </span>
+              </div>
+            </div>
+            <div id="character-bank-details" class="list-container"></div>
+          </div>
+
+          <!-- 10. 角色手机 - 行动轨迹 -->
+          <div id="character-trajectory-screen" class="character-phone-page">
+            <div class="header character-phone-header">
+              <span class="back-btn" data-target-page="character-phone-screen">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </span>
+              <span>足迹</span>
+              <div class="header-actions">
+                <!-- ★ 新增：足迹页的删除按钮 ★ -->
+                <span
+                  class="action-btn"
+                  id="clear-trajectory-btn"
+                  title="清空足迹"
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path
+                      d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"
+                    />
+                  </svg>
+                </span>
+                <span
+                  class="action-btn"
+                  id="generate-trajectory-btn"
+                  title="生成新足迹"
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path
+                      d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"
+                    ></path>
+                    <circle cx="12" cy="10" r="3"></circle>
+                  </svg>
+                </span>
+              </div>
+            </div>
+            <div id="character-trajectory-list" class="list-container"></div>
+          </div>
+
+          <!-- 11. 角色手机 - APP使用记录 -->
+          <div id="character-app-usage-screen" class="character-phone-page">
+            <div class="header character-phone-header">
+              <span class="back-btn" data-target-page="character-phone-screen">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </span>
+              <span>屏幕使用时间</span>
+              <div class="header-actions">
+                <!-- ★ 新增：使用记录页的删除按钮 ★ -->
+                <span
+                  class="action-btn"
+                  id="clear-app-usage-btn"
+                  title="清空记录"
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path
+                      d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"
+                    />
+                  </svg>
+                </span>
+                <span
+                  class="action-btn"
+                  id="generate-app-usage-btn"
+                  title="生成新记录"
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path
+                      d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"
+                    ></path>
+                  </svg>
+                </span>
+              </div>
+            </div>
+            <div id="character-app-usage-list" class="list-container"></div>
+          </div>
+
+          <!-- 12. 角色手机 - 日记 -->
+          <div id="character-diary-screen" class="character-phone-page">
+            <div class="header character-phone-header">
+              <span class="back-btn" data-target-page="character-phone-screen">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </span>
+              <span>日记</span>
+              <div class="header-actions">
+                <!-- ★ 新增：日记页的删除按钮 ★ -->
+                <span
+                  class="action-btn"
+                  id="clear-diary-entries-btn"
+                  title="清空日记"
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path
+                      d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"
+                    />
+                  </svg>
+                </span>
+                <span
+                  class="action-btn"
+                  id="generate-diary-entry-btn"
+                  title="写新日记"
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path
+                      d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"
+                    />
+                  </svg>
+                </span>
+              </div>
+            </div>
+            <div id="character-diary-list" class="list-container"></div>
+          </div>
+
+          <div
+            id="character-phone-appearance-screen"
+            class="character-phone-page"
+          >
+            <div class="header character-phone-header">
+              <span class="back-btn" data-target-page="character-phone-screen">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </span>
+              <span>外观设置</span>
+              <span style="width: 30px"></span>
+            </div>
+            <!-- 复用你已有的.form-container样式，方便滚动和布局 -->
+            <div class="form-container" style="padding: 15px; gap: 25px">
+              <!-- 壁纸设置区 -->
+              <div>
+                <label style="font-weight: 500; color: var(--text-secondary)"
+                  >手机壁纸</label
+                >
+                <div
+                  id="char-phone-wallpaper-preview"
+                  class="wallpaper-preview"
+                  style="
+                    height: 240px;
+                    width: 135px;
+                    margin: 10px auto;
+                    border-radius: 12px;
+                  "
+                >
+                  点击下方上传
+                </div>
+                <button
+                  id="upload-char-phone-wallpaper-btn"
+                  class="form-button"
+                >
+                  上传壁纸
+                </button>
+                <button
+                  id="remove-char-phone-wallpaper-btn"
+                  class="form-button form-button-secondary"
+                  style="margin-top: 10px"
+                >
+                  移除壁纸
+                </button>
+              </div>
+
+              <hr style="width: 100%; opacity: 0.2" />
+
+              <div>
+                <label style="font-weight: 500; color: var(--text-secondary)"
+                  >App 内壁纸</label
+                >
+                <div
+                  id="char-phone-app-wallpaper-preview"
+                  class="wallpaper-preview"
+                  style="
+                    height: 240px;
+                    width: 135px;
+                    margin: 10px auto;
+                    border-radius: 12px;
+                  "
+                >
+                  点击下方上传
+                </div>
+                <button
+                  id="upload-char-phone-app-wallpaper-btn"
+                  class="form-button"
+                >
+                  上传 App 内壁纸
+                </button>
+                <button
+                  id="remove-char-phone-app-wallpaper-btn"
+                  class="form-button form-button-secondary"
+                  style="margin-top: 10px"
+                >
+                  移除 App 内壁纸
+                </button>
+              </div>
+
+              <hr style="width: 100%; opacity: 0.2" />
+
+              <!-- App图标设置区 -->
+              <div>
+                <label style="font-weight: 500; color: var(--text-secondary)"
+                  >App 图标</label
+                >
+                <div
+                  id="char-phone-icon-settings-grid"
+                  style="
+                    display: grid;
+                    grid-template-columns: repeat(3, 1fr);
+                    gap: 20px;
+                    margin-top: 15px;
+                    text-align: center;
+                  "
+                >
+                  <!-- App图标设置将由JS动态生成在这里 -->
+                </div>
+              </div>
+
+              <hr style="width: 100%; opacity: 0.2" />
+              <!-- 桌面小组件设置区 -->
+              <div>
+                <label style="font-weight: 500; color: var(--text-secondary)"
+                  >桌面小组件</label
+                >
+                <!-- 小组件1: 左上角 -->
+                <div class="form-group" style="margin-top: 15px">
+                  <label>左上角小组件</label>
+                  <div class="avatar-upload">
+                    <img
+                      id="char-phone-widget-preview-1"
+                      class="wallpaper-preview"
+                      style="height: 100px; width: 100px; margin-bottom: 0"
+                    />
+                    <div
+                      style="display: flex; flex-direction: column; gap: 8px"
+                    >
+                      <button
+                        class="form-button-secondary"
+                        id="upload-widget-1-btn"
+                        style="margin-top: 0"
+                      >
+                        上传图片
+                      </button>
+                      <button
+                        class="form-button-secondary"
+                        id="remove-widget-1-btn"
+                        style="
+                          margin-top: 0;
+                          border-color: #ff3b30;
+                          color: #ff3b30;
+                        "
+                      >
+                        移除图片
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <!-- 小组件2: 右下角 -->
+                <div class="form-group" style="margin-top: 15px">
+                  <label>右下角小组件</label>
+                  <div class="avatar-upload">
+                    <img
+                      id="char-phone-widget-preview-2"
+                      class="wallpaper-preview"
+                      style="height: 100px; width: 100px; margin-bottom: 0"
+                    />
+                    <div
+                      style="display: flex; flex-direction: column; gap: 8px"
+                    >
+                      <button
+                        class="form-button-secondary"
+                        id="upload-widget-2-btn"
+                        style="margin-top: 0"
+                      >
+                        上传图片
+                      </button>
+                      <button
+                        class="form-button-secondary"
+                        id="remove-widget-2-btn"
+                        style="
+                          margin-top: 0;
+                          border-color: #ff3b30;
+                          color: #ff3b30;
+                        "
+                      >
+                        移除图片
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <hr style="width: 100%; opacity: 0.2; margin-top: 25px" />
+              <div class="preset-manager-container">
+                <div style="width: 100%; text-align: left; margin-bottom: 15px">
+                  <label style="font-weight: 500; color: var(--text-secondary)"
+                    >外观预设</label
+                  >
+                </div>
+                <div class="form-group">
+                  <select
+                    id="char-phone-preset-selector"
+                    class="form-group select"
+                  ></select>
+                  <div class="preset-manager-controls">
+                    <!-- 独占一行的应用按钮 -->
+                    <button
+                      id="apply-char-phone-preset-btn"
+                      class="preset-btn-capsule preset-btn-apply"
+                      disabled
+                    >
+                      应用
+                    </button>
+
+                    <!-- 2x2 网格按钮 -->
+                    <button
+                      id="save-char-phone-preset-btn"
+                      class="preset-btn-capsule preset-btn-save"
+                    >
+                      保存
+                    </button>
+                    <button

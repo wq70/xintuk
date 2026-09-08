@@ -1,0 +1,896 @@
+          const isVisualMode = chat.settings.visualVideoCallEnabled;
+          const callFeed = isVisualMode
+            ? document.getElementById("video-call-messages-visual")
+            : document.getElementById("video-call-main");
+
+          callFeed.innerHTML = ""; // 清空容器
+
+          // 重新渲染删除后的历史记录
+          videoCallState.callHistory.forEach((msg) => {
+            let bubble;
+            if (isVisualMode) {
+              bubble = document.createElement("div");
+              bubble.className = `visual-call-bubble ${msg.role === "user" ? "user" : "ai"}`;
+            } else {
+              bubble = document.createElement("div");
+              bubble.className = `call-message-bubble ${msg.role === "user" ? "user-speech" : "ai-speech"}`;
+            }
+            bubble.textContent = msg.content;
+            callFeed.appendChild(bubble);
+          });
+
+          // 4. 重新触发AI响应，它会根据删减后的历史记录生成新内容
+          await triggerAiInCallAction();
+        }
+
+        /**
+         * 应用指定的主题（'light' 或 'dark'）
+         * @param {string} theme - 要应用的主题名称
+         */
+        function applyTheme(theme) {
+          const phoneScreen = document.getElementById("phone-screen");
+          const toggleSwitch = document.getElementById("theme-toggle-switch");
+
+          const isDark = theme === "dark";
+
+          // 核心操作：添加或移除 .dark-mode 类
+          phoneScreen.classList.toggle("dark-mode", isDark);
+
+          // 如果开关存在，就同步它的状态
+          if (toggleSwitch) {
+            toggleSwitch.checked = isDark;
+          }
+
+          // 将用户的选择保存到本地存储，以便下次打开时记住
+          localStorage.setItem("ephone-theme", theme);
+
+          // 因为聊天背景色依赖模式，切换后需要重新渲染
+          if (state.activeChatId) {
+            renderChatInterface(state.activeChatId);
+          }
+        }
+
+        /**
+         * 当用户点击开关时，切换当前的主题
+         */
+        function toggleTheme() {
+          const toggleSwitch = document.getElementById("theme-toggle-switch");
+          // 直接根据开关的选中状态来决定新主题
+          const newTheme = toggleSwitch.checked ? "dark" : "light";
+          applyTheme(newTheme);
+        }
+
+        /**
+         * 删除角色手机中的一个联系人及其所有聊天记录
+         * @param {string} contactName - 要删除的联系人的名字
+         */
+        async function deleteCharacterPhoneContact(contactName) {
+          if (!activeCharacterPhoneId) return;
+
+          // 弹出确认框，防止误删
+          const confirmed = await showCustomConfirm(
+            "删除联系人",
+            `确定要从TA的手机中删除联系人“${contactName}”以及所有相关聊天记录吗？此操作不可恢复。`,
+            { confirmButtonClass: "btn-danger" },
+          );
+
+          if (confirmed) {
+            const chat = state.chats[activeCharacterPhoneId];
+            if (
+              chat &&
+              chat.characterPhoneData &&
+              chat.characterPhoneData.chats
+            ) {
+              // 从数据中删除这个联系人
+              delete chat.characterPhoneData.chats[contactName];
+
+              // 将更新后的数据保存回数据库
+              await db.chats.put(chat);
+
+              // 重新渲染聊天列表，让删除效果立刻显示
+              renderCharacterChatList();
+
+              alert(`联系人“${contactName}”已删除。`);
+            }
+          }
+        }
+
+        /**
+         * 打开心声面板，应用背景和所有自定义设置
+         */
+        function openInnerVoiceModal() {
+          if (!state.activeChatId) return;
+          const chat = state.chats[state.activeChatId];
+          if (!chat) return;
+
+          // --- 应用自定义样式  ---
+          applySavedInnerVoiceStyles();
+
+          applyInnerVoiceBackground(chat.innerVoiceBackground || "");
+
+          if (!chat.latestInnerVoice) {
+            alert("还没有捕捉到Ta的心声哦，试着再聊一句吧！");
+            return;
+          }
+
+          const modal = document.getElementById("inner-voice-modal");
+          const data = chat.latestInnerVoice;
+
+          // --- 角色信息填充 ---
+          document.getElementById("inner-voice-avatar").src =
+            chat.settings.aiAvatar || defaultAvatar;
+          document.getElementById("inner-voice-char-name").textContent =
+            chat.name;
+          const frameImg = document.getElementById("inner-voice-avatar-frame");
+          const avatarWrapper = document.getElementById(
+            "inner-voice-avatar-wrapper",
+          );
+          const frameUrl = chat.settings.aiAvatarFrame || "";
+
+          if (frameUrl) {
+            frameImg.src = frameUrl;
+            frameImg.style.display = "block";
+            avatarWrapper.classList.remove("has-border");
+          } else {
+            frameImg.src = "";
+            frameImg.style.display = "none";
+            avatarWrapper.classList.add("has-border");
+          }
+
+          const labelFormat =
+            chat.settings.innerVoiceAdopterLabelFormat || "领养人: {{user}}";
+          const userNickname = chat.settings.myNickname || "你";
+          const finalAdopterText = labelFormat.replace(
+            "{{user}}",
+            userNickname,
+          );
+
+          document.getElementById("inner-voice-adopter-avatar").src =
+            chat.settings.myAvatar || defaultAvatar;
+          document.getElementById("inner-voice-adopter-name").textContent =
+            finalAdopterText;
+
+          const header = document.querySelector(
+            "#inner-voice-main-panel .modal-header",
+          );
+          if (header) {
+            const shouldHideBorder =
+              chat.settings.innerVoiceHideHeaderBorder || false;
+            header.classList.toggle("no-border", shouldHideBorder);
+          }
+
+          // === 【修复重点开始】：获取标签并设置默认值 ===
+          // 防止 chat.settings.innerVoiceTags 为空或部分字段缺失
+          const tags = chat.settings.innerVoiceTags || {};
+
+          const label1 = tags.clothing_label || "服装";
+          const label2 = tags.behavior_label || "行为";
+          const label3 = tags.thoughts_label || "心声";
+          const label4 = tags.naughty_label || "坏心思";
+
+          // 1. 设置第一个标签
+          const clothingLabel = document.querySelector(
+            "#inner-voice-content-area div:nth-child(1) strong",
+          );
+          if (clothingLabel) clothingLabel.textContent = label1 + ":";
+          document.getElementById("inner-voice-clothing").textContent =
+            data.clothing || "...";
+
+          // 2. 设置第二个标签
+          const behaviorLabel = document.querySelector(
+            "#inner-voice-content-area div:nth-child(2) strong",
+          );
+          if (behaviorLabel) behaviorLabel.textContent = label2 + ":";
+          document.getElementById("inner-voice-behavior").textContent =
+            data.behavior || "...";
+
+          // 3. 设置第三个标签
+          const thoughtsLabel = document.querySelector(
+            "#inner-voice-content-area div:nth-child(3) strong",
+          );
+          if (thoughtsLabel) thoughtsLabel.textContent = label3 + ":";
+          document.getElementById("inner-voice-thoughts").textContent =
+            data.thoughts || "...";
+
+          // 4. 设置第四个标签
+          const naughtyLabel = document.querySelector(
+            "#inner-voice-content-area div:nth-child(4) strong",
+          );
+          if (naughtyLabel) naughtyLabel.textContent = label4 + ":";
+          document.getElementById("inner-voice-naughty-thoughts").textContent =
+            data.naughtyThoughts || "...";
+          // === 【修复重点结束】 ===
+
+          // --- 显示面板 ---
+          modal.classList.add("visible");
+          document.getElementById("inner-voice-history-panel").style.display =
+            "none";
+          document.getElementById("inner-voice-main-panel").style.display =
+            "flex";
+          isInnerVoiceHistoryOpen = false;
+        }
+
+        /**
+         * 打开或关闭历史记录面板
+         */
+        function toggleInnerVoiceHistory() {
+          const mainPanel = document.getElementById("inner-voice-main-panel");
+          const historyPanel = document.getElementById(
+            "inner-voice-history-panel",
+          );
+
+          if (isInnerVoiceHistoryOpen) {
+            // 如果是打开的，就关闭它，显示主面板
+            mainPanel.style.display = "flex";
+            historyPanel.style.display = "none";
+          } else {
+            // 如果是关闭的，就打开它，隐藏主面板
+            renderInnerVoiceHistory(); // 渲染历史记录
+            mainPanel.style.display = "none";
+            historyPanel.style.display = "flex";
+          }
+          isInnerVoiceHistoryOpen = !isInnerVoiceHistoryOpen; // 切换状态
+        }
+
+        /**
+         * 渲染心声的历史记录列表
+         * (已修复：支持显示自定义标签名)
+         */
+        function renderInnerVoiceHistory() {
+          const listEl = document.getElementById("inner-voice-history-list");
+          listEl.innerHTML = "";
+          const chat = state.chats[state.activeChatId];
+          const history = chat.innerVoiceHistory || [];
+
+          if (history.length === 0) {
+            listEl.innerHTML =
+              '<p style="text-align: center; color: #888; padding: 20px;">还没有历史记录</p>';
+            return;
+          }
+
+          // === 新增：获取当前自定义标签 ===
+          // 防止 chat.settings.innerVoiceTags 为空
+          const tags = chat.settings.innerVoiceTags || {};
+          // 如果用户没设置过，就用默认值
+          const label1 = tags.clothing_label || "服装";
+          const label2 = tags.behavior_label || "行为";
+          const label3 = tags.thoughts_label || "心声";
+          const label4 = tags.naughty_label || "坏心思";
+          // ==============================
+
+          // 从新到旧显示
+          [...history].reverse().forEach((item) => {
+            const itemEl = document.createElement("div");
+            itemEl.className = "inner-voice-history-item";
+
+            const date = new Date(item.timestamp);
+            const dateString = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+              date.getDate(),
+            ).padStart(
+              2,
+              "0",
+            )} ${String(date.getHours()).padStart(2, "0")}:${String(
+              date.getMinutes(),
+            ).padStart(2, "0")}`;
+
+            // 在HTML中加入删除按钮
+            // 关键修改点：将原来的中文写死，替换为上面获取的变量 ${labelX}
+            itemEl.innerHTML = `
+			            <button class="history-item-delete-btn" data-timestamp="${item.timestamp}">×</button>
+			            <div class="history-item-timestamp">${dateString}</div>
+			            <div class="history-item-content">
+			                <p><strong>${label1}:</strong> ${item.clothing || "..."}</p>
+			                <p><strong>${label2}:</strong> ${item.behavior || "..."}</p>
+			                <p><strong>${label3}:</strong> ${item.thoughts || "..."}</p>
+			                <p><strong>${label4}:</strong> ${item.naughtyThoughts || "..."}</p>
+			            </div>
+			        `;
+            listEl.appendChild(itemEl);
+          });
+        }
+
+        /**
+         * 删除单条心声记录
+         * @param {number} timestamp - 要删除的心声的时间戳
+         */
+        async function deleteSingleInnerVoice(timestamp) {
+          const chat = state.chats[state.activeChatId];
+          if (!chat || !chat.innerVoiceHistory) return;
+
+          // 弹出确认框
+          const confirmed = await showCustomConfirm(
+            "确认删除",
+            "确定要删除这条心声记录吗？",
+            {
+              confirmButtonClass: "btn-danger",
+            },
+          );
+          if (confirmed) {
+            // 从数组中过滤掉匹配的项
+            chat.innerVoiceHistory = chat.innerVoiceHistory.filter(
+              (item) => item.timestamp !== timestamp,
+            );
+            // 保存回数据库
+            await db.chats.put(chat);
+            // 重新渲染列表
+            renderInnerVoiceHistory();
+          }
+        }
+
+        /**
+         * 清空所有心声记录（包括当前心声）
+         */
+        async function clearAllInnerVoiceHistory() {
+          const chat = state.chats[state.activeChatId];
+          // 优化了判断条件，确保只要有历史或当前心声，就可以执行清空
+          if (
+            !chat ||
+            ((!chat.innerVoiceHistory || chat.innerVoiceHistory.length === 0) &&
+              !chat.latestInnerVoice)
+          ) {
+            alert("没有可以清空的心声记录。");
+            return;
+          }
+
+          const confirmed = await showCustomConfirm(
+            "确认清空",
+            "确定要清空所有心声历史记录吗？此操作不可恢复。",
+            {
+              confirmButtonClass: "btn-danger",
+            },
+          );
+          if (confirmed) {
+            // 不仅清空历史数组，也要清空当前的心声对象
+            chat.innerVoiceHistory = [];
+            chat.latestInnerVoice = null; // 将当前心声设为null
+
+            await db.chats.put(chat);
+
+            // 手动清空主面板的显示，防止返回时看到旧数据
+            document.getElementById("inner-voice-clothing").textContent = "...";
+            document.getElementById("inner-voice-behavior").textContent = "...";
+            document.getElementById("inner-voice-thoughts").textContent = "...";
+            document.getElementById(
+              "inner-voice-naughty-thoughts",
+            ).textContent = "...";
+
+            // 刷新历史记录列表（这行是原本就有的，会显示“还没有历史记录”）
+            renderInnerVoiceHistory();
+
+            // (可选但推荐) 给用户一个成功的提示
+            alert("所有心声记录已清空！");
+          }
+        }
+
+        /**
+         * 当用户点击“召唤NPC评论”按钮时触发
+         * @param {number} postId - 动态的ID
+         * @param {string} authorId - 动态作者的ID ('user' 或 'chat_...')
+         */
+        async function handleNpcSummonClick(postId, authorId) {
+          const post = await db.qzonePosts.get(postId);
+          if (!post) {
+            alert("找不到该动态！");
+            return;
+          }
+
+          if (authorId === "user") {
+            // 如果是用户发的动态，弹出选择菜单
+            await handleUserPostCommentTrigger(post);
+          } else {
+            // 如果是角色发的动态，直接触发他自己的NPC
+            await handleCharPostCommentTrigger(post, authorId);
+          }
+        }
+
+        /**
+         * 处理【角色】动态的NPC召唤
+         * @param {object} post - 动态对象
+         * @param {string} authorId - 动态作者的角色ID
+         */
+        async function handleCharPostCommentTrigger(post, authorId) {
+          const authorChar = state.chats[authorId];
+          if (
+            !authorChar ||
+            !authorChar.npcLibrary ||
+            authorChar.npcLibrary.length === 0
+          ) {
+            alert(`角色“${authorChar.name}”还没有自己的NPC朋友哦！`);
+            return;
+          }
+
+          // 只使用这个角色自己的NPC库
+          // 把作者本人(authorChar)作为“主人”传进去
+          await generateNpcCommentsForPost(
+            post,
+            authorChar.npcLibrary,
+            authorChar,
+          );
+        }
+
+        /**
+         * 处理【用户】动态的NPC召唤（弹出选择框）
+         */
+        async function handleUserPostCommentTrigger(post) {
+          const modal = document.getElementById("custom-modal-overlay");
+          const modalTitle = document.getElementById("custom-modal-title");
+          const modalBody = document.getElementById("custom-modal-body");
+          const modalConfirmBtn = document.getElementById(
+            "custom-modal-confirm",
+          );
+          const modalCancelBtn = document.getElementById("custom-modal-cancel");
+
+          modalTitle.textContent = "选择要召唤的NPC";
+
+          // 筛选出所有拥有NPC库的角色
+          const charsWithNpcs = Object.values(state.chats).filter(
+            (chat) =>
+              !chat.isGroup && chat.npcLibrary && chat.npcLibrary.length > 0,
+          );
+
+          if (charsWithNpcs.length === 0) {
+            alert("当前没有任何角色拥有NPC库。");
+            return;
+          }
+
+          // 构建选择列表的HTML
+          let optionsHtml = '<div style="text-align: left;">';
+          optionsHtml += `<label style="display: block; padding: 5px;"><input type="radio" name="npc_summon_choice" value="all" checked> 召唤所有人</label>`;
+          charsWithNpcs.forEach((char) => {
+            optionsHtml += `<label style="display: block; padding: 5px;"><input type="radio" name="npc_summon_choice" value="${char.id}"> 只召唤 ${char.name} 的朋友</label>`;
+          });
+          optionsHtml += "</div>";
+
+          modalBody.innerHTML = optionsHtml;
+          modalConfirmBtn.textContent = "确认召唤";
+          modalCancelBtn.style.display = "block";
+
+          modal.classList.add("visible");
+
+          modalConfirmBtn.onclick = async () => {
+            const selectedValue = document.querySelector(
+              'input[name="npc_summon_choice"]:checked',
+            ).value;
+            let npcsToSummon = [];
+            let ownerChar = null; // 声明一个变量来存储主人
+
+            if (selectedValue === "all") {
+              // 集合所有角色的所有NPC
+              charsWithNpcs.forEach((char) => {
+                npcsToSummon.push(...char.npcLibrary);
+              });
+              // 召唤所有人时，我们不指定特定的主人
+            } else {
+              // 只获取被选中的那个角色的NPC
+              const selectedChar = state.chats[selectedValue];
+              if (selectedChar) {
+                npcsToSummon = selectedChar.npcLibrary;
+                ownerChar = selectedChar; // 把选中的角色存为主人
+              }
+            }
+
+            modal.classList.remove("visible");
+            if (npcsToSummon.length > 0) {
+              // 把主人(ownerChar)作为第三个参数传进去
+              await generateNpcCommentsForPost(post, npcsToSummon, ownerChar);
+            }
+          };
+
+          modalCancelBtn.onclick = () => modal.classList.remove("visible");
+        }
+
+        /**
+         * 生成NPC评论或回复，并更新到动态
+         * @param {object} post - 动态对象
+         * @param {Array<object>} npcsToComment - 将要发表评论的NPC对象数组
+         * @param {object|null} ownerChar - (全新增) 这些NPC的“主人”角色对象
+         */
+        async function generateNpcCommentsForPost(
+          post,
+          npcsToComment,
+          ownerChar = null,
+        ) {
+          console.log(
+            "【NPC评论-诊断】: 1. 函数 generateNpcCommentsForPost 已触发",
+            {
+              post,
+              npcsToComment,
+              ownerChar,
+            },
+          );
+
+          await showCustomAlert("请稍候...", "正在召唤NPC们前来围观评论...");
+
+          const { proxyUrl, apiKey, model } = state.apiConfig;
+          if (!proxyUrl || !apiKey || !model) {
+            alert("请先配置API！");
+            return;
+          }
+
+          const postContent = (
+            post.content ||
+            post.publicText ||
+            post.hiddenContent ||
+            "(图片动态)"
+          ).substring(0, 150);
+          const existingComments = (post.comments || [])
+            .slice(-3)
+            .map((c) => `${c.commenterName}: ${c.text}`)
+            .join("\n");
+
+          const shuffledNpcs = [...npcsToComment].sort(
+            () => 0.5 - Math.random(),
+          );
+          const selectedNpcs = shuffledNpcs.slice(0, 5);
+          const npcList = selectedNpcs
+            .map((npc) => `- ${npc.name} (人设: ${npc.persona})`)
+            .join("\n");
+
+          const authorName =
+            post.authorId === "user"
+              ? state.qzoneSettings.nickname
+              : state.chats[post.authorId]?.name || "未知作者";
+
+          let ownerContext = "";
+          // 如果明确告诉了AI这些NPC的主人是谁
+          if (ownerChar) {
+            ownerContext = `
+			# NPC归属与关系 (重要背景)
+			- 你将要扮演的这些NPC都是角色“${ownerChar.name}”的朋友或关联人物。
+			- “${ownerChar.name}”的人设是: ${ownerChar.settings.aiPersona}
+			- 你在发表评论时，需要体现出你(作为NPC)与“${ownerChar.name}”的关系，并以此视角来看待动态作者“${authorName}”。
+			`;
+          }
+
+          const systemPrompt = `
+			# 任务
+			你是一个多角色扮演AI。现在有一条动态需要你扮演指定的NPC角色进行评论或回复。
+
+			${ownerContext}
+
+			# 动态信息
+			- 作者: ${authorName}
+			- 内容摘要: ${postContent}...
+			- 最近的评论 (你可以回复他们):
+			${existingComments || "(暂无评论)"}
+
+			# 你需要扮演的NPC列表 (及他们的人设)
+			${npcList}
+
+			# 核心规则
+			1.  你【必须】从上面的NPC列表中，选择1到3个最合适的角色进行评论或回复。
+			2.  评论/回复内容【必须】严格符合该NPC的人设和口吻，并与动态内容或已有评论相关。
+			3.  你的回复【必须且只能】是一个严格的JSON数组，每个对象代表一条评论或回复。
+			4.  格式: \`[{"commenterName": "NPC名字", "commentText": "评论内容", "replyTo": "(可选)被回复者名字"}]\`
+
+			现在，请开始生成评论或回复。
+			`;
+          console.log(
+            "【NPC评论-诊断】: 2. 已构建完成，准备发送给AI的 System Prompt:",
+            systemPrompt,
+          );
+
+          try {
+            let isGemini = proxyUrl === GEMINI_API_URL;
+            let messagesForApi;
+            if (isGemini) {
+              messagesForApi = [{ role: "user", content: systemPrompt }];
+            } else {
+              messagesForApi = [
+                { role: "system", content: systemPrompt },
+                {
+                  role: "user",
+                  content: "请根据你在system prompt中读到的信息生成评论。",
+                },
+              ];
+            }
+
+            let geminiConfig = toGeminiRequestData(
+              model,
+              apiKey,
+              systemPrompt,
+              messagesForApi,
+              isGemini,
+              state.apiConfig.temperature,
+            );
+
+            console.log(
+              "【NPC评论-诊断】: 3. 即将发送API请求... 请求地址:",
+              isGemini ? geminiConfig.url : `${proxyUrl}/v1/chat/completions`,
+            );
+            console.log(
+              "【NPC评论-诊断】: 3.1 请求体 (Body) 内容:",
+              isGemini
+                ? geminiConfig.data.body
+                : JSON.stringify({
+                    model,
+                    messages: messagesForApi,
+                    temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+                  }),
+            );
+
+            const response = isGemini
+              ? await fetch(geminiConfig.url, geminiConfig.data)
+              : await fetch(`${proxyUrl}/v1/chat/completions`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${apiKey}`,
+                  },
+                  body: JSON.stringify({
+                    model: model,
+                    messages: messagesForApi,
+                    temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+                  }),
+                });
+
+            console.log("【NPC评论-诊断】: 4. 收到API响应", {
+              ok: response.ok,
+              status: response.status,
+            });
+
+            if (!response.ok) {
+              const errorText = await response.text();
+              throw new Error(`API请求失败: ${response.status} - ${errorText}`);
+            }
+
+            const data = await response.json();
+            const aiResponseContent = (
+              isGemini
+                ? data.candidates[0].content.parts[0].text
+                : data.choices[0].message.content
+            )
+              .replace(/^```json\s*|```$/g, "")
+              .trim();
+
+            console.log(
+              "【NPC评论-诊断】: 5. 从API获取到的原始回复内容:",
+              aiResponseContent,
+            );
+
+            let newComments;
+            if (aiResponseContent.includes('"chatResponse"')) {
+              newComments = JSON.parse(aiResponseContent).chatResponse;
+            } else {
+              newComments = JSON.parse(aiResponseContent);
+            }
+
+            console.log(
+              "【NPC评论-诊断】: 6. 成功解析后的评论对象数组:",
+              newComments,
+            );
+
+            if (Array.isArray(newComments) && newComments.length > 0) {
+              const postToUpdate = await db.qzonePosts.get(post.id);
+              if (!postToUpdate)
+                throw new Error("在数据库中找不到要更新的帖子！");
+              if (!postToUpdate.comments) postToUpdate.comments = [];
+
+              newComments.forEach((comment) => {
+                if (comment.commenterName && comment.commentText) {
+                  const newCommentObject = {
+                    commenterName: comment.commenterName,
+                    text: comment.commentText,
+                    timestamp: Date.now(),
+                  };
+                  if (comment.replyTo)
+                    newCommentObject.replyTo = comment.replyTo;
+                  postToUpdate.comments.push(newCommentObject);
+                }
+              });
+
+              await db.qzonePosts.put(postToUpdate);
+              hideCustomModal();
+              await renderQzonePosts();
+              alert("NPC们评论成功！");
+            } else {
+              hideCustomModal();
+              alert("NPC们似乎没什么想说的。");
+            }
+          } catch (error) {
+            console.error("【NPC评论-错误】: 召唤NPC评论失败:", error);
+            await showCustomAlert(
+              "召唤失败",
+              `发生了一个错误：\n${error.message}`,
+            );
+          }
+        }
+
+        /**
+         * 如果数据库中没有，则自动创建一个内置的夜间模式主题
+         */
+        async function addDefaultDarkModeThemeIfNeeded() {
+          const themeName = "内置夜间模式"; // 这是我们要内置的主题名字
+          try {
+            // 检查数据库里是否已经有了这个名字的主题
+            const existingTheme = await db.themes
+              .where("name")
+              .equals(themeName)
+              .first();
+
+            // 如果没有找到 (existingTheme 是 undefined)，就创建它
+            if (!existingTheme) {
+              console.log("内置夜间模式不存在，正在创建...");
+
+              // 这就是完整的夜间模式CSS代码
+              const darkModeCss = `
+			/* 1. 全局重新定义颜色变量 */
+			:root {
+			  --secondary-bg: #1c1c1e;
+			  --border-color: #38383a;
+			  --text-primary: #ffffff;
+			  --text-secondary: #8e8e93;
+			  --status-bar-text-color: #ffffff;
+			  --accent-color: #0A84FF; /* iOS风格的蓝色 */
+			}
+
+			/* 2. 为所有屏幕和主要容器设置基础深色背景 */
+			#phone-screen, .screen, #chat-list, #world-book-list, .list-container, .form-container, #chat-messages,
+			#wallpaper-screen, #font-settings-screen, #api-settings-screen, #character-selection-screen,
+			#world-book-screen, #world-book-editor-screen, #character-phone-inner-screen, #character-phone-page {
+			    background-color: #000000 !important;
+			}
+
+			/* 3. 主屏幕专属样式 */
+			#home-screen { background: #111827 !important; }
+			#desktop-dock { background-color: rgba(55, 65, 81, 0.5); }
+			.desktop-app-icon .label, .widget-subtext { color: #e5e7eb; text-shadow: 0 1px 2px rgba(0,0,0,0.7); }
+			#profile-widget .profile-info { background: linear-gradient(to bottom, rgba(28, 28, 30, 0.85) 20%, rgba(28, 28, 30, 0)); color: #f9fafb; }
+			#profile-username, #profile-bio, #profile-location span { color: #f9fafb; }
+			#profile-sub-username, #profile-location { color: #9ca3af; }
+			#profile-location { background-color: rgba(255,255,255,0.1); }
+			.widget-bubble { background-color: rgba(55, 65, 81, 0.9); color: #e5e7eb; }
+			.widget-bubble::after { border-top-color: rgba(55, 65, 81, 0.9); }
+
+			/* 4. 适配所有页面的头部Header */
+			.header, .qzone-header, .character-phone-header {
+			    background-color: rgba(28, 28, 30, 0.85) !important;
+			    border-bottom-color: var(--border-color) !important;
+			    color: var(--text-primary) !important;
+			}
+
+			/* 5. 适配所有通用组件 */
+			#chat-input-area, #chat-list-bottom-nav { background-color: rgba(28, 28, 30, 0.85); border-top-color: var(--border-color); }
+			#chat-input { background-color: var(--secondary-bg); color: var(--text-primary); }
+			.modal-content, #custom-modal { background-color: #2c2c2e; }
+			.modal-header, .modal-footer, .custom-modal-footer, .custom-modal-footer button:first-child { border-color: var(--border-color); }
+			.form-group input, .form-group select, .form-group textarea { background-color: var(--secondary-bg); color: var(--text-primary); border-color: var(--border-color); }
+			.list-item, .chat-list-item-swipe-container:not(:last-child), .chat-group-container, .world-book-group-container { border-bottom-color: var(--border-color) !important; }
+			.chat-group-container:first-of-type { border-top-color: var(--border-color) !important; }
+			.list-item:hover, .chat-list-item:hover { background-color: #2c2c2e; }
+
+			/* 6. 特殊页面深度适配 */
+			.chat-group-header, .world-book-group-header { background-color: #1c1c1e; }
+			.chat-list-item-content.pinned { background-color: #3a3a3c; }
+			#font-preview, #wallpaper-preview, .font-preset-slot { background-color: #1c1c1e !important; border-color: #38383a !important; }
+
+			/* 7. 角色手机内部适配 & 全局文字颜色修复 */
+			#character-phone-container { background-color: #000000; }
+			.character-phone-frame { background-color: #111; }
+			#character-chat-history-messages { background-color: #0e0e0e !important; }
+			.character-chat-bubble.received { background-color: #2c2c2e !important; }
+			.character-data-item, .character-bank-transaction, .character-cart-item, .character-browser-item {
+			    background-color: #1c1c1e;
+			    border-color: #38383a;
+			}
+
+			/* ▼▼▼ 核心修复：把所有这些元素的文字颜色都改为低饱和度的浅灰色 ▼▼▼ */
+			.character-data-item .title,
+			.character-data-item .content,
+			.character-data-item .meta,
+			.cart-item-price,
+			.cart-item-info .title,
+			.character-browser-item .title,
+			.transaction-details .title,
+			.transaction-amount,
+			.character-select-item .name,  /* 修复角色选择列表的名字颜色 */
+			#character-diary-list .character-data-item .content,
+			#character-diary-list .character-data-item .content h1,
+			#character-diary-list .character-data-item .content h2 {
+			    color: #E0E0E0 !important; /* 使用一个柔和的、不刺眼的白色 */
+			}
+
+			.character-data-item .meta span,
+			#character-diary-list .character-data-item .meta {
+			    color: #9E9E9E !important; /* 次要信息使用更暗的灰色 */
+			}
+
+			#character-diary-list .character-data-item {
+			    background-color: #26211a; /* 夜间模式下的信纸背景色 */
+			    border-color: #524a3d;
+			    border-left-color: #9e8a70;
+			}
+
+			`;
+
+              await db.themes.add({ name: themeName, css: darkModeCss });
+              console.log("内置夜间模式已成功创建！");
+            } else {
+              console.log("内置夜间模式已存在，跳过创建。");
+            }
+          } catch (error) {
+            console.error("检查或创建内置夜间模式时出错:", error);
+          }
+        }
+        // 聊天记录搜索功能核心函数
+
+        /**
+         * 打开并准备聊天记录搜索界面
+         */
+        function openChatSearchScreen() {
+          const chat = state.chats[state.activeChatId];
+          if (!chat) return;
+
+          // 清空旧的搜索条件和结果
+          document.getElementById("keyword-search-input").value = "";
+          document.getElementById("sender-search-select").innerHTML = "";
+          document.getElementById("date-search-input").value = "";
+          document.getElementById("chat-search-results-list").innerHTML =
+            '<p style="text-align:center; color: var(--text-secondary); padding: 50px 0;">输入条件开始搜索</p>';
+
+          // 动态填充“人物”下拉菜单
+          const senderSelect = document.getElementById("sender-search-select");
+          senderSelect.innerHTML = '<option value="">所有人</option>'; // 默认选项
+
+          const myNickname = chat.isGroup
+            ? chat.settings.myNickname || "我"
+            : "我";
+          const myOption = document.createElement("option");
+          myOption.value = myNickname;
+          myOption.textContent = myNickname;
+          senderSelect.appendChild(myOption);
+
+          if (chat.isGroup) {
+            chat.members.forEach((member) => {
+              const memberOption = document.createElement("option");
+              memberOption.value = member.originalName; // 使用本名进行精确匹配
+              memberOption.textContent = member.groupNickname; // 显示群昵称给用户看
+              senderSelect.appendChild(memberOption);
+            });
+          } else {
+            const aiOption = document.createElement("option");
+            aiOption.value = chat.name;
+            aiOption.textContent = chat.name;
+            senderSelect.appendChild(aiOption);
+          }
+
+          // 关闭聊天设置弹窗，并显示搜索界面
+          document
+            .getElementById("chat-settings-modal")
+            .classList.remove("visible");
+          showScreen("chat-search-screen");
+        }
+
+        /**
+         * 执行搜索操作
+         */
+        function performChatSearch() {
+          const chat = state.chats[state.activeChatId];
+          if (!chat) {
+            // 如果找不到聊天对象，给用户一个明确的提示
+            alert("无法执行搜索，因为没有找到当前聊天。");
+            return;
+          }
+
+          // 1. 获取所有搜索条件
+          const keyword = document
+            .getElementById("keyword-search-input")
+            .value.trim();
+          const senderValue = document.getElementById(
+            "sender-search-select",
+          ).value;
+          const dateValue = document.getElementById("date-search-input").value;
+
+          // 将关键词保存到全局变量，以便在渲染结果时用于高亮
+          currentSearchKeyword = keyword;
+
+          if (!keyword && !senderValue && !dateValue) {
+            alert("请至少输入一个搜索条件！");
+            return;
+          }
+
+          // 2. 筛选聊天记录
+          console.log(
+            `开始搜索: 关键词='${keyword}', 发言人='${senderValue}', 日期='${dateValue}'`,
+          );
+

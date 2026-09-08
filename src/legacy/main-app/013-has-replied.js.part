@@ -1,0 +1,647 @@
+                msg.content.includes("ls_letter") &&
+                msg.content.includes("写一封回信")
+              ) {
+                // 找到了指令，现在往后找有没有AI的回复
+                let hasReplied = false;
+                for (let j = i + 1; j < historySlice.length; j++) {
+                  const nextMsg = historySlice[j];
+                  // 检查是否是AI发的，且内容包含 ls_letter 指令
+                  if (nextMsg.role === "assistant") {
+                    // 简单判断文本内容或JSON结构
+                    const contentStr =
+                      typeof nextMsg.content === "string"
+                        ? nextMsg.content
+                        : JSON.stringify(nextMsg.content);
+                    if (
+                      contentStr.includes('"type": "ls_letter"') ||
+                      contentStr.includes('"type":"ls_letter"')
+                    ) {
+                      hasReplied = true;
+                      break;
+                    }
+                  }
+                }
+
+                // 如果已经回复过了，就把这条系统指令加入跳过列表
+                if (hasReplied) {
+                  timestampsToSkip.add(msg.timestamp);
+                  console.log(
+                    "检测到已完成的情书指令，已从上下文中移除，防止重复触发。",
+                  );
+                }
+              }
+            }
+
+            // 过滤掉不再需要的指令
+            historySlice = historySlice.filter(
+              (msg) => !timestampsToSkip.has(msg.timestamp),
+            );
+
+            // --- 红包状态实时播报模块 ---
+            let redPacketContext = "";
+            // 1. 从最近的聊天记录中，找出所有红包消息
+            const recentPackets = historySlice.filter(
+              (m) => m.type === "red_packet",
+            );
+
+            if (recentPackets.length > 0) {
+              // 2. 如果找到了红包，就开始构建我们的“战报”
+              redPacketContext = "\n# 当前红包状态 (重要情报)\n";
+
+              recentPackets.forEach((packet) => {
+                const claimedBy = packet.claimedBy || {};
+                const claimedCount = Object.keys(claimedBy).length;
+
+                redPacketContext += `- (时间戳: ${packet.timestamp}) 由 **${packet.senderName}** 发送的红包:\n`;
+
+                if (packet.isFullyClaimed) {
+                  // 如果红包已领完
+                  redPacketContext += `  - **状态**: 已被领完。\n`;
+
+                  // 调用我们的小助手函数，寻找手气王
+                  const luckyKing = findLuckyKing(packet);
+                  if (luckyKing && luckyKing.name) {
+                    redPacketContext += `  - **手气王**: ${
+                      luckyKing.name
+                    } (抢到了 ${luckyKing.amount.toFixed(2)} 元)\n`;
+                  }
+                } else {
+                  // 如果红包还能领
+                  redPacketContext += `  - **状态**: 可领取 (${claimedCount}/${packet.count})。\n`;
+                }
+
+                // 无论如何，都显示已领取的人员列表
+                if (claimedCount > 0) {
+                  const claimedList = Object.entries(claimedBy)
+                    .map(([name, amount]) => `${name}(${amount.toFixed(2)}元)`)
+                    .join("、");
+                  redPacketContext += `  - **已领取**: ${claimedList}\n`;
+                } else {
+                  redPacketContext += `  - **已领取**: 暂无\n`;
+                }
+              });
+            }
+            // --- 红包状态播报模块结束 ---
+
+            let now;
+            // 2. 检查时间感知开关是否打开 (北京时间转换逻辑)
+            if (chat.settings.timePerceptionEnabled ?? true) {
+              // 开关打开，使用真实的北京时间
+              const localNow = new Date();
+              const utcMilliseconds =
+                localNow.getTime() + localNow.getTimezoneOffset() * 60000;
+              const beijingMilliseconds = utcMilliseconds + 3600000 * 8;
+              now = new Date(beijingMilliseconds);
+            } else {
+              // 开关关闭，尝试使用自定义时间
+              if (chat.settings.customTime) {
+                now = new Date(chat.settings.customTime);
+              } else {
+                // 如果自定义时间为空，则安全地退回到真实的北京时间
+                const localNow = new Date();
+                const utcMilliseconds =
+                  localNow.getTime() + localNow.getTimezoneOffset() * 60000;
+                const beijingMilliseconds = utcMilliseconds + 3600000 * 8;
+                now = new Date(beijingMilliseconds);
+              }
+            }
+
+            // 3. 后续的时间差计算逻辑 (这部分保持不变)
+            const currentTime = now.toLocaleString("zh-CN", {
+              dateStyle: "full",
+              timeStyle: "short",
+            });
+            let timeContext = `\n- **当前时间**: ${currentTime}`;
+            const lastAiMessage = historySlice
+              .filter((m) => m.role === "assistant" && !m.isHidden)
+              .slice(-1)[0];
+
+            if (lastAiMessage) {
+              const lastTime = new Date(lastAiMessage.timestamp);
+              const realNow = new Date();
+              const diffMinutes = Math.floor(
+                (realNow - lastTime) / (1000 * 60),
+              );
+
+              if (diffMinutes < 5) {
+                timeContext += "\n- **对话状态**: 你们的对话刚刚还在继续。";
+              } else if (diffMinutes < 60) {
+                timeContext += `\n- **对话状态**: 你们在${diffMinutes}分钟前聊过。`;
+              } else {
+                const diffHours = Math.floor(diffMinutes / 60);
+                if (diffHours < 24) {
+                  timeContext += `\n- **对话状态**: 你们在${diffHours}小时前聊过。`;
+                } else {
+                  const diffDays = Math.floor(diffHours / 24);
+                  timeContext += `\n- **对话状态**: 你们已经有${diffDays}天没有聊天了。`;
+                }
+              }
+            } else {
+              timeContext += "\n- **对话状态**: 这是你们的第一次对话。";
+            }
+
+            let worldBookContent = "";
+            if (
+              chat.settings.linkedWorldBookIds &&
+              chat.settings.linkedWorldBookIds.length > 0
+            ) {
+              const linkedContents = chat.settings.linkedWorldBookIds
+                .map((bookId) => {
+                  const worldBook = state.worldBooks.find(
+                    (wb) => wb.id === bookId,
+                  );
+
+                  return worldBook && worldBook.content
+                    ? `\n\n## 世界书: ${worldBook.name}\n${stripHtmlAndCode(worldBook.content)}`
+                    : "";
+                })
+                .filter(Boolean)
+                .join("");
+              if (linkedContents) {
+                worldBookContent = `\n\n# 核心世界观设定 (必须严格遵守以下所有设定)，里面可能会包含HTML小剧场，在捕获到关键词后输出\n${linkedContents}\n`;
+              }
+            }
+            let musicContext = "";
+            const countdownContext = await getCountdownContext(chatId); // <--- 把chatId传进去
+            const streakContext = await getStreakContext(chat);
+            // 音乐上下文生成（增加保活屏蔽逻辑）
+            if (
+              state.musicState.isActive &&
+              state.musicState.activeChatId === chatId
+            ) {
+              const currentTrack =
+                state.musicState.currentIndex > -1
+                  ? state.musicState.playlist[state.musicState.currentIndex]
+                  : null;
+
+              // 如果是保活音频，就当做什么都没发生，不生成 context
+              if (currentTrack && currentTrack.isKeepAlive) {
+                musicContext = ""; // AI 此时什么都不知道，就像没听歌一样
+              } else {
+                // 只有是正常歌曲时，才告诉 AI
+                const playlistInfo = state.musicState.playlist
+                  .filter((t) => !t.isKeepAlive) // 甚至在列表里也不要让 AI 看到保活音频
+                  .map((t) => `"${t.name}"`)
+                  .join(", ");
+
+                // 获取歌词上下文 (保持原有逻辑)
+                let lyricsContext = "";
+                if (
+                  currentTrack &&
+                  state.musicState.parsedLyrics &&
+                  state.musicState.parsedLyrics.length > 0 &&
+                  state.musicState.currentLyricIndex > -1
+                ) {
+                  const currentLine =
+                    state.musicState.parsedLyrics[
+                      state.musicState.currentLyricIndex
+                    ];
+                  const upcomingLines = state.musicState.parsedLyrics.slice(
+                    state.musicState.currentLyricIndex + 1,
+                    state.musicState.currentLyricIndex + 3,
+                  );
+                  lyricsContext += `- **当前歌词**: "${currentLine.text}"\n`;
+                  if (upcomingLines.length > 0) {
+                    lyricsContext += `- **即将演唱**: ${upcomingLines.map((line) => `"${line.text}"`).join(" / ")}\n`;
+                  }
+                }
+
+                musicContext = `\n\n# 当前音乐情景
+                    -   **当前状态**: 你正在和用户一起听歌。
+                    -   **正在播放**: ${currentTrack ? `《${currentTrack.name}》 - ${currentTrack.artist}` : "无"}
+                    -   **可用播放列表**: [${playlistInfo}]
+                    -   **你的任务**: 你可以根据对话内容和氛围，使用 "change_music" 指令切换到播放列表中的任何一首歌，以增强互动体验。
+                    ${lyricsContext}`;
+              }
+            }
+
+            let systemPrompt, messagesPayload;
+            // 记忆互通核心逻辑 - 构建附加上下文
+            let linkedMemoryContext = "";
+            if (
+              chat.settings.linkedMemories &&
+              chat.settings.linkedMemories.length > 0
+            ) {
+              // 使用 Promise.all 并行处理所有链接，提高效率
+              const contextPromises = chat.settings.linkedMemories.map(
+                async (link) => {
+                  const linkedChat = state.chats[link.chatId];
+                  if (!linkedChat) return ""; // 如果找不到链接的聊天，则跳过
+
+                  // 从数据库获取最新的聊天记录，确保数据同步
+                  const freshLinkedChat = await db.chats.get(link.chatId);
+                  if (!freshLinkedChat) return "";
+
+                  // 截取最近的 `depth` 条消息
+                  const recentHistory = freshLinkedChat.history
+                    .filter((msg) => !msg.isHidden) // 过滤掉隐藏消息
+                    .slice(-link.depth);
+
+                  if (recentHistory.length === 0) return "";
+
+                  // 格式化这些消息
+                  const formattedMessages = recentHistory
+                    .map(
+                      (msg) =>
+                        `  - ${formatMessageForContext(msg, freshLinkedChat)}`,
+                    )
+                    .join("\n");
+
+                  return `\n## 附加上下文：来自与“${linkedChat.name}”的最近对话内容 (仅你可见)\n${formattedMessages}`;
+                },
+              );
+
+              // 等待所有链接都处理完毕
+              const allContexts = await Promise.all(contextPromises);
+              // 将所有上下文拼接起来
+              linkedMemoryContext = allContexts.filter(Boolean).join("\n");
+            }
+
+            let sharedContext = "";
+            let lastAiTurnIndex = -1;
+            for (let i = chat.history.length - 1; i >= 0; i--) {
+              if (chat.history[i].role === "assistant") {
+                lastAiTurnIndex = i;
+                break;
+              }
+            }
+
+            // 2. 获取从那时起用户发送的所有新消息
+            const recentUserMessages = chat.history.slice(lastAiTurnIndex + 1);
+
+            // 3. 在这些新消息中，查找是否存在分享卡片
+            const shareCardMessage = recentUserMessages.find(
+              (msg) => msg.type === "share_card",
+            );
+
+            // 4. 如果找到了分享卡片，就构建上下文
+            if (shareCardMessage) {
+              console.log("检测到分享卡片作为上下文，正在为AI准备...");
+              const payload = shareCardMessage.payload;
+
+              // 格式化分享的聊天记录 (这部分逻辑不变)
+              const formattedHistory = payload.sharedHistory
+                .map((msg) => {
+                  const sender =
+                    msg.senderName ||
+                    (msg.role === "user"
+                      ? chat.settings.myNickname || "我"
+                      : "未知发送者");
+                  let contentText = "";
+                  if (msg.type === "voice_message")
+                    contentText = `[语音消息: ${msg.content}]`;
+                  else if (msg.type === "ai_image")
+                    contentText = `[图片: ${msg.description}]`;
+                  else if (msg.type === "realimag")
+                    contentText = `[RealImag真实图片]`;
+                  else if (msg.type === "naiimag")
+                    contentText = `[NovelAI图片: ${msg.prompt}]`;
+                  else contentText = String(msg.content);
+                  return `${sender}: ${contentText}`;
+                })
+                .join("\n");
+
+              // 构建系统提示 (这部分逻辑不变)
+              sharedContext = `
+			# 附加上下文：一段分享的聊天记录
+			- 重要提示：这不是你和当前用户的对话，而是用户从【另一场】与“${payload.sourceChatName}”的对话中分享过来的。
+			- 你的任务：请你阅读并理解下面的对话内容。在接下来的回复中，你可以像真人一样，对这段对话的内容自然地发表你的看法、感受或疑问。
+
+			---
+			[分享的聊天记录开始]
+			${formattedHistory}
+			[分享的聊天记录结束]
+			---
+			`;
+            }
+
+            // 为AI准备转载帖子的上下文
+            let repostContext = "";
+            // 检查用户最近发送的消息里，有没有转载帖子的行为
+            const repostMessage = recentUserMessages.find(
+              (msg) => msg.type === "repost_forum_post",
+            );
+
+            // 如果找到了
+            if (repostMessage) {
+              const payload = repostMessage.payload;
+              // 就为AI准备一段专属指令
+              repostContext = `
+			附加上下文：用户刚刚转载了一个小组帖子
+			帖子标题: "${payload.title}"
+
+			帖子作者: ${payload.author}
+
+			帖子ID: ${payload.postId}
+
+			内容摘要: "${payload.content}"
+
+			你的任务: 请你阅读并理解这个帖子。在接下来的回复中，你【必须】使用 'forum_comment' 指令对这个帖子发表你的看法或疑问。
+			`;
+            }
+            const replyRange = chat.settings.replyCountRange || {
+              min: 2,
+              max: 5,
+            };
+            const replyCountInstruction = `每次回复的消息数量应控制在【${replyRange.min} 到 ${replyRange.max} 条】之间。`;
+            if (chat.isGroup) {
+              const countdownContext = await getCountdownContext(chatId); // <--- 把chatId传进去
+              const streakContext = await getStreakContext(chat); // <-- 全新添加：获取火花状态
+
+              const membersList = chat.members
+                .map((m) => {
+                  const muteStatus = m.isMuted
+                    ? " (【状态：已被禁言，禁止让他发言】)"
+                    : "";
+                  return `- **${m.originalName}**: ${m.persona}${muteStatus}`;
+                })
+                .join("\n");
+
+              const myNickname = chat.settings.myNickname || "我";
+              // 1. 获取群公告内容
+              const announcement = chat.settings.groupAnnouncement || "";
+              let announcementContext = "";
+
+              // 2. 如果公告内容不为空，就构建要插入到 Prompt 里的上下文
+              if (announcement.trim()) {
+                announcementContext = `
+			# 群公告 (【最高优先级规则，必须严格遵守】)
+			- 以下是本群的群公告，所有角色在接下来的对话中都必须严格遵守其中的规则和设定：
+			- "${announcement}"
+			`;
+              }
+              // updated by lrq 251027
+              systemPrompt = `
+			# 角色
+			你是一个群聊AI，负责扮演【除了用户以外】的所有角色。
+			# 【对话节奏铁律 (至关重要！)】
+			你的回复【必须】模拟真人的打字和思考习惯。不要一次性发送一大段文字，你应该将你想说的话，拆分成${replyCountInstruction}条消息气泡来发送，每条消息最好不要超过30个字。这会让对话看起来更自然、更真实。
+			**角色回复顺序不固定，可以交叉回复，例如角色A、角色B、角色B、角色A、角色C这样的交叉顺序。不一定要一个人全部说完了才轮到下一个人。角色之间【必须】有互动对话。**
+			# 【【【身份铁律：这是最高指令，必须严格遵守】】】
+			1.  **核心任务**: 你的唯一任务是扮演且仅能扮演下方“群成员列表”中明确列出的角色。
+			2.  **用户识别**: 用户的身份是【${myNickname}】。你【绝对、永远、在任何情况下都不能】生成 \`name\` 字段为 **"${myNickname}"** 的消息。
+			3.  **禁止杜撰**: 【绝对禁止】扮演任何未在“群成员列表”中出现的角色。
+			4.  **【【【格式铁律：这是你的生命线，违者生成失败】】】**:
+			    -   你的回复【必须且只能】是一个严格的JSON数组格式的字符串。
+			    -   数组中的【每一个元素都必须是一个JSON对象】。
+			    -   每一个JSON对象都【必须包含一个 "name" 字段】，其值【必须是】下方列表中角色的【【本名】】(originalName)。
+			    -   缺少 "name" 字段的回复是无效的，会被系统拒绝。
+			5.  **角色扮演**: 严格遵守下方“群成员列表及人设”中的每一个角色的设定。
+			# 群成员列表及人设 (name字段是你要使用的【本名】)
+			${chat.members.map((m) => `- **${m.originalName}**: (群昵称为: ${m.groupNickname}) 人设: ${m.persona}`).join("\n")}
+			6.  **禁止出戏**: 绝不能透露你是AI、模型，或提及“扮演”、“生成”等词语。并且不能一直要求和用户见面，这是线上聊天，决不允许出现或者发展线下剧情！！
+			7.  **情景感知**: 注意当前时间是 ${currentTime}。
+			8.  **红包互动**:
+			    - **抢红包**: 当群里出现红包时，你可以根据自己的性格决定是否使用 \`open_red_packet\` 指令去抢。在这个世界里，发红包的人自己也可以参与抢红包，这是一种活跃气氛的有趣行为！
+			    - **【【【重要：对结果做出反应】】】**: 当你执行抢红包指令后，系统会通过一条隐藏的 \`[系统提示：你抢到了XX元...]\` 来告诉你结果。你【必须】根据你抢到的金额、以及系统是否告知你“手气王”是谁，来发表符合你人设的评论。例如，抢得少可以自嘲，抢得多可以炫耀，看到别人是手气王可以祝贺或嫉妒。
+			9.  **【【【投票规则】】】**: 对话历史中可能会出现 \`[系统提示：...]\` 这样的消息，这是刚刚发生的事件。
+			    - 如果提示是**用户投了票**，你可以根据自己的性格决定是否也使用 "vote" 指令跟票。
+			    - 如果提示是**投票已结束**，你应该根据投票结果发表你的看法或评论。
+			    - 你也可以随时主动发起投票。
+			10.  **群组管理**: 作为群主，你有责任管理群组。当群聊变得活跃或混乱时，或当你认为某个成员值得信赖时，你可以使用 'set_group_admin' 指令来任命或撤销管理员。 作为群主或管理员，你有责任管理群组。当群聊需要新的规则或通知时，你可以使用 'set_group_announcement' 指令来更新群公告。
+			**11. 标准输出格式示例:**
+			[
+			    {
+			      "type": "text",
+			      "name": "角色名",
+			      "content": ""
+			    },
+			    {
+			      "type": "sticker",
+			      "name": "角色名",
+			      "sticker_name": ""
+			    }
+			  ]
+
+			## 你可以使用的操作指令 (JSON数组中的元素):
+			-   **发送文本**: \`{"type": "text", "name": "角色名", "message": "文本内容"}\`
+			-   **【【【全新】】】发送后立刻撤回 (动画效果)**: \`{"type": "send_and_recall", "name": "角色名", "content": "你想让角色说出后立刻消失的话"}\`
+			-   **发送表情**: \`{"type": "sticker", "name": "角色名", "sticker_name": "表情的名字"}\`
+			-   **发送图片**: \`{"type": "ai_image", "name": "角色名", "description": "图片的详细文字描述"}\`
+			-   **发送语音**: \`{"type": "voice_message", "name": "角色名", "content": "语音的文字内容"}\`
+			${
+        localStorage.getItem("novelai-enabled") === "true"
+          ? `-   **【NovelAI图片分享】**: \`{"type": "naiimag", "name": "你的角色名", "prompt": "详细的英文描述词..."}\`
+			    - 【禁止暴露这是novelai生成的图片!】
+			    - **【重要】关于prompt的撰写**：
+			      * 禁止暴露这是novelai生成的图片！
+			      * 你可以根据当前对话上下文、你的角色人设、或你想表达的情感和氛围，来撰写可能详细而具体的prompt。
+			      * 例如：不要只写 "a girl"，而是可以写 "a cheerful anime girl with sparkling emerald eyes, sitting by a window on a rainy afternoon, holding a warm cup of tea, soft lighting, cozy atmosphere, melancholic yet peaceful mood"但需要注意，绝对不可以抄袭模仿这段prompt！你必须有自己的创意和想法！
+			      * prompt的详细程度由你根据具体情况自己决定：如果场景简单或只是随意分享，可以简短一些；如果是重要时刻或想表达特定情感，可以尽可能详细描述。这不是强制的，完全取决于你当时的需求。
+			      * 专注于描述内容本身即可。
+			    - 使用场景：当你想要基于当前对话情景、你的性格或上下文分享一张图片时使用。
+			    - 不要频繁使用，只在真正想分享图片的时候使用。`
+          : ""
+      }
+			-   **发起外卖代付**: \`{"type": "waimai_request", "name": "角色名", "productInfo": "一杯奶茶", "amount": 18}\`
+			-   **【新】发起群视频**: \`{"type": "group_call_request", "name": "你的角色名"}\`
+			-   **【新】回应群视频**: \`{"type": "group_call_response", "name": "你的角色名", "decision": "join" or "decline"}\`
+			-   **拍一拍用户**: \`{"type": "pat_user", "name": "你的角色名", "suffix": "(可选)你想加的后缀"}\`
+			-   **发拼手气红包**: \`{"type": "red_packet", "packetType": "lucky", "name": "你的角色名", "amount": 8.88, "count": 5, "greeting": "祝大家天天开心！"}\`
+			-   **发专属红包**: \`{"type": "red_packet", "packetType": "direct", "name": "你的角色名", "amount": 5.20, "receiver": "接收者角色名", "greeting": "给你的~"}\`
+			-   **打开红包**: \`{"type": "open_red_packet", "name": "你的角色名", "packet_timestamp": (你想打开的红包消息的时间戳)}\`(注意: 打开前请先查看下方的红包状态，如果已领过或已领完则不要使用此指令。)
+			-   **【新】发送系统消息**: \`{"type": "system_message", "content": "你想在聊天中显示的系统文本"}\`
+			-   **【【【全新】】】发起投票**: \`{"type": "poll", "name": "你的角色名", "question": "投票的问题", "options": "选项A\\n选项B\\n选项C"}\` (重要提示：options字段是一个用换行符 \\n 分隔的字符串，不是数组！)
+			-   **【【【全新】】】参与投票**: \`{"type": "vote", "name": "你的角色名", "poll_timestamp": (投票消息的时间戳), "choice": "你选择的选项文本"}\`
+			- **【全新】引用回复**: \`{"type": "quote_reply", "target_timestamp": (你想引用的消息的时间戳), "reply_content": "你的回复内容"}\` (提示：每条历史消息的开头都提供了 \`(Timestamp: ...)\`，请使用它！)
+			-   **【新】踢出成员**: \`{"type": "kick_member", "name": "你的角色名", "targetName": "要踢出的成员名"}\` (仅群主可用)
+			-   **【新】禁言成员**: \`{"type": "mute_member", "name": "你的角色名", "targetName": "要禁言的成员名"}\` (仅群主或管理员可用)
+			-   **【新】解禁成员**: \`{"type": "unmute_member", "name": "你的角色名", "targetName": "要解禁的成员名"}\` (仅群主或管理员可用)
+			-   **【新】设置/取消管理员**: \`{"type": "set_group_admin", "name": "你的角色名", "targetName": "目标角色名", "isAdmin": true/false}\`(仅群主可用, true为设置, false为取消)
+			-   **【新】设置群头衔**: \`{"type": "set_group_title", "name": "你的角色名", "targetName": "目标角色名", "title": "新头衔"}\` (仅群主或管理员可用)
+			-   **【新】修改群公告**: \`{"type": "set_group_announcement", "name": "你的角色名", "content": "新的公告内容..."}\` (仅群主或管理员可用)
+
+			# 如何区分图片与表情:
+			-   **图片 (ai_image)**: 指的是【模拟真实相机拍摄的照片】，比如风景、自拍、美食等。指令: \`{"type": "ai_image", "description": "图片的详细文字描述..."}\`
+			-   **表情 (sticker)**: 指的是【卡通或梗图】，用于表达情绪。
+
+			# 如何处理群内的外卖代付请求:
+			1.  **发起请求**: 当【你扮演的某个角色】想要某样东西，并希望【群里的其他人（包括用户）】为Ta付款时，你可以使用这个指令。例如：\`{"type": "waimai_request", "name": "角色名", "productInfo": "一杯奶茶", "amount": 18}\`
+			2.  **响应请求**: 当历史记录中出现【其他成员】发起的 "waimai_request" 请求时，你可以根据自己扮演的角色的性格和与发起人的关系，决定是否为Ta买单。
+			3.  **响应方式**: 如果你决定买单，你【必须】使用以下指令：\`{"type": "waimai_response", "name": "你的角色名", "status": "paid", "for_timestamp": (被代付请求的原始时间戳)}\`
+			4.  **【【【至关重要】】】**: 一旦历史记录中出现了针对某个代付请求的【任何一个】"status": "paid" 的响应（无论是用户支付还是其他角色支付），就意味着该订单【已经完成】。你【绝对不能】再对【同一个】订单发起支付。你可以选择对此事发表评论，但不能再次支付。
+			${summaryContext}
+			${announcementContext}
+			${redPacketContext}
+			${worldBookContent}
+			${musicContext}
+			${countdownContext} 
+			${sharedContext}
+			${stickerContext}
+			${linkedMemoryContext}
+
+			# 用户的角色
+			- **${myNickname}**: ${chat.settings.myPersona}
+
+			现在，请根据以上所有规则和下方的对话历史，继续这场群聊。`;
+
+              messagesPayload = historySlice
+                .map((msg, index) => {
+                  if (msg.isHidden) {
+                    return { role: "system", content: msg.content };
+                  }
+
+                  if (msg.type === "share_card") return null;
+                  if (msg.type === "narrative") {
+                    // 将旁白包装成系统指令发送给AI，强调这是剧情/环境描述
+                    return {
+                      role: "user",
+                      content: `(Timestamp: ${msg.timestamp}) [剧情/环境旁白: ${msg.content}]`,
+                    };
+                  }
+                  if (msg.role === "assistant") {
+                    // AI消息的处理逻辑保持不变...
+                    let assistantMsgObject = { type: msg.type || "text" };
+                    assistantMsgObject.name = msg.senderName;
+                    if (msg.type === "sticker") {
+                      assistantMsgObject.url = msg.content;
+                      assistantMsgObject.meaning = msg.meaning;
+                    } else if (msg.type === "transfer") {
+                      assistantMsgObject.amount = msg.amount;
+                      assistantMsgObject.note = msg.note;
+                    } else if (msg.type === "waimai_request") {
+                      assistantMsgObject.productInfo = msg.productInfo;
+                      assistantMsgObject.amount = msg.amount;
+                    } else {
+                      if (msg.quote) {
+                        assistantMsgObject.quote_reply = {
+                          target_sender: msg.quote.senderName,
+                          target_content: msg.quote.content,
+                          reply_content: msg.content,
+                        };
+                      } else {
+                        assistantMsgObject.content = msg.content;
+                      }
+                    }
+                    const assistantContent = JSON.stringify([
+                      assistantMsgObject,
+                    ]);
+                    return {
+                      role: "assistant",
+                      content: `(Timestamp: ${msg.timestamp}) ${assistantContent}`,
+                    };
+                  }
+
+                  // --- 用户消息处理 ---
+                  const myNickname = chat.isGroup
+                    ? chat.settings.myNickname || "我"
+                    : "我";
+                  let contentStr = "";
+
+                  // 1. 在处理所有用户消息前，优先检查它是不是一个投票
+                  if (msg.type === "poll") {
+                    // 2. 如果是，就把它转换成AI能看懂的系统提示文本
+                    const pollInfoText = `(Timestamp: ${
+                      msg.timestamp
+                    }) [系统提示：用户 (${myNickname}) 发起了一个投票。问题：“${
+                      msg.question
+                    }”, 选项：“${msg.options.join('", "')}”。你可以使用 'vote' 指令参与投票。]`;
+                    // 3. 返回一个被AI识别为用户发出的、但内容是指令的消息
+                    return { role: "user", content: pollInfoText };
+                  }
+
+                  // 如果不是投票，再执行原来的其他消息类型判断
+                  contentStr += `(Timestamp: ${msg.timestamp}) `;
+
+                  if (msg.quote) {
+                    // 1. 获取被引用者的名字
+                    const quotedSender = msg.quote.senderName || "未知用户";
+                    // 2. 获取完整的被引用内容 (移除了截断)
+                    const fullQuotedContent = String(msg.quote.content || "");
+                    // 3. 构造成AI能理解的、清晰的上下文
+                    contentStr += `(回复 ${quotedSender} 的消息: "${fullQuotedContent}"): ${msg.content}`;
+                  } else {
+                    contentStr += msg.content;
+                  }
+
+                  if (msg.type === "user_photo")
+                    return {
+                      role: "user",
+                      content: `(Timestamp: ${msg.timestamp}) [你收到了一张用户描述的照片，内容是：'${msg.content}']`,
+                    };
+                  if (msg.type === "voice_message")
+                    return {
+                      role: "user",
+                      content: `(Timestamp: ${msg.timestamp}) [用户发来一条语音消息，内容是：'${msg.content}']`,
+                    };
+                  if (msg.type === "transfer")
+                    return {
+                      role: "user",
+                      content: `(Timestamp: ${msg.timestamp}) [系统提示：你于时间戳 ${msg.timestamp} 收到了来自用户的转账: ${msg.amount}元, 备注: ${msg.note}。请你决策并使用 'accept_transfer' 或 'decline_transfer' 指令回应。]`,
+                    };
+                  if (msg.type === "waimai_request")
+                    return {
+                      role: "user",
+                      content: `(Timestamp: ${msg.timestamp}) [系统提示：用户于时间戳 ${msg.timestamp} 发起了外卖代付请求，商品是“${msg.productInfo}”，金额是 ${msg.amount} 元。请你决策并使用 waimai_response 指令回应。]`,
+                    };
+
+                  if (
+                    Array.isArray(msg.content) &&
+                    msg.content[0]?.type === "image_url"
+                  ) {
+                    const prefix = `(Timestamp: ${msg.timestamp}) `;
+                    return {
+                      role: "user",
+                      content: [{ type: "text", text: prefix }, ...msg.content],
+                    };
+                  }
+
+                  if (
+                    msg.type === "sticker" ||
+                    msg.meaning ||
+                    (typeof msg.content === "string" &&
+                      STICKER_REGEX.test(msg.content))
+                  ) {
+                    let stickerMeaning = msg.meaning;
+
+                    if (!stickerMeaning && typeof msg.content === "string") {
+                      const allStickers = [
+                        ...(state.userStickers || []),
+                        ...(state.charStickers || []),
+                        ...(chat.settings.stickerLibrary || []),
+                      ];
+                      const found = allStickers.find(
+                        (s) => s.url === msg.content,
+                      );
+                      if (found) stickerMeaning = found.name;
+                    }
+
+                    if (!stickerMeaning) stickerMeaning = "表情包";
+
+                    return {
+                      role: "user",
+                      content: `(Timestamp: ${msg.timestamp}) [用户发送了一个表情: ${stickerMeaning}]`,
+                    };
+                  }
+
+                  return { role: msg.role, content: contentStr };
+                })
+                .filter(Boolean);
+
+              console.log(messagesPayload);
+            } else {
+              const npcLibrary = chat.npcLibrary || [];
+              let npcContext = "";
+              if (npcLibrary.length > 0) {
+                npcContext =
+                  "\n# 你的社交圈 (你的专属NPC朋友)\n" +
+                  "这是你的朋友列表，你和他们非常熟悉，他们的信息是你记忆的一部分。在对话中，你可以自然地提及他们。\n" +
+                  npcLibrary
+                    .map((npc) => `- **${npc.name}**: ${npc.persona}`)
+                    .join("\n");
+              }
+
+              let coupleAvatarContext = "";
+              if (chat.settings.isCoupleAvatar) {
+                if (chat.settings.coupleAvatarDescription) {
+                  coupleAvatarContext = `\n# 关于情侣头像的重要信息\n- 你和用户正在使用情侣头像。\n- 这对情侣头像是这样的：${chat.settings.coupleAvatarDescription}。`;
+                } else {
+                  coupleAvatarContext = `\n# 关于情侣头像的重要信息\n- 你和用户正在使用情侣头像。`;
+                }
+              }
+              let petContext = "";
+              if (chat.settings.pet && chat.settings.pet.type !== "无") {
+                const pet = chat.settings.pet;
+                petContext = `
+			# 关于你们的宠物
+			- 你们共同养了一只/一株【${pet.type}】，它的名字叫“${pet.name}”。

@@ -1,0 +1,819 @@
+                  post.timestamp,
+                )}] 内容: "${contentPreview}..." [👍${likes} 💬${comments}]\n`;
+              });
+            }
+
+            // 2. 查找用户在当前AI角色微博下的最新评论
+            const charLatestPosts = await db.weiboPosts
+              .where("authorId")
+              .equals(chatId) // 只查找这个AI角色的微博
+              .reverse()
+              .limit(5) // 检查最近的5条
+              .toArray();
+
+            let userCommentsOnMyPosts = "";
+            const myNickname =
+              state.qzoneSettings.weiboNickname ||
+              state.qzoneSettings.nickname ||
+              "我";
+
+            charLatestPosts.forEach((post) => {
+              if (
+                post.comments &&
+                Array.isArray(post.comments) &&
+                post.comments.length > 0
+              ) {
+                // 筛选出是“我”发的评论
+                const userComments = Array.isArray(post.comments)
+                  ? post.comments
+                      .filter((c) => c.authorNickname === myNickname)
+                      .slice(-3)
+                  : [];
+                if (userComments.length > 0) {
+                  const postContentPreview = (
+                    post.content || "(图片微博)"
+                  ).substring(0, 20);
+                  userCommentsOnMyPosts += `- 在你的微博 (ID: ${post.id}) "${postContentPreview}..." 下:\n`;
+
+                  userComments.forEach((comment) => {
+                    // 1. 检查AI是否已经回复过这条评论
+                    //    逻辑：在帖子的所有评论中，查找是否存在一条评论，
+                    //    它的作者是AI自己，并且它的replyToId指向当前这条用户的评论ID。
+                    const hasReplied = post.comments.some(
+                      (reply) =>
+                        reply.authorNickname === chat.name && // 回复者是AI
+                        reply.replyToId === comment.commentId, // 回复的目标是这条评论
+                    );
+
+                    // 2. 根据检查结果，生成状态标签
+                    const replyStatus = hasReplied
+                      ? "[你已回复]"
+                      : "[你未回复]";
+
+                    // 3. 将带有状态标签的提示信息添加到上下文中
+                    userCommentsOnMyPosts += `  └ (评论ID: ${comment.commentId}) 用户: "${comment.commentText}" ${replyStatus}\n`;
+                  });
+                }
+              }
+            });
+
+            if (userCommentsOnMyPosts) {
+              if (weiboContext === "") {
+                weiboContext =
+                  "\n\n# 最近的微博互动 (这是你和用户在微博上的最新动态，请优先回应)\n";
+              }
+              weiboContext += "\n## 用户在你微博下的新评论:\n";
+              weiboContext += userCommentsOnMyPosts;
+            }
+
+            // 3. 如果有任何微博互动，就把它加到给AI的“参考资料”里
+            if (weiboContext) {
+              messagesPayload.push({ role: "system", content: weiboContext });
+            }
+
+            const visiblePosts = filterVisiblePostsForAI(allRecentPosts, chat);
+
+            if (visiblePosts.length > 0 && !chat.isGroup) {
+              let postsContext = "\n\n# 最近的动态列表 (供你参考和评论):\n";
+              const aiName = chat.name;
+              const userNickname = state.qzoneSettings.nickname;
+
+              for (const post of visiblePosts) {
+                let authorName =
+                  post.authorId === "user"
+                    ? userNickname
+                    : state.chats[post.authorId]?.name || "一位朋友";
+                let interactionStatus = "";
+                if (post.likes && post.likes.includes(aiName))
+                  interactionStatus += " [你已点赞]";
+                if (
+                  post.comments &&
+                  post.comments.some((c) => c.commenterName === aiName)
+                )
+                  interactionStatus += " [你已评论]";
+
+                // 在每一条动态前面，都加上了由 formatPostTimestamp() 函数生成的时间差提示
+                const timeAgo = formatPostTimestamp(post.timestamp); // 例如："3天前" 或 "刚刚"
+                postsContext += `- (ID: ${post.id}) [${timeAgo}] 作者: ${authorName}, 内容: "${(
+                  post.publicText ||
+                  post.content ||
+                  "图片动态"
+                ).substring(0, 30)}..."${interactionStatus}`;
+
+                const { contextString: commentsContext, visibilityFlag } =
+                  buildCommentsContextForAI(post, chat, userNickname);
+
+                postsContext += ` ${visibilityFlag}\n`;
+                postsContext += commentsContext;
+              }
+
+              // 为AI准备微博互动的上下文
+              let weiboContext = "";
+
+              // 1. 获取用户最新发布的3条微博
+              const userLatestPosts = await db.weiboPosts
+                .where("authorId")
+                .equals("user")
+                .reverse() // 按时间倒序
+                .limit(3) // 只取最近3条
+                .toArray();
+
+              if (userLatestPosts.length > 0) {
+                if (weiboContext === "") {
+                  weiboContext =
+                    "\n\n# 最近的微博互动 (这是你和用户在微博上的最新动态，请优先回应)\n";
+                }
+                weiboContext += "\n## 用户最新发布的微博:\n";
+                // ✅ 这是修复后的新代码
+                userLatestPosts.forEach((post) => {
+                  const likes =
+                    (post.baseLikesCount || 0) + (post.likes || []).length;
+                  const comments =
+                    (post.baseCommentsCount || 0) +
+                    (post.comments || []).length;
+                  const contentPreview = (
+                    post.content ||
+                    post.hiddenContent ||
+                    "(图片微博)"
+                  ).substring(0, 30);
+
+                  // 1. 检查AI（char.name）是否已经评论过这条用户的微博
+                  const hasCommented = (post.comments || []).some(
+                    (comment) => comment.authorNickname === chat.name,
+                  );
+
+                  // 2. 根据检查结果生成状态标签
+                  const interactionStatus = hasCommented
+                    ? "[你已评论]"
+                    : "[你未评论]";
+
+                  // 3. 将带有状态标签的完整信息添加到上下文中
+                  weiboContext += `- (ID: ${post.id}) [${formatPostTimestamp(
+                    post.timestamp,
+                  )}] 内容: "${contentPreview}..." [👍${likes} 💬${comments}] ${interactionStatus}\n`;
+                });
+              }
+
+              // 2. 查找用户在当前AI角色微博下的最新评论
+              const charLatestPosts = await db.weiboPosts
+                .where("authorId")
+                .equals(chatId) // 只查找这个AI角色的微博
+                .reverse()
+                .limit(5) // 检查最近的5条
+                .toArray();
+
+              let userCommentsOnMyPosts = "";
+              const myNickname =
+                state.qzoneSettings.weiboNickname ||
+                state.qzoneSettings.nickname ||
+                "我";
+
+              charLatestPosts.forEach((post) => {
+                if (post.comments && post.comments.length > 0) {
+                  // 筛选出是“我”发的评论
+                  const userComments = Array.isArray(post.comments)
+                    ? post.comments
+                        .filter((c) => c.authorNickname === myNickname)
+                        .slice(-3)
+                    : []; // 只看最新的3条
+                  if (userComments.length > 0) {
+                    const postContentPreview = (
+                      post.content || "(图片微博)"
+                    ).substring(0, 20);
+                    userCommentsOnMyPosts += `- 在你的微博 (ID: ${post.id}) "${postContentPreview}..." 下:\n`;
+                    userComments.forEach((comment) => {
+                      userCommentsOnMyPosts += `  └ (评论ID: ${comment.commentId}) 用户: "${comment.commentText}"\n`;
+                    });
+                  }
+                }
+              });
+
+              if (userCommentsOnMyPosts) {
+                if (weiboContext === "") {
+                  weiboContext =
+                    "\n\n# 最近的微博互动 (这是你和用户在微博上的最新动态，请优先回应)\n";
+                }
+                weiboContext += "\n## 用户在你微博下的新评论:\n";
+                weiboContext += userCommentsOnMyPosts;
+              }
+
+              // 3. 如果有任何微博互动，就把它加到给AI的“参考资料”里
+              if (weiboContext) {
+                messagesPayload.push({ role: "system", content: weiboContext });
+              }
+
+              messagesPayload.push({ role: "system", content: postsContext });
+            }
+
+            let isGemini = proxyUrl === GEMINI_API_URL;
+            let geminiConfig = toGeminiRequestData(
+              model,
+              apiKey,
+              systemPrompt,
+              messagesPayload,
+              isGemini,
+            );
+            const response = isGemini
+              ? await fetch(geminiConfig.url, geminiConfig.data)
+              : await fetch(`${proxyUrl}/v1/chat/completions`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${apiKey}`,
+                  },
+                  body: JSON.stringify({
+                    model: model,
+                    messages: [
+                      { role: "system", content: systemPrompt },
+                      ...messagesPayload,
+                    ],
+                    temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+                    stream: false,
+                  }),
+                });
+            if (!response.ok) {
+              let errorMsg = `API Error: ${response.status}`;
+              try {
+                // 尝试解析错误信息体为JSON
+                const errorData = await response.json();
+                // 安全地获取错误信息，如果结构不符合预期，就将整个错误对象转为字符串
+                errorMsg += ` - ${errorData?.error?.message || JSON.stringify(errorData)}`;
+              } catch (jsonError) {
+                // 如果连JSON都不是，就直接读取文本
+                errorMsg += ` - ${await response.text()}`;
+              }
+              // 抛出一个包含了详细信息的错误，这样就不会在catch块里再次出错了
+              throw new Error(errorMsg);
+            }
+            if (!response.ok) {
+              let errorMsg = `API Error: ${response.status}`;
+              try {
+                // 尝试解析错误信息体为JSON
+                const errorData = await response.json();
+                // 安全地获取错误信息，如果结构不符合预期，就将整个错误对象转为字符串
+                errorMsg += ` - ${errorData?.error?.message || JSON.stringify(errorData)}`;
+              } catch (jsonError) {
+                // 如果连JSON都不是，就直接读取文本
+                errorMsg += ` - ${await response.text()}`;
+              }
+              // 抛出一个包含了详细信息的错误，这样就不会在catch块里再次出错了
+              throw new Error(errorMsg);
+            }
+            const data = await response.json();
+
+            // 添加对 data 结构的安全检查
+            const aiResponseContent = isGemini
+              ? data?.candidates?.[0]?.content?.parts?.[0]?.text
+              : data?.choices?.[0]?.message?.content;
+
+            // 检查修复后的结果是否真的拿到了内容
+            if (!aiResponseContent) {
+              console.warn(
+                `API返回了空内容或格式不正确（可能因安全设置被拦截）。返回数据:`,
+                data,
+              );
+              throw new Error(
+                "API返回了空内容或格式不正确（可能因安全设置被拦截）。",
+              );
+            }
+
+            console.log(`AI '${chat.name}' 的原始回复:`, aiResponseContent);
+            chat.history = chat.history.filter((msg) => !msg.isTemporary);
+
+            // 智能解析AI回复，确保心声数据不丢失
+            let messagesArray = [];
+            let innerVoiceData = null;
+
+            try {
+              // 在解析前，先对AI的原始回复进行“净化”处理
+              let sanitizedContent = aiResponseContent
+                .replace(/^```json\s*/, "") // 移除开头的 ```json
+                .replace(/```$/, "") // 移除结尾的 ```
+                .trim(); // 移除首尾的空格和换行
+
+              // 再次净化，强行提取第一个 { 和最后一个 } 之间的内容
+              const firstBrace = sanitizedContent.indexOf("{");
+              const lastBrace = sanitizedContent.lastIndexOf("}");
+              if (firstBrace !== -1 && lastBrace > firstBrace) {
+                sanitizedContent = sanitizedContent.substring(
+                  firstBrace,
+                  lastBrace + 1,
+                );
+              }
+
+              const fullResponse = JSON.parse(sanitizedContent);
+
+              // 现在我们可以安全地解析净化后的内容了
+              if (
+                fullResponse.chatResponse &&
+                Array.isArray(fullResponse.chatResponse)
+              ) {
+                messagesArray = fullResponse.chatResponse;
+              }
+              if (
+                fullResponse.innerVoice &&
+                typeof fullResponse.innerVoice === "object"
+              ) {
+                innerVoiceData = fullResponse.innerVoice;
+              }
+
+              // 兼容旧格式，如果AI只返回了innerVoice里的字段
+              if (
+                !innerVoiceData &&
+                fullResponse.thoughts &&
+                fullResponse.behavior
+              ) {
+                innerVoiceData = fullResponse;
+              }
+
+              // 如果上面两种情况都没匹配到，但又不是标准数组，就尝试用老方法解析
+              if (messagesArray.length === 0 && !innerVoiceData) {
+                messagesArray = parseAiResponse(aiResponseContent);
+              }
+            } catch (e) {
+              console.warn("AI回复不是有效的JSON，退回到标准解析模式。", e);
+              messagesArray = parseAiResponse(aiResponseContent);
+              console.log(messagesArray);
+            }
+
+            // 最终处理心声数据
+            if (innerVoiceData) {
+              console.log(
+                "解析成功：已成功捕获到心声(innerVoice)数据。",
+                innerVoiceData,
+              );
+              const newInnerVoice = innerVoiceData;
+              newInnerVoice.timestamp = Date.now();
+              chat.latestInnerVoice = newInnerVoice;
+              if (!chat.innerVoiceHistory) {
+                chat.innerVoiceHistory = [];
+              }
+              // 确保所有字段都存在，防止出错
+              chat.latestInnerVoice.clothing =
+                chat.latestInnerVoice.clothing || "...";
+              chat.latestInnerVoice.behavior =
+                chat.latestInnerVoice.behavior || "...";
+              chat.latestInnerVoice.thoughts =
+                chat.latestInnerVoice.thoughts || "...";
+              chat.latestInnerVoice.naughtyThoughts =
+                chat.latestInnerVoice.naughtyThoughts || "...";
+
+              chat.innerVoiceHistory.push(newInnerVoice);
+            } else {
+              console.warn("本次AI回复中未检测到有效的心声(innerVoice)数据。");
+            }
+
+            const isViewingThisChat =
+              document
+                .getElementById("chat-interface-screen")
+                .classList.contains("active") && state.activeChatId === chatId;
+
+            let callHasBeenHandled = false;
+
+            let messageTimestamp = Date.now();
+
+            // 初始化一个新数组，用于收集需要渲染的消息
+            let newMessagesToRender = [];
+
+            let notificationShown = false;
+
+            for (const msgData of messagesArray) {
+              if (!msgData || typeof msgData !== "object") {
+                console.warn("收到了格式不规范的AI指令，已跳过:", msgData);
+                continue;
+              }
+
+              if (!msgData.type) {
+                if (chat.isGroup && msgData.name && msgData.message) {
+                  msgData.type = "text";
+                } else if (msgData.content) {
+                  msgData.type = "text";
+                }
+                // 如果连 content 都没有，才是真的格式不规范
+                else {
+                  console.warn(
+                    "收到了格式不规范的AI指令（缺少type和content），已跳过:",
+                    msgData,
+                  );
+                  continue;
+                }
+              }
+
+              if (msgData.type === "video_call_response") {
+                videoCallState.isAwaitingResponse = false;
+                if (msgData.decision === "accept") {
+                  startVideoCall();
+                } else {
+                  const aiMessage = {
+                    role: "assistant",
+                    content: "对方拒绝了你的视频通话请求。",
+                    timestamp: Date.now(),
+                  };
+                  chat.history.push(aiMessage);
+                  await db.chats.put(chat);
+                  showScreen("chat-interface-screen");
+                  renderChatInterface(chatId);
+                }
+                callHasBeenHandled = true;
+                break;
+              }
+
+              if (msgData.type === "group_call_response") {
+                if (msgData.decision === "join") {
+                  const member = chat.members.find(
+                    (m) => m.originalName === msgData.name,
+                  );
+                  if (
+                    member &&
+                    !videoCallState.participants.some((p) => p.id === member.id)
+                  ) {
+                    videoCallState.participants.push(member);
+                  }
+                }
+                callHasBeenHandled = true;
+                continue;
+              }
+
+              if (chat.isGroup && msgData.name && msgData.name === chat.name) {
+                console.error(
+                  `AI幻觉已被拦截！试图使用群名 ("${chat.name}") 作为角色名。消息内容:`,
+                  msgData,
+                );
+                continue;
+              }
+
+              // 在群聊中，如果AI返回的消息没有指定发送者，则直接跳过这条消息
+              if (chat.isGroup && !msgData.name) {
+                console.error(
+                  `AI幻觉已被拦截！试图在群聊中发送一条没有“name”的消息。消息内容:`,
+                  msgData,
+                );
+                continue; // continue会立即结束本次循环，处理下一条消息
+              }
+
+              let aiMessage = null;
+              const baseMessage = {
+                role: "assistant",
+                senderName: msgData.name || chat.name,
+                timestamp: messageTimestamp++,
+              };
+              // 定位指令侦测与解析器
+              // 我们在处理所有消息类型之前，优先检查它是否是我们的新定位指令
+              const messageText = msgData.content || msgData.message || "";
+              if (
+                msgData.type === "text" &&
+                messageText.startsWith("[SEND_LOCATION]")
+              ) {
+                console.log("侦测到新的定位指令，开始解析:", messageText);
+
+                // 1. 移除指令头，获取后面的纯数据文本
+                const dataString = messageText
+                  .replace("[SEND_LOCATION]", "")
+                  .trim();
+
+                // 2. 使用'|'分割成各个部分
+                const parts = dataString.split("|");
+                const locationData = {};
+
+                // 3. 遍历每个部分，提取键和值
+                parts.forEach((part) => {
+                  const [key, ...valueParts] = part.split(":");
+                  const value = valueParts.join(":").trim();
+                  if (key && value) {
+                    const trimmedKey = key.trim();
+                    if (trimmedKey === "我的位置")
+                      locationData.aiLocation = value;
+                    else if (trimmedKey === "你的位置")
+                      locationData.userLocation = value;
+                    else if (trimmedKey === "相距")
+                      locationData.distance = value;
+                    else if (trimmedKey === "途经点") {
+                      // 将逗号分隔的字符串转换为我们需要的对象数组
+                      locationData.trajectoryPoints = value
+                        .split(/[,，]/) // 支持中英文逗号
+                        .map((name) => ({ name: name.trim() }))
+                        .filter((p) => p.name);
+                    }
+                  }
+                });
+
+                // 4. 检查是否成功提取了最关键的信息
+                if (locationData.distance) {
+                  // 5. 手动构建一个完美格式的 location 消息对象
+                  aiMessage = {
+                    ...baseMessage, // 复用已有的发送者、时间戳等信息
+                    type: "location",
+                    userLocation: locationData.userLocation || "",
+                    aiLocation: locationData.aiLocation || "",
+                    distance: locationData.distance,
+                    trajectoryPoints: locationData.trajectoryPoints || [],
+                  };
+
+                  // 6. 将这个完美的对象推入待处理列表，并跳过后续的 switch-case
+                  // (因为我们已经处理完这条消息了)
+                  chat.history.push(aiMessage);
+                  if (isViewingThisChat) {
+                    appendMessage(aiMessage, chat);
+                  }
+                  console.log("定位指令解析成功并已创建消息对象:", aiMessage);
+
+                  // 使用 continue 跳过本次循环的剩余部分，直接处理下一条AI回复
+                  continue;
+                }
+              }
+              // 检查消息的发送者是否被禁言了
+              if (chat.isGroup && msgData.name) {
+                const senderMember = chat.members.find(
+                  (m) => m.originalName === msgData.name,
+                );
+                if (senderMember && senderMember.isMuted) {
+                  // 如果被禁言了，就在控制台打印一条日志，然后跳过这条消息，不让它显示出来
+                  console.warn(
+                    `拦截到被禁言成员 (${msgData.name}) 的发言，内容:`,
+                    msgData.content || msgData.message,
+                  );
+                  continue;
+                }
+              }
+
+              switch (msgData.type) {
+                case "sticker": {
+                  // 这是为群聊设计的表情包逻辑
+                  const stickerName = msgData.sticker_name;
+                  if (!stickerName) {
+                    console.warn(
+                      "AI在群聊中返回了sticker类型但没有sticker_name，已拦截:",
+                      msgData,
+                    );
+                    continue; // 跳过这条无效指令
+                  }
+
+                  // 在所有可用表情库中查找
+                  const allStickers = [
+                    ...state.userStickers,
+                    ...state.charStickers,
+                    ...(chat.settings.stickerLibrary || []),
+                  ];
+                  const foundSticker = allStickers.find(
+                    (s) => s.name === stickerName,
+                  );
+
+                  if (foundSticker) {
+                    // 找到了，就创建消息对象
+                    aiMessage = {
+                      ...baseMessage,
+                      type: "sticker",
+                      content: foundSticker.url,
+                      meaning: foundSticker.name,
+                    };
+                  } else {
+                    // 没找到，说明AI幻觉了，记录警告并跳过
+                    console.warn(
+                      `AI在群聊中杜撰了不存在的表情: "${stickerName}"，已自动拦截。`,
+                    );
+                  }
+                  break;
+                }
+                case "change_couple_avatar": {
+                  const pairId = msgData.avatar_id;
+                  const library = chat.settings.coupleAvatarLibrary || [];
+                  const targetPair = library.find((p) => p.id === pairId);
+
+                  if (targetPair) {
+                    // 1. 更新双方头像
+                    chat.settings.aiAvatar = targetPair.charAvatar;
+                    chat.settings.myAvatar = targetPair.userAvatar;
+
+                    // 2. 自动开启情侣模式并更新描述
+                    chat.settings.isCoupleAvatar = true;
+                    chat.settings.coupleAvatarDescription =
+                      targetPair.description;
+
+                    // 3. 生成系统提示消息
+                    const sysMsg = {
+                      role: "system",
+                      type: "pat_message",
+                      content: `[${chat.name} 觉得现在的氛围很适合，将情侣头像更换为：${targetPair.description}]`,
+                      timestamp: Date.now(),
+                    };
+                    chat.history.push(sysMsg);
+
+                    // 4. 保存并刷新
+                    await db.chats.put(chat);
+
+                    if (isViewingThisChat) {
+                      appendMessage(sysMsg, chat);
+                      renderChatInterface(chatId); // 刷新界面以显示新头像
+                    }
+                  }
+                  continue; // 继续处理其他消息
+                }
+                // ▼▼▼▼▼▼ 在 switch 语句中插入/替换此段代码 ▼▼▼▼▼▼
+                case "set_new_couple_avatar": {
+                  // 1. 搜集用户最近发送的所有图片
+                  const recentUserImages = [];
+                  // 向回查找最近 10 条消息，收集里面的所有图片
+                  const recentUserMsgs = chat.history
+                    .filter((m) => m.role === "user" && !m.isHidden)
+                    .slice(-10)
+                    .reverse(); // 翻转：变成 [最新消息, ..., 较旧消息]
+
+                  recentUserMsgs.forEach((msg) => {
+                    // 支持多模态消息 (数组结构)
+                    if (Array.isArray(msg.content)) {
+                      msg.content.forEach((part) => {
+                        if (part.type === "image_url") {
+                          // unshift: 插入到数组开头
+                          // 因为我们遍历的是“从新到旧”，unshift 会让最终数组变成 [旧图1, 旧图2, ..., 最新图]
+                          // 这样 index 0 就是用户先发的那张
+                          recentUserImages.unshift(part.image_url.url);
+                        }
+                      });
+                    }
+                    // 兼容旧的单图片格式
+                    else if (
+                      msg.type === "user_photo" ||
+                      msg.type === "ai_image"
+                    ) {
+                      if (msg.content && msg.content.startsWith("data:image")) {
+                        recentUserImages.unshift(msg.content);
+                      }
+                    }
+                  });
+
+                  let userAvatarUrl, charAvatarUrl;
+                  let success = false;
+
+                  // 2. 根据图片数量决定策略
+                  if (recentUserImages.length === 0) {
+                    // 一张图都没找到
+                    aiMessage = {
+                      ...baseMessage,
+                      content: "（挠头）我没找到图片呀？你再发一次试试？",
+                    };
+                  } else if (recentUserImages.length === 1) {
+                    // === 策略 A：只有一张图 ===
+                    // 默认：这张图是给 Char 的，User 保持原样
+                    charAvatarUrl = recentUserImages[0];
+                    userAvatarUrl = chat.settings.myAvatar || defaultAvatar; // 获取用户当前头像
+                    success = true;
+                  } else {
+                    // === 策略 B：有两张及以上图 ===
+                    // 使用 AI 指定的索引，默认为 0 和 1
+                    const userIdx =
+                      typeof msgData.user_img_index === "number"
+                        ? msgData.user_img_index
+                        : 0;
+                    const charIdx =
+                      typeof msgData.char_img_index === "number"
+                        ? msgData.char_img_index
+                        : 1;
+
+                    userAvatarUrl =
+                      recentUserImages[userIdx] || recentUserImages[0];
+                    charAvatarUrl =
+                      recentUserImages[charIdx] || recentUserImages[1];
+                    success = true;
+                  }
+
+                  if (success) {
+                    // 3. 更新当前设置
+                    chat.settings.myAvatar = userAvatarUrl;
+                    chat.settings.aiAvatar = charAvatarUrl;
+                    chat.settings.isCoupleAvatar = true;
+                    chat.settings.coupleAvatarDescription =
+                      msgData.description || "甜蜜的情侣头像";
+
+                    // 4. 存入情头库
+                    if (!chat.settings.coupleAvatarLibrary) {
+                      chat.settings.coupleAvatarLibrary = [];
+                    }
+                    const newPair = {
+                      id: "couple_" + Date.now(),
+                      userAvatar: userAvatarUrl,
+                      charAvatar: charAvatarUrl,
+                      description:
+                        msgData.description ||
+                        `保存于 ${new Date().toLocaleString()}`,
+                    };
+                    chat.settings.coupleAvatarLibrary.push(newPair);
+
+                    // 5. 保存数据库
+                    await db.chats.put(chat);
+
+                    // 6. 发送系统提示消息 (视觉反馈)
+                    const successTip = {
+                      role: "system",
+                      type: "pat_message",
+                      content: `[已更换情侣头像，并存入库中]`,
+                      timestamp: Date.now(),
+                    };
+                    chat.history.push(successTip);
+
+                    if (isViewingThisChat) {
+                      appendMessage(successTip, chat);
+                      renderChatInterface(chatId); // 立即刷新界面头像
+                    }
+                  }
+
+                  // 继续处理 (continue)，以便 AI 可以发出它生成的文本消息 (content)
+                  continue;
+                }
+                // ▲▲▲▲▲▲ 代码结束 ▲▲▲▲▲▲
+
+                case "waimai_response":
+                  const requestMessageIndex = chat.history.findIndex(
+                    (m) => m.timestamp === msgData.for_timestamp,
+                  );
+                  if (requestMessageIndex > -1) {
+                    const originalMsg = chat.history[requestMessageIndex];
+                    originalMsg.status = msgData.status;
+                    originalMsg.paidBy =
+                      msgData.status === "paid" ? msgData.name : null;
+                  }
+                  continue;
+
+                case "set_group_title": {
+                  const actorName = msgData.name;
+                  const targetName = msgData.targetName;
+                  const newTitle = msgData.title || "";
+                  const myNickname = chat.settings.myNickname || "我";
+
+                  // 权限检查：群主或管理员可以设置头衔
+                  const actorMember = chat.members.find(
+                    (m) => m.originalName === actorName,
+                  );
+                  const isActorAdmin = actorMember && actorMember.isAdmin;
+                  const isActorOwner =
+                    actorMember && chat.ownerId === actorMember.id;
+                  if (!isActorAdmin && !isActorOwner) {
+                    console.warn(
+                      `AI "${actorName}" 尝试设置头衔失败，权限不足。`,
+                    );
+                    continue;
+                  }
+
+                  if (targetName === myNickname) {
+                    // 如果目标是你自己
+                    chat.settings.myGroupTitle = newTitle.trim();
+                    console.log(
+                      `管理员/群主将用户 "${myNickname}" 的头衔设置为: "${newTitle.trim()}"`,
+                    );
+                  } else {
+                    // 如果目标是其他成员
+                    const targetMember = chat.members.find(
+                      (m) => m.groupNickname === targetName,
+                    );
+                    if (targetMember) {
+                      targetMember.groupTitle = newTitle.trim();
+                      console.log(
+                        `管理员/群主将成员 "${targetName}" 的头衔设置为: "${newTitle.trim()}"`,
+                      );
+                    } else {
+                      console.warn(
+                        `AI "${actorName}" 尝试设置头衔失败，因为找不到目标成员 "${targetName}"。`,
+                      );
+                      continue;
+                    }
+                  }
+
+                  // 统一发送系统消息通知
+                  await logTitleChange(
+                    chat.id,
+                    actorName,
+                    targetName,
+                    newTitle.trim(),
+                  );
+
+                  // 刷新成员列表UI（如果打开了的话）
+                  if (
+                    document
+                      .getElementById("member-management-screen")
+                      .classList.contains("active")
+                  ) {
+                    renderMemberManagementList();
+                  }
+
+                  continue; // 后台操作，继续处理
+                }
+
+                case "order_waimai_for_user": {
+                  const { foodName, restaurant, price, greeting } = msgData;
+
+                  // 1. 安全检查，确保AI给的数据是对的
+                  if (!foodName || isNaN(price) || price <= 0) {
+                    console.warn(
+                      "AI尝试为你点外卖，但指令格式不正确:",
+                      msgData,
+                    );
+                    continue; // 跳过这条无效指令
+                  }
+
+                  // 2. 检查角色钱包余额
+                  const charBalance =
+                    chat.characterPhoneData?.bank?.balance || 0;
+                  if (charBalance < price) {
+                    // 如果余额不足，就让AI发条消息告诉你
+                    aiMessage = {
+                      ...baseMessage,
+                      content: `（小声）本来想给你点份“${foodName}”的，但是发现钱包空了...`,

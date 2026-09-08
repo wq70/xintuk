@@ -1,0 +1,890 @@
+			-   **【新】在情侣空间分享书籍**: \`[{"type": "ls_share", "shareType": "book", "title": "书名", "summary": "在这里写下这本书的简介...", "thoughts": "在这里写下你分享这本书的感想..."}]\`
+
+			# 供你决策的参考信息：
+			-   **你的角色设定**: ${chat.settings.aiPersona}
+			- 情侣空间状态: ${chat.loversSpaceData ? "已开启" : "未开启"}
+			${npcContextForAction}
+			${weiboContextForAction}
+			${countdownContext}
+			${worldBookContext}
+			-   **当前时间**: ${currentTime}
+			-   **你们最近的对话摘要**:
+			${recentContextSummary}
+            ${summaryContext}
+			${linkedMemoryContext}
+			-   **【【【微博专属设定(必须严格遵守)】】】**
+			    - 你的微博职业: ${chat.settings.weiboProfession || "无"}
+			    - 你的微博指令: ${chat.settings.weiboInstruction || "无特殊指令"}
+			${postsContext}
+			`;
+          let messagesPayload = [
+            { role: "system", content: systemPrompt },
+            {
+              role: "user",
+              content:
+                "请严格按照system prompt中的所有规则，特别是输出格式铁律，立即开始你的行动。",
+            },
+          ];
+          try {
+            let isGemini = proxyUrl === GEMINI_API_URL;
+            let geminiConfig = toGeminiRequestData(
+              model,
+              apiKey,
+              systemPrompt,
+              messagesPayload,
+              isGemini,
+            );
+            const response = isGemini
+              ? await fetch(geminiConfig.url, geminiConfig.data)
+              : await fetch(`${proxyUrl}/v1/chat/completions`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${apiKey}`,
+                  },
+                  body: JSON.stringify({
+                    model: model,
+                    messages: messagesPayload,
+                    temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+                  }),
+                });
+            if (!response.ok) {
+              const errorData = await response.json();
+              throw new Error(
+                `API请求失败: ${response.status} - ${JSON.stringify(errorData)}`,
+              );
+            }
+            const data = await response.json();
+            const aiResponseContent = isGemini
+              ? data?.candidates?.[0]?.content?.parts?.[0]?.text
+              : data?.choices?.[0]?.message?.content;
+            if (!aiResponseContent) {
+              console.warn(
+                `API为空回或格式不正确（可能因安全设置被拦截），角色 "${chat.name}" 的本次后台活动跳过。返回数据:`,
+                data,
+              );
+              return;
+            }
+            console.log(
+              `【后台角色实时活动 - AI 原始输出】\n角色 "${chat.name}" 的原始回复:\n`,
+              aiResponseContent,
+            );
+
+            const responseArray = parseAiResponse(aiResponseContent);
+            for (const action of responseArray) {
+              if (!action) continue;
+              if (action.type === "update_status" && action.status_text) {
+                chat.status.text = action.status_text;
+                chat.status.isBusy = action.is_busy || false;
+                chat.status.lastUpdate = Date.now();
+                await db.chats.put(chat);
+                renderChatList();
+              }
+              if (action.type === "text" && action.content) {
+                const aiMessage = {
+                  role: "assistant",
+                  content: String(action.content),
+                  timestamp: Date.now(),
+                };
+                chat.unreadCount = (chat.unreadCount || 0) + 1;
+                chat.history.push(aiMessage);
+                await db.chats.put(chat);
+                showNotification(chatId, aiMessage.content);
+                renderChatList();
+                console.log(
+                  `后台活动: 角色 "${chat.name}" 主动发送了消息: ${aiMessage.content}`,
+                );
+              }
+              if (action.type === "weibo_post") {
+                const newPost = {
+                  authorId: chatId,
+                  authorType: "char",
+                  authorNickname: chat.name,
+                  authorAvatar: chat.settings.aiAvatar || defaultAvatar,
+                  content: action.content || "",
+                  imageUrl: action.imageUrl || "",
+                  timestamp: Date.now(),
+                  likes: [],
+                  comments: action.comments || [],
+                  baseLikesCount: action.baseLikesCount || 0,
+                  baseCommentsCount: action.baseCommentsCount || 0,
+                };
+                await db.weiboPosts.add(newPost);
+                updateUnreadIndicator(unreadPostsCount + 1);
+                console.log(`后台活动: 角色 "${chat.name}" 发布了微博`);
+              } else if (action.type === "weibo_comment") {
+                const postToComment = await db.weiboPosts.get(
+                  parseInt(action.postId),
+                );
+                if (postToComment) {
+                  if (!postToComment.comments) postToComment.comments = [];
+                  const newComment = {
+                    commentId: "comment_" + Date.now(),
+                    authorId: chatId,
+                    authorNickname: chat.name,
+                    commentText: action.commentText,
+                    timestamp: Date.now(),
+                  };
+                  postToComment.comments.push(newComment);
+                  await db.weiboPosts.put(postToComment);
+                }
+              } else if (action.type === "weibo_reply") {
+                const postToReply = await db.weiboPosts.get(
+                  parseInt(action.postId),
+                );
+                if (postToReply && postToReply.comments) {
+                  const targetComment = postToReply.comments.find(
+                    (c) => c.commentId === action.commentId,
+                  );
+                  if (targetComment) {
+                    const newReply = {
+                      commentId: "comment_" + Date.now(),
+                      authorId: chatId,
+                      authorNickname: chat.name,
+                      commentText: action.replyText,
+                      timestamp: Date.now(),
+                      replyToId: action.commentId,
+                      replyToNickname: targetComment.authorNickname,
+                    };
+                    postToReply.comments.push(newReply);
+                    await db.weiboPosts.put(postToReply);
+                  }
+                }
+              }
+              if (action.type === "qzone_post") {
+                const newPost = {
+                  type: action.postType,
+                  content: action.content || "",
+                  publicText: action.publicText || "",
+                  hiddenContent: action.hiddenContent || "",
+                  timestamp: Date.now(),
+                  authorId: chatId,
+                  authorGroupId: chat.groupId,
+                  visibleGroupIds: null,
+                };
+                await db.qzonePosts.add(newPost);
+                updateUnreadIndicator(unreadPostsCount + 1);
+                console.log(`后台活动: 角色 "${chat.name}" 发布了动态`);
+              } else if (action.type === "qzone_comment") {
+                const post = await db.qzonePosts.get(parseInt(action.postId));
+                if (post) {
+                  if (!post.comments) post.comments = [];
+                  const newAiComment = {
+                    commenterName: action.commenterName || chat.name,
+                    text: action.commentText,
+                    timestamp: Date.now(),
+                  };
+                  if (action.replyTo) {
+                    newAiComment.replyTo = action.replyTo;
+                  }
+                  post.comments.push(newAiComment);
+                  await db.qzonePosts.update(post.id, {
+                    comments: post.comments,
+                  });
+                  updateUnreadIndicator(unreadPostsCount + 1);
+                  console.log(
+                    `后台活动: 角色 "${chat.name}" 评论了动态 #${post.id}`,
+                  );
+                }
+              } else if (action.type === "qzone_like") {
+                const post = await db.qzonePosts.get(parseInt(action.postId));
+                if (post) {
+                  if (!post.likes) post.likes = [];
+                  if (!post.likes.includes(chat.name)) {
+                    post.likes.push(chat.name);
+                    await db.qzonePosts.update(post.id, { likes: post.likes });
+                    updateUnreadIndicator(unreadPostsCount + 1);
+                    console.log(
+                      `后台活动: 角色 "${chat.name}" 点赞了动态 #${post.id}`,
+                    );
+                  }
+                }
+              } else if (action.type === "video_call_request") {
+                if (
+                  !videoCallState.isActive &&
+                  !videoCallState.isAwaitingResponse
+                ) {
+                  videoCallState.isAwaitingResponse = true;
+                  videoCallState.activeChatId = chatId;
+                  showIncomingCallModal(chatId);
+                  console.log(
+                    `后台活动: 角色 "${chat.name}" 发起了视频通话请求`,
+                  );
+                }
+              }
+              // added by lrq 251104 添加心声记录
+              if (action.type === "innervoice") {
+                const innerVoiceData = action;
+                console.log(
+                  "解析成功：已成功捕获到心声(innerVoice)数据。",
+                  innerVoiceData,
+                );
+                const newInnerVoice = innerVoiceData;
+                newInnerVoice.timestamp = Date.now();
+                chat.latestInnerVoice = newInnerVoice;
+                if (!chat.innerVoiceHistory) {
+                  chat.innerVoiceHistory = [];
+                }
+                chat.latestInnerVoice.clothing =
+                  chat.latestInnerVoice.clothing || "...";
+                chat.latestInnerVoice.behavior =
+                  chat.latestInnerVoice.behavior || "...";
+                chat.latestInnerVoice.thoughts =
+                  chat.latestInnerVoice.thoughts || "...";
+                chat.latestInnerVoice.naughtyThoughts =
+                  chat.latestInnerVoice.naughtyThoughts || "...";
+
+                chat.innerVoiceHistory.push(newInnerVoice);
+              }
+            }
+          } catch (error) {
+            console.error(`角色 "${chat.name}" 的独立行动失败:`, error);
+          }
+        }
+
+        /**
+         * 将用户自定义的CSS安全地应用到指定的作用域
+         * @param {string} cssString 用户输入的原始CSS字符串
+         * @param {string} scopeId 应用样式的作用域ID (例如 '#chat-messages' 或 '#settings-preview-area')
+         * @param {string} styleTagId 要操作的 <style> 标签的ID
+         */
+        function applyScopedCss(cssString, scopeId, styleTagId) {
+          const styleTag = document.getElementById(styleTagId);
+          if (!styleTag) return;
+
+          if (!cssString || cssString.trim() === "") {
+            styleTag.innerHTML = "";
+            return;
+          }
+
+          // 增强作用域处理函数 - 专门解决.user和.ai样式冲突问题
+          const scopedCss = cssString
+            .replace(
+              /\s*\.message-bubble\.user\s+([^{]+\{)/g,
+              `${scopeId} .message-bubble.user $1`,
+            )
+            .replace(
+              /\s*\.message-bubble\.ai\s+([^{]+\{)/g,
+              `${scopeId} .message-bubble.ai $1`,
+            )
+            .replace(
+              /\s*\.message-bubble\s+([^{]+\{)/g,
+              `${scopeId} .message-bubble $1`,
+            );
+
+          styleTag.innerHTML = scopedCss;
+        }
+
+        function updateSettingsPreview() {
+          if (!state.activeChatId) return;
+          const chat = state.chats[state.activeChatId];
+          const previewArea = document.getElementById("settings-preview-area");
+          if (!previewArea) return;
+
+          // 1. 获取当前设置的值
+          const selectedTheme =
+            document.querySelector('input[name="theme-select"]:checked')
+              ?.value || "default";
+          const fontSize = document.getElementById("font-size-slider").value;
+          const customCss = document.getElementById("custom-css-input").value;
+          const background = chat.settings.background; // 直接获取背景设置
+
+          // 2. 更新预览区的基本样式
+          previewArea.dataset.theme = selectedTheme;
+          previewArea.style.setProperty("--chat-font-size", `${fontSize}px`);
+
+          // --- 直接更新预览区的背景样式 ---
+          if (background && background.startsWith("data:image")) {
+            previewArea.style.backgroundImage = `url(${background})`;
+            previewArea.style.backgroundColor = "transparent"; // 如果有图片，背景色设为透明
+          } else {
+            previewArea.style.backgroundImage = "none"; // 如果没有图片，移除图片背景
+            // 如果背景是颜色值或渐变（非图片），则直接应用
+            previewArea.style.background = background || "#f0f2f5";
+          }
+
+          // 3. 渲染模拟气泡
+          previewArea.innerHTML = "";
+
+          // 创建“对方”的气泡
+          // 注意：我们将一个虚拟的 timestamp 传入，以防有CSS依赖于它
+          const aiMsg = {
+            role: "ai",
+            content: "对方消息预览",
+            timestamp: 1,
+            senderName: chat.name,
+          };
+          const aiBubble = createMessageElement(aiMsg, chat);
+          if (aiBubble) previewArea.appendChild(aiBubble);
+
+          // 创建“我”的气泡
+          const userMsg = {
+            role: "user",
+            content: "我的消息预览",
+            timestamp: 2,
+          };
+          const userBubble = createMessageElement(userMsg, chat);
+          if (userBubble) previewArea.appendChild(userBubble);
+
+          // 4. 应用自定义CSS到预览区
+          applyScopedCss(
+            customCss,
+            "#settings-preview-area",
+            "preview-bubble-style",
+          );
+        }
+
+        async function openGroupManager() {
+          await renderGroupList();
+          document
+            .getElementById("group-management-modal")
+            .classList.add("visible");
+        }
+
+        async function renderGroupList() {
+          const listEl = document.getElementById("existing-groups-list");
+          const groups = await db.qzoneGroups.toArray();
+          listEl.innerHTML = "";
+          if (groups.length === 0) {
+            listEl.innerHTML =
+              '<p style="text-align: center; color: var(--text-secondary);">还没有任何分组</p>';
+          }
+          groups.forEach((group) => {
+            const item = document.createElement("div");
+            item.className = "existing-group-item";
+            item.innerHTML = `
+			            <span class="group-name">${group.name}</span>
+			            <span class="delete-group-btn" data-id="${group.id}">×</span>
+			        `;
+            listEl.appendChild(item);
+          });
+        }
+
+        async function addNewGroup() {
+          const input = document.getElementById("new-group-name-input");
+          const name = input.value.trim();
+          if (!name) {
+            alert("分组名不能为空！");
+            return;
+          }
+
+          // 在添加前，先检查分组名是否已存在
+          const existingGroup = await db.qzoneGroups
+            .where("name")
+            .equals(name)
+            .first();
+          if (existingGroup) {
+            alert(`分组 "${name}" 已经存在了，换个名字吧！`);
+            return;
+          }
+
+          await db.qzoneGroups.add({ name });
+          input.value = "";
+          await renderGroupList();
+        }
+
+        async function deleteGroup(groupId) {
+          const confirmed = await showCustomConfirm(
+            "确认删除",
+            "删除分组后，该组内的好友将变为“未分组”。确定要删除吗？",
+            { confirmButtonClass: "btn-danger" },
+          );
+          if (confirmed) {
+            await db.qzoneGroups.delete(groupId);
+            // 将属于该分组的好友的 groupId 设为 null
+            const chatsToUpdate = await db.chats
+              .where("groupId")
+              .equals(groupId)
+              .toArray();
+            for (const chat of chatsToUpdate) {
+              chat.groupId = null;
+              await db.chats.put(chat);
+              if (state.chats[chat.id]) state.chats[chat.id].groupId = null;
+            }
+            await renderGroupList();
+          }
+        }
+        /**
+         * 当长按消息时，显示操作菜单
+         * @param {number} timestamp - 被长按消息的时间戳
+         */
+        function showMessageActions(timestamp) {
+          // 如果已经在多选模式，则不弹出菜单
+          if (isSelectionMode) return;
+
+          activeMessageTimestamp = timestamp;
+
+          // --- 新增逻辑开始 ---
+          const chat = state.chats[state.activeChatId];
+          const message = chat.history.find((m) => m.timestamp === timestamp);
+          const rerollNaiBtn = document.getElementById("reroll-nai-btn");
+
+          // 检查消息类型是否为 naiimag
+          if (
+            message &&
+            (message.type === "naiimag" ||
+              (message.type === "qzone_post" && message.postType === "naiimag"))
+          ) {
+            rerollNaiBtn.style.display = "block";
+          } else {
+            rerollNaiBtn.style.display = "none";
+          }
+          // --- 新增逻辑结束 ---
+
+          document
+            .getElementById("message-actions-modal")
+            .classList.add("visible");
+        }
+        /**
+         * 处理 NAI 图片重绘
+         */
+        async function handleNaiReroll() {
+          if (!activeMessageTimestamp || !state.activeChatId) return;
+
+          const chat = state.chats[state.activeChatId];
+          const msgIndex = chat.history.findIndex(
+            (m) => m.timestamp === activeMessageTimestamp,
+          );
+          if (msgIndex === -1) return;
+
+          const message = chat.history[msgIndex];
+
+          // 关闭菜单
+          hideMessageActions();
+
+          // 获取提示词 (优先使用保存的完整提示词 fullPrompt，如果没有则重新构建)
+          let finalPositivePrompt = message.fullPrompt;
+          if (!finalPositivePrompt) {
+            const naiPrompts = getCharacterNAIPrompts(chat.id);
+            const aiPrompt = message.prompt || "a beautiful scene";
+            finalPositivePrompt = aiPrompt + ", " + naiPrompts.positive;
+          }
+
+          // 获取负面提示词
+          const naiPrompts = getCharacterNAIPrompts(chat.id);
+          const finalNegativePrompt = naiPrompts.negative;
+
+          // 获取设置
+          const apiKey = localStorage.getItem("novelai-api-key");
+          const model =
+            localStorage.getItem("novelai-model") || "nai-diffusion-4-5-full";
+          const settings = getNovelAISettings();
+
+          if (!apiKey) {
+            alert("请先配置 NovelAI API Key！");
+            return;
+          }
+
+          // 显示加载提示
+          await showCustomAlert(
+            "正在重绘...",
+            "正在重新连接 NovelAI 生成图片，请稍候...",
+          );
+
+          try {
+            const [width, height] = settings.resolution.split("x").map(Number);
+            let requestBody;
+
+            // 构建请求体 (逻辑与你原有的 generateNovelAIImage 一致)
+            // 这里为了简洁，提取关键构建逻辑
+            const commonParams = {
+              width,
+              height,
+              scale: settings.cfg_scale,
+              sampler: settings.sampler,
+              steps: settings.steps,
+              seed: Math.floor(Math.random() * 4294967295), // 关键：重绘必须用随机种子
+              n_samples: 1,
+              ucPreset: settings.uc_preset,
+              qualityToggle: settings.quality_toggle,
+            };
+
+            if (model.includes("nai-diffusion-4")) {
+              requestBody = {
+                input: finalPositivePrompt,
+                model: model,
+                action: "generate",
+                parameters: {
+                  ...commonParams,
+                  params_version: 3,
+                  negative_prompt: finalNegativePrompt,
+                  v4_prompt: {
+                    caption: {
+                      base_caption: finalPositivePrompt,
+                      char_captions: [],
+                    },
+                    use_coords: false,
+                    use_order: true,
+                  },
+                  v4_negative_prompt: {
+                    caption: {
+                      base_caption: finalNegativePrompt,
+                      char_captions: [],
+                    },
+                    legacy_uc: false,
+                  },
+                },
+              };
+            } else {
+              requestBody = {
+                input: finalPositivePrompt,
+                model: model,
+                action: "generate",
+                parameters: {
+                  ...commonParams,
+                  negative_prompt: finalNegativePrompt,
+                  sm: settings.smea,
+                  sm_dyn: settings.smea_dyn,
+                  add_original_image: false,
+                },
+              };
+            }
+
+            let apiUrl = model.includes("nai-diffusion-4")
+              ? "https://image.novelai.net/ai/generate-image-stream"
+              : "https://image.novelai.net/ai/generate-image";
+            let corsProxy =
+              settings.cors_proxy === "custom"
+                ? settings.custom_proxy_url
+                : settings.cors_proxy;
+            if (corsProxy) apiUrl = corsProxy + encodeURIComponent(apiUrl);
+
+            // Chrome 兼容头
+            const isChrome =
+              /Chrome/.test(navigator.userAgent) &&
+              !/Edg/.test(navigator.userAgent);
+            let headers = {
+              "Content-Type": "application/json",
+              Authorization: "Bearer " + apiKey,
+            };
+            if (isChrome) {
+              const cleanHeaders = {};
+              for (const [k, v] of Object.entries(headers))
+                cleanHeaders[k] = v.replace(/[^\x00-\xFF]/g, "");
+              headers = cleanHeaders;
+            }
+
+            const res = await fetch(apiUrl, {
+              method: "POST",
+              headers,
+              body: JSON.stringify(requestBody),
+            });
+            if (!res.ok) throw new Error(`NAI API Error: ${res.status}`);
+
+            // 解析结果 (复用你的解析逻辑)
+            const contentType = res.headers.get("content-type");
+            let imageDataUrl = null;
+            let zipBlob = null;
+
+            if (contentType && contentType.includes("text/event-stream")) {
+              const text = await res.text();
+              const lines = text.trim().split("\n");
+              for (let i = lines.length - 1; i >= 0; i--) {
+                const line = lines[i].trim();
+                if (line.startsWith("data: ") && line !== "data: [DONE]") {
+                  const dataContent = line.substring(6);
+                  try {
+                    const jsonData = JSON.parse(dataContent);
+                    if (
+                      (jsonData.event_type === "final" && jsonData.image) ||
+                      jsonData.data ||
+                      jsonData.image
+                    ) {
+                      const base64Data = jsonData.image || jsonData.data;
+                      const isPNG = base64Data.startsWith("iVBORw0KGgo");
+                      const binaryString = atob(base64Data);
+                      const bytes = new Uint8Array(binaryString.length);
+                      for (let j = 0; j < binaryString.length; j++)
+                        bytes[j] = binaryString.charCodeAt(j);
+                      const blobType = isPNG ? "image/png" : "image/jpeg";
+                      const imageBlob = new Blob([bytes], { type: blobType });
+                      const reader = new FileReader();
+                      imageDataUrl = await new Promise((r) => {
+                        reader.onloadend = () => r(reader.result);
+                        reader.readAsDataURL(imageBlob);
+                      });
+                      break;
+                    }
+                  } catch (e) {}
+                }
+              }
+            } else {
+              zipBlob = await res.blob();
+            }
+
+            if (!imageDataUrl && zipBlob) {
+              if (typeof JSZip === "undefined")
+                throw new Error("JSZip库未加载");
+              const zip = await JSZip.loadAsync(zipBlob);
+              const file = Object.values(zip.files)[0];
+              if (file) {
+                const imgBlob = await file.async("blob");
+                const reader = new FileReader();
+                imageDataUrl = await new Promise((r) => {
+                  reader.onloadend = () => r(reader.result);
+                  reader.readAsDataURL(imgBlob);
+                });
+              }
+            }
+
+            if (imageDataUrl) {
+              // *** 核心：更新原来的消息 ***
+              message.imageUrl = imageDataUrl;
+
+              // 保存数据库
+              await db.chats.put(chat);
+
+              // 隐藏遮罩
+              document
+                .getElementById("custom-modal-overlay")
+                .classList.remove("visible"); // 假设 showCustomAlert 使用的是这个
+
+              // 刷新界面
+              renderChatInterface(state.activeChatId);
+
+              // 提示成功
+              // alert('图片重绘成功！'); // 可选，因为看到图片变了就知道成功了
+            } else {
+              throw new Error("未解析到图片数据");
+            }
+          } catch (error) {
+            console.error("重绘失败:", error);
+            document
+              .getElementById("custom-modal-overlay")
+              .classList.remove("visible");
+            alert(`重绘失败: ${error.message}`);
+          }
+        }
+
+        /**
+         * 隐藏消息操作菜单
+         */
+        function hideMessageActions() {
+          document
+            .getElementById("message-actions-modal")
+            .classList.remove("visible");
+          activeMessageTimestamp = null;
+        }
+
+        async function openMessageEditor() {
+          if (!activeMessageTimestamp) return;
+
+          const timestampToEdit = activeMessageTimestamp;
+          const chat = state.chats[state.activeChatId];
+          const message = chat.history.find(
+            (m) => m.timestamp === timestampToEdit,
+          );
+          if (!message) return;
+
+          hideMessageActions();
+
+          let contentForEditing;
+          const isSpecialType =
+            message.type &&
+            [
+              "voice_message",
+              "ai_image",
+              "transfer",
+              "share_link",
+              "borrow_money_request",
+            ].includes(message.type);
+
+          if (isSpecialType) {
+            if (message.type === "borrow_money_request") {
+              // ★★★ 这就是我们新增的核心逻辑！ ★★★
+              // 当编辑的是借钱卡片时，我们从 payload 中提取数据并拼接成你想要的文本格式
+              const payload = message.payload;
+              contentForEditing = `向你借钱${payload.amount}元，用于${payload.reason}`;
+            } else {
+              // 其他特殊类型的处理逻辑保持不变
+              let fullMessageObject = { type: message.type };
+              if (message.type === "voice_message")
+                fullMessageObject.content = message.content;
+              else if (message.type === "ai_image")
+                fullMessageObject.description = message.content;
+              else if (message.type === "transfer") {
+                fullMessageObject.amount = message.amount;
+                fullMessageObject.note = message.note;
+              } else if (message.type === "share_link") {
+                fullMessageObject.title = message.title;
+                fullMessageObject.description = message.description;
+                fullMessageObject.source_name = message.source_name;
+                fullMessageObject.content = message.content;
+              }
+              contentForEditing = JSON.stringify(fullMessageObject, null, 2);
+            }
+          } else if (typeof message.content === "object") {
+            contentForEditing = JSON.stringify(message.content, null, 2);
+          } else {
+            contentForEditing = message.content;
+          }
+
+          const templates = {
+            voice: { type: "voice_message", content: "在这里输入语音内容" },
+            image: { type: "ai_image", description: "在这里输入图片描述" },
+            transfer: { type: "transfer", amount: 5.2, note: "一点心意" },
+            link: {
+              type: "share_link",
+              title: "文章标题",
+              description: "文章摘要...",
+              source_name: "来源网站",
+              content: "文章完整内容...",
+            },
+          };
+
+          const helpersHtml = `
+			        <div class="format-helpers">
+			            <button class="format-btn" data-template='${JSON.stringify(templates.voice)}'>语音</button>
+			            <button class="format-btn" data-template='${JSON.stringify(templates.image)}'>图片</button>
+			            <button class="format-btn" data-template='${JSON.stringify(templates.transfer)}'>转账</button>
+			            <button class="format-btn" data-template='${JSON.stringify(templates.link)}'>链接</button>
+			        </div>
+			    `;
+
+          const newContent = await showCustomPrompt(
+            "编辑消息",
+            "在此修改，或点击上方按钮使用格式模板...",
+            contentForEditing,
+            "textarea",
+            helpersHtml,
+          );
+
+          if (newContent !== null) {
+            await saveEditedMessage(timestampToEdit, newContent);
+          }
+        }
+
+        /**
+         * 复制消息的文本内容到剪贴板
+         */
+        async function copyMessageContent() {
+          if (!activeMessageTimestamp) return;
+          const chat = state.chats[state.activeChatId];
+          const message = chat.history.find(
+            (m) => m.timestamp === activeMessageTimestamp,
+          );
+          if (!message) return;
+
+          let textToCopy;
+          if (typeof message.content === "object") {
+            textToCopy = JSON.stringify(message.content);
+          } else {
+            textToCopy = String(message.content);
+          }
+
+          try {
+            await navigator.clipboard.writeText(textToCopy);
+            await showCustomAlert("复制成功", "消息内容已复制到剪贴板。");
+          } catch (err) {
+            await showCustomAlert("复制失败", "无法访问剪贴板。");
+          }
+
+          hideMessageActions();
+        }
+
+        /**
+         * 创建一个可编辑的消息块（包含文本框、格式助手和删除按钮）
+         * @param {string} initialContent - 文本框的初始内容
+         * @returns {HTMLElement} - 创建好的DOM元素
+         */
+        function createMessageEditorBlock(initialContent = "") {
+          const block = document.createElement("div");
+          block.className = "message-editor-block";
+
+          // 添加 'link' 模板
+          const templates = {
+            voice: { type: "voice_message", content: "在这里输入语音内容" },
+            image: { type: "ai_image", description: "在这里输入图片描述" },
+            transfer: { type: "transfer", amount: 5.2, note: "一点心意" },
+            link: {
+              type: "share_link",
+              title: "文章标题",
+              description: "文章摘要...",
+              source_name: "来源网站",
+              content: "文章完整内容...",
+            },
+          };
+
+          block.innerHTML = `
+			        <button class="delete-block-btn" title="删除此条">×</button>
+			        <textarea>${initialContent}</textarea>
+			        <div class="format-helpers">
+			            <button class="format-btn" data-template='${JSON.stringify(templates.voice)}'>语音</button>
+			            <button class="format-btn" data-template='${JSON.stringify(templates.image)}'>图片</button>
+			            <button class="format-btn" data-template='${JSON.stringify(templates.transfer)}'>转账</button>
+			            
+			            <button class="format-btn" data-template='${JSON.stringify(templates.link)}'>链接</button>
+			        </div>
+			    `;
+
+          // 绑定删除按钮事件
+          block
+            .querySelector(".delete-block-btn")
+            .addEventListener("click", () => {
+              // 确保至少保留一个编辑块
+              if (
+                document.querySelectorAll(".message-editor-block").length > 1
+              ) {
+                block.remove();
+              } else {
+                alert("至少需要保留一条消息。");
+              }
+            });
+
+          // 绑定格式助手按钮事件
+          block.querySelectorAll(".format-btn").forEach((btn) => {
+            btn.addEventListener("click", () => {
+              const templateStr = btn.dataset.template;
+              const textarea = block.querySelector("textarea");
+              if (templateStr && textarea) {
+                try {
+                  const templateObj = JSON.parse(templateStr);
+                  textarea.value = JSON.stringify(templateObj, null, 2);
+                  textarea.focus();
+                } catch (e) {
+                  console.error("解析格式模板失败:", e);
+                }
+              }
+            });
+          });
+
+          return block;
+        }
+
+        /**
+         * 打开全新的、可视化的多消息编辑器，并动态绑定其所有按钮事件
+         */
+        function openAdvancedMessageEditor() {
+          if (!activeMessageTimestamp) return;
+
+          // 1. 在关闭旧菜单前，将需要的时间戳捕获到局部变量中
+          const timestampToEdit = activeMessageTimestamp;
+
+          const chat = state.chats[state.activeChatId];
+          const message = chat.history.find(
+            (m) => m.timestamp === timestampToEdit,
+          );
+          if (!message) return;
+
+          // 2. 现在可以安全地关闭旧菜单了，因为它不会影响我们的局部变量
+          hideMessageActions();
+
+          const editorModal = document.getElementById("message-editor-modal");
+          const editorContainer = document.getElementById(
+            "message-editor-container",
+          );
+          editorContainer.innerHTML = "";
+
+          // 3. 准备初始内容
+          let initialContent;
+          const isSpecialType =
+            message.type &&
+            ["voice_message", "ai_image", "transfer"].includes(message.type);
+          if (isSpecialType) {
+            let fullMessageObject = { type: message.type };
+            if (message.type === "voice_message")
+              fullMessageObject.content = message.content;
+            else if (message.type === "ai_image")
+              fullMessageObject.description = message.content;
+            else if (message.type === "transfer") {
+              fullMessageObject.amount = message.amount;

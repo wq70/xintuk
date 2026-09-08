@@ -1,0 +1,891 @@
+                `确定要删除这条评论吗？\n\n“${commentText.substring(0, 50)}...”`,
+                { confirmButtonClass: "btn-danger" },
+              );
+              if (confirmed) {
+                post.comments.splice(commentIndex, 1);
+                await db.qzonePosts.update(postId, { comments: post.comments });
+                await renderQzonePosts();
+                alert("评论已删除。");
+              }
+              return;
+            }
+
+            if (target.classList.contains("post-actions-btn")) {
+              const container = target.closest(".qzone-post-container");
+              if (container && container.dataset.postId)
+                showPostActions(parseInt(container.dataset.postId));
+              return;
+            }
+
+            if (target.closest(".qzone-post-delete-action")) {
+              const container = target.closest(
+                ".qzone-post-delete-action",
+              ).parentElement;
+              if (!container) return;
+              const postIdToDelete = parseInt(container.dataset.postId);
+              if (isNaN(postIdToDelete)) return;
+              const confirmed = await showCustomConfirm(
+                "删除动态",
+                "确定要永久删除这条动态吗？",
+                {
+                  confirmButtonClass: "btn-danger",
+                },
+              );
+              if (confirmed) {
+                container.style.transition = "all 0.3s ease";
+                container.style.transform = "scale(0.8)";
+                container.style.opacity = "0";
+                setTimeout(async () => {
+                  await db.qzonePosts.delete(postIdToDelete);
+                  const notificationIdentifier = `(ID: ${postIdToDelete})`;
+                  for (const chatId in state.chats) {
+                    const chat = state.chats[chatId];
+                    const originalHistoryLength = chat.history.length;
+                    chat.history = chat.history.filter(
+                      (msg) =>
+                        !(
+                          msg.role === "system" &&
+                          msg.content.includes(notificationIdentifier)
+                        ),
+                    );
+                    if (chat.history.length < originalHistoryLength)
+                      await db.chats.put(chat);
+                  }
+                  await renderQzonePosts();
+                  alert("动态已删除。");
+                }, 300);
+              }
+              return;
+            }
+
+            if (target.tagName === "IMG" && target.dataset.hiddenText) {
+              showCustomAlert(
+                "图片内容",
+                target.dataset.hiddenText.replace(/<br>/g, "\n"),
+              );
+              return;
+            }
+            const icon = target.closest(".action-icon");
+            if (icon) {
+              const postContainer = icon.closest(".qzone-post-container");
+              if (!postContainer) return;
+              const postId = parseInt(postContainer.dataset.postId);
+              if (isNaN(postId)) return;
+              if (icon.classList.contains("like")) {
+                const post = await db.qzonePosts.get(postId);
+                if (!post) return;
+                if (!post.likes) post.likes = [];
+                const userNickname = state.qzoneSettings.nickname;
+                const userLikeIndex = post.likes.indexOf(userNickname);
+                if (userLikeIndex > -1) {
+                  post.likes.splice(userLikeIndex, 1);
+                } else {
+                  post.likes.push(userNickname);
+                  icon.classList.add("animate-like");
+                  icon.addEventListener(
+                    "animationend",
+                    () => icon.classList.remove("animate-like"),
+                    { once: true },
+                  );
+                }
+                await db.qzonePosts.update(postId, { likes: post.likes });
+              }
+              if (icon.classList.contains("favorite")) {
+                const existingFavorite = await db.favorites
+                  .where({ type: "qzone_post", "content.id": postId })
+                  .first();
+                if (existingFavorite) {
+                  await db.favorites.delete(existingFavorite.id);
+                  await showCustomAlert("提示", "已取消收藏");
+                } else {
+                  const postToSave = await db.qzonePosts.get(postId);
+                  if (postToSave) {
+                    await db.favorites.add({
+                      type: "qzone_post",
+                      content: postToSave,
+                      timestamp: Date.now(),
+                    });
+                    await showCustomAlert("提示", "收藏成功！");
+                  }
+                }
+              }
+              await renderQzonePosts();
+              return;
+            }
+
+            // 处理评论发送逻辑
+            const sendBtn = target.closest(".comment-send-btn");
+            if (sendBtn) {
+              const postContainer = sendBtn.closest(".qzone-post-container");
+              if (!postContainer) return;
+              const postId = parseInt(postContainer.dataset.postId);
+              const commentInput =
+                postContainer.querySelector(".comment-input");
+              const commentText = commentInput.value.trim();
+              if (!commentText) return alert("评论内容不能为空哦！");
+              const post = await db.qzonePosts.get(postId);
+              if (!post) return;
+              if (!post.comments) post.comments = [];
+
+              // 创建新的评论对象
+              const newComment = {
+                commenterName: state.qzoneSettings.nickname,
+                text: commentText,
+                timestamp: Date.now(),
+              };
+
+              // 检查是不是在回复模式
+              if (commentInput.dataset.replyTo) {
+                newComment.replyTo = commentInput.dataset.replyTo; // 如果是，就把回复对象的名字加上
+              }
+
+              post.comments.push(newComment);
+              await db.qzonePosts.update(postId, { comments: post.comments });
+              for (const chatId in state.chats) {
+                const chat = state.chats[chatId];
+                if (!chat.isGroup) {
+                  let aiNotification = `[系统提示：'${state.qzoneSettings.nickname}' 在ID为${postId}的动态下发表了评论：“${commentText}”`;
+                  if (newComment.replyTo) {
+                    aiNotification += ` (这是对'${newComment.replyTo}'的回复)`;
+                  }
+                  aiNotification += `]`;
+                  chat.history.push({
+                    role: "system",
+                    content: aiNotification,
+                    timestamp: Date.now(),
+                    isHidden: true,
+                  });
+                  await db.chats.put(chat);
+                }
+              }
+
+              // 发送后，重置输入框状态
+              commentInput.value = "";
+              commentInput.placeholder = "友善的评论是交流的起点";
+              delete commentInput.dataset.replyTo; // 清除回复状态
+
+              await renderQzonePosts();
+              return;
+            }
+          });
+
+          // 绑定动态页和收藏页的返回按钮
+          document
+            .getElementById("qzone-back-btn")
+            .addEventListener("click", () =>
+              switchToChatListView("messages-view"),
+            );
+          document
+            .getElementById("favorites-back-btn")
+            .addEventListener("click", () =>
+              switchToChatListView("messages-view"),
+            );
+
+          // 收藏页搜索功能
+          const searchInput = document.getElementById("favorites-search-input");
+          const searchClearBtn = document.getElementById(
+            "favorites-search-clear-btn",
+          );
+
+          searchInput.addEventListener("input", () => {
+            const searchTerm = searchInput.value.trim().toLowerCase();
+
+            // 控制清除按钮的显示/隐藏
+            searchClearBtn.style.display = searchTerm ? "block" : "none";
+
+            if (!searchTerm) {
+              displayFilteredFavorites(allFavoriteItems); // 如果搜索框为空，显示所有
+              return;
+            }
+
+            // 筛选逻辑
+            const filteredItems = allFavoriteItems.filter((item) => {
+              let contentToSearch = "";
+              let authorToSearch = "";
+
+              if (item.type === "qzone_post") {
+                const post = item.content;
+                contentToSearch +=
+                  (post.publicText || "") + " " + (post.content || "");
+                if (post.authorId === "user") {
+                  authorToSearch = state.qzoneSettings.nickname;
+                } else if (state.chats[post.authorId]) {
+                  authorToSearch = state.chats[post.authorId].name;
+                }
+              } else if (item.type === "chat_message") {
+                const msg = item.content;
+                if (typeof msg.content === "string") {
+                  contentToSearch = msg.content;
+                }
+                const chat = state.chats[item.chatId];
+                if (chat) {
+                  if (msg.role === "user") {
+                    authorToSearch = chat.isGroup
+                      ? chat.settings.myNickname || "我"
+                      : "我";
+                  } else {
+                    authorToSearch = chat.isGroup ? msg.senderName : chat.name;
+                  }
+                }
+              }
+
+              // 同时搜索内容和作者，并且不区分大小写
+              return (
+                contentToSearch.toLowerCase().includes(searchTerm) ||
+                authorToSearch.toLowerCase().includes(searchTerm)
+              );
+            });
+
+            displayFilteredFavorites(filteredItems);
+          });
+
+          // 清除按钮的点击事件
+          searchClearBtn.addEventListener("click", () => {
+            searchInput.value = "";
+            searchClearBtn.style.display = "none";
+            displayFilteredFavorites(allFavoriteItems);
+            searchInput.focus();
+          });
+
+          // 为聊天界面的批量收藏按钮绑定事件
+          // 为聊天界面的批量收藏按钮绑定事件 (已修正)
+          document
+            .getElementById("selection-favorite-btn")
+            .addEventListener("click", async () => {
+              if (selectedMessages.size === 0) return;
+              const chat = state.chats[state.activeChatId];
+              if (!chat) return;
+
+              const favoritesToAdd = [];
+              const timestampsToFavorite = [...selectedMessages];
+
+              for (const timestamp of timestampsToFavorite) {
+                // 使用新的、高效的索引进行查询
+                const existing = await db.favorites
+                  .where("originalTimestamp")
+                  .equals(timestamp)
+                  .first();
+
+                if (!existing) {
+                  const messageToSave = chat.history.find(
+                    (msg) => msg.timestamp === timestamp,
+                  );
+                  if (messageToSave) {
+                    favoritesToAdd.push({
+                      type: "chat_message",
+                      content: messageToSave,
+                      chatId: state.activeChatId,
+                      timestamp: Date.now(), // 这是收藏操作发生的时间
+                      originalTimestamp: messageToSave.timestamp, // 保存原始消息的时间戳到新字段
+                    });
+                  }
+                }
+              }
+
+              if (favoritesToAdd.length > 0) {
+                await db.favorites.bulkAdd(favoritesToAdd);
+                allFavoriteItems = await db.favorites
+                  .orderBy("timestamp")
+                  .reverse()
+                  .toArray(); // 更新全局收藏缓存
+                await showCustomAlert(
+                  "收藏成功",
+                  `已成功收藏 ${favoritesToAdd.length} 条消息。`,
+                );
+              } else {
+                await showCustomAlert("提示", "选中的消息均已收藏过。");
+              }
+
+              exitSelectionMode();
+            });
+
+          // 收藏页面的"编辑"按钮事件 (已修正)
+          const favoritesEditBtn =
+            document.getElementById("favorites-edit-btn");
+          const favoritesView = document.getElementById("favorites-view");
+          const favoritesActionBar = document.getElementById(
+            "favorites-action-bar",
+          );
+          const mainBottomNav = document.getElementById("chat-list-bottom-nav"); // 获取主导航栏
+          const favoritesList = document.getElementById("favorites-list"); // 获取收藏列表
+
+          favoritesEditBtn.addEventListener("click", () => {
+            isFavoritesSelectionMode = !isFavoritesSelectionMode;
+            favoritesView.classList.toggle(
+              "selection-mode",
+              isFavoritesSelectionMode,
+            );
+
+            if (isFavoritesSelectionMode) {
+              // --- 进入编辑模式 ---
+              favoritesEditBtn.textContent = "完成";
+              favoritesActionBar.style.display = "block"; // 显示删除操作栏
+              mainBottomNav.style.display = "none"; // ▼ 新增：隐藏主导航栏
+              favoritesList.style.paddingBottom = "80px"; // ▼ 新增：给列表底部增加空间
+            } else {
+              // --- 退出编辑模式 ---
+              favoritesEditBtn.textContent = "编辑";
+              favoritesActionBar.style.display = "none"; // 隐藏删除操作栏
+              mainBottomNav.style.display = "flex"; // ▼ 新增：恢复主导航栏
+              favoritesList.style.paddingBottom = ""; // ▼ 新增：恢复列表默认padding
+
+              // 退出时清空所有选择
+              selectedFavorites.clear();
+              document
+                .querySelectorAll(".favorite-item-card.selected")
+                .forEach((card) => card.classList.remove("selected"));
+              document.getElementById(
+                "favorites-delete-selected-btn",
+              ).textContent = `删除 (0)`;
+            }
+          });
+
+          // 收藏列表的点击选择事件 (事件委托)
+          document
+            .getElementById("favorites-list")
+            .addEventListener("click", (e) => {
+              const target = e.target;
+              const card = target.closest(".favorite-item-card");
+
+              // 处理文字图点击，这段逻辑要放在最前面，保证任何模式下都生效
+              if (target.tagName === "IMG" && target.dataset.hiddenText) {
+                const hiddenText = target.dataset.hiddenText;
+                showCustomAlert("图片内容", hiddenText.replace(/<br>/g, "\n"));
+                return; // 处理完就退出，不继续执行选择逻辑
+              }
+
+              // 如果不在选择模式，则不执行后续的选择操作
+              if (!isFavoritesSelectionMode) return;
+
+              // --- 以下是原有的选择逻辑，保持不变 ---
+              if (!card) return;
+
+              const favId = parseInt(card.dataset.favid);
+              if (isNaN(favId)) return;
+
+              // 切换选择状态
+              if (selectedFavorites.has(favId)) {
+                selectedFavorites.delete(favId);
+                card.classList.remove("selected");
+              } else {
+                selectedFavorites.add(favId);
+                card.classList.add("selected");
+              }
+
+              // 更新底部删除按钮的计数
+              document.getElementById(
+                "favorites-delete-selected-btn",
+              ).textContent = `删除 (${selectedFavorites.size})`;
+            });
+
+          // 收藏页面批量删除按钮事件
+          document
+            .getElementById("favorites-delete-selected-btn")
+            .addEventListener("click", async () => {
+              if (selectedFavorites.size === 0) return;
+
+              const confirmed = await showCustomConfirm(
+                "确认删除",
+                `确定要从收藏夹中移除这 ${selectedFavorites.size} 条内容吗？`,
+                { confirmButtonClass: "btn-danger" },
+              );
+
+              if (confirmed) {
+                const idsToDelete = [...selectedFavorites];
+                await db.favorites.bulkDelete(idsToDelete);
+                await showCustomAlert("删除成功", "选中的收藏已被移除。");
+
+                // 从前端缓存中也移除被删除的项
+                allFavoriteItems = allFavoriteItems.filter(
+                  (item) => !idsToDelete.includes(item.id),
+                );
+
+                // 使用更新后的缓存，立即重新渲染列表
+                displayFilteredFavorites(allFavoriteItems);
+
+                // 最后，再退出编辑模式
+                favoritesEditBtn.click(); // 模拟点击"完成"按钮来退出编辑模式
+              }
+            });
+
+          if (state.globalSettings.enableBackgroundActivity) {
+            startBackgroundSimulation();
+            console.log("后台活动模拟已自动启动。");
+          }
+
+          // 1. 监听主题选择
+          document
+            .querySelectorAll('input[name="theme-select"]')
+            .forEach((radio) => {
+              radio.addEventListener("change", updateSettingsPreview);
+            });
+
+          // 2. 监听字体大小滑块
+          const fontSizeSlider = document.getElementById("font-size-slider");
+          fontSizeSlider.addEventListener("input", () => {
+            // a. 实时更新数值显示
+            document.getElementById("font-size-value").textContent =
+              `${fontSizeSlider.value}px`;
+            // b. 更新预览
+            updateSettingsPreview();
+          });
+
+          // 3. 监听自定义CSS输入框
+          const customCssInputForPreview =
+            document.getElementById("custom-css-input");
+          customCssInputForPreview.addEventListener(
+            "input",
+            updateSettingsPreview,
+          );
+
+          // 4. 监听重置按钮
+          document
+            .getElementById("reset-theme-btn")
+            .addEventListener("click", () => {
+              document.getElementById("theme-default").checked = true;
+              updateSettingsPreview();
+            });
+
+          document
+            .getElementById("reset-custom-css-btn")
+            .addEventListener("click", () => {
+              document.getElementById("custom-css-input").value = "";
+              updateSettingsPreview();
+            });
+
+          document
+            .querySelectorAll('input[name="visibility"]')
+            .forEach((radio) => {
+              radio.addEventListener("change", function () {
+                const groupsContainer = document.getElementById(
+                  "post-visibility-groups",
+                );
+                if (this.value === "include" || this.value === "exclude") {
+                  groupsContainer.style.display = "block";
+                } else {
+                  groupsContainer.style.display = "none";
+                }
+              });
+            });
+
+          document
+            .getElementById("manage-groups-btn")
+            .addEventListener("click", openGroupManager);
+          document
+            .getElementById("close-group-manager-btn")
+            .addEventListener("click", () => {
+              document
+                .getElementById("group-management-modal")
+                .classList.remove("visible");
+              // 刷新聊天设置里的分组列表
+              const chatSettingsBtn =
+                document.getElementById("chat-settings-btn");
+              if (
+                document
+                  .getElementById("chat-settings-modal")
+                  .classList.contains("visible")
+              ) {
+                chatSettingsBtn.click(); // 再次点击以重新打开
+              }
+            });
+
+          document
+            .getElementById("add-new-group-btn")
+            .addEventListener("click", addNewGroup);
+          document
+            .getElementById("existing-groups-list")
+            .addEventListener("click", (e) => {
+              if (e.target.classList.contains("delete-group-btn")) {
+                const groupId = parseInt(e.target.dataset.id);
+                deleteGroup(groupId);
+              }
+            });
+
+          // 消息操作菜单的按钮事件
+          document
+            .getElementById("cancel-message-action-btn")
+            .addEventListener("click", hideMessageActions);
+          // 使用新的编辑器入口
+          document
+            .getElementById("edit-message-btn")
+            .addEventListener("click", openAdvancedMessageEditor);
+          document
+            .getElementById("reroll-nai-btn")
+            .addEventListener("click", handleNaiReroll);
+
+          document
+            .getElementById("copy-message-btn")
+            .addEventListener("click", copyMessageContent);
+
+          document
+            .getElementById("recall-message-btn")
+            .addEventListener("click", handleRecallClick);
+
+          document
+            .getElementById("select-message-btn")
+            .addEventListener("click", () => {
+              // 在关闭菜单前，先捕获时间戳
+              const timestampToSelect = activeMessageTimestamp;
+              hideMessageActions();
+              // 使用捕获到的值
+              if (timestampToSelect) {
+                enterSelectionMode(timestampToSelect);
+              }
+            });
+
+          // 动态操作菜单的按钮事件
+          document
+            .getElementById("edit-post-btn")
+            .addEventListener("click", openPostEditor);
+          document
+            .getElementById("copy-post-btn")
+            .addEventListener("click", copyPostContent);
+          document
+            .getElementById("cancel-post-action-btn")
+            .addEventListener("click", hidePostActions);
+
+          // 联系人选择器事件绑定
+          document
+            .getElementById("cancel-contact-picker-btn")
+            .addEventListener("click", () => {
+              showScreen("chat-list-screen");
+            });
+
+          document
+            .getElementById("contact-picker-list")
+            .addEventListener("click", (e) => {
+              const item = e.target.closest(".contact-picker-item");
+              if (!item) return;
+
+              const contactId = item.dataset.contactId;
+              item.classList.toggle("selected");
+
+              if (selectedContacts.has(contactId)) {
+                selectedContacts.delete(contactId);
+              } else {
+                selectedContacts.add(contactId);
+              }
+              updateContactPickerConfirmButton();
+            });
+
+          // 绑定“管理群成员”按钮事件
+          document
+            .getElementById("manage-members-btn")
+            .addEventListener("click", () => {
+              // 在切换屏幕前，先隐藏当前的聊天设置弹窗
+              document
+                .getElementById("chat-settings-modal")
+                .classList.remove("visible");
+              // 然后再打开成员管理屏幕
+              openMemberManagementScreen();
+            });
+
+          // 群成员管理功能事件绑定
+          document
+            .getElementById("back-from-member-management")
+            .addEventListener("click", () => {
+              showScreen("chat-interface-screen");
+              document.getElementById("chat-settings-btn").click();
+            });
+
+          document
+            .getElementById("add-existing-contact-btn")
+            .addEventListener("click", async () => {
+              // 从好友列表添加的事件
+              // 为“完成”按钮绑定“拉人入群”的逻辑
+              const confirmBtn = document.getElementById(
+                "confirm-contact-picker-btn",
+              );
+              // 使用克隆节点方法清除旧的事件监听器，防止重复绑定
+              const newConfirmBtn = confirmBtn.cloneNode(true);
+              confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+              newConfirmBtn.addEventListener("click", handleAddMembersToGroup);
+
+              await openContactPickerForAddMember();
+            });
+
+          document
+            .getElementById("create-new-member-btn")
+            .addEventListener("click", createNewMemberInGroup);
+
+          // 视频通话功能事件监听器
+
+          // 绑定单聊和群聊的发起按钮
+          document
+            .getElementById("video-call-btn")
+            .addEventListener("click", handleInitiateCall);
+          document
+            .getElementById("group-video-call-btn")
+            .addEventListener("click", handleInitiateCall);
+
+          // 绑定“挂断”按钮
+          document
+            .getElementById("hang-up-btn")
+            .addEventListener("click", endVideoCall);
+
+          // 绑定“取消呼叫”按钮
+          document
+            .getElementById("cancel-call-btn")
+            .addEventListener("click", () => {
+              videoCallState.isAwaitingResponse = false;
+              showScreen("chat-interface-screen");
+            });
+
+          // 绑定“加入通话”按钮
+          document
+            .getElementById("join-call-btn")
+            .addEventListener("click", handleUserJoinCall);
+
+          // 绑定来电请求的“拒绝”按钮
+          document
+            .getElementById("decline-call-btn")
+            .addEventListener("click", async () => {
+              stopRingtone();
+              hideIncomingCallModal();
+              const callerChatId = videoCallState.activeChatId; // 从专用信道获取来电者ID
+              if (!callerChatId) return;
+
+              const chat = state.chats[callerChatId];
+              if (!chat) return;
+
+              // 根据是否群聊，执行不同的拒绝逻辑
+              if (videoCallState.isGroupCall) {
+                // 对于群聊，拒绝=旁观，这个逻辑不变
+                videoCallState.isUserParticipating = false;
+                const systemNote = {
+                  role: "system",
+                  content: `[系统提示：用户拒绝了通话邀请，但你们可以自己开始。请你们各自决策是否加入。]`,
+                  timestamp: Date.now(),
+                  isHidden: true,
+                };
+                chat.history.push(systemNote);
+                await db.chats.put(chat);
+                await triggerAiResponse();
+              } else {
+                // 对于单聊，我们不再打扰用户当前界面，而是静默处理
+                const declineMessage = {
+                  role: "user",
+                  content: "我拒绝了你的视频通话请求。",
+                  timestamp: Date.now(),
+                  isHidden: true,
+                };
+                chat.history.push(declineMessage);
+                await db.chats.put(chat);
+
+                // 只通知，不切换屏幕
+                showNotification(callerChatId, "你已拒绝通话邀请。");
+                // 在后台为对方触发一个响应，让它知道自己被拒绝了
+                // 我们需要临时切换activeChatId来触发，然后再换回来
+                const originalActiveChatId = state.activeChatId;
+                state.activeChatId = callerChatId;
+                await triggerAiResponse();
+                state.activeChatId = originalActiveChatId;
+              }
+
+              // 清理状态
+              videoCallState.isAwaitingResponse = false;
+              videoCallState.activeChatId = null;
+            });
+
+          // 绑定来电请求的“接听”按钮
+          document
+            .getElementById("accept-call-btn")
+            .addEventListener("click", async () => {
+              stopRingtone();
+              hideIncomingCallModal();
+              const callerChatId = videoCallState.activeChatId;
+              if (!callerChatId) return;
+
+              // 在接听时真正改变全局状态，并打开通话界面
+              state.activeChatId = callerChatId; // <-- 在这里，我们才授权修改全局状态！
+
+              videoCallState.initiator = "ai";
+              videoCallState.isUserParticipating = true;
+
+              if (videoCallState.isGroupCall) {
+                const chat = state.chats[videoCallState.activeChatId];
+                const requester = chat.members.find(
+                  (m) => m.name === videoCallState.callRequester,
+                );
+                if (requester) {
+                  videoCallState.participants = [requester];
+                } else {
+                  videoCallState.participants = [];
+                }
+              }
+
+              startVideoCall(); // 启动通话界面
+            });
+
+          // 绑定用户在通话中发言的按钮
+          document
+            .getElementById("user-speak-btn")
+            .addEventListener("click", async () => {
+              if (!videoCallState.isActive) return;
+
+              // 在弹出输入框前，先找到并高亮用户头像
+              const userAvatar = document.querySelector(
+                '.participant-avatar-wrapper[data-participant-id="user"] .participant-avatar',
+              );
+              if (userAvatar) {
+                userAvatar.classList.add("speaking");
+              }
+
+              const userInput = await showCustomPrompt(
+                "你说",
+                "请输入你想说的话...",
+              );
+
+              // 无论用户是否输入，只要关闭输入框就移除高亮
+              if (userAvatar) {
+                userAvatar.classList.remove("speaking");
+              }
+
+              if (userInput && userInput.trim()) {
+                triggerAiInCallAction(userInput.trim());
+              }
+            });
+
+          // 回忆录相关事件绑定
+          // 1. 将“回忆”页签和它的视图连接起来
+          document
+            .querySelector('.nav-item[data-view="memories-view"]')
+            .addEventListener("click", () => {
+              // 在切换前，确保"收藏"页面的编辑模式已关闭
+              if (isFavoritesSelectionMode) {
+                document.getElementById("favorites-edit-btn").click();
+              }
+              switchToChatListView("memories-view");
+              renderMemoriesScreen(); // 点击时渲染
+            });
+
+          // 2. 绑定回忆录界面的返回按钮
+          document
+            .getElementById("memories-back-btn")
+            .addEventListener("click", () =>
+              switchToChatListView("messages-view"),
+            );
+
+          // 约定/倒计时功能事件绑定
+          document
+            .getElementById("add-countdown-btn")
+            .addEventListener("click", () => {
+              document
+                .getElementById("create-countdown-modal")
+                .classList.add("visible");
+            });
+          document
+            .getElementById("cancel-create-countdown-btn")
+            .addEventListener("click", () => {
+              document
+                .getElementById("create-countdown-modal")
+                .classList.remove("visible");
+            });
+          document
+            .getElementById("confirm-create-countdown-btn")
+            .addEventListener("click", async () => {
+              const title = document
+                .getElementById("countdown-title-input")
+                .value.trim();
+              const dateValue = document.getElementById(
+                "countdown-date-input",
+              ).value;
+
+              if (!title || !dateValue) {
+                alert("请填写完整的约定标题和日期！");
+                return;
+              }
+
+              const targetDate = new Date(dateValue);
+              if (isNaN(targetDate) || targetDate <= new Date()) {
+                alert("请输入一个有效的、未来的日期！");
+                return;
+              }
+
+              const newCountdown = {
+                chatId: null, // 用户创建的，不属于任何特定AI
+                authorName: "我",
+                description: title,
+                timestamp: Date.now(),
+                type: "countdown",
+                targetDate: targetDate.getTime(),
+              };
+
+              await db.memories.add(newCountdown);
+              document
+                .getElementById("create-countdown-modal")
+                .classList.remove("visible");
+              renderMemoriesScreen();
+            });
+
+          // 拉黑功能事件绑定
+          document
+            .getElementById("block-chat-btn")
+            .addEventListener("click", async () => {
+              if (
+                !state.activeChatId ||
+                state.chats[state.activeChatId].isGroup
+              )
+                return;
+
+              const chat = state.chats[state.activeChatId];
+              const confirmed = await showCustomConfirm(
+                "确认拉黑",
+                `确定要拉黑“${chat.name}”吗？拉黑后您将无法向其发送消息，直到您将Ta移出黑名单，或等待Ta重新申请好友。`,
+                { confirmButtonClass: "btn-danger" },
+              );
+
+              if (confirmed) {
+                chat.relationship.status = "blocked_by_user";
+                chat.relationship.blockedTimestamp = Date.now();
+
+                const hiddenMessage = {
+                  role: "system",
+                  content: `[系统提示：你刚刚被用户拉黑了。在对方解除拉黑之前，你无法再主动发起对话，也无法回应。]`,
+                  timestamp: Date.now() + 1,
+                  isHidden: true,
+                };
+                chat.history.push(hiddenMessage);
+
+                await db.chats.put(chat);
+
+                // 关闭设置弹窗，并刷新聊天界面
+                document
+                  .getElementById("chat-settings-modal")
+                  .classList.remove("visible");
+                renderChatInterface(state.activeChatId);
+                // 刷新聊天列表，可能会有UI变化
+                renderChatList();
+              }
+            });
+
+          document
+            .getElementById("chat-lock-overlay")
+            .addEventListener("click", async (e) => {
+              const chat = state.chats[state.activeChatId];
+              if (!chat) return;
+
+              if (e.target.id === "force-apply-check-btn") {
+                alert(
+                  "正在手动触发好友申请流程，请稍后...\n如果API调用成功，将弹出提示。如果失败，也会有错误提示。如果长时间无反应，说明AI可能决定暂时不申请。",
+                );
+                await triggerAiFriendApplication(chat.id);
+                renderChatInterface(chat.id);
+                return;
+              }
+
+              if (e.target.id === "unblock-btn") {
+                chat.relationship.status = "friend";
+                chat.relationship.blockedTimestamp = null;
+
+                const hiddenMessage = {
+                  role: "system",
+                  content: `[系统提示：用户刚刚解除了对你的拉黑。现在你们可以重新开始对话了。]`,
+                  timestamp: Date.now(),
+                  isHidden: true,
+                };
+                chat.history.push(hiddenMessage);
+
+                await db.chats.put(chat);
+                renderChatInterface(chat.id);
+                renderChatList();

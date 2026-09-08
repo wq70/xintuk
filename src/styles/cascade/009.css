@@ -1,0 +1,1275 @@
+
+#flat-capsule-bubble {
+  flex-grow: 1;
+  min-width: auto;
+  /* ★★★ 修改点1：高度从 44px 减小到 38px ★★★ */
+  height: 35px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 15px;
+  /* ★★★ 修改点2：新增背景色，将透明度从 0.4 提升到 0.6，让它更不透明 ★★★ */
+  background-color: rgba(255, 255, 255, 0.4);
+}
+/* ▲▲▲ 替换结束 ▲▲▲ */
+
+#flat-capsule-bubble::after {
+  content: none; /* 移除继承来的小尾巴 */
+}
+
+/* ▼▼▼ 用这块【修改后】的代码替换旧的 #circular-bubble 样式 ▼▼▼ */
+#circular-bubble {
+  flex-shrink: 0;
+  /* ★★★ 修改点1：宽度和高度都从 44px 减小到 38px ★★★ */
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-width: auto;
+  /* ★★★ 修改点2：新增背景色，与胶囊气泡保持一致，更不透明 ★★★ */
+  background-color: rgba(255, 255, 255, 0.4);
+}
+/* ▲▲▲ 替换结束 ▲▲▲ */
+
+/* 4. 移除圆形气泡的小尾巴 */
+#circular-bubble::after {
+  content: none;
+}
+
+/* ▲▲▲ 新增CSS结束 ▲▲▲ */
+/* ▼▼▼ 请将这段新样式粘贴到 <style> 的末尾 ▼▼▼ */
+
+/* 1. 新头像组件的定位：中间偏上 */
+#second-page-center-avatar {
+  position: absolute;
+  top: 235px; /* 控制上下位置，数值越小越靠上 */
+  transform: translateX(-50%); /* 水平居中 */
+  z-index: 5; /* 确保它在其他元素之上 */
+}
+
+/* 2. 新头像的尺寸和样式：比第一个大，且没有轮廓线 */
+#second-page-center-avatar .widget-circle-uploader {
+  width: 85px; /* 比第一个头像(65px)大一圈 */
+  height: 85px; /* 保持正圆 */
+  border: none; /* 移除轮廓线 */
+  padding: 0; /* 移除内边距，让图片填满 */
+}
+
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+/* ▼▼▼ 把这一整块全新的CSS，粘贴到 <style> 标签的最末尾 ▼▼▼ */
+
+/* 1. 这是包裹头像和所有新气泡的总容器 (V2 加大版) */
+/* 1. 这是包裹头像和所有新气泡的总容器 (V2 加大版) */
+#center-avatar-wrapper {
+  position: absolute;
+  /* ★ 核心修改：将固定值改为可调节的变量，并提供一个默认值 190px */
+  top: var(--second-page-center-avatar-top-offset, 190px);
+  transform: translateX(-55%);
+  z-index: 5;
+
+  /* ★ 修改点：把这个“看不见的盒子”的尺寸变大 */
+  width: 300px; /* 从 250px 增加到了 300px */
+  height: 180px; /* 从 150px 增加到了 180px */
+}
+
+/* 2. 把你原来的头像在总容器里居中，这样它的位置看起来和原来一模一样 */
+#second-page-center-avatar {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  /* 我们不再需要它自己来定位了，所以把旧的定位样式移除 */
+}
+
+#avatar-subtitle {
+  position: absolute;
+  bottom: 20px; /* ★ 修改点：把它从容器外面移到里面，位置更协调 */
+  left: 50%;
+  transform: translateX(-50%);
+
+  background-color: transparent;
+  border: none;
+  outline: none;
+
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: center;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  cursor: pointer;
+  padding: 2px 8px;
+}
+
+/* 这是四个角落气泡的通用样式 */
+.corner-bubble {
+  position: absolute;
+  background-color: rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 12px;
+  padding: 8px 12px;
+  color: white;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  min-width: 80px;
+  cursor: pointer;
+}
+
+/* ▼▼▼ 在这里分别修改四个角落的位置 ▼▼▼ */
+
+/* 5. 分别定位四个角落的气泡 */
+#bubble-top-left {
+  top: 40px; /* 控制上下位置，数值越大越【往下】移 */
+  left: -15px; /* 控制左右位置，数值越大越【往右】移 */
+}
+
+#bubble-top-right {
+  top: 40px; /* 控制上下位置，数值越大越【往下】移 */
+  right: -15px; /* 控制左右位置，数值越大越【往左】移 */
+}
+
+#bubble-bottom-left {
+  bottom: 40px; /* 控制上下位置，数值越大越【往上】移 */
+  left: -15px; /* 控制左右位置，数值越大越【往右】移 */
+}
+
+#bubble-bottom-right {
+  bottom: 40px; /* 控制上下位置，数值越大越【往上】移 */
+  right: -15px; /* 控制左右位置，数值越大越【往左】移 */
+}
+/* ▼▼▼ 【这是修改后的版本】请用这整块代码替换旧的 ▼▼▼ */
+
+/* 1. 总容器：移除了顶部的内边距 */
+#new-custom-widget {
+  position: absolute;
+  bottom: 30px;
+  right: 20px;
+  width: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  /* padding-top: 50px;  <-- 这行已经被删掉了 */
+}
+
+/* 2. 【全新】头部容器：负责让月份和头像水平排列 */
+/* 这是头部容器：负责让月份和头像水平排列 */
+#new-widget-header {
+  width: 100%;
+  display: flex;
+  justify-content: flex-end; /* 修改：让所有内容都靠右对齐 */
+  align-items: center;
+  gap: 70px; /* 新增：在月份和头像之间加一点间距 */
+  margin-bottom: 5px;
+}
+
+/* 3. 月份：移除了绝对定位，现在是普通的flex项目 */
+#widget-month-display {
+  font-size: 25px;
+  font-weight: 300;
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 0 6px rgba(255, 255, 255, 0.6);
+  line-height: 1;
+}
+
+/* 4. 头像：移除了不必要的样式，因为布局由父容器控制了 */
+#new-custom-widget #new-widget-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  outline: none;
+}
+
+/* 5. 可编辑文字和分割线 (保持不变) */
+#new-custom-widget .new-widget-text {
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 2px 4px;
+  border-radius: 3px;
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 0 6px rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+  text-align: right;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+#new-custom-widget .new-widget-divider {
+  width: 60%;
+  height: 1px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.3);
+}
+/* ▲▲▲ 替换结束 ▲▲▲ */
+/* ▼▼▼ 【精致版】请用这整块代码替换旧的论坛帖子删除按钮样式 ▼▼▼ */
+
+/* 1. 帖子列表项样式 (保持不变，只是确保右侧有足够空间) */
+.forum-post-item {
+  position: relative;
+  padding-right: 40px;
+}
+
+/* 2. 删除按钮的新样式 - 小巧精致版 */
+.forum-post-delete-btn {
+  position: absolute;
+  top: 50%;
+  right: 12px; /* 离边缘稍微近一点 */
+  transform: translateY(-50%);
+
+  /* --- 核心修改：尺寸变小 --- */
+  width: 24px;
+  height: 24px;
+
+  /* --- 核心修改：外观更精致 --- */
+  background-color: transparent; /* 默认背景透明，不突兀 */
+  color: var(--text-secondary); /* 默认颜色使用次要文字的灰色，更柔和 */
+  border: none;
+  border-radius: 50%;
+  font-size: 18px; /* 减小 "×" 的大小 */
+  line-height: 24px; /* 确保 "×" 垂直居中 */
+  text-align: center;
+  cursor: pointer;
+
+  /* --- 核心修改：交互动效 --- */
+  transition: all 0.2s ease; /* 为所有变化添加平滑过渡 */
+}
+
+/* 3. 鼠标悬停时的反馈效果 */
+.forum-post-delete-btn:hover {
+  background-color: #ff3b30; /* 悬停时才显示醒目的红色背景 */
+  color: white; /* "×" 变为白色 */
+  transform: translateY(-50%) scale(1.1); /* 轻微放大，更有动感 */
+}
+
+/* ▲▲▲ 替换结束 ▲▲▲ */
+/* 1. 定义一个通用的、控制所有主屏幕文字颜色的变量 (保持不变) */
+#phone-screen {
+  --home-icon-widget-text-color: #ffffff;
+}
+
+/* 2. 【核心】创建一个“超级选择器”，一次性选中所有需要变色的文字 */
+/* 这次我们加入了顶部状态栏和底部Dock栏的图标文字 */
+.desktop-app-icon .label,                        /* ▼▼▼ 核心修改：移除了前面的ID限定，让它能同时选中主屏幕和Dock栏的图标文字 ▼▼▼ */
+#desktop-widget-column .widget-bubble,           
+#desktop-widget-column .widget-subtext,        
+#second-page-left-widget .widget-bubble,           
+#second-page-left-widget .widget-subtext,        
+#avatar-subtitle,                                
+.corner-bubble,                                   
+#new-custom-widget .new-widget-text,              
+#widget-month-display,
+#status-bar                                     /* ★★★ 新增：顶部状态栏 ★★★ */ {
+  color: var(--home-icon-widget-text-color) !important;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+/* ▼▼▼ 【全新】去除主屏幕字体阴影的样式 ▼▼▼ */
+#phone-screen.no-home-font-shadow .app-icon .label,
+#phone-screen.no-home-font-shadow .desktop-app-icon .label,
+#phone-screen.no-home-font-shadow .widget-bubble,
+#phone-screen.no-home-font-shadow .widget-subtext,
+#phone-screen.no-home-font-shadow #avatar-subtitle,
+#phone-screen.no-home-font-shadow .corner-bubble,
+#phone-screen.no-home-font-shadow .new-widget-text,
+#phone-screen.no-home-font-shadow #widget-month-display,
+#phone-screen.no-home-font-shadow #profile-username,
+#phone-screen.no-home-font-shadow #profile-sub-username,
+#phone-screen.no-home-font-shadow #profile-bio,
+#phone-screen.no-home-font-shadow #profile-location,
+#phone-screen.no-home-font-shadow #clock-container {
+  text-shadow: none !important;
+}
+/* ▲▲▲ 新增样式结束 ▲▲▲ */
+
+/* ▼▼▼ 【全新】这是微博主页头像框的专属样式 ▼▼▼ */
+.weibo-avatar-container .weibo-avatar-frame {
+  position: absolute;
+  width: 121%; /* 相对大小，你可以微调 */
+  height: 121%;
+  /* 使用transform进行精确定位，确保完美居中 */
+  transform: translate(-50%, -57%);
+  top: 50%;
+  left: 50%;
+  z-index: 4; /* 确保在头像之上 */
+  pointer-events: none; /* 让鼠标事件可以穿透它 */
+}
+
+/* ▼▼▼ 【全新】这是微博帖子作者头像框的专属样式 ▼▼▼ */
+
+/* 这是帖子头部，头像和框的总容器 */
+.weibo-post-header .avatar-with-frame {
+  position: relative;
+  /* 核心：尺寸和原来的头像保持一致 */
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+}
+
+/* 容器内的头像图片 */
+.weibo-post-header .avatar-with-frame .avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1; /* 确保在框的下面 */
+}
+
+/* 容器内的头像框图片 */
+.weibo-post-header .avatar-with-frame .avatar-frame {
+  position: absolute;
+  width: 121%; /* 相对大小，你可以微调 */
+  height: 121%;
+  /* 使用transform进行精确定位，确保完美居中 */
+  transform: translate(-50%, -57%);
+  top: 50%;
+  left: 50%;
+  z-index: 4; /* 确保在头像之上 */
+  pointer-events: none; /* 让鼠标事件可以穿透它 */
+}
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+
+/* ▼▼▼ 【全新】这是主屏幕头像框的专属样式 ▼▼▼ */
+#profile-widget .profile-avatar-container .weibo-avatar-frame {
+  position: absolute;
+  width: 121%; /* 相对大小，你可以微调 */
+  height: 121%;
+  /* 使用transform进行精确定位，确保完美居中 */
+  transform: translate(-50%, -57%);
+  top: 50%;
+  left: 50%;
+  z-index: 4; /* 确保在头像之上 */
+  pointer-events: none; /* 让鼠标事件可以穿透它 */
+}
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+
+/* ▼▼▼ 把这段全新的CSS，粘贴到你 <style> 标签的最末尾 ▼▼▼ */
+
+.weibo-background {
+  /* 核心代码：使用 mask-image 创建一个从上到下的渐变蒙版 */
+
+  /* a. -webkit- 前缀是为了兼容旧版的 Chrome 和 Safari 浏览器 */
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+
+    /* 渐变方向：从上到下 */ /* ★★★ 这里是你可以自己调整的地方 ★★★ */ black 60%,
+    /* 前60%的部分是完全不透明的 (黑色=不透明) */ transparent 100%
+      /* 从60%的位置开始，到底部(100%)，逐渐过渡到完全透明 */
+  );
+
+  /* b. 这是标准语法，兼容现代浏览器 */
+  mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+}
+
+/* ▲▲▲ 粘贴结束 ▲▲▲ */
+/* ▼▼▼ 【全新】圈子分类标签样式 ▼▼▼ */
+.category-tag-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.category-tag {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--accent-color);
+  background-color: #e7f3ff;
+  padding: 3px 8px;
+  border-radius: 10px;
+}
+#phone-screen.dark-mode .category-tag {
+  background-color: rgba(10, 132, 255, 0.2);
+  color: #0a84ff;
+}
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+/* ▼▼▼ 【全新】圈子/小组分类筛选功能样式 ▼▼▼ */
+
+/* 筛选图标的样式 */
+.header .filter-btn {
+  font-size: 20px; /* 图标大小 */
+  cursor: pointer;
+  color: var(--accent-color); /* 跟随主题色 */
+  position: relative; /* 为了定位小红点 */
+}
+
+/* 当筛选生效时，图标上显示一个小点提示 */
+.header .filter-btn.active::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 8px;
+  height: 8px;
+  background-color: #ff3b30;
+  border-radius: 50%;
+  border: 1.5px solid var(--secondary-bg);
+}
+
+/* 筛选弹窗内的分类列表 */
+#forum-filter-category-list {
+  display: flex;
+  flex-wrap: wrap; /* 自动换行 */
+  gap: 10px; /* 标签之间的间距 */
+  padding: 10px;
+}
+
+#forum-filter-category-list label {
+  display: inline-flex;
+  align-items: center;
+  background-color: #f0f2f5;
+  padding: 6px 12px;
+  border-radius: 15px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+#phone-screen.dark-mode #forum-filter-category-list label {
+  background-color: #3a3a3c;
+}
+
+#forum-filter-category-list input[type="checkbox"] {
+  display: none; /* 隐藏原始的复选框 */
+}
+
+/* 选中后的样式 */
+#forum-filter-category-list input[type="checkbox"]:checked + span {
+  color: white;
+  font-weight: 500;
+}
+
+/* 默认给标签一个好看的颜色循环 */
+#forum-filter-category-list label:nth-of-type(6n + 1) input:checked + span {
+  background-color: #007bff;
+}
+#forum-filter-category-list label:nth-of-type(6n + 2) input:checked + span {
+  background-color: #28a745;
+}
+#forum-filter-category-list label:nth-of-type(6n + 3) input:checked + span {
+  background-color: #fd7e14;
+}
+#forum-filter-category-list label:nth-of-type(6n + 4) input:checked + span {
+  background-color: #6f42c1;
+}
+#forum-filter-category-list label:nth-of-type(6n + 5) input:checked + span {
+  background-color: #dc3545;
+}
+#forum-filter-category-list label:nth-of-type(6n + 6) input:checked + span {
+  background-color: #ffc107;
+}
+
+/* 标签内的文字部分，也需要设置样式，特别是选中后的背景色 */
+#forum-filter-category-list label span {
+  padding: 6px 12px;
+  margin: -6px -12px; /* 抵消label的padding，让背景色填满 */
+  border-radius: 15px;
+  transition: all 0.2s ease;
+}
+/* ▲▲▲ 样式粘贴结束 ▲▲▲ */
+/* ▼▼▼ 【全新】游戏大厅样式 ▼▼▼ */
+#game-hall-grid {
+  display: grid;
+  grid-template-columns: 1fr; /* 每行一个游戏 */
+  gap: 15px; /* 游戏卡片之间的间距 */
+}
+
+.game-card {
+  background-color: var(--secondary-bg);
+  border-radius: 12px;
+  padding: 15px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  cursor: pointer;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
+}
+
+.game-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+}
+
+.game-card .game-icon {
+  font-size: 32px;
+  width: 50px;
+  height: 50px;
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #f0f2f5;
+  border-radius: 10px;
+}
+
+#phone-screen.dark-mode .game-card .game-icon {
+  background-color: #2c2c2e;
+}
+
+.game-card .game-info .game-title {
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--text-primary);
+}
+
+.game-card .game-info .game-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+/* ▼▼▼ 【全新】狼人杀游戏样式 ▼▼▼ */
+
+/* 游戏设置页的玩家选择列表 */
+.player-selection-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 15px;
+  border-bottom: 1px solid var(--border-color);
+}
+.player-selection-item:last-child {
+  border-bottom: none;
+}
+.player-selection-item input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  margin-right: 15px;
+}
+.player-selection-item img {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  margin-right: 10px;
+}
+.player-selection-item .name {
+  font-weight: 500;
+}
+.player-selection-item .type-tag {
+  font-size: 11px;
+  color: var(--text-secondary);
+  background-color: #f0f0f0;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: auto;
+}
+
+/* 游戏主界面布局 */
+#werewolf-game-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  padding: 10px;
+  box-sizing: border-box;
+}
+
+/* 玩家座位网格 */
+#werewolf-players-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
+  gap: 10px;
+  padding: 10px;
+  flex-shrink: 0;
+}
+
+.player-seat {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+.player-seat .player-avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  object-fit: cover;
+  transition: all 0.3s ease;
+}
+.player-seat .player-avatar.speaking {
+  border-color: #4cd964; /* 绿色边框表示正在发言 */
+  box-shadow: 0 0 10px #4cd964;
+}
+.player-seat .player-avatar.dead {
+  filter: grayscale(100%);
+  opacity: 0.5;
+}
+.player-seat .player-name {
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+  max-width: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.player-seat .player-role-indicator {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background-color: #ff3b30; /* 红色代表狼人 */
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+  display: none; /* 默认隐藏 */
+  justify-content: center;
+  align-items: center;
+  border: 1px solid white;
+}
+
+/* 游戏日志区域 */
+#werewolf-log-container {
+  flex-grow: 1;
+  background-color: rgba(0, 0, 0, 0.05);
+  border-radius: 10px;
+  padding: 10px;
+  overflow-y: auto;
+  margin: 10px 0;
+  min-height: 0; /* flex布局下滚动的关键 */
+}
+.log-entry {
+  padding: 6px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.log-entry.system {
+  color: var(--accent-color);
+  font-weight: bold;
+  text-align: center;
+  background-color: rgba(0, 123, 255, 0.05);
+  border-radius: 5px;
+}
+.log-entry.speech .speaker {
+  font-weight: 600;
+}
+
+/* 玩家操作区 */
+#werewolf-action-area {
+  flex-shrink: 0;
+  padding: 10px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+  min-height: 50px;
+}
+#werewolf-action-area button {
+  padding: 10px 20px;
+}
+#werewolf-action-area .vote-target-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+#werewolf-action-area .vote-target-btn {
+  padding: 8px 12px;
+  font-size: 13px;
+  background-color: #e9ecef;
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+#werewolf-action-area .vote-target-btn.selected {
+  background-color: var(--accent-color);
+  color: white;
+  border-color: var(--accent-color);
+}
+/* ▲▲▲ 狼人杀样式结束 ▲▲▲ */
+/* ▼▼▼ 【全新】狼人杀发言日志美化样式 ▼▼▼ */
+
+/* 包含头像和文字的总容器 */
+.log-entry.speech {
+  display: flex;
+  align-items: flex-start; /* 顶部对齐 */
+  gap: 10px; /* 头像和文字的间距 */
+  padding: 8px 6px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05); /* 每条发言之间的分割线 */
+}
+
+/* 发言者的圆形小头像 */
+.speech-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%; /* 完美圆形 */
+  flex-shrink: 0; /* 防止头像被压缩 */
+  object-fit: cover;
+}
+
+/* 包裹名字和发言内容的新容器 */
+.speech-content {
+  display: flex;
+  flex-direction: column; /* 名字和内容垂直排列 */
+  gap: 2px;
+}
+
+/* 发言者名字的样式 */
+.speech-content .speaker {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-secondary); /* 使用次要文字颜色，不那么刺眼 */
+}
+
+/* 发言内容的样式 */
+.speech-content .speech-text {
+  word-break: break-word; /* 确保长篇发言能正确换行 */
+  line-height: 1.6;
+}
+
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+
+/* ▼▼▼ 【这是为你新增的X社交App图标样式】粘贴到 <style> 的末尾 ▼▼▼ */
+#second-page-x-social-app {
+  position: absolute;
+  /* 控制上下位置。我把值调大了，让它更靠下，和“圈子”图标对齐 */
+  top: 100px; /* ★ 修改这里 ★ */
+
+  /* 控制左右位置。我把值调小了，让它更靠右，和“情侣空间”图标对齐 */
+  right: 0px; /* ★ 修改这里 ★ */
+}
+
+/* 把新图标的文字也变成白色，和其他图标统一 */
+#second-page-x-social-app .label {
+  color: white;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+/* ▲▲▲ 新增样式粘贴结束 ▲▲▲ */
+/* ▼▼▼ 【全新】海龟汤游戏样式 ▼▼▼ */
+
+.sts-log-entry {
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  border-radius: 8px;
+  line-height: 1.6;
+}
+
+/* 系统消息 (谜面、提示等) */
+.sts-log-entry.system {
+  background-color: #e9ecef;
+  color: var(--text-secondary);
+  text-align: center;
+  font-weight: 500;
+}
+#phone-screen.dark-mode .sts-log-entry.system {
+  background-color: #2c2c2e;
+}
+
+/* 玩家提问 */
+.sts-log-entry.question {
+  background-color: #fff;
+  border: 1px solid var(--border-color);
+}
+#phone-screen.dark-mode .sts-log-entry.question {
+  background-color: #1c1c1e;
+}
+.sts-log-entry .speaker {
+  font-weight: 600;
+  color: var(--accent-color);
+}
+
+/* ▼▼▼ 【全新】海龟汤 - 出题人回答气泡美化 ▼▼▼ */
+.sts-log-entry.answer {
+  text-align: right;
+}
+.sts-log-entry.answer .answer-text {
+  display: inline-block;
+  padding: 8px 12px; /* 增加内边距，让气泡更饱满 */
+  border-radius: 18px; /* 增加圆角 */
+  font-weight: 500; /* 字体不用太粗 */
+  background-color: #f0f2f5; /* 统一的、中性的浅灰色背景 */
+  color: var(--text-primary); /* 文字颜色使用主题的主色，适配夜间模式 */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); /* 稍微调整阴影 */
+}
+
+/* 移除旧的、按颜色区分的样式，确保所有回答都用上面的新样式 */
+.sts-log-entry.answer .answer-text.yes,
+.sts-log-entry.answer .answer-text.no,
+.sts-log-entry.answer .answer-text.irrelevant {
+  background-color: #f0f2f5; /* 确保所有都用这个颜色 */
+}
+
+/* 夜间模式适配 */
+#phone-screen.dark-mode .sts-log-entry.answer .answer-text,
+#phone-screen.dark-mode .sts-log-entry.answer .answer-text.yes,
+#phone-screen.dark-mode .sts-log-entry.answer .answer-text.no,
+#phone-screen.dark-mode .sts-log-entry.answer .answer-text.irrelevant {
+  background-color: #3a3a3c; /* 夜间模式下的深灰色 */
+}
+/* ▲▲▲ 替换结束 ▲▲▲ */
+
+/* AI猜测 */
+.sts-log-entry.guess {
+  font-style: italic;
+  color: #fd7e14;
+  border-left: 3px solid #fd7e14;
+  padding-left: 12px;
+}
+
+/* 玩家座位上的身份指示器 */
+.player-seat .player-role-indicator.riddle-master {
+  background-color: #ffc107; /* 黄色代表出题人 */
+  display: flex;
+}
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+/* ▼▼▼ 【全新】海龟汤聊天日志美化样式 ▼▼▼ */
+.sts-log-entry.question,
+.sts-log-entry.answer,
+.sts-log-entry.guess {
+  display: flex;
+  align-items: flex-start; /* 头像和气泡顶部对齐 */
+  gap: 10px;
+  max-width: 85%;
+  margin-bottom: 12px;
+}
+
+/* 提问和猜测靠左 */
+.sts-log-entry.question,
+.sts-log-entry.guess {
+  align-self: flex-start;
+}
+
+/* 回答靠右 */
+.sts-log-entry.answer {
+  align-self: flex-end;
+  flex-direction: row-reverse; /* 关键：让头像在右边 */
+}
+
+/* 头像样式 */
+.sts-log-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+/* ▼▼▼ 【全新】海龟汤聊天日志美化样式 (气泡透明版) ▼▼▼ */
+.sts-log-entry.question .sts-log-content,
+.sts-log-entry.guess .sts-log-content {
+  background-color: transparent; /* <-- 修改点1：背景改为透明 */
+  border-radius: 8px;
+  padding: 8px 12px;
+  border: none; /* <-- 修改点2：移除边框，让它彻底“消失” */
+}
+
+#phone-screen.dark-mode .sts-log-entry.question .sts-log-content,
+#phone-screen.dark-mode .sts-log-entry.guess .sts-log-content {
+  background-color: #1c1c1e;
+}
+
+/* 修正回答气泡的样式，因为它不是一个完整的块 */
+.sts-log-entry.answer .answer-text {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+.player-seat .player-avatar.active-turn {
+  border-color: #007bff; /* 使用主题色作为边框颜色 */
+  box-shadow: 0 0 15px rgba(0, 123, 255, 0.7); /* 添加发光效果 */
+  animation: sts-pulse-glow 1.5s infinite ease-in-out; /* 应用动画 */
+}
+
+@keyframes sts-pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 15px rgba(0, 123, 255, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(0, 123, 255, 1);
+  }
+}
+/* ▼▼▼ 【海龟汤布局修复】请将这段新样式粘贴到 <style> 的末尾 ▼▼▼ */
+#sts-game-log {
+  display: flex;
+  flex-direction: column;
+}
+/* ▲▲▲ 修复结束 ▲▲▲ */
+/* ▼▼▼ 【全新】海龟汤聊天日志美化样式 ▼▼▼ */
+.sts-log-entry.question,
+.sts-log-entry.answer,
+.sts-log-entry.guess {
+  display: flex;
+  align-items: flex-start; /* 头像和气泡顶部对齐 */
+  gap: 10px;
+  max-width: 85%;
+  margin-bottom: 12px;
+  /* 移除旧的背景和边框，因为现在由子元素处理 */
+  background-color: transparent;
+  border: none;
+}
+
+/* 提问和猜测（猜题方）靠左 */
+.sts-log-entry.question,
+.sts-log-entry.guess {
+  align-self: flex-start;
+}
+
+/* 回答（出题人）靠右 */
+.sts-log-entry.answer {
+  align-self: flex-end;
+  flex-direction: row-reverse; /* 关键：让头像在右边 */
+}
+
+/* 头像样式 */
+.sts-log-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+/* 包含发言人和内容的气泡 */
+.sts-log-entry.question .sts-log-content,
+.sts-log-entry.guess .sts-log-content {
+  background-color: #fff;
+  border-radius: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+}
+
+#phone-screen.dark-mode .sts-log-entry.question .sts-log-content,
+#phone-screen.dark-mode .sts-log-entry.guess .sts-log-content {
+  background-color: #1c1c1e;
+}
+
+/* 修正回答气泡的样式，因为它不是一个完整的块 */
+.sts-log-entry.answer .answer-text {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* 让日志容器支持flex布局的对齐 */
+#sts-game-log {
+  display: flex;
+  flex-direction: column;
+}
+/* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
+/* ▼▼▼ 【海龟汤输入区终极修复版】 ▼▼▼ */
+
+/* 1. 强制重置整个输入区域的布局为“横向排列”并“垂直居中” */
+#sts-action-area {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important; /* 核心修正：从 flex-end 改为 center，实现垂直居中 */
+  gap: 8px !important;
+}
+
+/* 2. 强制内部的 main-row 也垂直居中，并让它填满空间 */
+#sts-action-area .chat-input-main-row {
+  flex-grow: 1 !important;
+  display: flex !important;
+  align-items: center !important; /* 核心修正：内部也保持垂直居中 */
+  gap: 8px !important;
+}
+
+/* 3. 美化输入框本身，并让它自动撑满宽度 */
+#sts-action-area #sts-question-input {
+  flex-grow: 1;
+  border: none;
+  padding: 10px 15px;
+  border-radius: 20px;
+  background-color: var(--secondary-bg);
+  font-size: 16px;
+  resize: none;
+  max-height: 100px;
+  line-height: 1.5;
+}
+
+/* 4. 统一所有按钮的高度和样式，让它们和输入框完美适配 */
+#sts-action-area #guess-sts-answer-btn,
+#sts-action-area #send-sts-question-btn {
+  height: 40px;
+  border-radius: 20px;
+  padding: 0 15px;
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* 5. 夜间模式适配 */
+#phone-screen.dark-mode #sts-action-area #sts-question-input {
+  background-color: #2c2c2e;
+  color: var(--text-primary);
+}
+/* ▲▲▲ 修复结束 ▲▲▲ */
+/* ▼▼▼ 【全新】剧本杀游戏样式 ▼▼▼ */
+
+/* 游戏主界面布局 */
+#script-kill-game-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  padding: 10px;
+  box-sizing: border-box;
+}
+
+/* 玩家座位区 (复用狼人杀的样式) */
+#script-kill-players-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
+  gap: 10px;
+  padding: 10px;
+  flex-shrink: 0;
+}
+
+/* 游戏日志区 (复用狼人杀的样式) */
+#script-kill-log-container {
+  flex-grow: 1;
+  background-color: rgba(0, 0, 0, 0.05);
+  border-radius: 10px;
+  padding: 10px;
+  overflow-y: auto;
+  margin: 10px 0;
+  min-height: 0; /* flex布局下滚动的关键 */
+}
+
+/* 玩家操作区 (复用狼人杀的样式) */
+#script-kill-action-area {
+  flex-shrink: 0;
+  padding: 10px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+  min-height: 50px;
+}
+#script-kill-action-area button {
+  padding: 10px 20px;
+}
+
+/* 投票选项样式 */
+#sk-vote-options-list label {
+  display: block;
+  padding: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+#sk-vote-options-list label:hover {
+  background-color: #f0f2f5;
+}
+#phone-screen.dark-mode #sk-vote-options-list label:hover {
+  background-color: #2c2c2e;
+}
+
+/* 线索卡片样式 */
+.sk-evidence-card {
+  background-color: var(--secondary-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+.sk-evidence-card .source {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+.sk-evidence-card .description {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* ▲▲▲ 剧本杀样式结束 ▲▲▲ */
+/* ▼▼▼ 把这一整块全新的CSS，粘贴到 <style> 标签的最末尾 ▼▼▼ */
+
+/* 【全新】剧本杀可视化编辑器样式 */
+
+/* 角色/线索卡片的容器 */
+.sk-item-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background-color: #f0f2f5;
+  padding: 10px;
+  border-radius: 8px;
+  min-height: 50px;
+  border: 1px solid var(--border-color);
+}
+#phone-screen.dark-mode .sk-item-container {
+  background-color: #2c2c2e;
+}
+
+/* 单个角色/线索的卡片 */
+.sk-editor-item {
+  background-color: var(--secondary-bg);
+  padding: 10px 15px;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sk-editor-item .item-info .item-name {
+  font-weight: 600;
+}
+.sk-editor-item .item-info .item-meta {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* 卡片上的编辑/删除按钮 */
+.sk-editor-item .item-actions {
+  display: flex;
+  gap: 8px;
+}
+.sk-editor-item .item-actions button {
+  padding: 4px 8px;
+  font-size: 13px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+/* ▲▲▲ 新增CSS结束 ▲▲▲ */
+/* ▼▼▼ 【全新】“你说我猜”游戏样式 ▼▼▼ */
+
+/* 游戏日志区域 */
+#guess-what-game-log {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* 单条日志条目 */
+.guess-log-entry {
+  padding: 8px 12px;
+  border-radius: 12px;
+  line-height: 1.6;
+  max-width: 90%;
+  word-break: break-word;
+}
+
+/* 系统提示，例如游戏开始、谁的回合 */
+.guess-log-entry.system {
+  background-color: #e9ecef;
+  color: var(--text-secondary);
+  text-align: center;
+  font-weight: 500;
+  font-size: 13px;
+  align-self: center;
+}
+#phone-screen.dark-mode .guess-log-entry.system {
+  background-color: #2c2c2e;
+}
+
+/* 玩家发言的气泡（通用） */
+.guess-log-entry.user-turn,
+.guess-log-entry.ai-turn {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+/* 玩家发言内容 */
+.guess-log-entry .bubble {
+  background-color: #fff;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+#phone-screen.dark-mode .guess-log-entry .bubble {
+  background-color: #2c2c2e;
+}
+
+/* AI发言气泡（靠左） */
+.guess-log-entry.ai-turn {
+  align-self: flex-start;
+}
+
+/* 用户发言气泡（靠右） */
+.guess-log-entry.user-turn {
+  align-self: flex-end;
+  flex-direction: row-reverse; /* 头像在右边 */
+}
+.guess-log-entry.user-turn .bubble {
+  background-color: #dcf8c6; /* 类似微信的绿色 */
+}
+#phone-screen.dark-mode .guess-log-entry.user-turn .bubble {
+  background-color: #3b5b32; /* 夜间模式下的绿色 */
+}
+
+/* 气泡内的头像 */
+.guess-log-entry .avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* 气泡内的名字和内容 */
+.guess-log-entry .name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+/* 游戏输入区美化 */
+#guess-what-action-area {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important; /* 保持垂直居中 */
+  gap: 8px !important;
+  width: 100%; /* 新增：让整个容器撑满宽度 */
+  box-sizing: border-box; /* 新增：确保内边距和边框被正确计算在内 */
+}
+
+#guess-what-action-area #guess-what-user-input {
+  flex-grow: 1;
+  border: none;
+  padding: 10px 15px;
+  border-radius: 20px;
+  background-color: var(--secondary-bg);
+  font-size: 16px;
+  resize: none;
+  max-height: 100px;
+  line-height: 1.5;
+}
+#guess-what-action-area #send-guess-what-input-btn {
+  height: 40px;
+  border-radius: 20px;
+  padding: 0 15px;
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+#phone-screen.dark-mode #guess-what-action-area #guess-what-user-input {
+  background-color: #2c2c2e;
+  color: var(--text-primary);
+}
+
+/* ▲▲▲ “你说我猜”游戏样式结束 ▲▲▲ */
+/* ▼▼▼ 【剧本杀AI生成器布局修复】请将这整块全新的CSS粘贴到 <style> 标签的最末尾 ▼▼▼ */
+
+/* 1. 【核心】让整个弹窗的内容区(modal-body)能够正确地撑满剩余空间并滚动 */
+#sk-ai-generator-modal .modal-body {
+  flex-grow: 1; /* 允许内容区占据 header 和 footer 之间的所有可用垂直空间 */
+  min-height: 0; /* 解决flex布局中一个常见的滚动条失效问题，非常关键 */
+  /* overflow-y: auto;  <-- 这个属性你的 .modal-body 已经有了，所以不用重复写 */
+}
+
+/* 2. 【核心】指定包含“预览框”的那个 form-group 也需要能够弹性增长 */
+/* 我们用 :last-of-type 精准定位到最后一个 .form-group */
+#sk-ai-generator-modal .modal-body .form-group:last-of-type {
+  flex-grow: 1; /* 让它吃掉所有剩余的垂直空间 */
+  min-height: 0; /* 同样是为了兼容性 */
+  display: flex; /* 把它自己也变成flex容器 */
+  flex-direction: column; /* 让它里面的 label 和 preview 垂直排列 */
+}
+
+/* 3. 【核心】最后，确保预览框本身能够撑满它的父容器，并且在内容过多时自己滚动 */

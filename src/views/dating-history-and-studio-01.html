@@ -1,0 +1,1070 @@
+    <div id="dating-history-screen" class="screen">
+      <div class="header">
+        <span class="back-btn" id="dating-history-back-btn">‹</span>
+        <span>历史约会</span>
+        <span style="width: 30px"></span>
+        <!-- 占位符，保持标题居中 -->
+      </div>
+      <div id="dating-history-list" class="list-container">
+        <!-- 历史约会卡片将由JS动态生成在这里 -->
+      </div>
+    </div>
+
+    <div id="create-dating-scene-modal" class="modal">
+      <div class="modal-content" style="width: 300px; height: auto">
+        <div class="modal-header">
+          <span>创建约会场景</span>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="scene-name-input">场景名称</label>
+            <input
+              type="text"
+              id="scene-name-input"
+              placeholder="例如：月光下的海滩漫步"
+            />
+          </div>
+          <div class="form-group">
+            <label for="scene-image-url-input">图片 URL (可选)</label>
+            <!-- ★★★ 核心修改：更新了 placeholder 提示文字 ★★★ -->
+            <input
+              type="text"
+              id="scene-image-url-input"
+              placeholder="留空则由AI根据场景名生成图片..."
+            />
+          </div>
+          <div class="form-group">
+            <label for="scene-cost-input">花费 (金币)</label>
+            <input
+              type="number"
+              id="scene-cost-input"
+              placeholder="例如：520"
+            />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="cancel-create-scene-btn">取消</button>
+          <button class="save" id="save-custom-scene-btn">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="sticker-category-modal" class="modal">
+      <div class="modal-content" style="height: auto; max-height: 70%">
+        <div class="modal-header">
+          <span>移动表情到分类</span>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>选择一个现有分类</label>
+            <div
+              id="sticker-category-list"
+              style="
+                max-height: 200px;
+                overflow-y: auto;
+                border: 1px solid var(--border-color);
+                border-radius: 8px;
+                padding: 5px;
+              "
+            >
+              <!-- 分类列表将由JS动态生成 -->
+            </div>
+          </div>
+          <p
+            style="
+              text-align: center;
+              color: var(--text-secondary);
+              margin: 10px 0;
+            "
+          >
+            或
+          </p>
+          <div class="form-group">
+            <label for="new-sticker-category-input">创建一个新分类</label>
+            <input
+              type="text"
+              id="new-sticker-category-input"
+              placeholder="输入新分类的名称..."
+            />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="cancel-sticker-category-btn">取消</button>
+          <button class="save" id="confirm-sticker-category-btn">
+            确认移动
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="advanced-transfer-modal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <span>高级导入 / 导出</span>
+        </div>
+        <div class="modal-body">
+          <h4>选择要导出的内容</h4>
+
+          <!-- App 数据导出区 -->
+          <div class="form-group">
+            <label>全局App数据 (多选)</label>
+            <div
+              id="export-apps-list"
+              style="
+                max-height: 200px;
+                overflow-y: auto;
+                border: 1px solid var(--border-color);
+                padding: 10px;
+                border-radius: 8px;
+              "
+            >
+              <!-- App 多选框将由JS动态生成在这里 -->
+            </div>
+          </div>
+
+          <!-- 角色数据导出区 -->
+          <div class="form-group">
+            <label
+              style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+              "
+            >
+              <span>角色数据 (多选,qq动态什么的)</span>
+              <label
+                style="font-size: 13px; font-weight: normal; cursor: pointer"
+              >
+                <input
+                  type="checkbox"
+                  id="select-all-characters-checkbox"
+                  style="vertical-align: middle; margin-right: 4px"
+                />
+                全选/全不选
+              </label>
+            </label>
+            <div
+              id="export-characters-list"
+              style="
+                max-height: 200px;
+                overflow-y: auto;
+                border: 1px solid var(--border-color);
+                padding: 10px;
+                border-radius: 8px;
+              "
+            >
+              <!-- 角色多选框将由JS动态生成在这里 -->
+            </div>
+          </div>
+          <button id="export-selected-data-btn" class="form-button">
+            导出选中项
+          </button>
+
+          <hr style="margin: 20px 0" />
+
+          <h4>兼容性操作</h4>
+          <p style="font-size: 13px; color: #666">
+            从其他版本导入数据，或将数据导出为兼容格式。
+          </p>
+
+          <button
+            id="import-from-330-btn"
+            class="form-button"
+            style="background-color: #28a745; margin-bottom: 10px"
+          >
+            📥 兼容330格式导入
+          </button>
+
+          <button
+            id="export-for-330-btn"
+            class="form-button"
+            style="background-color: #6f42c1"
+          >
+            🚀 兼容330数据导出
+          </button>
+
+          <hr style="margin: 20px 0" />
+
+          <h4>导入补充数据</h4>
+          <p style="font-size: 13px; color: #666">
+            导入将以【补充和覆盖】的方式进行，不会删除您现有的其他数据。这可以用来合并数据或恢复单个角色的备份。
+          </p>
+          <button
+            id="import-chunked-data-btn"
+            class="form-button form-button-secondary"
+          >
+            选择文件并导入
+          </button>
+          <input
+            id="import-chunked-data-input"
+            type="file"
+            accept="application/json"
+            hidden
+          />
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="close-advanced-transfer-btn">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <input
+      id="import-from-330-input"
+      type="file"
+      accept="application/json"
+      hidden
+    />
+
+    <div id="intimacy-panel" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <span>亲密关系</span>
+          <span
+            id="close-intimacy-panel"
+            class="close-btn"
+            style="cursor: pointer"
+            >&times;</span
+          >
+        </div>
+        <div class="modal-body" id="intimacy-panel-body">
+          <div id="intimacy-display">
+            <p>当前亲密值</p>
+            <h2 id="intimacy-score-display">--</h2>
+          </div>
+          <div id="intimacy-details">
+            <div class="detail-item">
+              <span>🔥 火花天数</span>
+              <span id="intimacy-streak-days">-- 天</span>
+            </div>
+            <div class="detail-item">
+              <span>💬 今日消息</span>
+              <span id="intimacy-today-msgs">-- 条</span>
+            </div>
+            <div class="detail-item">
+              <span>📈 累计消息</span>
+              <span id="intimacy-total-msgs">-- 条</span>
+            </div>
+          </div>
+          <div id="intimacy-symbol-unlocks">
+            <h3>亲密徽章</h3>
+            <div id="symbol-list-container">
+              <!-- JS会在这里生成所有可解锁的徽章 -->
+            </div>
+          </div>
+          <div id="intimacy-records">
+            <h3>解锁记录</h3>
+            <div id="unlocked-symbols-record">
+              <!-- JS会在这里生成已解锁徽章的记录 -->
+              <p>暂无记录</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="studio-screen" class="screen">
+      <div class="header">
+        <span class="back-btn" onclick="showScreen('home-screen')">‹</span>
+        <span>小剧场</span>
+        <div class="header-actions">
+          <span
+            class="action-btn"
+            id="import-studio-script-btn"
+            style="font-size: 14px; margin-right: 5px"
+            >导入</span
+          >
+
+          <span class="action-btn" id="add-studio-script-btn">新增剧本</span>
+          <span class="action-btn" id="studio-history-btn">故事记录</span>
+        </div>
+      </div>
+      <div id="studio-script-list" class="list-container">
+        <!-- 剧本列表将由JS动态生成在这里 -->
+      </div>
+
+      <input
+        type="file"
+        id="studio-import-input"
+        accept=".json"
+        style="display: none"
+      />
+    </div>
+
+    <!-- 2. 小剧场剧本编辑器 -->
+    <div id="studio-editor-screen" class="screen">
+      <div class="header">
+        <span class="back-btn" id="back-from-studio-editor">‹</span>
+        <span id="studio-editor-title">编辑剧本</span>
+        <div class="header-actions">
+          <span class="action-btn" id="ai-generate-script-btn">AI补充</span>
+          <span class="save-btn" id="save-studio-script-btn">保存</span>
+        </div>
+      </div>
+      <div class="form-container">
+        <div class="form-group">
+          <label for="studio-name-input">剧本名称</label>
+          <input
+            type="text"
+            id="studio-name-input"
+            placeholder="给你的剧本起个名字..."
+          />
+        </div>
+        <div class="form-group">
+          <label for="studio-background-input">故事背景</label>
+          <textarea
+            id="studio-background-input"
+            rows="4"
+            placeholder="描述故事发生的时代、地点和基本情境..."
+          ></textarea>
+        </div>
+        <div class="form-group">
+          <label for="studio-goal-input">故事目标</label>
+          <textarea
+            id="studio-goal-input"
+            rows="3"
+            placeholder="描述达成什么条件算演绎成功，例如：找到真凶、成功逃脱..."
+          ></textarea>
+        </div>
+        <div class="form-group">
+          <label for="studio-opening-remark-input">开场白 (可选)</label>
+          <textarea
+            id="studio-opening-remark-input"
+            rows="3"
+            placeholder="这是剧本开始时展示的第一段文字，用于营造氛围或引入场景..."
+          ></textarea>
+        </div>
+        <div class="form-group">
+          <label for="studio-char1-identity-input">人物1 身份背景</label>
+          <textarea
+            id="studio-char1-identity-input"
+            rows="4"
+            placeholder="描述人物1的身份、与他人的关系、秘密任务等..."
+          ></textarea>
+        </div>
+        <div class="form-group">
+          <label for="studio-char2-identity-input">人物2 身份背景</label>
+          <textarea
+            id="studio-char2-identity-input"
+            rows="4"
+            placeholder="描述人物2的身份、与他人的关系、秘密任务等..."
+          ></textarea>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 20px">
+          <button
+            id="export-studio-script-btn"
+            class="form-button form-button-secondary"
+            style="flex: 1; margin: 0"
+          >
+            导出剧本
+          </button>
+
+          <button
+            id="delete-studio-script-btn"
+            class="form-button form-button-secondary"
+            style="
+              background-color: #ff3b30;
+              color: white;
+              border-color: #ff3b30;
+              flex: 1;
+              margin: 0;
+            "
+          >
+            删除剧本
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. 小剧场角色扮演界面 -->
+    <div id="studio-play-screen" class="screen">
+      <div class="header">
+        <span class="back-btn" id="exit-studio-play-btn">‹</span>
+        <span id="studio-play-title">剧本名称</span>
+        <div class="header-actions">
+          <span class="action-btn" id="reroll-studio-play-btn">刷新</span>
+        </div>
+      </div>
+      <div id="studio-play-messages" class="chat-messages">
+        <!-- 演绎过程将由JS动态生成在这里 -->
+      </div>
+      <div id="studio-play-input-area" class="chat-input-area">
+        <div class="chat-input-main-row">
+          <textarea
+            id="studio-play-input"
+            rows="1"
+            placeholder="你的行动/对话..."
+          ></textarea>
+          <button id="send-studio-play-action-btn" class="action-button">
+            发送
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. 角色选择模态框 -->
+    <div id="studio-role-selection-modal" class="modal">
+      <div class="modal-content" style="height: auto">
+        <div class="modal-header">
+          <span>选择角色与身份</span>
+        </div>
+        <div class="modal-body">
+          <!-- 角色1 -->
+          <div class="form-group">
+            <label>人物1</label>
+            <p id="studio-role1-desc" class="role-description"></p>
+            <!-- 新增：由谁扮演 -->
+            <div class="player-selection-group">
+              <label
+                ><input type="radio" name="player-role1" value="user" checked />
+                由我扮演</label
+              >
+              <label
+                ><input type="radio" name="player-role1" value="ai" />
+                由AI扮演</label
+              >
+            </div>
+            <!-- 修改：下拉框现在只选择身份 -->
+            <label
+              style="
+                font-size: 13px;
+                color: var(--text-secondary);
+                margin-top: 10px;
+              "
+              >使用此身份:</label
+            >
+            <select id="studio-role1-identity-select"></select>
+          </div>
+
+          <hr style="opacity: 0.2; margin: 15px 0" />
+
+          <!-- 角色2 -->
+          <div class="form-group">
+            <label>人物2</label>
+            <p id="studio-role2-desc" class="role-description"></p>
+            <!-- 新增：由谁扮演 -->
+            <div class="player-selection-group">
+              <label
+                ><input type="radio" name="player-role2" value="user" />
+                由我扮演</label
+              >
+              <label
+                ><input type="radio" name="player-role2" value="ai" />
+                由AI扮演</label
+              >
+            </div>
+            <!-- 修改：下拉框现在只选择身份 -->
+            <label
+              style="
+                font-size: 13px;
+                color: var(--text-secondary);
+                margin-top: 10px;
+              "
+              >使用此身份:</label
+            >
+            <select id="studio-role2-identity-select"></select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="cancel-role-selection-btn">取消</button>
+          <button class="save" id="confirm-role-selection-btn">进入剧本</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. 演绎成功/结束模态框 -->
+    <div id="studio-summary-modal" class="modal">
+      <div class="modal-content" style="height: auto; max-height: 80%">
+        <div class="modal-header">
+          <span id="studio-summary-title">演绎成功！</span>
+        </div>
+        <div
+          class="modal-body"
+          id="studio-summary-content"
+          style="white-space: pre-wrap; line-height: 1.7"
+        >
+          <!-- 故事目标和总结将显示在这里 -->
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="generate-novel-btn">生成小说</button>
+          <button class="save" id="close-studio-summary-btn">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6. 小说分享模态框 -->
+    <div id="studio-novel-share-modal" class="modal">
+      <div class="modal-content" style="height: 80%">
+        <div class="modal-header">
+          <span>生成的小说</span>
+        </div>
+        <div
+          class="modal-body"
+          id="studio-novel-content"
+          style="
+            white-space: pre-wrap;
+            line-height: 1.7;
+            text-align: left;
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 8px;
+          "
+        >
+          <!-- 小说内容将由JS动态生成在这里 -->
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="share-novel-btn">分享给角色</button>
+          <button class="save" id="close-novel-share-btn">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 小剧场 - 故事记录屏幕 -->
+    <div id="studio-history-screen" class="screen">
+      <div class="header">
+        <span class="back-btn" id="back-from-studio-history">‹</span>
+        <span>故事记录</span>
+        <span style="width: 30px"></span>
+        <!-- 占位符 -->
+      </div>
+      <div id="studio-history-list" class="list-container">
+        <!-- 故事记录列表将由JS动态生成在这里 -->
+      </div>
+    </div>
+
+    <div id="account-editor-modal" class="modal">
+      <div class="modal-content" style="height: auto; max-height: 85%">
+        <div class="modal-header">
+          <span id="account-editor-title">添加新账户</span>
+        </div>
+        <div class="modal-body">
+          <!-- 核心修改1：这是全新的账户类型选择视图，默认隐藏 -->
+          <div id="account-type-selection-view">
+            <!-- JS会在这里动态生成所有账户类型 -->
+          </div>
+
+          <!-- 核心修改2：将原有的表单包裹起来，默认隐藏 -->
+          <div id="account-editor-form" style="display: none">
+            <div class="form-group">
+              <label for="account-category-select">账户大类</label>
+              <select id="account-category-select"></select>
+            </div>
+            <div class="form-group">
+              <label for="account-type-select">账户类型</label>
+              <select id="account-type-select"></select>
+            </div>
+            <div class="form-group">
+              <label for="account-name-input">账户名称</label>
+              <input
+                type="text"
+                id="account-name-input"
+                placeholder="例如：工资卡, 零钱"
+              />
+            </div>
+            <div class="form-group">
+              <label for="account-balance-input">账户余额</label>
+              <input
+                type="number"
+                id="account-balance-input"
+                placeholder="0.00"
+              />
+            </div>
+            <div class="form-group">
+              <label for="account-remarks-input">备注 (可选)</label>
+              <textarea id="account-remarks-input" rows="2"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="cancel-account-editor-btn">取消</button>
+          <!-- 保存按钮初始时隐藏，选择类型后显示 -->
+          <button class="save" id="save-account-btn" style="display: none">
+            保存
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1. 创建/管理记账群聊的弹窗 (添加解散按钮) -->
+    <div id="tukey-group-manager-modal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <span id="tukey-group-manager-title">创建记账群聊</span>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="tukey-group-name-input">群聊名称</label>
+            <input
+              type="text"
+              id="tukey-group-name-input"
+              placeholder="给你的群聊起个名吧"
+            />
+          </div>
+          <div class="form-group">
+            <label>选择群成员 (勾选=拉人，取消勾选=踢人)</label>
+            <div id="tukey-member-picker-list" class="contact-picker-list">
+              <!-- 角色列表将由JS动态生成 -->
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <!-- 解散按钮 (默认隐藏) -->
+          <button
+            class="form-button-secondary"
+            id="tukey-disband-group-btn"
+            style="
+              background-color: #ffe5e5;
+              color: #ff3b30;
+              border-color: #ffc2d1;
+              display: none;
+              margin-right: auto;
+            "
+          >
+            解散群聊
+          </button>
+
+          <button class="cancel" id="tukey-cancel-group-manager-btn">
+            取消
+          </button>
+          <button class="save" id="tukey-save-group-btn">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. 群聊AI回复设置的弹窗 -->
+    <div id="tukey-reply-settings-modal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <span>AI回复设置</span>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="tukey-reply-threshold-input"
+              >每记账 ____ 条后，AI进行回复：</label
+            >
+            <input
+              type="number"
+              id="tukey-reply-threshold-input"
+              min="1"
+              value="1"
+            />
+          </div>
+          <hr style="opacity: 0.2" />
+          <div class="form-group">
+            <label>选择回复模式：</label>
+            <div
+              class="theme-selector"
+              style="flex-direction: column; align-items: flex-start; gap: 10px"
+            >
+              <label
+                ><input
+                  type="radio"
+                  name="tukey-reply-mode"
+                  value="all"
+                  checked
+                />
+                所有成员都回复</label
+              >
+              <label
+                ><input type="radio" name="tukey-reply-mode" value="random" />
+                随机选择成员回复</label
+              >
+              <label
+                ><input type="radio" name="tukey-reply-mode" value="specific" />
+                指定成员回复</label
+              >
+            </div>
+          </div>
+          <div id="tukey-specific-reply-options" style="display: none">
+            <div class="form-group">
+              <label for="tukey-random-count-input"
+                >随机回复人数 (当选择“随机”时):</label
+              >
+              <input
+                type="number"
+                id="tukey-random-count-input"
+                min="1"
+                value="2"
+              />
+            </div>
+            <div class="form-group">
+              <label>指定回复的成员 (当选择“指定”时):</label>
+              <div
+                id="tukey-specific-member-picker-list"
+                class="contact-picker-list"
+                style="max-height: 150px"
+              >
+                <!-- 成员列表将由JS动态生成 -->
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="tukey-cancel-reply-settings-btn">
+            取消
+          </button>
+          <button class="save" id="tukey-save-reply-settings-btn">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. 新建/编辑记账记录的弹窗 -->
+    <div id="tukey-record-editor-modal" class="modal">
+      <div class="modal-content" style="height: auto; max-height: 90%">
+        <div class="modal-header">
+          <span id="tukey-record-editor-title">记一笔</span>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>类型</label>
+            <div class="tukey-type-selector">
+              <button class="type-btn active" data-type="expense">支出</button>
+              <button class="type-btn" data-type="income">收入</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="tukey-record-amount-input">金额</label>
+            <input
+              type="number"
+              id="tukey-record-amount-input"
+              placeholder="0.00"
+            />
+          </div>
+          <div class="form-group">
+            <label for="tukey-record-category-select">分类</label>
+            <select id="tukey-record-category-select">
+              <!-- 分类将由JS动态生成 -->
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="tukey-record-account-select">账户</label>
+            <select id="tukey-record-account-select">
+              <!-- 账户将由JS动态生成 -->
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="tukey-record-time-input">时间</label>
+            <input type="datetime-local" id="tukey-record-time-input" />
+          </div>
+          <div class="form-group">
+            <label for="tukey-record-remarks-input">备注 (可选)</label>
+            <textarea id="tukey-record-remarks-input" rows="2"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="tukey-cancel-record-editor-btn">
+            取消
+          </button>
+          <button class="save" id="tukey-save-record-btn">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. 查岗 - 电脑屏幕 (模态框) -->
+    <div id="kk-computer-modal" class="modal">
+      <div
+        class="modal-content"
+        style="
+          width: 95%;
+          height: 90%;
+          max-width: 500px;
+          background-color: #e0e0e0;
+          background-image: url(&quot;https://i.postimg.cc/k495F4W5/profile-banner.jpg&quot;);
+          background-size: cover;
+          background-position: center;
+        "
+      >
+        <div
+          class="modal-header"
+          id="kk-computer-header"
+          style="
+            background-color: rgba(0, 0, 0, 0.3);
+            color: white;
+            text-shadow: 0 1px 2px black;
+          "
+        >
+          <span>的电脑</span>
+          <span id="close-kk-computer-modal" style="cursor: pointer">×</span>
+        </div>
+        <div class="modal-body" id="kk-computer-desktop">
+          <!-- 电脑桌面图标将由JS动态生成 -->
+        </div>
+      </div>
+    </div>
+
+    <!-- 6. 查岗 - 文件浏览器模态框 -->
+    <div id="kk-file-explorer-modal" class="modal" style="z-index: 1003">
+      <div class="modal-content" style="height: 70%">
+        <div class="modal-header">
+          <span>私人文件</span>
+        </div>
+        <div class="modal-body" id="kk-file-list">
+          <!-- 文件列表将由JS动态生成 -->
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="close-file-explorer-modal-btn">
+            关闭
+          </button>
+        </div>
+      </div>
+    </div>
+    <!-- “kk查岗”文件查看器弹窗-->
+    <div id="kk-file-viewer-modal" class="modal" style="z-index: 1004">
+      <div class="modal-content" style="height: 70%">
+        <div class="modal-header">
+          <span id="kk-file-viewer-title"></span>
+          <span
+            id="close-kk-file-viewer-btn"
+            style="cursor: pointer; font-size: 24px"
+            >&times;</span
+          >
+        </div>
+        <div
+          class="modal-body"
+          style="padding: 15px; background-color: #f0f2f5; overflow-y: auto"
+        >
+          <!-- 使用 <pre> 标签可以更好地保留原文的换行和格式 -->
+          <pre
+            id="kk-file-viewer-content"
+            style="
+              white-space: pre-wrap;
+              word-wrap: break-word;
+              font-family: inherit;
+              font-size: 14px;
+            "
+          ></pre>
+        </div>
+      </div>
+    </div>
+    <!-- Steam游戏库弹窗 ▼▼▼ -->
+    <div id="kk-steam-modal" class="modal" style="z-index: 1003">
+      <div class="modal-content" style="height: 70%">
+        <div class="modal-header">
+          <span>Steam 游戏库</span>
+          <div class="header-actions">
+            <span
+              class="action-btn"
+              id="kk-generate-more-games-btn"
+              title="生成更多游戏"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+            </span>
+          </div>
+        </div>
+        <div class="modal-body" id="kk-steam-games-list">
+          <!-- 游戏列表将由JS动态生成在这里 -->
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="close-kk-steam-modal-btn">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 快捷回复管理模态框 -->
+    <div id="quick-reply-modal" class="modal">
+      <div class="modal-content" style="height: 60%">
+        <div class="modal-header">
+          <span>快捷回复</span>
+          <div class="header-actions">
+            <!-- 顶部操作按钮 -->
+            <span
+              class="action-btn"
+              id="import-quick-reply-btn"
+              title="导入"
+              style="font-size: 14px"
+              >导入</span
+            >
+            <span
+              class="action-btn"
+              id="export-quick-reply-btn"
+              title="导出"
+              style="font-size: 14px"
+              >导出</span
+            >
+            <span
+              class="action-btn"
+              id="add-quick-reply-btn"
+              style="font-size: 24px"
+              >+</span
+            >
+          </div>
+        </div>
+        <div
+          class="modal-body"
+          id="quick-reply-list"
+          style="padding: 0; overflow-y: auto"
+        >
+          <!-- 列表将由JS动态生成 -->
+        </div>
+        <div class="modal-footer">
+          <button class="save" id="close-quick-reply-btn" style="width: 100%">
+            关闭
+          </button>
+        </div>
+      </div>
+    </div>
+    <!-- 隐藏的文件选择器 -->
+    <input type="file" id="import-quick-reply-input" accept=".json" hidden />
+
+    <!-- 时间轴/存档管理模态框 -->
+    <div id="branching-modal" class="modal">
+      <div class="modal-content" style="height: 70%">
+        <div class="modal-header">
+          <span>时间轴管理</span>
+          <div class="header-actions">
+            <button
+              id="create-branch-btn"
+              class="action-button"
+              style="font-size: 14px"
+            >
+              + 新存档
+            </button>
+          </div>
+        </div>
+        <div
+          class="modal-body"
+          style="padding: 0; display: flex; flex-direction: column"
+        >
+          <!-- 顶部操作区 -->
+          <div
+            style="
+              padding: 15px;
+              border-bottom: 1px solid var(--border-color);
+              text-align: center;
+            "
+          >
+            <button
+              id="restart-chat-btn"
+              class="form-button"
+              style="background-color: #ff9800; color: white; margin-bottom: 0"
+            >
+              🔄 重开新剧情 (清空当前)
+            </button>
+            <p
+              style="
+                font-size: 12px;
+                color: #999;
+                margin-top: 8px;
+                margin-bottom: 0;
+              "
+            >
+              重开前建议先点击右上角保存当前进度
+            </p>
+          </div>
+
+          <!-- 存档列表 -->
+          <div
+            id="branch-list"
+            class="list-container"
+            style="flex-grow: 1; background-color: var(--secondary-bg)"
+          >
+            <!-- 存档项将由JS生成 -->
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button
+            class="save"
+            id="close-branching-modal-btn"
+            style="width: 100%"
+          >
+            关闭
+          </button>
+        </div>
+      </div>
+    </div>
+    <!-- KK查岗物品详情专用弹窗 -->
+    <div id="kk-item-share-modal" class="modal">
+      <div class="modal-content" style="height: auto; max-height: 80%">
+        <div class="modal-header">
+          <span id="kk-item-share-title">物品详情</span>
+        </div>
+        <!-- 内容显示区 -->
+        <div class="modal-body" style="padding: 15px">
+          <div
+            id="kk-item-share-content"
+            style="
+              text-align: left;
+              white-space: pre-wrap;
+              background: #f9f9f9;
+              padding: 15px;
+              border-radius: 8px;
+              font-size: 14px;
+              line-height: 1.6;
+              border: 1px solid #eee;
+              color: #333;
+            "
+          ></div>
+        </div>
+        <!-- 按钮区 -->
+        <div class="modal-footer" style="display: flex; gap: 10px">
+          <button
+            class="form-button-secondary"
+            id="kk-item-share-close-btn"
+            style="flex: 1; margin: 0"
+          >
+            关闭
+          </button>
+          <button
+            class="form-button"
+            id="kk-item-share-confirm-btn"
+            style="
+              flex: 1;
+              margin: 0;
+              background-color: #ff9800;
+              border-color: #ff9800;
+            "
+          >
+            📤 分享给Ta
+          </button>
+        </div>
+      </div>
+    </div>
+    <!-- 番茄钟暂停休息聊天弹窗 -->
+    <div id="pomodoro-break-modal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <span>☕ 休息时间</span>
+          <span
+            id="close-pomodoro-break-btn"
+            style="cursor: pointer; font-size: 20px"
+            >×</span
+          >
+        </div>
+        <!-- 消息列表 -->
+        <div class="modal-body" id="pomodoro-break-messages">
+          <div
+            style="
+              text-align: center;
+              color: #999;
+              font-size: 13px;
+              margin-top: 10px;
+            "
+          >
+            累了吗？和我聊聊吧~
+          </div>
+        </div>
+        <!-- 输入框区域 -->
+        <div class="chat-input-area">
+          <div class="chat-input-main-row">
+            <textarea
+              id="pomodoro-break-input"
+              rows="1"
+              placeholder="说点什么..."
+            ></textarea>
+            <button id="pomodoro-break-send-btn" class="action-button">
+              发送
+            </button>
+          </div>
