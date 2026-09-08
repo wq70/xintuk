@@ -213,64 +213,209 @@
               messagesPayload,
               isGemini,
             );
-            const response = isGemini
-              ? await fetch(geminiConfig.url, geminiConfig.data)
-              : await fetch(`${proxyUrl}/v1/chat/completions`, {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${apiKey}`,
-                  },
-                  body: JSON.stringify({
-                    model: model,
-                    messages: [
-                      { role: "system", content: systemPrompt },
-                      ...messagesPayload,
-                    ],
-                    temperature: parseFloat(state.apiConfig.temperature) || 0.8,
-                    stream: false,
-                  }),
-                });
-            if (!response.ok) {
+            const assertApiResponse = async (response) => {
+              if (response.ok) return response;
               let errorMsg = `API Error: ${response.status}`;
               try {
-                // 尝试解析错误信息体为JSON
                 const errorData = await response.json();
-                // 安全地获取错误信息，如果结构不符合预期，就将整个错误对象转为字符串
                 errorMsg += ` - ${errorData?.error?.message || JSON.stringify(errorData)}`;
               } catch (jsonError) {
-                // 如果连JSON都不是，就直接读取文本
                 errorMsg += ` - ${await response.text()}`;
               }
-              // 抛出一个包含了详细信息的错误，这样就不会在catch块里再次出错了
               throw new Error(errorMsg);
-            }
-            if (!response.ok) {
-              let errorMsg = `API Error: ${response.status}`;
-              try {
-                // 尝试解析错误信息体为JSON
-                const errorData = await response.json();
-                // 安全地获取错误信息，如果结构不符合预期，就将整个错误对象转为字符串
-                errorMsg += ` - ${errorData?.error?.message || JSON.stringify(errorData)}`;
-              } catch (jsonError) {
-                // 如果连JSON都不是，就直接读取文本
-                errorMsg += ` - ${await response.text()}`;
-              }
-              // 抛出一个包含了详细信息的错误，这样就不会在catch块里再次出错了
-              throw new Error(errorMsg);
-            }
-            const data = await response.json();
+            };
 
-            // 添加对 data 结构的安全检查
-            const aiResponseContent = isGemini
-              ? data?.candidates?.[0]?.content?.parts?.[0]?.text
-              : data?.choices?.[0]?.message?.content;
+            const sendMcpModelRequest = async (request) => {
+              if (!isGemini) {
+                const response = await assertApiResponse(
+                  await fetch(`${proxyUrl}/v1/chat/completions`, {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      Authorization: `Bearer ${apiKey}`,
+                    },
+                    body: JSON.stringify({
+                      model,
+                      messages: request.messages,
+                      temperature:
+                        parseFloat(state.apiConfig.temperature) || 0.8,
+                      stream: false,
+                      ...(request.tools?.length
+                        ? {
+                            tools: request.tools,
+                            tool_choice: request.requireTool
+                              ? "required"
+                              : "auto",
+                          }
+                        : {}),
+                    }),
+                  }),
+                );
+                const responseData = await response.json();
+                const message = responseData?.choices?.[0]?.message || {};
+                return {
+                  text: message.content || "",
+                  toolCalls: (message.tool_calls || []).map((call) => ({
+                    id: call.id,
+                    name: call.function?.name,
+                    arguments: call.function?.arguments || "{}",
+                  })),
+                  assistantMessage: message,
+                };
+              }
+
+              const baseData = JSON.parse(geminiConfig.data.body);
+              const systemParts = [];
+              const contents = [];
+              request.messages.forEach((message) => {
+                if (message.role === "system") {
+                  systemParts.push({ text: String(message.content || "") });
+                  return;
+                }
+                if (message.role === "tool") {
+                  let responseValue;
+                  try {
+                    responseValue = JSON.parse(message.content || "{}");
+                  } catch (error) {
+                    responseValue = { result: String(message.content || "") };
+                  }
+                  contents.push({
+                    role: "user",
+                    parts: [
+                      {
+                        functionResponse: {
+                          name: message.name,
+                          response: responseValue,
+                        },
+                      },
+                    ],
+                  });
+                  return;
+                }
+                const parts = [];
+                if (message.content) parts.push({ text: String(message.content) });
+                (message.tool_calls || []).forEach((call) => {
+                  let args = {};
+                  try {
+                    args = JSON.parse(call.function?.arguments || "{}");
+                  } catch (error) {}
+                  parts.push({
+                    functionCall: { name: call.function?.name, args },
+                  });
+                });
+                if (parts.length) {
+                  contents.push({
+                    role: message.role === "assistant" ? "model" : "user",
+                    parts,
+                  });
+                }
+              });
+              const body = {
+                ...baseData,
+                contents,
+                ...(systemParts.length
+                  ? { systemInstruction: { parts: systemParts } }
+                  : {}),
+              };
+              if (request.tools?.length) {
+                body.tools = [
+                  {
+                    functionDeclarations: request.tools.map(
+                      (tool) => tool.function,
+                    ),
+                  },
+                ];
+                body.toolConfig = {
+                  functionCallingConfig: {
+                    mode: request.requireTool ? "ANY" : "AUTO",
+                  },
+                };
+              } else {
+                delete body.tools;
+                delete body.toolConfig;
+              }
+              const response = await assertApiResponse(
+                await fetch(geminiConfig.url, {
+                  ...geminiConfig.data,
+                  body: JSON.stringify(body),
+                }),
+              );
+              const responseData = await response.json();
+              const parts = responseData?.candidates?.[0]?.content?.parts || [];
+              const calls = parts
+                .filter((part) => part.functionCall)
+                .map((part, index) => ({
+                  id: `gemini-mcp-${Date.now()}-${index}`,
+                  name: part.functionCall.name,
+                  arguments: part.functionCall.args || {},
+                }));
+              const text = parts
+                .filter((part) => typeof part.text === "string")
+                .map((part) => part.text)
+                .join("\n");
+              return {
+                text,
+                toolCalls: calls,
+                assistantMessage: {
+                  role: "assistant",
+                  content: text,
+                  tool_calls: calls.map((call) => ({
+                    id: call.id,
+                    type: "function",
+                    function: {
+                      name: call.name,
+                      arguments: JSON.stringify(call.arguments || {}),
+                    },
+                  })),
+                },
+              };
+            };
+
+            let aiResponseContent = null;
+            if (window.McpChatOrchestrator) {
+              aiResponseContent = await window.McpChatOrchestrator.run({
+                chat,
+                messages: [
+                  { role: "system", content: systemPrompt },
+                  ...messagesPayload,
+                ],
+                send: sendMcpModelRequest,
+              });
+            }
+            if (aiResponseContent === null) {
+              const response = await assertApiResponse(
+                isGemini
+                  ? await fetch(geminiConfig.url, geminiConfig.data)
+                  : await fetch(`${proxyUrl}/v1/chat/completions`, {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${apiKey}`,
+                      },
+                      body: JSON.stringify({
+                        model: model,
+                        messages: [
+                          { role: "system", content: systemPrompt },
+                          ...messagesPayload,
+                        ],
+                        temperature:
+                          parseFloat(state.apiConfig.temperature) || 0.8,
+                        stream: false,
+                      }),
+                    }),
+              );
+              const data = await response.json();
+              aiResponseContent = isGemini
+                ? data?.candidates?.[0]?.content?.parts?.find(
+                    (part) => typeof part.text === "string",
+                  )?.text
+                : data?.choices?.[0]?.message?.content;
+            }
 
             // 检查修复后的结果是否真的拿到了内容
             if (!aiResponseContent) {
               console.warn(
-                `API返回了空内容或格式不正确（可能因安全设置被拦截）。返回数据:`,
-                data,
+                "API返回了空内容或格式不正确（可能因安全设置被拦截）。",
               );
               throw new Error(
                 "API返回了空内容或格式不正确（可能因安全设置被拦截）。",

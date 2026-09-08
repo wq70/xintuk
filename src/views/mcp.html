@@ -1,0 +1,54 @@
+    <div id="mcp-screen" class="screen">
+      <div class="header mcp-app-header">
+        <span class="back-btn" onclick="showScreen('home-screen')">‹</span>
+        <span>MCP</span>
+        <button id="mcp-add-connection-btn" class="action-button" type="button">添加</button>
+      </div>
+
+      <div class="mcp-app-body">
+        <section class="mcp-overview" aria-live="polite">
+          <div class="mcp-overview-copy">
+            <strong id="mcp-overview-title">尚未连接服务</strong>
+            <span id="mcp-overview-detail">添加一个 MCP 服务后即可发现工具</span>
+          </div>
+          <div class="mcp-overview-counts">
+            <span><b id="mcp-online-count">0</b> 在线</span>
+            <span><b id="mcp-tool-count">0</b> 工具</span>
+          </div>
+        </section>
+
+        <div class="mcp-view-switch" role="tablist" aria-label="MCP 内容">
+          <button class="active" type="button" data-mcp-view="connections">服务</button>
+          <button type="button" data-mcp-view="capabilities">能力</button>
+          <button type="button" data-mcp-view="activities">记录</button>
+          <button type="button" data-mcp-view="settings">设置</button>
+        </div>
+
+        <div id="mcp-main-content" class="mcp-main-content"></div>
+      </div>
+
+      <input id="mcp-import-input" type="file" accept="application/json,.json" hidden />
+
+      <div id="mcp-sheet-backdrop" class="mcp-sheet-backdrop" aria-hidden="true">
+        <section class="mcp-sheet" role="dialog" aria-modal="true" aria-labelledby="mcp-sheet-title">
+          <div class="mcp-sheet-header">
+            <strong id="mcp-sheet-title">MCP</strong>
+            <button id="mcp-sheet-close" class="mcp-icon-button" type="button" aria-label="关闭">×</button>
+          </div>
+          <div id="mcp-sheet-body" class="mcp-sheet-body"></div>
+          <div id="mcp-sheet-actions" class="mcp-sheet-actions"></div>
+        </section>
+      </div>
+
+      <div id="mcp-confirm-backdrop" class="mcp-confirm-backdrop" aria-hidden="true">
+        <section class="mcp-confirm-card" role="alertdialog" aria-modal="true" aria-labelledby="mcp-confirm-title">
+          <strong id="mcp-confirm-title">确认操作</strong>
+          <p id="mcp-confirm-message"></p>
+          <pre id="mcp-confirm-details" hidden></pre>
+          <div class="mcp-confirm-actions">
+            <button id="mcp-confirm-cancel" type="button" class="mcp-secondary-button">取消</button>
+            <button id="mcp-confirm-accept" type="button" class="mcp-primary-button">允许</button>
+          </div>
+        </section>
+      </div>
+    </div>

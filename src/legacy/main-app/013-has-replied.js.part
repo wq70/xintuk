@@ -420,7 +420,7 @@
 			-   **发送图片**: \`{"type": "ai_image", "name": "角色名", "description": "图片的详细文字描述"}\`
 			-   **发送语音**: \`{"type": "voice_message", "name": "角色名", "content": "语音的文字内容"}\`
 			${
-        localStorage.getItem("novelai-enabled") === "true"
+        projectStorage.getItem("novelai-enabled") === "true"
           ? `-   **【NovelAI图片分享】**: \`{"type": "naiimag", "name": "你的角色名", "prompt": "详细的英文描述词..."}\`
 			    - 【禁止暴露这是novelai生成的图片!】
 			    - **【重要】关于prompt的撰写**：
@@ -477,6 +477,7 @@
 
               messagesPayload = historySlice
                 .map((msg, index) => {
+                  if (msg.type === "mcp_activity") return null;
                   if (msg.isHidden) {
                     return { role: "system", content: msg.content };
                   }

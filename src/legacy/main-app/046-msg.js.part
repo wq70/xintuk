@@ -135,7 +135,7 @@
                 "enable-lock-screen-toggle",
               ).checked;
               state.globalSettings.enableLockScreen = isLockEnabled;
-              localStorage.setItem("lockScreenEnabled", isLockEnabled);
+              projectStorage.setItem("lockScreenEnabled", isLockEnabled);
 
               // 保存主屏幕字体颜色 (现在我们可以从任意一个输入框取值，因为它们是同步的)
               // 这里优先取文本框的值，因为它更直观
@@ -313,13 +313,13 @@
                 document.getElementById("novelai-api-key");
 
               if (novelaiSwitch) {
-                localStorage.setItem("novelai-enabled", novelaiSwitch.checked);
+                projectStorage.setItem("novelai-enabled", novelaiSwitch.checked);
               }
               if (novelaiModelInput) {
-                localStorage.setItem("novelai-model", novelaiModelInput.value);
+                projectStorage.setItem("novelai-model", novelaiModelInput.value);
               }
               if (novelaiKeyInput) {
-                localStorage.setItem(
+                projectStorage.setItem(
                   "novelai-api-key",
                   novelaiKeyInput.value.trim(),
                 );
@@ -634,7 +634,7 @@
               const unlockKey = "isCharacterImportUnlocked";
 
               // 1. 检查是否已经解锁 (和角色卡导入共用一个解锁状态)
-              if (localStorage.getItem(unlockKey) === "true") {
+              if (projectStorage.getItem(unlockKey) === "true") {
                 document.getElementById("world-book-import-input").click(); // 直接打开文件选择器
                 return;
               }
@@ -666,7 +666,7 @@
               // 6. 验证PIN码
               const correctPin = generatePinFromDeviceCode(deviceCode);
               if (userPin.trim().toUpperCase() === correctPin) {
-                localStorage.setItem(unlockKey, "true");
+                projectStorage.setItem(unlockKey, "true");
                 await showCustomAlert(
                   "解锁成功！",
                   "导入功能已解锁，此设备无需再次输入PIN码。",

@@ -128,6 +128,13 @@
             "datingSpriteGroups",
             "datingSprites",
             "datingHistory",
+            "mcpConnections",
+            "mcpCapabilities",
+            "mcpActivities",
+            "mcpSubscriptions",
+            "mcpTasks",
+            "mcpApprovals",
+            "mcpSettings",
           ];
 
           const stream = new ReadableStream({
@@ -502,10 +509,10 @@
          */
         function getDeviceCode() {
           const deviceIdKey = "ephone-device-code"; // 使用一个新的键名
-          let deviceId = localStorage.getItem(deviceIdKey);
+          let deviceId = projectStorage.getItem(deviceIdKey);
           if (!deviceId) {
             deviceId = crypto.randomUUID();
-            localStorage.setItem(deviceIdKey, deviceId);
+            projectStorage.setItem(deviceIdKey, deviceId);
           }
           return deviceId;
         }

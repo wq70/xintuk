@@ -263,7 +263,7 @@
               contrast: 90,
               sepia: 10,
             };
-            const manualPref = localStorage.getItem(storageKey);
+            const manualPref = projectStorage.getItem(storageKey);
             if (manualPref === "true") {
               DarkReader.enable(darkReaderOptions);
               toggleCheckbox.checked = true;
@@ -279,10 +279,10 @@
             toggleCheckbox.addEventListener("change", function () {
               if (this.checked) {
                 DarkReader.enable(darkReaderOptions);
-                localStorage.setItem(storageKey, "true");
+                projectStorage.setItem(storageKey, "true");
               } else {
                 DarkReader.disable();
-                localStorage.setItem(storageKey, "false");
+                projectStorage.setItem(storageKey, "false");
               }
             });
           });

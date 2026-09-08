@@ -44,6 +44,7 @@
 
             # 对话历史
             ${chat.history
+              .filter((m) => m.type !== "mcp_activity")
               .slice(-chat.settings.maxMemory)
               .map(
                 (m) =>
@@ -53,9 +54,9 @@
 
             现在，请根据用户的最后一句话，开始你的表演。`;
 
-            const messagesForOfflineMode = chat.history.slice(
-              -chat.settings.maxMemory,
-            );
+            const messagesForOfflineMode = chat.history
+              .filter((message) => message.type !== "mcp_activity")
+              .slice(-chat.settings.maxMemory);
 
             // UI 状态更新
             const chatHeaderTitle =
@@ -106,19 +107,29 @@
                 };
               }
 
-              const response = await fetch(requestUrl, {
-                method: "POST",
-                headers: requestHeaders,
-                body: JSON.stringify(requestBody),
-              });
+              let aiResponseContent = null;
+              if (window.McpManager) {
+                aiResponseContent = await window.McpManager.runWithConfiguredModel(
+                  chat,
+                  offlineSystemPrompt,
+                  messagesForOfflineMode,
+                );
+              }
+              if (aiResponseContent === null) {
+                const response = await fetch(requestUrl, {
+                  method: "POST",
+                  headers: requestHeaders,
+                  body: JSON.stringify(requestBody),
+                });
 
-              if (!response.ok)
-                throw new Error(`API 错误: ${await response.text()}`);
+                if (!response.ok)
+                  throw new Error(`API 错误: ${await response.text()}`);
 
-              const data = await response.json();
-              const aiResponseContent = isGemini
-                ? data?.candidates?.[0]?.content?.parts?.[0]?.text
-                : data?.choices?.[0]?.message?.content;
+                const data = await response.json();
+                aiResponseContent = isGemini
+                  ? data?.candidates?.[0]?.content?.parts?.[0]?.text
+                  : data?.choices?.[0]?.message?.content;
+              }
 
               if (!aiResponseContent) throw new Error("API返回内容为空");
 
@@ -194,9 +205,9 @@
                       const finalPositivePrompt = `${aiPrompt}, ${naiPrompts.positive}`;
                       const finalNegativePrompt = naiPrompts.negative;
 
-                      const apiKey = localStorage.getItem("novelai-api-key");
+                      const apiKey = projectStorage.getItem("novelai-api-key");
                       const model =
-                        localStorage.getItem("novelai-model") ||
+                        projectStorage.getItem("novelai-model") ||
                         "nai-diffusion-4-5-full";
                       const settings = getNovelAISettings();
 

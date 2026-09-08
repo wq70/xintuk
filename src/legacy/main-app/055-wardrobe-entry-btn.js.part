@@ -357,7 +357,7 @@
             "enable-lock-screen-toggle",
           );
           const lockScreenEnabled =
-            localStorage.getItem("lockScreenEnabled") !== "false";
+            projectStorage.getItem("lockScreenEnabled") !== "false";
           enableLockScreenToggle.checked = lockScreenEnabled;
 
           // 2. 读取、应用并监听“显示状态栏”设置
@@ -367,7 +367,7 @@
           const statusBar = document.getElementById("status-bar");
           // 读取保存的状态，如果没保存过，默认是 true (显示)
           const showStatusBar =
-            localStorage.getItem("showStatusBar") !== "false";
+            projectStorage.getItem("showStatusBar") !== "false";
           // 让开关的状态和保存的状态同步
           showStatusBarToggle.checked = showStatusBar;
           // 根据保存的状态，决定一加载进来时是否显示状态栏
@@ -381,7 +381,7 @@
           showStatusBarToggle.addEventListener("change", (e) => {
             const isEnabled = e.target.checked;
             // a. 将新的开关状态 (true 或 false) 保存到浏览器的 localStorage 里
-            localStorage.setItem("showStatusBar", isEnabled);
+            projectStorage.setItem("showStatusBar", isEnabled);
             // b. 立刻根据新的状态来显示或隐藏状态栏
             statusBar.style.display = isEnabled ? "flex" : "none";
           });
@@ -732,12 +732,12 @@
               msgEl.textContent = "验证通过，正在进入...";
 
               // 保存登录状态
-              localStorage.setItem("ephone_saved_uid", uid);
+              projectStorage.setItem("ephone_saved_uid", uid);
               // 同时保存你的新验证标记
-              localStorage.setItem("ephone_auth", "true");
+              projectStorage.setItem("ephone_auth", "true");
 
               // 初始化数据库 (使用 uid 作为数据库标识)
-              initDatabase(uid);
+              await initDatabase(uid);
 
               // 移除遮罩动画
               const overlay = document.getElementById("login-overlay");
@@ -780,19 +780,21 @@
         // ==========================================
 
         // 检查本地是否已登录
-        const savedUid = localStorage.getItem("ephone_saved_uid");
+        const savedUid = projectStorage.getItem("ephone_saved_uid");
 
         if (savedUid) {
           console.log(`[Auto Login] 检测到已登录账号: ${savedUid}`);
-          try {
-            // 已登录：直接初始化数据库并启动，不显示登录框
-            initDatabase(savedUid);
-            init();
-          } catch (e) {
-            console.error("自动登录出错，重置状态:", e);
-            localStorage.removeItem("ephone_saved_uid");
-            renderLoginOverlay();
-          }
+          (async () => {
+            try {
+              // 已登录：完成数据库就绪和旧数据迁移后再启动。
+              await initDatabase(savedUid);
+              await init();
+            } catch (e) {
+              console.error("自动登录出错，重置状态:", e);
+              projectStorage.removeItem("ephone_saved_uid");
+              renderLoginOverlay();
+            }
+          })();
         } else {
           // 未登录：显示登录框
           renderLoginOverlay();
@@ -812,7 +814,7 @@
             newBtn.addEventListener("click", async () => {
               // 使用原生的 confirm，防止 showCustomConfirm 没加载
               if (confirm("确定要退出登录吗？")) {
-                localStorage.removeItem("ephone_saved_uid");
+                projectStorage.removeItem("ephone_saved_uid");
                 window.location.reload();
               }
             });

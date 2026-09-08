@@ -658,6 +658,8 @@
             currentRenderedCount++;
           }
         }
+        window.appendMessage = appendMessage;
+        window.renderChatInterface = renderChatInterface;
 
         async function openChat(chatId) {
           state.activeChatId = chatId;

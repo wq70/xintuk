@@ -356,7 +356,9 @@
 
           try {
             // 1. 准备任务列表
-            const tablesToExport = db.tables.map((t) => t.name);
+            const tablesToExport = db.tables
+              .map((t) => t.name)
+              .filter((name) => name !== "mcpSecrets");
             const singleObjects = [
               "apiConfig",
               "globalSettings",

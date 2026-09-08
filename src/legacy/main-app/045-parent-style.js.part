@@ -61,7 +61,7 @@
           }
           // ▲▲▲▲▲▲▲▲▲▲▲▲ 修改结束 ▲▲▲▲▲▲▲▲▲▲▲▲
 
-          const savedTheme = localStorage.getItem("ephone-theme") || "light"; // 默认为日间模式
+          const savedTheme = projectStorage.getItem("ephone-theme") || "light"; // 默认为日间模式
           applyTheme(savedTheme);
 
           const customBubbleStyleTag = document.createElement("style");
@@ -151,7 +151,7 @@
 
           // 初始化未读动态计数
           const storedCount =
-            parseInt(localStorage.getItem("unreadPostsCount")) || 0;
+            parseInt(projectStorage.getItem("unreadPostsCount")) || 0;
           updateUnreadIndicator(storedCount);
 
           if (state.globalSettings && state.globalSettings.fontUrl) {
@@ -449,7 +449,7 @@
               const unlockKey = "isCharacterImportUnlocked";
 
               // 1. 检查是否已经解锁
-              if (localStorage.getItem(unlockKey) === "true") {
+              if (projectStorage.getItem(unlockKey) === "true") {
                 document.getElementById("character-card-input").click();
                 return;
               }
@@ -481,7 +481,7 @@
               // 6. 验证PIN码
               const correctPin = generatePinFromDeviceCode(deviceCode);
               if (userPin.trim().toUpperCase() === correctPin) {
-                localStorage.setItem(unlockKey, "true");
+                projectStorage.setItem(unlockKey, "true");
                 await showCustomAlert(
                   "解锁成功！",
                   "导入功能已解锁，此设备无需再次输入PIN码。",

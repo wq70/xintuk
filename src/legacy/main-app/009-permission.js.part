@@ -723,7 +723,7 @@
         async function renderWallpaperScreen() {
           // 锁屏开关
           const lockScreenEnabled =
-            localStorage.getItem("lockScreenEnabled") !== "false";
+            projectStorage.getItem("lockScreenEnabled") !== "false";
           const toggle = document.getElementById("enable-lock-screen-toggle");
           if (toggle) {
             toggle.checked = lockScreenEnabled;

@@ -467,7 +467,7 @@
               );
               // 检查系统是否启用了NovelAI
               const novelaiEnabled =
-                localStorage.getItem("novelai-enabled") === "true";
+                projectStorage.getItem("novelai-enabled") === "true";
               if (!isGroup && novelaiEnabled) {
                 naiCharacterSettingsGroup.style.display = "block";
 

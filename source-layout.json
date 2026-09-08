@@ -3,6 +3,7 @@
     "index.html": [
       "src/views/document-shell.html",
       "src/views/home.html",
+      "src/views/mcp.html",
       "src/views/weibo.html",
       "src/views/world-book-and-api-settings.html",
       "src/views/chat-and-albums-01.html",
@@ -107,7 +108,8 @@
       "src/styles/cascade/018.css",
       "src/styles/cascade/019.css",
       "src/styles/cascade/020.css",
-      "src/styles/cascade/021.css"
+      "src/styles/cascade/021.css",
+      "src/styles/cascade/022-mcp.css"
     ],
     "game-hall.js": [
       "src/features/game-hall/001-ludo-board-size.js.part",
@@ -163,6 +165,11 @@
     ],
     "avatar-frames.js": [
       "src/features/avatar-frames/001-avatar-frames.js.part"
+    ],
+    "mcp.js": [
+      "src/features/mcp/001-protocol-client.js",
+      "src/features/mcp/002-manager-and-chat.js",
+      "src/features/mcp/003-app-controller.js"
     ]
   }
 }

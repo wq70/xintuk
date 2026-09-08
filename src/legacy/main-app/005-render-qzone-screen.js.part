@@ -691,6 +691,13 @@
               taobaoCart,
               userWalletTransactions,
               userStickerCategories,
+              mcpConnections,
+              mcpCapabilities,
+              mcpActivities,
+              mcpSubscriptions,
+              mcpTasks,
+              mcpApprovals,
+              mcpSettings,
             ] = await Promise.all([
               db.chats.toArray(),
               db.worldBooks.toArray(),
@@ -729,6 +736,13 @@
               db.taobaoCart.toArray(),
               db.userWalletTransactions.toArray(),
               db.userStickerCategories.toArray(),
+              db.mcpConnections.toArray(),
+              db.mcpCapabilities.toArray(),
+              db.mcpActivities.toArray(),
+              db.mcpSubscriptions.toArray(),
+              db.mcpTasks.toArray(),
+              db.mcpApprovals.toArray(),
+              db.mcpSettings.toArray(),
             ]);
 
             Object.assign(backupData, {
@@ -769,6 +783,13 @@
               taobaoCart,
               userWalletTransactions,
               userStickerCategories,
+              mcpConnections,
+              mcpCapabilities,
+              mcpActivities,
+              mcpSubscriptions,
+              mcpTasks,
+              mcpApprovals,
+              mcpSettings,
             });
 
             backupData.homeScreenState = {

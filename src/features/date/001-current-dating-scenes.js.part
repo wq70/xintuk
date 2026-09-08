@@ -927,7 +927,7 @@ function openDatingBgmModal() {
 
   // 设置音量条的初始值
   const volumeSlider = document.getElementById("dating-bgm-volume-slider");
-  bgmPlayer.volume = parseFloat(localStorage.getItem("datingBgmVolume")) || 1.0; // 读取保存的音量
+  bgmPlayer.volume = parseFloat(projectStorage.getItem("datingBgmVolume")) || 1.0; // 读取保存的音量
   volumeSlider.value = bgmPlayer.volume;
   document.getElementById("dating-bgm-volume-value").textContent =
     `${Math.round(bgmPlayer.volume * 100)}%`;
@@ -1014,7 +1014,7 @@ function setDatingBgmVolume(volume) {
   document.getElementById("dating-bgm-volume-value").textContent =
     `${Math.round(volume * 100)}%`;
   // ▼▼▼ 新增：将音量设置保存到 localStorage ▼▼▼
-  localStorage.setItem("datingBgmVolume", volume);
+  projectStorage.setItem("datingBgmVolume", volume);
 }
 
 /**

@@ -171,6 +171,7 @@
               updateSettingsPreview();
 
               renderBubblePresetSelector();
+              window.McpApp?.renderChatSettings(chat);
               document
                 .getElementById("bubble-style-preset-select")
                 .addEventListener("change", handlePresetSelectChange);
@@ -417,7 +418,7 @@
                 ).checked;
                 // 保存NAI出图设置
                 const novelaiEnabled =
-                  localStorage.getItem("novelai-enabled") === "true";
+                  projectStorage.getItem("novelai-enabled") === "true";
                 if (novelaiEnabled) {
                   if (!chat.settings.naiSettings) {
                     chat.settings.naiSettings = {};
@@ -578,6 +579,8 @@
                   fontColor: "#ff6f00",
                 };
               }
+
+              window.McpApp?.saveChatSettingsFromPanel(chat);
 
               await db.chats.put(chat);
 

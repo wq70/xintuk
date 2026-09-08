@@ -1,9 +1,9 @@
 {
-  "elementIdCount": 2021,
-  "elementIdOrderHash": "84ef13bbfae5ebc52fb2876f38efe2a56da676a10cd406e4d81db0f312372e4e",
-  "screenCount": 62,
-  "screenIdOrderHash": "30113b8d494e9cf2e9cf13e5bfcbf1a29758a2fed60e1d5899d71705ab7beaf5",
-  "inlineHandlerCount": 54,
+  "elementIdCount": 2044,
+  "elementIdOrderHash": "0a1ac2fbacf5051515db050a413a5dcdc4fd77d4d85cfae95cf41e10d876a6c4",
+  "screenCount": 63,
+  "screenIdOrderHash": "dce15df84f67a9bfe170b7ed165bbcd9d6ab2932c30979de78faa3a4db1580db",
+  "inlineHandlerCount": 56,
   "scriptReferences": [
     "https://unpkg.com/dexie/dist/dexie.js",
     "https://cdn.jsdelivr.net/npm/marked/marked.min.js",
@@ -26,7 +26,8 @@
     "https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js",
     "https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js",
     "https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js",
-    "avatar-frames.js"
+    "avatar-frames.js",
+    "mcp.js"
   ],
-  "databaseSchemaHash": "7f0f2fa75d6a8e098857faa895d79f1913fab77683c3e2a6f0427743d1be6e42"
+  "databaseSchemaHash": "4116b2e8bb98e6971866d3acd342719d44e1dd3d64d33c3a4bbe442ccc1c6aac"
 }

@@ -465,9 +465,9 @@
           const finalNegativePrompt = naiPrompts.negative;
 
           // 获取设置
-          const apiKey = localStorage.getItem("novelai-api-key");
+          const apiKey = projectStorage.getItem("novelai-api-key");
           const model =
-            localStorage.getItem("novelai-model") || "nai-diffusion-4-5-full";
+            projectStorage.getItem("novelai-model") || "nai-diffusion-4-5-full";
           const settings = getNovelAISettings();
 
           if (!apiKey) {

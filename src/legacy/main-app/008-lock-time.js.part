@@ -133,9 +133,9 @@
             .getElementById("novelai-api-key")
             .value.trim();
 
-          localStorage.setItem("novelai-enabled", novelaiEnabled);
-          localStorage.setItem("novelai-model", novelaiModel);
-          localStorage.setItem("novelai-api-key", novelaiApiKey);
+          projectStorage.setItem("novelai-enabled", novelaiEnabled);
+          projectStorage.setItem("novelai-model", novelaiModel);
+          projectStorage.setItem("novelai-api-key", novelaiApiKey);
 
           // 保存高级参数配置
           const settings = {
@@ -160,11 +160,11 @@
               .value,
           };
 
-          localStorage.setItem("novelai-settings", JSON.stringify(settings));
+          projectStorage.setItem("novelai-settings", JSON.stringify(settings));
         }
 
         function resetNovelAISettings() {
-          localStorage.removeItem("novelai-settings");
+          projectStorage.removeItem("novelai-settings");
           loadNovelAISettings();
           alert("已恢复默认设置！");
         }
@@ -188,7 +188,7 @@
             custom_proxy_url: "",
           };
 
-          const saved = localStorage.getItem("novelai-settings");
+          const saved = projectStorage.getItem("novelai-settings");
           if (saved) {
             try {
               return { ...defaultSettings, ...JSON.parse(saved) };
@@ -711,10 +711,10 @@
 
           // 加载NovelAI配置
           const novelaiEnabled =
-            localStorage.getItem("novelai-enabled") === "true";
+            projectStorage.getItem("novelai-enabled") === "true";
           const novelaiModel =
-            localStorage.getItem("novelai-model") || "nai-diffusion-4-5-full";
-          const novelaiApiKey = localStorage.getItem("novelai-api-key") || "";
+            projectStorage.getItem("novelai-model") || "nai-diffusion-4-5-full";
+          const novelaiApiKey = projectStorage.getItem("novelai-api-key") || "";
           document.getElementById("novelai-switch").checked = novelaiEnabled;
           document.getElementById("novelai-model").value = novelaiModel;
           document.getElementById("novelai-api-key").value = novelaiApiKey;

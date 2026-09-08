@@ -402,6 +402,23 @@
         }
 
         function createMessageElement(msg, chat) {
+          if (msg.type === "mcp_activity") {
+            const wrapper = document.createElement("div");
+            wrapper.className = "message-wrapper ai mcp-activity-wrapper";
+            wrapper.dataset.timestamp = msg.timestamp;
+            wrapper.dataset.mcpActivityId = msg.mcpActivityId || "";
+            const bubble = document.createElement("div");
+            bubble.className = "message-bubble mcp-activity-bubble";
+            bubble.dataset.timestamp = msg.timestamp;
+            bubble.innerHTML = window.McpManager?.renderActivityCardHtml(msg) || "";
+            wrapper.appendChild(bubble);
+            addLongPressListener(wrapper, () => showMessageActions(msg.timestamp));
+            wrapper.addEventListener("click", () => {
+              if (isSelectionMode) toggleMessageSelection(msg.timestamp);
+            });
+            return wrapper;
+          }
+
           if (msg.type === "recalled_message") {
             const wrapper = document.createElement("div");
             // 1. 给 wrapper 也加上 timestamp，方便事件委托时查找

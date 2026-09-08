@@ -96,7 +96,7 @@
               });
 
               // B. 清空 LocalStorage (包含主题、部分开关设置等)
-              localStorage.clear();
+              projectStorage.clear();
 
               // C. 成功提示并刷新
               alert("数据已全部初始化，应用将重启。");

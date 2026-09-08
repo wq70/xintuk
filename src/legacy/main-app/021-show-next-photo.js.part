@@ -53,7 +53,7 @@
          */
         function updateUnreadIndicator(count) {
           unreadPostsCount = count;
-          localStorage.setItem("unreadPostsCount", count); // 持久化存储
+          projectStorage.setItem("unreadPostsCount", count); // 持久化存储
 
           // --- 更新底部导航栏的“动态”按钮 ---
           const navItem = document.querySelector(

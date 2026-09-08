@@ -53,7 +53,7 @@ const runtimeScriptReferences = [...runtimeHtml.matchAll(/<script\s+src="([^"]+)
   .map((match) => match[1])
   .filter((reference) => !reference.startsWith("runtime/"));
 const inlineHandlerCount = [...templateHtml.matchAll(/\bon(?:click|change|input|submit|load|error|keydown|keyup)=/g)].length;
-const schema = mainScript.match(/db\.version\(62\)\.stores\(\{[\s\S]*?\n\s*\}\);/)?.[0];
+const schema = mainScript.match(/db\.version\(63\)\.stores\(\{[\s\S]*?\n\s*\}\);/)?.[0];
 
 if (elementIds.length !== contract.elementIdCount || hashList(elementIds) !== contract.elementIdOrderHash) failures.push("protected DOM id contract changed");
 if (screenIds.length !== contract.screenCount || hashList(screenIds) !== contract.screenIdOrderHash) failures.push("protected screen contract changed");

@@ -124,6 +124,13 @@
             taobaoCart,
             userWalletTransactions,
             userStickerCategories,
+            mcpConnections,
+            mcpCapabilities,
+            mcpActivities,
+            mcpSubscriptions,
+            mcpTasks,
+            mcpApprovals,
+            mcpSettings,
           ] = await Promise.all([
             db.chats.toArray(),
             db.worldBooks.toArray(),
@@ -162,6 +169,13 @@
             db.taobaoCart.toArray(),
             db.userWalletTransactions.toArray(),
             db.userStickerCategories.toArray(),
+            db.mcpConnections.toArray(),
+            db.mcpCapabilities.toArray(),
+            db.mcpActivities.toArray(),
+            db.mcpSubscriptions.toArray(),
+            db.mcpTasks.toArray(),
+            db.mcpApprovals.toArray(),
+            db.mcpSettings.toArray(),
           ]);
 
           // 组装数据
@@ -203,6 +217,13 @@
             taobaoCart,
             userWalletTransactions,
             userStickerCategories,
+            mcpConnections,
+            mcpCapabilities,
+            mcpActivities,
+            mcpSubscriptions,
+            mcpTasks,
+            mcpApprovals,
+            mcpSettings,
           });
 
           // 这里省略了 homeScreenState 的详细抓取，因为它依赖 DOM 元素，
@@ -670,6 +691,13 @@
                 "bubbleStylePresets",
                 "fontPresets",
                 "homeScreenPresets",
+                "mcpConnections",
+                "mcpCapabilities",
+                "mcpActivities",
+                "mcpSubscriptions",
+                "mcpTasks",
+                "mcpApprovals",
+                "mcpSettings",
               ];
 
               // 世界书格式兼容转换代码

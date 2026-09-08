@@ -305,7 +305,7 @@ ${libraryList}
 			- **发送表情**: \`{"type": "sticker", "sticker_name": "表情的名字"}\`(表情名必须在表情列表中，禁止杜撰)
 			- **发送图片**: \`{"type": "ai_image", "description": "图片的详细文字描述..."}\`(图片指模拟真实照片，区别于表情)
 			${
-        localStorage.getItem("novelai-enabled") === "true"
+        projectStorage.getItem("novelai-enabled") === "true"
           ? `- **【NovelAI真实图片分享】**: \`{"type": "naiimag", "prompt": "详细的英文描述词..."}\`
 			    - **【绝不能暴露是novelai生成的图片！】
 			    - **【重要】关于prompt的撰写**：
@@ -367,7 +367,7 @@ ${libraryList}
 			- **发布说说**: \`{"type": "qzone_post", "postType": "shuoshuo", "content": "动态文字..."}\`
 			- **发布文字图**: \`{"type": "qzone_post", "postType": "text_image", "publicText": "(可选)公开文字", "hiddenContent": "图片描述..."}\`
 			${
-        localStorage.getItem("novelai-enabled") === "true"
+        projectStorage.getItem("novelai-enabled") === "true"
           ? `- **【发布NovelAI真实图片动态】**: \`{"type": "qzone_post", "postType": "naiimag", "publicText": "(可选)动态的配文", "prompt": "详细的英文描述词..."}\` 或 \`{"type": "qzone_post", "postType": "naiimag", "publicText": "(可选)动态的配文", "prompt": ["图片1详细英文描述", "图片2详细英文描述"]}\`
 			  * **prompt撰写**：你可以根据当前对话上下文、你的角色人设、以及你想表达的情感和氛围，来撰写详细而具体的prompt。详细程度由你根据具体情况自己决定，并不强制。
 			  * 例如："a cheerful anime girl with sparkling emerald eyes, sitting by a window on a rainy afternoon, holding a warm cup of tea, soft lighting, cozy atmosphere, melancholic yet peaceful mood"`
@@ -427,6 +427,7 @@ ${libraryList}
               // 构建单人聊天的messagesPayload
               messagesPayload = historySlice
                 .map((msg) => {
+                  if (msg.type === "mcp_activity") return null;
                   if (msg.isHidden) {
                     // 如果是隐藏消息，就把它作为一条 system 角色的消息发送给AI
                     // AI能看到它，但它不会被误解为是用户的发言

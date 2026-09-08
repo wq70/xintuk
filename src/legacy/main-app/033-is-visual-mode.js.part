@@ -42,7 +42,7 @@
           }
 
           // 将用户的选择保存到本地存储，以便下次打开时记住
-          localStorage.setItem("ephone-theme", theme);
+          projectStorage.setItem("ephone-theme", theme);
 
           // 因为聊天背景色依赖模式，切换后需要重新渲染
           if (state.activeChatId) {

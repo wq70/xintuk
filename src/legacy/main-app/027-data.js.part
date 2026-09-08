@@ -458,7 +458,7 @@
             toggleSwitch.checked = isDark;
           }
 
-          localStorage.setItem("ephone-theme", theme);
+          projectStorage.setItem("ephone-theme", theme);
         }
 
         /**
