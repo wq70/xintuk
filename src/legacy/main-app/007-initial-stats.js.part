@@ -579,6 +579,37 @@
           console.log("已将永久播放列表保存到数据库。");
         }
 
+        if (window.MusicIntegration) {
+          window.MusicIntegration.setImportHandler(async (tracks) => {
+            let added = 0;
+            let skipped = 0;
+            const normalize = (value) =>
+              String(value || "")
+                .trim()
+                .toLowerCase()
+                .replace(/\s+/g, "");
+            const existingKeys = new Set(
+              state.musicState.playlist.map(
+                (track) =>
+                  `${track.musicSource || ""}:${track.musicId || ""}:${normalize(track.name)}:${normalize(track.artist)}`,
+              ),
+            );
+            for (const track of tracks || []) {
+              const key = `${track.musicSource || ""}:${track.musicId || ""}:${normalize(track.name)}:${normalize(track.artist)}`;
+              if (existingKeys.has(key)) {
+                skipped += 1;
+                continue;
+              }
+              existingKeys.add(key);
+              state.musicState.playlist.push(track);
+              added += 1;
+            }
+            await saveGlobalPlaylist();
+            updatePlaylistUI();
+            return { added, skipped };
+          });
+        }
+
         function formatTimestamp(timestamp) {
           if (!timestamp) return "";
           const date = new Date(timestamp);
@@ -748,7 +779,10 @@
           // 而是直接找出所有 src 链接来自于 API 服务器的歌曲。
           // 这是一个绝对可靠的识别方法，无论它有没有被正确保存。
           const songsToCheck = state.musicState.playlist.filter(
-            (track) => track.src && track.src.includes("api.vkeys.cn"),
+            (track) =>
+              window.MusicIntegration
+                ? window.MusicIntegration.isManagedTrack(track)
+                : track.src && track.src.includes("api.vkeys.cn"),
           );
 
           if (songsToCheck.length === 0) {
@@ -757,13 +791,40 @@
           }
 
           const songsToDelete = [];
+          let renewedCount = 0;
           const twentyFourHoursAgo = Date.now() - 24 * 60 * 60 * 1000;
 
           // 2. 对每一首识别出的歌曲，进行严格的“体检”
-          await Promise.all(
-            songsToCheck.map(async (track) => {
+          let nextSongToCheck = 0;
+          const checkNextSong = async () => {
+            while (nextSongToCheck < songsToCheck.length) {
+              const track = songsToCheck[nextSongToCheck++];
               // 条件1：检查链接本身是否已经失效（无法播放）
-              const isUrlInvalid = !(await checkAudioAvailability(track.src));
+              let isUrlInvalid = !(await checkAudioAvailability(track.src));
+              if (
+                isUrlInvalid &&
+                window.MusicIntegration &&
+                track.musicId &&
+                track.musicSource
+              ) {
+                const renewed = await window.MusicIntegration.resolveTrack(
+                  {
+                    ...track,
+                    id: track.musicId,
+                    source: track.musicSource,
+                  },
+                  { allowSearchFallback: true },
+                );
+                if (renewed?.url) {
+                  track.src = renewed.url;
+                  track.musicId = renewed.id || track.musicId;
+                  track.musicSource = renewed.source || track.musicSource;
+                  track.apiProvider = renewed.provider || track.apiProvider;
+                  track.nodeBase = renewed.nodeBase || track.nodeBase;
+                  isUrlInvalid = false;
+                  renewedCount += 1;
+                }
+              }
 
               // 条件2：检查添加时间是否超过24小时（作为双重保险）
               const isOlderThan24h =
@@ -778,8 +839,19 @@
                   } ${isOlderThan24h ? "超过24小时" : ""})`,
                 );
               }
-            }),
+            }
+          };
+          await Promise.all(
+            Array.from(
+              { length: Math.min(3, songsToCheck.length) },
+              () => checkNextSong(),
+            ),
           );
+
+          if (renewedCount > 0) {
+            await saveGlobalPlaylist();
+            updatePlaylistUI();
+          }
 
           // 3. 根据检查结果进行反馈和操作 (这部分逻辑不变)
           if (songsToDelete.length === 0) {

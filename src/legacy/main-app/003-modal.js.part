@@ -1,9 +1,13 @@
-            // 聚合搜索 (vkeys接口)
-            const [neteaseResults, tencentResults] = await Promise.all([
-              searchNeteaseMusic(musicName, singerName),
-              searchTencentMusic(musicName),
-            ]);
-            combinedResults = [...neteaseResults, ...tencentResults];
+            // 聚合搜索：每个第三方节点独立容错。
+            combinedResults = window.MusicIntegration
+              ? await window.MusicIntegration.search(
+                  `${musicName} ${singerName}`.trim(),
+                  { scope: "all" },
+                )
+              : [
+                  ...(await searchNeteaseMusic(musicName, singerName)),
+                  ...(await searchTencentMusic(musicName)),
+                ];
           } else if (source === "netease") {
             // 仅网易云 (vkeys接口)
             combinedResults = await searchNeteaseMusic(musicName, singerName);
@@ -41,10 +45,20 @@
               sourceLabel = "QQ音乐";
             }
 
-            item.innerHTML = `
-                        <div class="title">${song.name}</div>
-                        <div class="artist">${song.artist} <span class="source">${sourceLabel}</span></div>
-                    `;
+            if (song.source === "joox") sourceLabel = "Joox";
+            if (song.source === "kuwo") sourceLabel = "酷我";
+            if (song.apiProvider === "ncm-public") sourceLabel = "网易云聚合";
+            const title = document.createElement("div");
+            title.className = "title";
+            title.textContent = song.name;
+            const artist = document.createElement("div");
+            artist.className = "artist";
+            artist.append(document.createTextNode(song.artist || "未知艺术家"));
+            const source = document.createElement("span");
+            source.className = "source";
+            source.textContent = sourceLabel;
+            artist.append(" ", source);
+            item.append(title, artist);
             // ▲▲▲ 修改/新增部分结束 ▲▲▲
             listEl.appendChild(item);
           });
@@ -65,8 +79,20 @@
           // 兼容两种 source 字段
           let finalSource = songData.originalSource || songData.source;
 
-          // --- 核心逻辑分支：根据 apiProvider 调用不同的接口 ---
-          if (songData.apiProvider === "gdstudio") {
+          if (window.MusicIntegration) {
+            playableResult = await window.MusicIntegration.resolveTrack(
+              songData,
+              { allowSearchFallback: true },
+            );
+            if (playableResult) {
+              finalSource = playableResult.source || finalSource;
+              playableResult.apiProvider =
+                playableResult.provider || songData.apiProvider;
+              if (playableResult.matchedSong) {
+                songData = { ...songData, ...playableResult.matchedSong };
+              }
+            }
+          } else if (songData.apiProvider === "gdstudio") {
             // ▼▼▼ 核心修改：将 btwaf 从 9018895 换成 20639888！▼▼▼
             const gdApiUrl = `https://music-api.gdstudio.xyz/api.php?btwaf=20639888&types=url&source=${finalSource}&id=${songData.id}&br=320`;
             // ▲▲▲ 核心修改结束 ▲▲▲
@@ -147,15 +173,22 @@
           }
 
           // 获取歌词 (现在会根据 apiProvider 调用正确的接口)
-          const lrcContent =
-            (await getLyricsForSong(
-              playableResult.id,
-              playableResult.source,
-              playableResult.apiProvider,
-            )) || "";
+          const lrcContent = playableResult.lrcContent || (window.MusicIntegration
+            ? await window.MusicIntegration.getLyrics({
+                ...songData,
+                id: playableResult.id,
+                source: playableResult.source,
+                apiProvider: playableResult.apiProvider,
+                nodeBase: playableResult.nodeBase,
+              })
+            : (await getLyricsForSong(
+                playableResult.id,
+                playableResult.source,
+                playableResult.apiProvider,
+              )) || "");
 
           // 获取专辑图 (只有 GD 源才需要额外获取)
-          let coverUrl = songData.cover;
+          let coverUrl = playableResult.cover || songData.cover;
           if (playableResult.apiProvider === "gdstudio" && songData.pic_id) {
             const picApiUrl = `https://music-api.gdstudio.xyz/api.php?btwaf=20639888&types=pic&source=${playableResult.source}&id=${songData.pic_id}&size=500`;
             const picResult = await Http_Get(picApiUrl);
@@ -177,6 +210,7 @@
             musicId: playableResult.id,
             musicSource: finalSource,
             apiProvider: playableResult.apiProvider,
+            nodeBase: playableResult.nodeBase,
           };
 
           state.musicState.playlist.push(newSong);
@@ -214,6 +248,13 @@
         }
 
         async function getLyricsForSong(songId, source, apiProvider) {
+          if (window.MusicIntegration) {
+            return await window.MusicIntegration.getLyrics({
+              id: songId,
+              source,
+              apiProvider,
+            });
+          }
           let url = "";
           // ▼▼▼ 修改/新增部分开始 ▼▼▼
           if (apiProvider === "gdstudio") {
@@ -301,17 +342,20 @@
           );
 
           let songData = null;
-
-          // 策略1：优先用网易云搜索 (通常结果更准)
-          const neteaseResults = await searchNeteaseMusic(name, artist);
-          if (neteaseResults.length > 0) {
-            songData = neteaseResults[0]; // 如果找到了，就用第一个结果
+          if (window.MusicIntegration) {
+            const results = await window.MusicIntegration.search(
+              `${name} ${artist || ""}`.trim(),
+              { scope: "all" },
+            );
+            songData = results[0] || null;
+          } else {
+            const neteaseResults = await searchNeteaseMusic(name, artist);
+            songData = neteaseResults[0] || null;
           }
-          // 策略2：如果网易云找不到，再用QQ音乐搜一次
-          else {
+          if (!songData) {
             const tencentResults = await searchTencentMusic(name);
             if (tencentResults.length > 0) {
-              songData = tencentResults[0]; // 用QQ音乐的第一个结果
+              songData = tencentResults[0];
             }
           }
 
@@ -327,17 +371,23 @@
           // 到这里，我们已经有了一首歌的基本信息 (id, source, name, artist)
           // 下面的逻辑就是调用API获取真实的播放链接
 
-          const apiUrl =
-            songData.source === "netease"
-              ? `https://api.vkeys.cn/v2/music/netease?id=${songData.id}`
-              : `https://api.vkeys.cn/v2/music/tencent?id=${songData.id}`;
-
-          const result = await Http_Get(apiUrl);
+          const result = window.MusicIntegration
+            ? await window.MusicIntegration.resolveTrack(songData, {
+                allowSearchFallback: true,
+              })
+            : await Http_Get(
+                songData.source === "netease"
+                  ? `https://api.vkeys.cn/v2/music/netease?id=${songData.id}`
+                  : `https://api.vkeys.cn/v2/music/tencent?id=${songData.id}`,
+              );
+          const playableUrl = window.MusicIntegration
+            ? result?.url
+            : result?.data?.url;
 
           // 检查获取到的链接是否真的能播放
           if (
-            !result?.data?.url ||
-            !(await checkAudioAvailability(result.data.url))
+            !playableUrl ||
+            !(await checkAudioAvailability(playableUrl))
           ) {
             await showCustomAlert(
               "获取失败",
@@ -347,19 +397,29 @@
           }
 
           // 获取歌词
-          const lrcContent =
-            (await getLyricsForSong(songData.id, songData.source)) || "";
+          const lrcContent = result?.lrcContent || (window.MusicIntegration
+            ? await window.MusicIntegration.getLyrics({
+                ...songData,
+                source: result?.source || songData.source,
+                apiProvider: result?.provider || songData.apiProvider,
+                nodeBase: result?.nodeBase,
+              })
+            : (await getLyricsForSong(songData.id, songData.source)) || "");
 
           // 准备新的歌曲对象，准备添加到播放列表
           const newSong = {
             name: songData.name,
             artist: songData.artist,
-            src: result.data.url, // 使用我们刚刚获取到的真实、可播放的URL！
-            cover: songData.cover,
+            src: playableUrl,
+            cover: result?.cover || songData.cover,
             isLocal: false,
             lrcContent: lrcContent,
             isTemporary: true, // 标记为临时歌曲，24小时后可能会失效
             addedTimestamp: Date.now(),
+            musicId: result?.id || songData.id,
+            musicSource: result?.source || songData.source,
+            apiProvider: result?.provider || songData.apiProvider,
+            nodeBase: result?.nodeBase,
           };
 
           // 检查播放列表里是不是已经有这首歌了

@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "check": "node scripts/check-architecture.mjs"
+    "check": "node scripts/check-architecture.mjs",
+    "check:music": "node scripts/check-music-integration.mjs"
   }
 }

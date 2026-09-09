@@ -622,12 +622,23 @@
 
         // 检查音频链接是否真的可以播放
         function checkAudioAvailability(url) {
+          if (window.MusicIntegration) {
+            return window.MusicIntegration.validateAudio(url);
+          }
           return new Promise((resolve) => {
             const tester = new Audio();
-            tester.addEventListener("loadedmetadata", () => resolve(true), {
+            let settled = false;
+            const finish = (result) => {
+              if (settled) return;
+              settled = true;
+              clearTimeout(timeout);
+              resolve(result);
+            };
+            const timeout = setTimeout(() => finish(false), 9000);
+            tester.addEventListener("loadedmetadata", () => finish(true), {
               once: true,
             });
-            tester.addEventListener("error", () => resolve(false), {
+            tester.addEventListener("error", () => finish(false), {
               once: true,
             });
             tester.src = url;
@@ -642,6 +653,12 @@
             let searchTerm = name.replace(/\s/g, "");
             if (singer) {
               searchTerm += ` ${singer.replace(/\s/g, "")}`;
+            }
+
+            if (window.MusicIntegration) {
+              return await window.MusicIntegration.search(searchTerm, {
+                scope: "netease",
+              });
             }
 
             const apiUrl = `https://api.vkeys.cn/v2/music/netease?word=${encodeURIComponent(searchTerm)}`;
@@ -679,12 +696,7 @@
               }))
               .slice(0, 15);
           } catch (e) {
-            // 如果这次还失败，请把浏览器F12控制台里的红色错误信息完整地截图给我
             console.error("【vkeys API 直连】搜索失败:", e);
-            await showCustomAlert(
-              "网易云接口直连失败",
-              `如果浏览器控制台(F12)提示CORS错误，说明此API禁止直接访问。错误: ${e.message}`,
-            );
             return [];
           }
         }
@@ -694,8 +706,13 @@
         async function searchGdstudioMusic(name) {
           try {
             const searchTerm = name.replace(/\s/g, "");
+            if (window.MusicIntegration) {
+              return await window.MusicIntegration.search(searchTerm, {
+                scope: "gdstudio",
+              });
+            }
             // 同时请求网易云和QQ音乐源，然后合并结果
-            const [neteaseResults, tencentResults] = await Promise.all([
+            const [neteaseResult, tencentResult] = await Promise.allSettled([
               Http_Get(
                 `https://music-api.gdstudio.xyz/api.php?btwaf=9018895&types=search&source=netease&name=${encodeURIComponent(
                   searchTerm,
@@ -707,6 +724,17 @@
                 )}&count=10&pages=1`,
               ),
             ]);
+
+            const neteaseResults =
+              neteaseResult.status === "fulfilled" &&
+              Array.isArray(neteaseResult.value)
+                ? neteaseResult.value
+                : [];
+            const tencentResults =
+              tencentResult.status === "fulfilled" &&
+              Array.isArray(tencentResult.value)
+                ? tencentResult.value
+                : [];
 
             const combined = [
               ...(neteaseResults || []),
@@ -752,6 +780,11 @@
         async function searchTencentMusic(name) {
           try {
             name = name.replace(/\s/g, "");
+            if (window.MusicIntegration) {
+              return await window.MusicIntegration.search(name, {
+                scope: "tencent",
+              });
+            }
             const result = await Http_Get(
               `https://api.vkeys.cn/v2/music/tencent?word=${encodeURIComponent(name)}`,
             );

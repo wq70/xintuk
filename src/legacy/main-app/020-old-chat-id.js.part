@@ -204,13 +204,16 @@
          * 加载歌曲，支持自动检测过期并续期URL
          */
         async function loadSong(index) {
-          if (index < 0 || index >= state.musicState.playlist.length) return;
+          if (index < 0 || index >= state.musicState.playlist.length)
+            return false;
           state.musicState.currentIndex = index;
           let track = state.musicState.playlist[index];
 
           if (!track.isLocal && track.musicId && track.musicSource) {
             // 1. 检查当前链接是否有效
-            const isUrlValid = await checkAudioAvailability(track.src);
+            const isUrlValid = track.src
+              ? await checkAudioAvailability(track.src)
+              : false;
 
             if (!isUrlValid) {
               console.log(
@@ -222,15 +225,40 @@
 
               try {
                 // 2. 使用保存的ID重新获取链接
+                const resolved = window.MusicIntegration
+                  ? await window.MusicIntegration.resolveTrack(
+                      {
+                        ...track,
+                        id: track.musicId,
+                        source: track.musicSource,
+                      },
+                      { allowSearchFallback: true },
+                    )
+                  : null;
                 const apiUrl =
                   track.musicSource === "netease"
                     ? `https://api.vkeys.cn/v2/music/netease?id=${track.musicId}`
                     : `https://api.vkeys.cn/v2/music/tencent?id=${track.musicId}`;
-
-                const res = await Http_Get(apiUrl);
-                if (res?.data?.url) {
+                const res = resolved || (await Http_Get(apiUrl));
+                const renewedUrl = resolved?.url || res?.data?.url;
+                if (renewedUrl) {
                   // 3. 更新内存中的链接
-                  track.src = res.data.url;
+                  track.src = renewedUrl;
+                  if (resolved) {
+                    track.musicId = resolved.id || track.musicId;
+                    track.musicSource = resolved.source || track.musicSource;
+                    track.apiProvider = resolved.provider || track.apiProvider;
+                    track.nodeBase = resolved.nodeBase || track.nodeBase;
+                    track.cover = resolved.cover || track.cover;
+                    track.lrcContent = resolved.lrcContent || track.lrcContent;
+                    if (!track.lrcContent) {
+                      track.lrcContent = await window.MusicIntegration.getLyrics({
+                        ...track,
+                        id: track.musicId,
+                        source: track.musicSource,
+                      });
+                    }
+                  }
                   // 4. 更新数据库，保存新链接
                   state.musicState.playlist[index] = track;
                   await saveGlobalPlaylist();
@@ -240,6 +268,14 @@
                 console.error("自动续期失败:", e);
               }
             }
+          }
+
+          if (!track.isLocal && !track.src) {
+            state.musicState.isPlaying = false;
+            updatePlayerUI();
+            const statusEl = document.getElementById("music-player-artist");
+            if (statusEl) statusEl.textContent = "暂时无法获取播放链接";
+            return false;
           }
 
           // 检查并加载网络歌词
@@ -263,7 +299,7 @@
             audioPlayer.src = track.src;
           } else {
             console.error("本地歌曲源错误:", track);
-            return;
+            return false;
           }
 
           // 更新界面信息
@@ -282,10 +318,12 @@
           audioPlayer.onloadedmetadata = () => {
             updateMusicProgressBar();
           };
+          return true;
         }
 
         async function playSong(index) {
-          await loadSong(index);
+          const loaded = await loadSong(index);
+          if (!loaded) return;
           try {
             await audioPlayer.play();
 

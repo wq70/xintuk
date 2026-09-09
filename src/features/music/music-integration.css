@@ -1,0 +1,289 @@
+#music-playlist-panel .playlist-header .music-account-entry {
+  max-width: 30px;
+  flex: 0 1 auto;
+  overflow: hidden;
+  padding: 0 1px;
+  font-size: 11px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.music-account-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10020;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.42);
+  box-sizing: border-box;
+}
+
+.music-account-overlay.visible {
+  display: flex;
+}
+
+.music-account-panel {
+  width: min(430px, 100%);
+  max-height: calc(100vh - 32px);
+  max-height: min(720px, calc(100dvh - 32px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  background: var(--secondary-bg, #fff);
+  color: var(--text-primary);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.22);
+}
+
+.music-account-header {
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) 64px;
+  align-items: center;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border-color);
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.music-account-header strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.music-account-header-spacer {
+  width: 64px;
+}
+
+.music-account-body {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px;
+}
+
+.music-account-section {
+  padding: 13px;
+  border: 1px solid var(--border-color);
+  border-radius: 11px;
+  background: var(--secondary-bg, #fff);
+}
+
+.music-account-section + .music-account-section {
+  margin-top: 12px;
+}
+
+.music-account-section-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.music-account-section-title strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+}
+
+.music-account-section-title span {
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.music-account-summary {
+  margin-top: 10px;
+}
+
+.music-account-profile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.music-account-profile img {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.music-account-profile-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.music-account-controls,
+.music-account-playlist-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.music-account-btn,
+.music-account-input,
+.music-account-select {
+  min-height: 32px;
+  box-sizing: border-box;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--secondary-bg, #fff);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+}
+
+.music-account-btn {
+  flex: 0 0 auto;
+  padding: 6px 11px;
+  border-color: var(--accent-color);
+  background: var(--accent-color);
+  color: #fff;
+  cursor: pointer;
+}
+
+.music-account-btn.secondary {
+  background: var(--secondary-bg, #fff);
+  color: var(--accent-color);
+}
+
+.music-account-btn.danger {
+  border-color: #e46b6b;
+  background: var(--secondary-bg, #fff);
+  color: #d84e4e;
+}
+
+.music-account-btn:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.music-account-close {
+  justify-self: start;
+  min-height: 28px;
+  padding: 4px 8px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--accent-color);
+}
+
+.music-account-input {
+  flex: 1 1 100%;
+  min-width: 0;
+  padding: 6px 9px;
+}
+
+.music-account-select {
+  flex: 1 1 180px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 5px 28px 5px 8px;
+}
+
+.music-account-channel {
+  flex: 1 1 115px;
+}
+
+.music-account-qr {
+  margin-top: 10px;
+  text-align: center;
+}
+
+.music-account-qr img {
+  width: 164px;
+  height: 164px;
+  max-width: 58vw;
+  max-height: 58vw;
+  padding: 7px;
+  border-radius: 10px;
+  background: #fff;
+  object-fit: contain;
+  box-sizing: border-box;
+}
+
+.music-account-qr-link {
+  color: var(--accent-color);
+  font-size: 13px;
+}
+
+.music-account-status {
+  min-height: 18px;
+  margin-top: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.music-account-status[data-state="success"] {
+  color: #2e9b59;
+}
+
+.music-account-status[data-state="scanned"] {
+  color: var(--accent-color);
+}
+
+.music-account-notice {
+  margin: 9px 0 0;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+@media (max-width: 390px) {
+  .music-account-overlay {
+    padding: 10px;
+  }
+
+  .music-account-panel {
+    max-height: calc(100vh - 20px);
+    max-height: calc(100dvh - 20px);
+  }
+
+  .music-account-body {
+    padding: 10px;
+  }
+
+  .music-account-section {
+    padding: 11px;
+  }
+
+  .music-account-section-title span {
+    max-width: 45%;
+  }
+}
+
+@media (max-width: 340px) {
+  .music-account-header {
+    grid-template-columns: 52px minmax(0, 1fr) 52px;
+    padding: 0 8px;
+  }
+
+  .music-account-header-spacer {
+    width: 52px;
+  }
+
+  .music-account-btn {
+    padding-inline: 9px;
+  }
+}

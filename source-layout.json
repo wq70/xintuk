@@ -30,6 +30,7 @@
       "src/views/dating-history-and-studio-02.html"
     ],
     "main-app.js": [
+      "src/features/music/music-integration.js",
       "src/legacy/main-app/001-capture-error.js.part",
       "src/legacy/main-app/002-find-lucky-king.js.part",
       "src/legacy/main-app/003-modal.js.part",
@@ -109,7 +110,8 @@
       "src/styles/cascade/019.css",
       "src/styles/cascade/020.css",
       "src/styles/cascade/021.css",
-      "src/styles/cascade/022-mcp.css"
+      "src/styles/cascade/022-mcp.css",
+      "src/features/music/music-integration.css"
     ],
     "game-hall.js": [
       "src/features/game-hall/001-ludo-board-size.js.part",

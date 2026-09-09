@@ -953,12 +953,17 @@ async function openLoversSpaceMusicPlayer(shareData) {
   const songName = shareData.title;
   const artistName = shareData.artist || "";
 
-  // 策略1：优先用网易云搜索 (通常结果更准)
-  const neteaseResults = await searchNeteaseMusic(songName, artistName);
-  if (neteaseResults.length > 0) {
-    songData = neteaseResults[0];
+  if (window.MusicIntegration) {
+    const results = await window.MusicIntegration.search(
+      `${songName} ${artistName}`.trim(),
+      { scope: "all" },
+    );
+    songData = results[0] || null;
   } else {
-    // 策略2：如果网易云找不到，再用QQ音乐搜一次
+    const neteaseResults = await searchNeteaseMusic(songName, artistName);
+    songData = neteaseResults[0] || null;
+  }
+  if (!songData) {
     const tencentResults = await searchTencentMusic(songName);
     if (tencentResults.length > 0) {
       songData = tencentResults[0];
@@ -974,14 +979,20 @@ async function openLoversSpaceMusicPlayer(shareData) {
   }
 
   // 获取播放链接
-  const apiUrl =
-    songData.source === "netease"
-      ? `https://api.vkeys.cn/v2/music/netease?id=${songData.id}`
-      : `https://api.vkeys.cn/v2/music/tencent?id=${songData.id}`;
+  const result = window.MusicIntegration
+    ? await window.MusicIntegration.resolveTrack(songData, {
+        allowSearchFallback: true,
+      })
+    : await Http_Get(
+        songData.source === "netease"
+          ? `https://api.vkeys.cn/v2/music/netease?id=${songData.id}`
+          : `https://api.vkeys.cn/v2/music/tencent?id=${songData.id}`,
+      );
+  const playableUrl = window.MusicIntegration
+    ? result?.url
+    : result?.data?.url;
 
-  const result = await Http_Get(apiUrl);
-
-  if (!result?.data?.url || !(await checkAudioAvailability(result.data.url))) {
+  if (!playableUrl || !(await checkAudioAvailability(playableUrl))) {
     await showCustomAlert(
       "获取失败",
       `找到了《${songName}》，但无法获取有效的播放链接。`,
@@ -990,16 +1001,27 @@ async function openLoversSpaceMusicPlayer(shareData) {
   }
 
   // 获取歌词
-  const lrcContent =
-    (await getLyricsForSong(songData.id, songData.source)) || "";
+  const lrcContent = result?.lrcContent || (window.MusicIntegration
+    ? await window.MusicIntegration.getLyrics({
+        ...songData,
+        source: result?.source || songData.source,
+        apiProvider: result?.provider || songData.apiProvider,
+        nodeBase: result?.nodeBase,
+      })
+    : (await getLyricsForSong(songData.id, songData.source)) || "");
 
   // 创建新的歌曲对象并添加到播放列表
   const newSong = {
     name: songData.name,
     artist: songData.artist,
-    src: result.data.url,
-    cover: songData.cover,
+    src: playableUrl,
+    cover: result?.cover || songData.cover,
     lrcContent: lrcContent,
+    isLocal: false,
+    musicId: result?.id || songData.id,
+    musicSource: result?.source || songData.source,
+    apiProvider: result?.provider || songData.apiProvider,
+    nodeBase: result?.nodeBase,
   };
 
   lsMusicState.playlist.push(newSong);
@@ -1021,6 +1043,28 @@ async function playLSSong(index) {
   lsMusicState.currentIndex = index;
   const track = lsMusicState.playlist[index];
   const lsAudioPlayer = document.getElementById("ls-audio-player");
+
+  if (
+    window.MusicIntegration &&
+    !track.isLocal &&
+    track.musicId &&
+    !(await window.MusicIntegration.validateAudio(track.src))
+  ) {
+    const resolved = await window.MusicIntegration.resolveTrack(
+      { ...track, id: track.musicId, source: track.musicSource },
+      { allowSearchFallback: true },
+    );
+    if (!resolved?.url) {
+      lsMusicState.isPlaying = false;
+      renderLSMusicPlayerUI();
+      return;
+    }
+    track.src = resolved.url;
+    track.musicId = resolved.id || track.musicId;
+    track.musicSource = resolved.source || track.musicSource;
+    track.apiProvider = resolved.provider || track.apiProvider;
+    track.nodeBase = resolved.nodeBase || track.nodeBase;
+  }
 
   // 解析和渲染歌词
   track.parsedLyrics = parseLRC(track.lrcContent || ""); // 复用已有的歌词解析函数
