@@ -4,6 +4,7 @@
       "src/views/document-shell.html",
       "src/views/home.html",
       "src/views/mcp.html",
+      "src/views/thought-chain.html",
       "src/views/weibo.html",
       "src/views/world-book-and-api-settings.html",
       "src/views/chat-and-albums-01.html",
@@ -111,6 +112,7 @@
       "src/styles/cascade/020.css",
       "src/styles/cascade/021.css",
       "src/styles/cascade/022-mcp.css",
+      "src/styles/cascade/023-thought-chain.css",
       "src/features/music/music-integration.css"
     ],
     "game-hall.js": [
@@ -172,6 +174,9 @@
       "src/features/mcp/001-protocol-client.js",
       "src/features/mcp/002-manager-and-chat.js",
       "src/features/mcp/003-app-controller.js"
+    ],
+    "thought-chain.js": [
+      "src/features/thought-chain/app.js"
     ]
   }
 }

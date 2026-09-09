@@ -1,0 +1,56 @@
+    <div id="thought-chain-screen" class="screen">
+      <div class="header tc-app-header">
+        <span class="back-btn" onclick="showScreen('home-screen')">‹</span>
+        <span>思维链</span>
+        <button id="tc-import-btn" class="action-button" type="button">导入</button>
+      </div>
+
+      <div class="tc-app-body">
+        <section class="tc-overview" aria-live="polite">
+          <div class="tc-overview-copy">
+            <strong id="tc-overview-title">思维链已关闭</strong>
+            <span id="tc-overview-detail">请求保持当前项目的原始行为</span>
+          </div>
+          <label class="tc-toggle" aria-label="思维链总开关">
+            <input id="tc-master-switch" type="checkbox" />
+            <span></span>
+          </label>
+        </section>
+
+        <div id="tc-mode-picker" class="tc-mode-picker" role="radiogroup" aria-label="思维链模式">
+          <button type="button" data-tc-mode="native_off">
+            <strong>关闭原生</strong><span>不注入 COT</span>
+          </button>
+          <button type="button" data-tc-mode="card">
+            <strong>卡 COT</strong><span>首尾接管</span>
+          </button>
+          <button type="button" data-tc-mode="hybrid">
+            <strong>混合</strong><span>原生＋自定义</span>
+          </button>
+        </div>
+
+        <div class="tc-view-switch" role="tablist" aria-label="思维链设置">
+          <button class="active" type="button" data-tc-view="config">配置</button>
+          <button type="button" data-tc-view="items">条目</button>
+          <button type="button" data-tc-view="presets">预设</button>
+          <button type="button" data-tc-view="tools">工具</button>
+        </div>
+
+        <div id="tc-main-content" class="tc-main-content"></div>
+      </div>
+
+      <input id="tc-import-input" type="file" accept="application/json,.json" hidden />
+
+      <div id="tc-sheet-backdrop" class="tc-sheet-backdrop" aria-hidden="true">
+        <section class="tc-sheet" role="dialog" aria-modal="true" aria-labelledby="tc-sheet-title">
+          <div class="tc-sheet-header">
+            <strong id="tc-sheet-title">思维链</strong>
+            <button id="tc-sheet-close" class="tc-icon-button" type="button" aria-label="关闭">×</button>
+          </div>
+          <div id="tc-sheet-body" class="tc-sheet-body"></div>
+          <div id="tc-sheet-actions" class="tc-sheet-actions"></div>
+        </section>
+      </div>
+
+      <div id="tc-toast" class="tc-toast" role="status" aria-live="polite"></div>
+    </div>

@@ -205,6 +205,23 @@
               messagesPayload.push({ role: "system", content: postsContext });
             }
 
+            const thoughtChainRequest = window.ThoughtChainApp
+              ? window.ThoughtChainApp.prepareRequest({
+                  systemPrompt,
+                  messages: messagesPayload,
+                  proxyUrl,
+                  model,
+                  scope: "chat",
+                })
+              : {
+                  systemPrompt,
+                  messages: messagesPayload,
+                  active: false,
+                  openAIOptions: {},
+                };
+            systemPrompt = thoughtChainRequest.systemPrompt;
+            messagesPayload = thoughtChainRequest.messages;
+
             let isGemini = proxyUrl === GEMINI_API_URL;
             let geminiConfig = toGeminiRequestData(
               model,
@@ -213,6 +230,12 @@
               messagesPayload,
               isGemini,
             );
+            if (isGemini && window.ThoughtChainApp) {
+              geminiConfig = window.ThoughtChainApp.applyGeminiConfig(
+                geminiConfig,
+                thoughtChainRequest,
+              );
+            }
             const assertApiResponse = async (response) => {
               if (response.ok) return response;
               let errorMsg = `API Error: ${response.status}`;
@@ -240,6 +263,7 @@
                       temperature:
                         parseFloat(state.apiConfig.temperature) || 0.8,
                       stream: false,
+                      ...thoughtChainRequest.openAIOptions,
                       ...(request.tools?.length
                         ? {
                             tools: request.tools,
@@ -350,7 +374,11 @@
                   arguments: part.functionCall.args || {},
                 }));
               const text = parts
-                .filter((part) => typeof part.text === "string")
+                .filter(
+                  (part) =>
+                    typeof part.text === "string" &&
+                    (!thoughtChainRequest.active || part.thought !== true),
+                )
                 .map((part) => part.text)
                 .join("\n");
               return {
@@ -372,6 +400,7 @@
             };
 
             let aiResponseContent = null;
+            let thoughtChainResponseData = null;
             if (window.McpChatOrchestrator) {
               aiResponseContent = await window.McpChatOrchestrator.run({
                 chat,
@@ -401,14 +430,25 @@
                         temperature:
                           parseFloat(state.apiConfig.temperature) || 0.8,
                         stream: false,
+                        ...thoughtChainRequest.openAIOptions,
                       }),
                     }),
               );
               const data = await response.json();
+              thoughtChainResponseData = data;
               aiResponseContent = isGemini
-                ? data?.candidates?.[0]?.content?.parts?.find(
-                    (part) => typeof part.text === "string",
-                  )?.text
+                ? thoughtChainRequest.active
+                  ? (data?.candidates?.[0]?.content?.parts || [])
+                      .filter(
+                        (part) =>
+                          typeof part.text === "string" &&
+                          part.thought !== true,
+                      )
+                      .map((part) => part.text)
+                      .join("\n")
+                  : data?.candidates?.[0]?.content?.parts?.find(
+                      (part) => typeof part.text === "string",
+                    )?.text
                 : data?.choices?.[0]?.message?.content;
             }
 
@@ -420,6 +460,21 @@
               throw new Error(
                 "API返回了空内容或格式不正确（可能因安全设置被拦截）。",
               );
+            }
+
+            if (thoughtChainRequest.active && window.ThoughtChainApp) {
+              const processedThoughtResponse =
+                window.ThoughtChainApp.processResponse({
+                  text: aiResponseContent,
+                  data: thoughtChainResponseData,
+                  provider: thoughtChainRequest.provider,
+                  proxyUrl,
+                  model,
+                });
+              aiResponseContent = processedThoughtResponse.text;
+              if (!aiResponseContent) {
+                throw new Error("思维链提取后没有可用的正文内容。");
+              }
             }
 
             console.log(`AI '${chat.name}' 的原始回复:`, aiResponseContent);

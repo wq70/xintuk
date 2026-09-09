@@ -991,6 +991,9 @@
           if (screenId === "mcp-screen") {
             window.McpApp?.open();
           }
+          if (screenId === "thought-chain-screen") {
+            window.ThoughtChainApp?.open();
+          }
 
           document
             .querySelectorAll(".screen")

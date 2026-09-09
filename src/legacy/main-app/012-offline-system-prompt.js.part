@@ -72,6 +72,23 @@
 
             try {
               const { proxyUrl, apiKey, model } = state.apiConfig;
+              const thoughtChainRequest = window.ThoughtChainApp
+                ? window.ThoughtChainApp.prepareRequest({
+                    systemPrompt: offlineSystemPrompt,
+                    messages: messagesForOfflineMode,
+                    proxyUrl,
+                    model,
+                    scope: "offline",
+                  })
+                : {
+                    systemPrompt: offlineSystemPrompt,
+                    messages: messagesForOfflineMode,
+                    active: false,
+                    openAIOptions: {},
+                  };
+              const preparedOfflineSystemPrompt =
+                thoughtChainRequest.systemPrompt;
+              const preparedOfflineMessages = thoughtChainRequest.messages;
               let isGemini = proxyUrl === GEMINI_API_URL;
               let requestBody;
               let requestUrl = isGemini
@@ -86,33 +103,45 @@
 
               if (isGemini) {
                 requestBody = {
-                  contents: messagesForOfflineMode.map((item) => ({
+                  contents: preparedOfflineMessages.map((item) => ({
                     role: item.role === "assistant" ? "model" : "user",
                     parts: [{ text: item.content }],
                   })),
                   generationConfig: {
                     temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+                    ...(thoughtChainRequest.geminiThinkingConfig
+                      ? {
+                          thinkingConfig:
+                            thoughtChainRequest.geminiThinkingConfig,
+                        }
+                      : {}),
                   },
-                  systemInstruction: { parts: [{ text: offlineSystemPrompt }] },
+                  systemInstruction: {
+                    parts: [{ text: preparedOfflineSystemPrompt }],
+                  },
                 };
               } else {
                 requestBody = {
                   model: model,
                   messages: [
-                    { role: "system", content: offlineSystemPrompt },
-                    ...messagesForOfflineMode,
+                    { role: "system", content: preparedOfflineSystemPrompt },
+                    ...preparedOfflineMessages,
                   ],
                   temperature: parseFloat(state.apiConfig.temperature) || 0.8,
                   stream: false,
+                  ...thoughtChainRequest.openAIOptions,
                 };
               }
 
               let aiResponseContent = null;
+              let thoughtChainResponseData = null;
               if (window.McpManager) {
                 aiResponseContent = await window.McpManager.runWithConfiguredModel(
                   chat,
-                  offlineSystemPrompt,
-                  messagesForOfflineMode,
+                  preparedOfflineSystemPrompt,
+                  preparedOfflineMessages,
+                  undefined,
+                  thoughtChainRequest,
                 );
               }
               if (aiResponseContent === null) {
@@ -126,12 +155,37 @@
                   throw new Error(`API 错误: ${await response.text()}`);
 
                 const data = await response.json();
+                thoughtChainResponseData = data;
                 aiResponseContent = isGemini
-                  ? data?.candidates?.[0]?.content?.parts?.[0]?.text
+                  ? thoughtChainRequest.active
+                    ? (data?.candidates?.[0]?.content?.parts || [])
+                        .filter(
+                          (part) =>
+                            typeof part.text === "string" &&
+                            part.thought !== true,
+                        )
+                        .map((part) => part.text)
+                        .join("\n")
+                    : data?.candidates?.[0]?.content?.parts?.[0]?.text
                   : data?.choices?.[0]?.message?.content;
               }
 
               if (!aiResponseContent) throw new Error("API返回内容为空");
+
+              if (thoughtChainRequest.active && window.ThoughtChainApp) {
+                const processedThoughtResponse =
+                  window.ThoughtChainApp.processResponse({
+                    text: aiResponseContent,
+                    data: thoughtChainResponseData,
+                    provider: thoughtChainRequest.provider,
+                    proxyUrl,
+                    model,
+                  });
+                aiResponseContent = processedThoughtResponse.text;
+                if (!aiResponseContent) {
+                  throw new Error("思维链提取后没有可用的正文内容。");
+                }
+              }
 
               // 解析 JSON
               let messagesArray = [];

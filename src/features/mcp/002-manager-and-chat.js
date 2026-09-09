@@ -835,7 +835,7 @@
     }));
   }
 
-  function createConfiguredModelSender() {
+  function createConfiguredModelSender(thoughtChainRequest) {
     const config = appState()?.apiConfig || {};
     const proxyUrl = String(config.proxyUrl || "").replace(/\/$/, "");
     const isGemini = proxyUrl === "https://generativelanguage.googleapis.com/v1beta/models";
@@ -851,6 +851,7 @@
             messages: requestData.messages,
             temperature: parseFloat(config.temperature) || 0.8,
             stream: false,
+            ...(thoughtChainRequest?.openAIOptions || {}),
             ...(requestData.tools?.length ? { tools: requestData.tools, tool_choice: requestData.requireTool ? "required" : "auto" } : {}),
           }),
           signal: requestData.signal,
@@ -885,7 +886,12 @@
       const body = {
         ...(systemParts.length ? { systemInstruction: { parts: systemParts } } : {}),
         contents,
-        generationConfig: { temperature: parseFloat(config.temperature) || 0.8 },
+        generationConfig: {
+          temperature: parseFloat(config.temperature) || 0.8,
+          ...(thoughtChainRequest?.geminiThinkingConfig
+            ? { thinkingConfig: thoughtChainRequest.geminiThinkingConfig }
+            : {}),
+        },
         ...(requestData.tools?.length ? {
           tools: [{ functionDeclarations: requestData.tools.map((tool) => tool.function) }],
           toolConfig: { functionCallingConfig: { mode: requestData.requireTool ? "ANY" : "AUTO" } },
@@ -898,7 +904,14 @@
       const data = await response.json();
       const parts = data?.candidates?.[0]?.content?.parts || [];
       const calls = parts.filter((part) => part.functionCall).map((part, index) => ({ id: `gemini-mcp-${Date.now()}-${index}`, name: part.functionCall.name, arguments: part.functionCall.args || {} }));
-      const text = parts.filter((part) => typeof part.text === "string").map((part) => part.text).join("\n");
+      const text = parts
+        .filter(
+          (part) =>
+            typeof part.text === "string" &&
+            (!thoughtChainRequest?.active || part.thought !== true),
+        )
+        .map((part) => part.text)
+        .join("\n");
       return {
         text,
         toolCalls: calls,
@@ -907,11 +920,11 @@
     };
   }
 
-  async function runWithConfiguredModel(chat, systemPrompt, messages, signal) {
+  async function runWithConfiguredModel(chat, systemPrompt, messages, signal, thoughtChainRequest) {
     return runChatToolLoop({
       chat,
       messages: [{ role: "system", content: systemPrompt }, ...(messages || [])],
-      send: createConfiguredModelSender(),
+      send: createConfiguredModelSender(thoughtChainRequest),
       signal,
     });
   }
