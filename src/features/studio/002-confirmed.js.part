@@ -270,7 +270,7 @@
    */
   async function getApiResponse(systemPrompt) {
     const { proxyUrl, apiKey, model } = window.state.apiConfig;
-    const isGemini = proxyUrl === 'https://generativelanguage.googleapis.com/v1beta/models';
+    const isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
 
     const temperature = parseFloat(window.state.apiConfig.temperature) || 0.8;
 

@@ -88,6 +88,15 @@
             <span class="action-btn" id="add-world-book-btn">+</span>
           </div>
         </div>
+        <div class="world-book-toolbar" aria-label="世界书筛选与控制">
+          <label class="world-book-engine-toggle" title="关闭后所有世界书都不会参与内容生成">
+            <input type="checkbox" id="world-book-engine-enabled" checked />
+            <span class="world-book-toggle-slider"></span>
+            <span>世界书引擎</span>
+          </label>
+          <input id="world-book-search-input" type="search" placeholder="搜索世界书或词条" aria-label="搜索世界书或词条" />
+          <button type="button" id="world-book-tools-btn" class="world-book-compact-btn">诊断</button>
+        </div>
         <div id="world-book-list"></div>
       </div>
 
@@ -116,12 +125,94 @@
             </select>
           </div>
 
-          <div class="form-group" style="height: 100%">
-            <label for="world-book-content-input">内容</label>
+          <div class="world-book-switch-row">
+            <label class="world-book-switch-item">
+              <input type="checkbox" id="world-book-enabled-switch" checked />
+              <span class="world-book-toggle-slider"></span>
+              <span>启用此世界书</span>
+            </label>
+            <label class="world-book-switch-item">
+              <input type="checkbox" id="world-book-global-switch" />
+              <span class="world-book-toggle-slider"></span>
+              <span>全局启用</span>
+            </label>
+          </div>
+
+          <div class="form-group">
+            <label for="world-book-description-input">说明</label>
+            <textarea id="world-book-description-input" rows="2" placeholder="说明这本世界书的用途；说明不会发送给 AI"></textarea>
+          </div>
+
+          <details class="world-book-settings-panel">
+            <summary>匹配与预算设置</summary>
+            <div class="world-book-settings-grid">
+              <label>默认扫描深度<input type="number" id="world-book-scan-depth-input" min="0" value="6" /></label>
+              <label>Token 预算<input type="number" id="world-book-token-budget-input" min="0" value="1500" /></label>
+              <label>最大递归步数<input type="number" id="world-book-recursion-steps-input" min="0" max="20" value="3" /></label>
+              <label class="world-book-checkline"><input type="checkbox" id="world-book-recursive-switch" checked />递归扫描</label>
+              <label class="world-book-checkline"><input type="checkbox" id="world-book-case-sensitive-switch" />默认区分大小写</label>
+              <label class="world-book-checkline"><input type="checkbox" id="world-book-whole-word-switch" />默认全词匹配</label>
+            </div>
+          </details>
+
+          <div class="form-group world-book-legacy-content" hidden>
+            <label for="world-book-content-input">兼容正文</label>
             <textarea
               id="world-book-content-input"
               placeholder="在此处输入详细的世界观设定..."
             ></textarea>
+          </div>
+
+          <div class="world-book-entry-heading">
+            <div>
+              <strong>词条</strong>
+              <span id="world-book-entry-count">0/0 已启用</span>
+            </div>
+            <div class="world-book-entry-actions">
+              <button type="button" id="world-book-enable-all-entries" class="world-book-compact-btn">全开</button>
+              <button type="button" id="world-book-disable-all-entries" class="world-book-compact-btn">全关</button>
+              <button type="button" id="add-world-book-entry-btn" class="world-book-compact-btn world-book-primary-btn">+ 词条</button>
+            </div>
+          </div>
+          <div id="world-book-entries-container"></div>
+        </div>
+      </div>
+
+      <div id="world-book-tools-modal" class="modal">
+        <div class="modal-content world-book-tools-content">
+          <div class="modal-header">
+            <span>世界书诊断与测试</span>
+            <button type="button" id="world-book-tools-close" class="world-book-icon-btn" aria-label="关闭">×</button>
+          </div>
+          <div class="modal-body world-book-tools-body">
+            <section>
+              <h3>数据状态</h3>
+              <div class="world-book-settings-grid world-book-global-settings">
+                <label>世界书总 Token 预算<input type="number" id="world-book-total-budget-input" min="0" value="4096" /></label>
+                <label class="world-book-checkline"><input type="checkbox" id="world-book-include-names-switch" checked />扫描时包含参与者名称</label>
+              </div>
+              <div id="world-book-diagnostic-summary" class="world-book-diagnostic-summary">尚未扫描</div>
+              <div class="world-book-tool-actions">
+                <button type="button" id="world-book-run-diagnostics" class="world-book-compact-btn">重新扫描</button>
+                <button type="button" id="world-book-repair-data" class="world-book-compact-btn">规范化当前项目数据</button>
+                <button type="button" id="world-book-export-data" class="world-book-compact-btn">导出当前世界书</button>
+                <button type="button" id="world-book-import-legacy-db" class="world-book-compact-btn">从旧项目数据库选择导入</button>
+              </div>
+              <p class="world-book-tool-note">不会自动读取、修改或删除旧项目数据库。只有点击导入并确认后，转换副本才会写入当前项目。</p>
+            </section>
+            <section>
+              <h3>激活测试器</h3>
+              <textarea id="world-book-test-text" rows="4" placeholder="输入一段模拟对话，查看当前已启用世界书中的词条如何激活"></textarea>
+              <button type="button" id="world-book-run-test" class="world-book-compact-btn world-book-primary-btn">测试激活</button>
+              <div id="world-book-test-results" class="world-book-test-results" aria-live="polite"></div>
+            </section>
+            <section>
+              <div class="world-book-section-title-row">
+                <h3>最近运行日志</h3>
+                <button type="button" id="world-book-clear-logs" class="world-book-compact-btn">清除</button>
+              </div>
+              <div id="world-book-runtime-logs" class="world-book-runtime-logs">暂无日志</div>
+            </section>
           </div>
         </div>
       </div>
@@ -192,25 +283,7 @@
                   </button>
                 </div>
               </div>
-              <div class="form-group">
-                <label
-                  >温度 (随机性):
-                  <span
-                    id="temperature-value"
-                    style="color: var(--accent-color)"
-                    >0.8</span
-                  ></label
-                >
-                <input
-                  type="range"
-                  id="temperature-slider"
-                  min="0"
-                  max="2"
-                  step="0.1"
-                  value="0.8"
-                  class="moe-slider"
-                />
-              </div>
+              <div id="api-generation-params"></div>
               <button id="fetch-models-btn" class="moe-btn-secondary">
                 拉取模型列表
               </button>
@@ -251,6 +324,70 @@
               >
                 拉取语音模型
               </button>
+              <div class="media-settings-grid" id="minimax-global-audio-settings">
+                <div class="form-group">
+                  <label>默认音频格式</label>
+                  <select id="minimax-audio-format" class="moe-input">
+                    <option value="mp3">MP3</option>
+                    <option value="wav">WAV</option>
+                    <option value="flac">FLAC</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>采样率</label>
+                  <select id="minimax-sample-rate" class="moe-input">
+                    <option value="16000">16 kHz</option>
+                    <option value="24000">24 kHz</option>
+                    <option value="32000" selected>32 kHz</option>
+                    <option value="44100">44.1 kHz</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>码率</label>
+                  <select id="minimax-bitrate" class="moe-input">
+                    <option value="64000">64 kbps</option>
+                    <option value="128000" selected>128 kbps</option>
+                    <option value="256000">256 kbps</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>声道</label>
+                  <select id="minimax-channel" class="moe-input">
+                    <option value="1" selected>单声道</option>
+                    <option value="2">立体声</option>
+                  </select>
+                </div>
+              </div>
+              <div class="media-inline-toggles">
+                <label class="toggle-switch-label" for="minimax-stream-enabled">
+                  <span class="toggle-switch-text">流式返回</span>
+                  <input type="checkbox" id="minimax-stream-enabled" />
+                  <span class="toggle-switch-slider"></span>
+                </label>
+                <label class="toggle-switch-label" for="minimax-subtitle-enabled">
+                  <span class="toggle-switch-text">生成字幕时间戳</span>
+                  <input type="checkbox" id="minimax-subtitle-enabled" />
+                  <span class="toggle-switch-slider"></span>
+                </label>
+              </div>
+              <div class="form-group">
+                <label>自定义 API 地址（可选）</label>
+                <input
+                  type="url"
+                  id="minimax-base-url"
+                  class="moe-input"
+                  placeholder="留空时按国内版/海外版自动选择"
+                />
+              </div>
+              <div class="moe-btn-group media-compact-actions">
+                <button id="fetch-minimax-voices-btn" class="moe-btn-secondary" type="button">
+                  拉取音色库
+                </button>
+                <button id="test-minimax-voice-btn" class="moe-btn-secondary" type="button">
+                  试听连接
+                </button>
+              </div>
+              <div id="minimax-voice-library-status" class="media-status-text" aria-live="polite"></div>
             </div>
           </div>
 
@@ -419,6 +556,8 @@
                 <div class="form-group">
                   <label>模型</label>
                   <select id="novelai-model" class="moe-input">
+                    <option value="nai-diffusion-5-full">V5 Full</option>
+                    <option value="nai-diffusion-5-curated">V5 Curated</option>
                     <option value="nai-diffusion-4-curated-preview">
                       V4.5 Curated
                     </option>
@@ -472,7 +611,7 @@
             </div>
             <div class="moe-card-body">
               <div class="form-group">
-                <label>API Key (可选，用于高级功能/去水印)</label>
+                <label>API Key（当前官方接口需要）</label>
                 <input
                   type="password"
                   id="pollinations-api-key"
@@ -480,9 +619,77 @@
                   class="moe-input"
                 />
                 <p style="font-size: 12px; color: #888; margin-top: 5px">
-                  * 如果留空，将使用免费公开接口 (可能包含水印或受限)。
+                  * 当前官方接口需要密钥。旧公开接口 Fallback 仍保留，可在下方关闭。
                 </p>
               </div>
+              <div class="form-group">
+                <label>图像模型</label>
+                <select id="pollinations-model-select" class="moe-input">
+                  <option value="flux">Flux（兼容旧配置）</option>
+                  <option value="zimage">Z-Image</option>
+                </select>
+              </div>
+              <div class="moe-btn-group media-compact-actions">
+                <button id="fetch-pollinations-models-btn" class="moe-btn-secondary" type="button">
+                  拉取图像模型
+                </button>
+                <button id="test-pollinations-btn" class="moe-btn-secondary" type="button">
+                  测试生图
+                </button>
+              </div>
+              <div class="media-settings-grid">
+                <div class="form-group">
+                  <label>默认宽度</label>
+                  <input id="pollinations-width" class="moe-input" type="number" min="256" max="4096" step="64" value="1024" />
+                </div>
+                <div class="form-group">
+                  <label>默认高度</label>
+                  <input id="pollinations-height" class="moe-input" type="number" min="256" max="4096" step="64" value="1024" />
+                </div>
+                <div class="form-group">
+                  <label>默认种子</label>
+                  <input id="pollinations-seed" class="moe-input" type="number" min="-1" max="2147483647" value="-1" />
+                </div>
+                <div class="form-group">
+                  <label>质量</label>
+                  <select id="pollinations-quality" class="moe-input">
+                    <option value="medium">中</option>
+                    <option value="high">高</option>
+                    <option value="hd">HD</option>
+                    <option value="low">低</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>默认负面提示词</label>
+                <textarea id="pollinations-negative-prompt" class="moe-input media-textarea" rows="2" placeholder="仅支持该参数的模型会使用"></textarea>
+              </div>
+              <div class="form-group">
+                <label>安全过滤</label>
+                <select id="pollinations-safe" class="moe-input">
+                  <option value="">关闭（保持原行为）</option>
+                  <option value="true">开启</option>
+                </select>
+              </div>
+              <div class="media-inline-toggles">
+                <label class="toggle-switch-label" for="pollinations-enhance">
+                  <span class="toggle-switch-text">自动增强提示词</span>
+                  <input type="checkbox" id="pollinations-enhance" />
+                  <span class="toggle-switch-slider"></span>
+                </label>
+                <label class="toggle-switch-label" for="pollinations-transparent">
+                  <span class="toggle-switch-text">透明背景</span>
+                  <input type="checkbox" id="pollinations-transparent" />
+                  <span class="toggle-switch-slider"></span>
+                </label>
+                <label class="toggle-switch-label" for="pollinations-legacy-fallback">
+                  <span class="toggle-switch-text">保留旧公开接口 Fallback</span>
+                  <input type="checkbox" id="pollinations-legacy-fallback" checked />
+                  <span class="toggle-switch-slider"></span>
+                </label>
+              </div>
+              <div id="pollinations-model-status" class="media-status-text" aria-live="polite"></div>
+              <img id="pollinations-test-preview" class="media-test-preview" alt="Pollinations 测试生成结果" hidden />
             </div>
           </div>
 
@@ -753,4 +960,3 @@
           hidden
         />
       </div>
-

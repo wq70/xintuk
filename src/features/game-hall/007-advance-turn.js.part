@@ -62,7 +62,7 @@ ${eventPrompt}
 
     try {
       const { proxyUrl, apiKey, model } = state.apiConfig;
-      let isGemini = proxyUrl === GEMINI_API_URL;
+      let isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
       let messagesForApi = [{ role: 'user', content: systemPrompt }];
       let geminiConfig = toGeminiRequestData(
         model,
@@ -81,7 +81,7 @@ ${eventPrompt}
             body: JSON.stringify({
               model: model,
               messages: messagesForApi,
-              temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+              ...window.ApiGenerationParams.current(),
               response_format: { type: 'json_object' },
             }),
           });

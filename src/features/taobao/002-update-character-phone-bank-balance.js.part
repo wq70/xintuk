@@ -235,7 +235,7 @@ async function handleGenerateFoodsAI() {
 
   try {
     const messagesForApi = [{ role: "user", content: prompt }];
-    const isGemini = proxyUrl === GEMINI_API_URL;
+    const isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
     const requestData = isGemini
       ? toGeminiRequestData(model, apiKey, prompt, messagesForApi, isGemini)
       : {
@@ -249,7 +249,7 @@ async function handleGenerateFoodsAI() {
             body: JSON.stringify({
               model: model,
               messages: messagesForApi,
-              temperature: 1.1,
+              ...window.ApiGenerationParams.current({ temperature: 1.1 }),
               response_format: { type: "json_object" },
             }),
           },
@@ -333,7 +333,7 @@ async function handleSearchFoodsAI() {
 
   try {
     const messagesForApi = [{ role: "user", content: prompt }];
-    const isGemini = proxyUrl === GEMINI_API_URL;
+    const isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
     const requestData = isGemini
       ? toGeminiRequestData(model, apiKey, prompt, messagesForApi, isGemini)
       : {
@@ -347,7 +347,7 @@ async function handleSearchFoodsAI() {
             body: JSON.stringify({
               model: model,
               messages: messagesForApi,
-              temperature: 0.8,
+              ...window.ApiGenerationParams.current({ temperature: 0.8 }),
               response_format: { type: "json_object" },
             }),
           },
@@ -917,7 +917,7 @@ async function generateProductReviews(productId) {
 `;
   try {
     const messagesForApi = [{ role: "user", content: prompt }];
-    let isGemini = proxyUrl === GEMINI_API_URL;
+    let isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
     let geminiConfig = toGeminiRequestData(
       model,
       apiKey,
@@ -937,7 +937,7 @@ async function generateProductReviews(productId) {
           body: JSON.stringify({
             model: model,
             messages: messagesForApi,
-            temperature: parseFloat(state.apiConfig.temperature) || 1.0,
+            ...window.ApiGenerationParams.current(),
             response_format: { type: "json_object" },
           }),
         });
@@ -1372,7 +1372,7 @@ async function handleSearchProductsAI() {
     const messagesForApi = [{ role: "user", content: prompt }];
 
     // 恢复对 Gemini 和 OpenAI 的兼容判断逻辑
-    const isGemini = proxyUrl === GEMINI_API_URL;
+    const isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
     const requestData = isGemini
       ? toGeminiRequestData(model, apiKey, prompt, messagesForApi, isGemini)
       : {
@@ -1386,7 +1386,7 @@ async function handleSearchProductsAI() {
             body: JSON.stringify({
               model: model,
               messages: messagesForApi,
-              temperature: 0.8,
+              ...window.ApiGenerationParams.current({ temperature: 0.8 }),
               response_format: { type: "json_object" },
             }),
           },

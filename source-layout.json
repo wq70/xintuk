@@ -5,6 +5,7 @@
       "src/views/home.html",
       "src/views/mcp.html",
       "src/views/thought-chain.html",
+      "src/views/prompt-center.html",
       "src/views/weibo.html",
       "src/views/world-book-and-api-settings.html",
       "src/views/chat-and-albums-01.html",
@@ -17,6 +18,7 @@
       "src/views/chat-settings-and-modals-01.html",
       "src/views/chat-settings-and-modals-02.html",
       "src/views/chat-settings-and-modals-03.html",
+      "src/views/memory-center.html",
       "src/views/forum-01.html",
       "src/views/forum-02.html",
       "src/views/games-01.html",
@@ -28,14 +30,19 @@
       "src/views/accounting.html",
       "src/views/check-in.html",
       "src/views/dating-history-and-studio-01.html",
+      "src/views/studio-modals.html",
       "src/views/dating-history-and-studio-02.html"
     ],
     "main-app.js": [
       "src/features/music/music-integration.js",
+      "src/features/time/time-context.js",
+      "src/features/api/request-parameters.js",
       "src/legacy/main-app/001-capture-error.js.part",
       "src/legacy/main-app/002-find-lucky-king.js.part",
       "src/legacy/main-app/003-modal.js.part",
       "src/legacy/main-app/004-base64.js.part",
+      "src/features/world-book/core.js",
+      "src/features/world-book/ui.js",
       "src/legacy/main-app/005-render-qzone-screen.js.part",
       "src/legacy/main-app/006-blob.js.part",
       "src/legacy/main-app/007-initial-stats.js.part",
@@ -87,7 +94,10 @@
       "src/legacy/main-app/053-custom-time-container.js.part",
       "src/legacy/main-app/054-on-sticker-category-delete.js.part",
       "src/legacy/main-app/055-wardrobe-entry-btn.js.part",
-      "src/legacy/main-app/056-bubble.js.part"
+      "src/legacy/main-app/056-bubble.js.part",
+      "src/features/media/media-integration.js",
+      "src/features/memory/app.js",
+      "src/features/bilingual/app.js"
     ],
     "style.css": [
       "src/styles/cascade/001.css",
@@ -113,7 +123,15 @@
       "src/styles/cascade/021.css",
       "src/styles/cascade/022-mcp.css",
       "src/styles/cascade/023-thought-chain.css",
-      "src/features/music/music-integration.css"
+      "src/styles/cascade/024-memory.css",
+      "src/styles/cascade/025-time-context.css",
+      "src/styles/cascade/026-api-generation-params.css",
+      "src/styles/cascade/027-prompt-center.css",
+      "src/features/music/music-integration.css",
+      "src/features/media/media-integration.css",
+      "src/features/studio/studio-enhancements.css",
+      "src/features/bilingual/bilingual.css",
+      "src/features/world-book/world-book.css"
     ],
     "game-hall.js": [
       "src/features/game-hall/001-ludo-board-size.js.part",
@@ -164,8 +182,7 @@
       "src/features/tukey-accounting/002-render-tukey-records-list.js.part"
     ],
     "studio.js": [
-      "src/features/studio/001-active-studio-script-id.js.part",
-      "src/features/studio/002-confirmed.js.part"
+      "src/features/studio/app.js"
     ],
     "avatar-frames.js": [
       "src/features/avatar-frames/001-avatar-frames.js.part"
@@ -177,6 +194,10 @@
     ],
     "thought-chain.js": [
       "src/features/thought-chain/app.js"
+    ],
+    "prompt-center.js": [
+      "src/features/prompt-center/catalog.js",
+      "src/features/prompt-center/app.js"
     ]
   }
 }

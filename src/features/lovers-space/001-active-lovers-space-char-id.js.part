@@ -884,7 +884,7 @@ async function handleGenerateDailyActivity(chat) {
 
   try {
     const messagesForApi = [{ role: "user", content: systemPrompt }];
-    let isGemini = proxyUrl === GEMINI_API_URL;
+    let isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
     let geminiConfig = toGeminiRequestData(
       model,
       apiKey,
@@ -906,7 +906,7 @@ async function handleGenerateDailyActivity(chat) {
             body: JSON.stringify({
               model: model,
               messages: messagesForApi,
-              temperature: 1.0,
+              ...window.ApiGenerationParams.current({ temperature: 1.0 }),
               response_format: { type: "json_object" },
             }),
           },

@@ -70,6 +70,7 @@
             if (weiboContext) {
               messagesPayload.push({ role: "system", content: weiboContext });
             }
+            }
 
             const visiblePosts = filterVisiblePostsForAI(allRecentPosts, chat);
 
@@ -108,6 +109,7 @@
               }
 
               // 为AI准备微博互动的上下文
+              if (singleChatFeatures.weibo) {
               let weiboContext = "";
 
               // 1. 获取用户最新发布的3条微博
@@ -201,8 +203,28 @@
               if (weiboContext) {
                 messagesPayload.push({ role: "system", content: weiboContext });
               }
+              }
 
               messagesPayload.push({ role: "system", content: postsContext });
+            }
+
+            if (window.PromptCenterApp) {
+              const promptCenterRequest = window.PromptCenterApp.prepareMessages([
+                { role: "system", content: systemPrompt },
+                ...messagesPayload,
+              ]);
+              const primarySystemIndex = promptCenterRequest.messages.findIndex(
+                (message) => message.role === "system",
+              );
+              if (primarySystemIndex >= 0) {
+                systemPrompt = promptCenterRequest.messages[primarySystemIndex].content;
+                messagesPayload = promptCenterRequest.messages.filter(
+                  (_, index) => index !== primarySystemIndex,
+                );
+              } else {
+                systemPrompt = "";
+                messagesPayload = promptCenterRequest.messages;
+              }
             }
 
             const thoughtChainRequest = window.ThoughtChainApp
@@ -222,7 +244,7 @@
             systemPrompt = thoughtChainRequest.systemPrompt;
             messagesPayload = thoughtChainRequest.messages;
 
-            let isGemini = proxyUrl === GEMINI_API_URL;
+            let isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
             let geminiConfig = toGeminiRequestData(
               model,
               apiKey,
@@ -260,10 +282,8 @@
                     body: JSON.stringify({
                       model,
                       messages: request.messages,
-                      temperature:
-                        parseFloat(state.apiConfig.temperature) || 0.8,
                       stream: false,
-                      ...thoughtChainRequest.openAIOptions,
+                      ...window.ApiGenerationParams.mergeOpenAI(thoughtChainRequest.openAIOptions),
                       ...(request.tools?.length
                         ? {
                             tools: request.tools,
@@ -427,10 +447,8 @@
                           { role: "system", content: systemPrompt },
                           ...messagesPayload,
                         ],
-                        temperature:
-                          parseFloat(state.apiConfig.temperature) || 0.8,
                         stream: false,
-                        ...thoughtChainRequest.openAIOptions,
+                        ...window.ApiGenerationParams.mergeOpenAI(thoughtChainRequest.openAIOptions),
                       }),
                     }),
               );
@@ -511,6 +529,7 @@
                 messagesArray = fullResponse.chatResponse;
               }
               if (
+                singleChatFeatures.innerVoice &&
                 fullResponse.innerVoice &&
                 typeof fullResponse.innerVoice === "object"
               ) {
@@ -519,6 +538,7 @@
 
               // 兼容旧格式，如果AI只返回了innerVoice里的字段
               if (
+                singleChatFeatures.innerVoice &&
                 !innerVoiceData &&
                 fullResponse.thoughts &&
                 fullResponse.behavior
@@ -559,7 +579,7 @@
                 chat.latestInnerVoice.naughtyThoughts || "...";
 
               chat.innerVoiceHistory.push(newInnerVoice);
-            } else {
+            } else if (singleChatFeatures.innerVoice) {
               console.warn("本次AI回复中未检测到有效的心声(innerVoice)数据。");
             }
 
@@ -580,6 +600,13 @@
             for (const msgData of messagesArray) {
               if (!msgData || typeof msgData !== "object") {
                 console.warn("收到了格式不规范的AI指令，已跳过:", msgData);
+                continue;
+              }
+
+              if (!isSingleChatFeatureActionAllowed(chat, msgData.type)) {
+                console.warn(
+                  `已忽略未开启的单聊附加功能指令: ${msgData.type}`,
+                );
                 continue;
               }
 
@@ -652,10 +679,14 @@
               }
 
               let aiMessage = null;
+              const bilingualMetadata =
+                window.TukBilingual?.extractGeneratedMetadata(msgData, chat) ||
+                {};
               const baseMessage = {
                 role: "assistant",
                 senderName: msgData.name || chat.name,
                 timestamp: messageTimestamp++,
+                ...bilingualMetadata,
               };
               // 定位指令侦测与解析器
               // 我们在处理所有消息类型之前，优先检查它是否是我们的新定位指令

@@ -40,26 +40,9 @@
 
           const userNickname = chat.settings.myNickname || "我";
 
-          let worldBookContent = "";
-          if (
-            chat.settings.linkedWorldBookIds &&
-            chat.settings.linkedWorldBookIds.length > 0
-          ) {
-            const linkedContents = chat.settings.linkedWorldBookIds
-              .map((bookId) => {
-                const worldBook = state.worldBooks.find(
-                  (wb) => wb.id === bookId,
-                );
-                return worldBook && worldBook.content
-                  ? `\n\n## 世界书: ${worldBook.name}\n${worldBook.content}`
-                  : "";
-              })
-              .filter(Boolean)
-              .join("");
-            if (linkedContents) {
-              worldBookContent = `\n\n# 核心世界观设定 (你必须严格遵守)\n${linkedContents}\n`;
-            }
-          }
+          let worldBookContent = window.TukWorldBook.buildForChat(chat, {
+            generationType: "quiet",
+          });
 
           if (userInput && videoCallState.isUserParticipating) {
             if (isVisualMode) {
@@ -95,7 +78,7 @@
 			你的任务是根据每个角色的性格，生成他们在通话中会说的【第一人称对话】，注意是在视频通话，绝对不能以为是在现实！每次回复的字数多些，50字以上。
 
 			# 核心规则
-			1.  **【【【语言铁律】】】**: 无论角色人设是什么国籍或说什么语言，在本次视频通话中，所有角色【必须】全程使用【中文】进行交流。
+			${window.TukBilingual?.buildCallPromptContext(chat, { isGroup: true }) || "1.  **【【【语言铁律】】】**: 无论角色人设是什么国籍或说什么语言，在本次视频通话中，所有角色【必须】全程使用【中文】进行交流。"}
 			2.  **【【【格式铁律】】】**: 你的回复【必须】是一个JSON数组，每个对象代表一个角色的发言，格式为：\`{"name": "【角色的本名】", "speech": "【在这里加入带动作的对话】"}\`。
 			3.  **【【【表现力铁律】】】**: 在 "speech" 字段中，你【必须】为角色的对话加入【动作、表情或心理活动】，并用【】符号包裹。这非常重要！
 			4.  **示例**: \`{"name": "张三", "speech": "【挠了挠头】啊？我刚刚走神了，你们说到哪了？"}\`
@@ -134,6 +117,13 @@
 			${worldBookContent}
 			现在，请根据【通话前摘要】和下面的【通话实时记录】，继续进行对话。
 			`;
+          }
+
+          if (!videoCallState.isGroupCall) {
+            inCallPrompt +=
+              window.TukBilingual?.buildCallPromptContext(chat, {
+                isGroup: false,
+              }) || "";
           }
 
           // ================= [修改开始] =================
@@ -194,7 +184,7 @@
           }
 
           try {
-            let isGemini = proxyUrl === GEMINI_API_URL;
+            let isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
             let geminiConfig = toGeminiRequestData(
               model,
               apiKey,
@@ -216,7 +206,7 @@
                       { role: "system", content: inCallPrompt },
                       ...messagesForApi,
                     ],
-                    temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+                    ...window.ApiGenerationParams.current(),
                   }),
                 });
             if (!response.ok)
@@ -233,55 +223,83 @@
             const connectingElement = callFeed.querySelector("em");
             if (connectingElement) connectingElement.remove();
 
-            let bubble; // 先声明一个 bubble 变量
-
-            // 根据通话模式创建对应的气泡元素
-            if (isVisualMode) {
-              bubble = document.createElement("div");
-              bubble.className = "visual-call-bubble ai";
-            } else {
-              bubble = document.createElement("div");
-              bubble.className = "call-message-bubble ai-speech";
-              if (videoCallState.isGroupCall && turn.name) {
-                bubble.innerHTML = `<strong>${turn.name}:</strong> `;
+            let turns = [{ name: chat.name, speech: sanitizedResponse }];
+            if (videoCallState.isGroupCall) {
+              try {
+                const parsedTurns = JSON.parse(
+                  sanitizedResponse
+                    .replace(/^```json\s*/i, "")
+                    .replace(/```$/, "")
+                    .trim(),
+                );
+                if (Array.isArray(parsedTurns) && parsedTurns.length > 0) {
+                  turns = parsedTurns;
+                }
+              } catch (parseError) {
+                console.warn("群视频通话回复未使用标准JSON数组，按普通文本显示。", parseError);
               }
             }
-            // 将AI的文本内容填充到气泡中
-            bubble.appendChild(document.createTextNode(sanitizedResponse));
 
-            // 挂载到通话界面
-            callFeed.appendChild(bubble);
+            for (const turn of turns) {
+              const senderName = turn.name || chat.name;
+              const responseText = String(
+                turn.speech || turn.content || sanitizedResponse,
+              ).trim();
+              if (!responseText) continue;
 
-            // 检查：是否是单人通话、语音接入是否开启、Minimax是否配置、角色语音ID是否存在、并且AI确实返回了内容
-            if (
-              !chat.isGroup &&
-              chat.settings.videoCallVoiceAccess &&
-              state.apiConfig.minimaxGroupId &&
-              state.apiConfig.minimaxApiKey &&
-              chat.settings.minimaxVoiceId &&
-              sanitizedResponse
-            ) {
-              console.log(
-                `[视频通话] 检测到语音接入已开启，为“${chat.name}”合成语音...`,
-              );
-              // 调用你已有的 playMinimaxAudio 函数来播放语音
-              playMinimaxAudio(
-                sanitizedResponse,
-                chat.settings.minimaxVoiceId,
-                [bubble],
-              );
-            }
+              let bubble;
+              if (isVisualMode) {
+                bubble = document.createElement("div");
+                bubble.className = "visual-call-bubble ai";
+              } else {
+                bubble = document.createElement("div");
+                bubble.className = "call-message-bubble ai-speech";
+                if (videoCallState.isGroupCall && senderName) {
+                  const senderLabel = document.createElement("strong");
+                  senderLabel.textContent = `${senderName}: `;
+                  bubble.appendChild(senderLabel);
+                }
+              }
 
-            // 将这条消息记录到通话历史中，这部分逻辑不变
-            if (videoCallState.isGroupCall && turn.name) {
+              const callContent = window.TukBilingual?.renderCallContent(
+                bubble,
+                responseText,
+                chat,
+                senderName,
+              ) || {
+                original: responseText,
+                translation: "",
+                ttsText: responseText,
+                bilingual: null,
+              };
+              callFeed.appendChild(bubble);
+
+              if (
+                !chat.isGroup &&
+                chat.settings.videoCallVoiceAccess &&
+                state.apiConfig.minimaxGroupId &&
+                state.apiConfig.minimaxApiKey &&
+                chat.settings.minimaxVoiceId &&
+                callContent.ttsText
+              ) {
+                console.log(
+                  `[视频通话] 检测到语音接入已开启，为“${chat.name}”合成语音...`,
+                );
+                playMinimaxAudio(
+                  callContent.ttsText,
+                  chat.settings.minimaxVoiceId,
+                  [bubble],
+                );
+              }
+
               videoCallState.callHistory.push({
                 role: "assistant",
-                content: `${turn.name}: ${sanitizedResponse}`,
-              });
-            } else {
-              videoCallState.callHistory.push({
-                role: "assistant",
-                content: sanitizedResponse,
+                content: videoCallState.isGroupCall
+                  ? `${senderName}: ${callContent.original}`
+                  : callContent.original,
+                ...(callContent.bilingual
+                  ? { bilingual: callContent.bilingual }
+                  : {}),
               });
             }
 
@@ -627,26 +645,9 @@
             })
             .join("\n");
 
-          let worldBookContent = "";
-          if (
-            chat.settings.linkedWorldBookIds &&
-            chat.settings.linkedWorldBookIds.length > 0
-          ) {
-            const linkedContents = chat.settings.linkedWorldBookIds
-              .map((bookId) => {
-                const worldBook = state.worldBooks.find(
-                  (wb) => wb.id === bookId,
-                );
-                return worldBook && worldBook.content
-                  ? `\n\n## 世界书: ${worldBook.name}\n${worldBook.content}`
-                  : "";
-              })
-              .filter(Boolean)
-              .join("");
-            if (linkedContents) {
-              worldBookContent = `\n\n# 核心世界观设定 (请参考)\n${linkedContents}\n`;
-            }
-          }
+          let worldBookContent = window.TukWorldBook.buildForChat(chat, {
+            generationType: "quiet",
+          });
 
           const systemPrompt = `
 			# 你的任务
@@ -670,7 +671,7 @@
           const messagesForApi = [{ role: "user", content: systemPrompt }];
 
           try {
-            let isGemini = proxyUrl === GEMINI_API_URL;
+            let isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
             let geminiConfig = toGeminiRequestData(
               model,
               apiKey,
@@ -689,7 +690,7 @@
                   body: JSON.stringify({
                     model: model,
                     messages: messagesForApi,
-                    temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+                    ...window.ApiGenerationParams.current(),
                   }),
                 });
             if (!response.ok) {

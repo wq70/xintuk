@@ -4,6 +4,27 @@
               naiExample = `,\n    {\n      "type": "naiimag",\n      "prompt": "1girl, sitting in cafe, holding coffee cup, smile, indoor lighting, cinematic composition"\n    }`;
             }
 
+            const offlineTimeContext = window.TukTimeContext?.buildContext({
+              chat,
+              state,
+              mode: "offline",
+            }).prompt || "";
+            const offlineBilingualContext =
+              window.TukBilingual?.buildPromptContext(chat, {
+                mode: "offline",
+              }) || "";
+            const offlineInnerVoiceRequirement = singleChatFeatures.innerVoice
+              ? `3.  **"innerVoice" 键**: (JSON对象) 你的内心活动，必含 clothing, behavior, thoughts, naughtyThoughts 字段。`
+              : "";
+            const offlineInnerVoiceExample = singleChatFeatures.innerVoice
+              ? `,
+              "innerVoice": {
+                "clothing": "...",
+                "behavior": "...",
+                "thoughts": "...",
+                "naughtyThoughts": "..."
+              }`
+              : "";
             const offlineSystemPrompt = `
             # 核心任务：线下场景角色扮演
 
@@ -11,6 +32,8 @@
 
             # 你的角色设定
             ${chat.settings.aiPersona}
+            ${offlineTimeContext}
+            ${offlineBilingualContext}
             ${summaryContext}
             ${worldBookContext}
 
@@ -21,7 +44,7 @@
             # 你的输出要求 (最高指令)
             1.  **【格式铁律】**: 你的回复【必须】是一个**单一且完整**的JSON对象。
             2.  **"chatResponse" 键**: (JSON数组) 包含你要发送的消息。通常是一段长叙事文本，如果开启生图，则包含生图指令。
-            3.  **"innerVoice" 键**: (JSON对象) 你的内心活动，必含 clothing, behavior, thoughts, naughtyThoughts 字段。
+            ${offlineInnerVoiceRequirement}
             4.  **【字数铁律】**: 文本内容的字数应在【${wordCount}】字左右。
             5.  **【禁止出戏】**: 绝对不能提及你是AI。
             ${naiInstruction}
@@ -33,13 +56,7 @@
                   "type": "text",
                   "content": "（这里写你的大段叙事内容...）"
                 }${naiExample}
-              ],
-              "innerVoice": {
-                "clothing": "...",
-                "behavior": "...",
-                "thoughts": "...",
-                "naughtyThoughts": "..."
-              }
+              ]${offlineInnerVoiceExample}
             }
 
             # 对话历史
@@ -48,15 +65,21 @@
               .slice(-chat.settings.maxMemory)
               .map(
                 (m) =>
-                  `${m.role === "user" ? "用户" : chat.name}: ${m.content}`,
+                  `${m.role === "user" ? "用户" : chat.name}: ${window.TukBilingual?.contextContent(m, chat) ?? m.content}`,
               )
               .join("\n")}
 
             现在，请根据用户的最后一句话，开始你的表演。`;
 
-            const messagesForOfflineMode = chat.history
-              .filter((message) => message.type !== "mcp_activity")
-              .slice(-chat.settings.maxMemory);
+            const messagesForOfflineMode =
+              window.TukBilingual?.prepareMessagesForModel(
+                chat.history
+                  .filter((message) => message.type !== "mcp_activity")
+                  .slice(-chat.settings.maxMemory),
+                chat,
+              ) || chat.history
+                .filter((message) => message.type !== "mcp_activity")
+                .slice(-chat.settings.maxMemory);
 
             // UI 状态更新
             const chatHeaderTitle =
@@ -72,27 +95,48 @@
 
             try {
               const { proxyUrl, apiKey, model } = state.apiConfig;
+              let promptCenterSystemPrompt = offlineSystemPrompt;
+              let promptCenterMessages = messagesForOfflineMode;
+              if (window.PromptCenterApp) {
+                const promptCenterRequest = window.PromptCenterApp.prepareMessages([
+                  { role: "system", content: offlineSystemPrompt },
+                  ...messagesForOfflineMode,
+                ]);
+                const primarySystemIndex = promptCenterRequest.messages.findIndex(
+                  (message) => message.role === "system",
+                );
+                if (primarySystemIndex >= 0) {
+                  promptCenterSystemPrompt =
+                    promptCenterRequest.messages[primarySystemIndex].content;
+                  promptCenterMessages = promptCenterRequest.messages.filter(
+                    (_, index) => index !== primarySystemIndex,
+                  );
+                } else {
+                  promptCenterSystemPrompt = "";
+                  promptCenterMessages = promptCenterRequest.messages;
+                }
+              }
               const thoughtChainRequest = window.ThoughtChainApp
                 ? window.ThoughtChainApp.prepareRequest({
-                    systemPrompt: offlineSystemPrompt,
-                    messages: messagesForOfflineMode,
+                    systemPrompt: promptCenterSystemPrompt,
+                    messages: promptCenterMessages,
                     proxyUrl,
                     model,
                     scope: "offline",
                   })
                 : {
-                    systemPrompt: offlineSystemPrompt,
-                    messages: messagesForOfflineMode,
+                    systemPrompt: promptCenterSystemPrompt,
+                    messages: promptCenterMessages,
                     active: false,
                     openAIOptions: {},
                   };
               const preparedOfflineSystemPrompt =
                 thoughtChainRequest.systemPrompt;
               const preparedOfflineMessages = thoughtChainRequest.messages;
-              let isGemini = proxyUrl === GEMINI_API_URL;
+              let isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
               let requestBody;
               let requestUrl = isGemini
-                ? `${GEMINI_API_URL}/${model}:generateContent?key=${getRandomValue(apiKey)}`
+                ? `${String(proxyUrl).replace(/\/$/, "")}/${model}:generateContent?key=${getRandomValue(apiKey)}`
                 : `${proxyUrl}/v1/chat/completions`;
               let requestHeaders = isGemini
                 ? { "Content-Type": "application/json" }
@@ -108,7 +152,7 @@
                     parts: [{ text: item.content }],
                   })),
                   generationConfig: {
-                    temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+                    ...window.ApiGenerationParams.gemini(),
                     ...(thoughtChainRequest.geminiThinkingConfig
                       ? {
                           thinkingConfig:
@@ -127,9 +171,8 @@
                     { role: "system", content: preparedOfflineSystemPrompt },
                     ...preparedOfflineMessages,
                   ],
-                  temperature: parseFloat(state.apiConfig.temperature) || 0.8,
                   stream: false,
-                  ...thoughtChainRequest.openAIOptions,
+                  ...window.ApiGenerationParams.mergeOpenAI(thoughtChainRequest.openAIOptions),
                 };
               }
 
@@ -212,7 +255,7 @@
                 ) {
                   messagesArray = fullResponse.chatResponse;
                 }
-                if (fullResponse.innerVoice) {
+                if (singleChatFeatures.innerVoice && fullResponse.innerVoice) {
                   innerVoiceData = fullResponse.innerVoice;
                 }
               } catch (e) {
@@ -240,6 +283,9 @@
               let messageTimestamp = Date.now();
 
               for (const msgData of messagesArray) {
+                if (!isSingleChatFeatureActionAllowed(chat, msgData?.type)) {
+                  continue;
+                }
                 // 2.1 如果是 naiimag 类型，执行生图逻辑 (复用线上代码)
                 if (msgData.type === "naiimag") {
                   if (!enableNai) continue; // 如果开关关了，跳过
@@ -271,7 +317,7 @@
                         .split("x")
                         .map(Number);
                       let requestBody;
-                      let apiUrl = model.includes("nai-diffusion-4")
+                      let apiUrl = (window.isNovelAIModernModel ? window.isNovelAIModernModel(model) : model.includes("nai-diffusion-4"))
                         ? "https://image.novelai.net/ai/generate-image-stream"
                         : "https://image.novelai.net/ai/generate-image";
 
@@ -288,7 +334,7 @@
                         qualityToggle: settings.quality_toggle,
                       };
 
-                      if (model.includes("nai-diffusion-4")) {
+                      if (window.isNovelAIModernModel ? window.isNovelAIModernModel(model) : model.includes("nai-diffusion-4")) {
                         requestBody = {
                           input: finalPositivePrompt,
                           model,
@@ -327,6 +373,13 @@
                             add_original_image: false,
                           },
                         };
+                      }
+
+                      if (window.applyNovelAIAdvancedParameters) {
+                        requestBody = window.applyNovelAIAdvancedParameters(
+                          requestBody,
+                          model,
+                        );
                       }
 
                       // 代理处理
@@ -622,6 +675,7 @@
 
           let lsPhotosContext = "";
           if (
+            singleChatFeatures.loversSpace &&
             chat.loversSpaceData &&
             chat.loversSpaceData.photos &&
             chat.loversSpaceData.photos.length > 0
@@ -638,7 +692,7 @@
           }
 
           let weiboContextForActiveChat = "";
-          try {
+          if (singleChatFeatures.weibo) try {
             // 1. 从数据库里找出最新的5条微博
             const recentWeiboPosts = await db.weiboPosts
               .orderBy("timestamp")
@@ -773,7 +827,7 @@
 
               try {
                 // 3. 发送请求
-                let isGemini = proxyUrl === GEMINI_API_URL;
+                let isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
                 let geminiConfig = toGeminiRequestData(
                   model,
                   apiKey,
@@ -792,8 +846,7 @@
                       body: JSON.stringify({
                         model: model,
                         messages: messagesForDecision,
-                        temperature:
-                          parseFloat(state.apiConfig.temperature) || 0.8,
+                        ...window.ApiGenerationParams.current(),
                       }),
                     });
 

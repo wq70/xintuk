@@ -290,7 +290,7 @@
 			`;
 
             // 3. 发起API调用，让AI扮演塔罗师
-            let isGemini = proxyUrl === GEMINI_API_URL;
+            let isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
             let messagesForApi = [{ role: "user", content: tarotMasterPrompt }];
             let geminiConfig = toGeminiRequestData(
               model,
@@ -311,7 +311,7 @@
                   body: JSON.stringify({
                     model: model,
                     messages: messagesForApi,
-                    temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+                    ...window.ApiGenerationParams.current(),
                   }),
                 });
 

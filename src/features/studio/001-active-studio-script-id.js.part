@@ -667,7 +667,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
       const { proxyUrl, apiKey, model } = window.state.apiConfig;
-      const isGemini = proxyUrl === 'https://generativelanguage.googleapis.com/v1beta/models';
+      const isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
 
       const requestData = isGemini
         ? window.toGeminiRequestData(model, apiKey, systemPrompt, messagesForApi, true)
@@ -757,7 +757,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
       const { proxyUrl, apiKey, model } = window.state.apiConfig;
-      const isGemini = proxyUrl === 'https://generativelanguage.googleapis.com/v1beta/models';
+      const isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
       const requestData = isGemini
         ? window.toGeminiRequestData(model, apiKey, systemPrompt, [{ role: 'user', content: '请开始创作' }], true)
         : {
@@ -765,7 +765,7 @@ document.addEventListener('DOMContentLoaded', () => {
             data: {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-              body: JSON.stringify({ model, messages: [{ role: 'user', content: systemPrompt }], temperature: 0.7 }),
+              body: JSON.stringify({ model, messages: [{ role: 'user', content: systemPrompt }], ...window.ApiGenerationParams.openAI({ temperature: 0.7 }) }),
             },
           };
 

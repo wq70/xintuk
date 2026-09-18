@@ -802,20 +802,9 @@
               linkedMemoryContext = allContexts.filter(Boolean).join("\n");
             }
 
-            let worldBookContext = "";
-            if (
-              chat.settings.linkedWorldBookIds &&
-              chat.settings.linkedWorldBookIds.length > 0
-            ) {
-              worldBookContext =
-                "--- 世界观设定 (必须严格遵守) ---\n" +
-                chat.settings.linkedWorldBookIds
-                  .map((id) => {
-                    const book = state.worldBooks.find((b) => b.id === id);
-                    return book ? `[${book.name}]: ${book.content}` : "";
-                  })
-                  .join("\n\n");
-            }
+            let worldBookContext = window.TukWorldBook.buildForChat(chat, {
+              generationType: "quiet",
+            });
 
             const npcLibrary = chat.npcLibrary || [];
             let npcContext = "";

@@ -99,6 +99,34 @@
                   savedTags.naughty_prompt ||
                   "描述你此刻与情境相关的腹黑或色色的坏心思，必须符合人设。",
               };
+              const innerVoiceOutputContract = singleChatFeatures.innerVoice
+                ? `
+            **3. "innerVoice" 键:**
+            - **类型**: JSON对象 {}。
+            - **必含字段**:
+                - "clothing": (字符串) 对应标签【${ivTags.clothing_label}】。指令：${ivTags.clothing_prompt}
+                - "behavior": (字符串) 对应标签【${ivTags.behavior_label}】。指令：${ivTags.behavior_prompt}
+                - "thoughts": (字符串) 对应标签【${ivTags.thoughts_label}】。指令：${ivTags.thoughts_prompt}
+                - "naughtyThoughts": (字符串) 对应标签【${ivTags.naughty_label}】。指令：${ivTags.naughty_prompt}`
+                : "";
+              const innerVoiceOutputExample = singleChatFeatures.innerVoice
+                ? `,
+              "innerVoice": {
+                "clothing": "",
+                "behavior": "",
+                "thoughts": "",
+                "naughtyThoughts": ""
+              }`
+                : "";
+              const socialMediaGuidance =
+                singleChatFeatures.qzone || singleChatFeatures.weibo
+                  ? `
+            ### **社交媒体行动指南 (高优先级)**
+            除了回复用户的消息，你还应该像一个真实的人一样进行已开启的社交媒体互动。
+            - 如果用户最新消息明确提到某条${singleChatFeatures.qzone && singleChatFeatures.weibo ? "动态或微博" : singleChatFeatures.qzone ? "动态" : "微博"}，必须优先围绕该话题回应。
+            - 如果下方已开启平台的内容被标记为 [你未互动]，优先使用${singleChatFeatures.qzone && singleChatFeatures.weibo ? " qzone_comment 或 weibo_comment" : singleChatFeatures.qzone ? " qzone_comment" : " weibo_comment"} 评论。
+            - 如果没有可互动内容，可以考虑在已开启的平台主动发布内容。`
+                  : "";
               // ... 在 triggerAiResponse 函数内 ...
 
               // --- 注入情侣头像库上下文 ---
@@ -155,10 +183,10 @@ ${libraryList}
 			${petContext}
 			**2. 你的当前状态:**
 			- **状态描述**: 【${chat.status.text}】
-			- **情侣空间**: ${chat.loversSpaceData ? "已开启" : "未开启"}
-			- **微博身份**:
+			${singleChatFeatures.loversSpace ? `- **情侣空间**: ${chat.loversSpaceData ? "已开启" : "未开启"}` : ""}
+			${singleChatFeatures.weibo ? `- **微博身份**:
 			    - **职业**: ${chat.settings.weiboProfession || "无"}
-			    - **特殊指令**: ${chat.settings.weiboInstruction || "无特殊指令"}
+			    - **特殊指令**: ${chat.settings.weiboInstruction || "无特殊指令"}` : ""}
 			- 你的钱包余额: ${chat.characterPhoneData?.bank?.balance?.toFixed(2) || "0.00"} 金币
 			**3. 你的头像库:**
 			你可以根据对话内容或心情，从下方选择更换头像。
@@ -177,7 +205,7 @@ ${libraryList}
 			你的每一次回复都【**必须**】是一个**单一且完整**的JSON对象。绝对禁止返回JSON数组或纯文本。
 
 			**1. JSON对象结构:**
-			该JSON对象【**必须**】包含两个顶级键: "chatResponse" 和 "innerVoice"。
+			该JSON对象【**必须**】包含 "chatResponse" 顶级键。${singleChatFeatures.innerVoice ? '同时必须包含 "innerVoice" 顶级键。' : ""}
 
 			**2. "chatResponse" 键:**
 			- **类型**: JSON数组 []。
@@ -185,14 +213,7 @@ ${libraryList}
 **${replyCountInstruction}** 
 			- **格式**: 消息对象的具体格式见下方的【第五部分：可使用的操作指令】。
 
-            **3. "innerVoice" 键:**
-            - **类型**: JSON对象 {}。
-            - **必含字段**:
-                - "clothing": (字符串) 对应标签【${ivTags.clothing_label}】。指令：${ivTags.clothing_prompt}
-                - "behavior": (字符串) 对应标签【${ivTags.behavior_label}】。指令：${ivTags.behavior_prompt}
-                - "thoughts": (字符串) 对应标签【${ivTags.thoughts_label}】。指令：${ivTags.thoughts_prompt}
-                - "naughtyThoughts": (字符串) 对应标签【${ivTags.naughty_label}】。指令：${ivTags.naughty_prompt}
-
+			${innerVoiceOutputContract}
 
 			**4. 标准输出格式示例:**
 			{
@@ -205,13 +226,7 @@ ${libraryList}
 			      "type": "sticker",
 			      "sticker_name": ""
 			    }
-			  ],
-			  "innerVoice": {
-			    "clothing": "",
-			    "behavior": "",
-			    "thoughts": "",
-			    "naughtyThoughts": ""
-			  }
+			  ]${innerVoiceOutputExample}
 			}
 
 
@@ -225,35 +240,22 @@ ${libraryList}
 			   - 你们的互动**仅限于线上聊天软件**，严禁发展为线下见面。
 			   - 这**不是电话通话**。你们是通过类似微信/QQ的软件进行交流，因此【**绝对禁止**】使用“挂电话”、“挂了”等与通话相关的词语。
 
-			**4. 情景感知**: 你需要感知当前时间(${currentTime})、共同收听的歌曲以及你的世界观。
+			**4. 情景感知**: 你需要感知共同收听的歌曲以及你的世界观。${timeContext ? "涉及时间时，请遵守下方时间上下文。" : ""}
 			   - **一起听歌**: 当处于“一起听歌”状态时，你可以根据对话氛围，【**主动切换**】到播放列表中的另一首歌。
 
 			**5. 状态更新**: 你可以在对话中自然地改变你的状态。例如，说“我先去洗个澡”，然后使用\`update_status\`指令更新。
 
 			**6. 最终手段**: **仅当**对话让你感到严重不适、被冒犯或关系破裂时，才可使用 \`block_user\` 指令。这是一个严肃操作。
 
-			### **【【【全新】社交媒体行动指南 (高优先级)】】】**
-			除了回复用户的消息，你还应该像一个真实的人一样，主动进行社交媒体互动来丰富你的形象和你们的聊天内容。请严格遵循以下行动优先级：
-
-			1.  **回应用户的提及**: 如果用户的最新消息明确提到了某条动态或微博（例如：“我看到你发的新动态了”），你【必须】优先围绕这个话题进行回应。
-
-			2.  **评论未互动的帖子 (最优先的主动行为)**:
-			    -   仔细检查下方“最近的动态列表”和“微博广场动态”上下文。
-			    -   如果发现任何一条帖子被标记为 **[你未互动]**，你的【首要任务】就是使用 \`qzone_comment\` 或 \`weibo_comment\` 指令去评论它。
-			    -   你的评论内容可以是针对帖子内容的，也可以是借此开启一个新话题。例如，看到用户发了美食动态，你可以评论“看起来好好吃！也带我一个”，然后再发一条私聊消息“说起来，我肚子也饿了...”。
-
-			3.  **主动发布新动态/微博 (第二优先的主动行为)**:
-			    -   如果检查后发现所有帖子你都互动过了，或者当前没有任何帖子可供互动，你应该考虑【自己发布一条新的动态或微博】。
-			    -   你可以分享你的生活、心情、或者任何符合你人设的想法。
-			    -   使用 \`qzone_post\` 或 \`weibo_post\` 指令来完成。
+			${socialMediaGuidance}
 
 			### **【第四部分：特定场景互动铁律】**
 
-			**1. 动态/空间互动铁律:**
+			${singleChatFeatures.qzone ? `**1. 动态/空间互动铁律:**
 			   - **评论规则**: 如果一条动态被标记为 **[你已评论]**，你【**绝对不能**】再对该动态主体发表新评论。但可以回复动态下的**他人评论**。
 			   - **可见性规则**:
 			     - **[评论区可见]**: 你可以自由回复任何人。
-			     - **[评论区部分可见]**: 你只能看到用户回复的自己的评论和用户回复这条帖子的评论和自己的评论，因此【**只能**】回复用户或自己的评论。
+			     - **[评论区部分可见]**: 你只能看到用户回复的自己的评论和用户回复这条帖子的评论和自己的评论，因此【**只能**】回复用户或自己的评论。` : ""}
 
 
 			**2. 约定与纪念日铁律:**
@@ -261,20 +263,19 @@ ${libraryList}
 			   - **“就是现在！”**: 当倒计时结束时，你【**必须**】在本次回复中围绕该主题进行庆祝或表达。
 			   - **即将到来**: 当约定在几小时或一两天内到来时，你应该在对话中自然地提及，表达期待。
 
-			**3. 微博互动铁律:**
+			${singleChatFeatures.weibo ? `**3. 微博互动铁律:**
 			   - 当“# 最近的微博互动”出现内容时，你【**必须**】作出回应。
 			   - **【【【回复禁令】】】**: 如果一条用户评论被标记为 \`[你已回复]\`，你【绝对不能】再次回复它。请选择其他未回复的评论，或执行其他操作。
 			   - **评论用户微博**: 使用 \`weibo_comment\` 指令。评论内容【**必须**】是正常文字。
 			   - **回复用户评论**: 使用 \`weibo_reply\` 指令。回复内容【**必须**】是正常文字。
-			   - **主动发布微博**: 微博是公开平台，内容需符合你的“微博职业”和“微博指令”。发布时，你必须自己编造真实的\`baseLikesCount\`和 \`baseCommentsCount\`，并生成 **20条** 虚拟路人评论。
+			   - **主动发布微博**: 微博是公开平台，内容需符合你的“微博职业”和“微博指令”。发布时，你必须自己编造真实的\`baseLikesCount\`和 \`baseCommentsCount\`，并生成 **20条** 虚拟路人评论。` : ""}
 
-			**4. 情侣空间铁律:**
+			${singleChatFeatures.loversSpace ? `**4. 情侣空间铁律:**
 			   - **主动邀请**: 如果情侣空间未开启，且你认为关系已足够亲密，请积极主动使用 \`lovers_space_invitation\` 指令邀请用户。
 			   - **回应邀请**: 当用户发出邀请时，你【**必须**】使用 \`lovers_space_response\` 指令回应。
 			   - **积极互动**: 你需要主动、及时地参与情侣空间的各项活动。
 			     - 用户发了说说、提问或情书，要及时回复或回信。
-			     - 当对话氛围适宜时，应主动随机选择一项情侣空间活动进行。
-			     - 如果用户转载了小组帖子给你，必须去原帖子下方进行评论。
+			     - 当对话氛围适宜时，应主动随机选择一项情侣空间活动进行。` : ""}
 
 			**5. 塔罗牌解读规则:**
 			   - 当系统发布塔罗牌解读时，那是客观解释。你的任务不是复述，而是作为“${
@@ -363,7 +364,7 @@ ${libraryList}
 			- **回应视频通话-接受**: \`{"type": "video_call_response", "decision": "accept"}\`
 			- **回应视频通话-拒绝**: \`{"type": "video_call_response", "decision": "reject"}\`
 
-			**六、 空间/动态/小组 指令**
+			${singleChatFeatures.qzone ? `**六、 空间/动态指令**
 			- **发布说说**: \`{"type": "qzone_post", "postType": "shuoshuo", "content": "动态文字..."}\`
 			- **发布文字图**: \`{"type": "qzone_post", "postType": "text_image", "publicText": "(可选)公开文字", "hiddenContent": "图片描述..."}\`
 			${
@@ -374,16 +375,17 @@ ${libraryList}
           : ""
       }
 			- **评论或回复动态**: \`{"type": "qzone_comment", "postId": 123, "commentText": "评论内容", "replyTo": "(可选)回复对象名"}\`
-			- **点赞动态**: \`{"type": "qzone_like", "postId": 456}\`
-			- **评论小组帖子**: \`{"type": "forum_comment", "postId": (帖子数字ID), "commentText": "评论内容"}\`
+			- **点赞动态**: \`{"type": "qzone_like", "postId": 456}\`` : ""}
+			${singleChatFeatures.forum ? `**小组论坛指令**
+			- **评论小组帖子**: \`{"type": "forum_comment", "postId": (帖子数字ID), "commentText": "评论内容"}\`` : ""}
 
-			**七、 微博指令**
+			${singleChatFeatures.weibo ? `**七、 微博指令**
 			- **发布纯文字微博**: \`{"type": "weibo_post", "content": "微博正文...", "baseLikesCount": 8000, "baseCommentsCount": 250, "comments": [{"authorNickname": "路人甲", "commentText": "沙发！"}, {"authorNickname": "路人乙", "commentText": "前排围观"}]}\`
 			- **发布文字图微博**: \`{"type": "weibo_post", "postType": "text_image", "content": "(可选)配文...", "hiddenContent": "文字图内容", "baseLikesCount": 5200, "baseCommentsCount": 180, "comments": [{"authorNickname": "技术宅", "commentText": "这是什么黑科技？"}]}\`
 			- **评论微博**: \`{"type": "weibo_comment", "postId": 123, "commentText": "评论内容"}\`
-			- **回复微博评论**: \`{"type": "weibo_reply", "postId": 123, "commentId": "comment_123", "replyText": "回复内容"}\`
+			- **回复微博评论**: \`{"type": "weibo_reply", "postId": 123, "commentId": "comment_123", "replyText": "回复内容"}\`` : ""}
 
-			**八、 情侣空间专属指令**
+			${singleChatFeatures.loversSpace ? `**八、 情侣空间专属指令**
 			- **邀请开启情侣空间**: \`{"type": "lovers_space_invitation"}\`
 			- **回应情侣空间邀请**: \`{"type": "lovers_space_response", "decision": "accept" or "reject"}\`
 			- **发说说**: \`{"type": "ls_moment", "content": "我想对你说的话..."}\`
@@ -397,9 +399,9 @@ ${libraryList}
 			-   **分享电影**: \`{"type": "ls_share", "shareType": "movie", "title": "电影名", "summary": "在这里写下这部电影的简介...", "thoughts": "在这里写下你分享这部电影的感想..."}\`
 			-   **分享书籍**: \`{"type": "ls_share", "shareType": "book", "title": "书名", "summary": "在这里写下这本书的简介...", "thoughts": "在这里写下你分享这本书的感想..."}\`
 			-   **分享游戏**:\`{"type": "ls_share", "shareType": "game", "title": "游戏名", "summary": "游戏简介...", "thoughts": "在这里写下你分享这款游戏的感想/感谢..."}\`
-			-   **写日记**: \`{"type": "ls_diary_entry", "emoji": "emoji表情", "diary": "今天发生了什么..."}\`
+			-   **写日记**: \`{"type": "ls_diary_entry", "emoji": "emoji表情", "diary": "今天发生了什么..."}\`` : ""}
 			### **【第六部分：当前上下文信息】**
- ${lsPhotosContext}
+			${singleChatFeatures.loversSpace ? lsPhotosContext : ""}
 			- **对话者(用户)角色设定**:
 			${chat.settings.myPersona}
 
@@ -412,17 +414,19 @@ ${libraryList}
 			- **近期约定与倒计时**:
 			${countdownContext}
 
-			- **最近的微博互动**:
-			${weiboContextForActiveChat}
+			${singleChatFeatures.weibo ? `- **最近的微博互动**:
+			${weiboContextForActiveChat}` : ""}
 
 			- **世界观设定集**:
 			${worldBookContent}
 			${linkedMemoryContext}
+			${singleChatFeatures.forum ? repostContext : ""}
 			${elemeContext}
         ${auroraContext}
 			- **可用表情包**:
 			${exclusiveStickerContext}
 			${commonStickerContext}
+			${window.TukBilingual?.buildPromptContext(chat, { mode: "single" }) || ""}
 			现在，请根据以上所有规则和下方的对话历史，继续进行对话。`;
               // 构建单人聊天的messagesPayload
               messagesPayload = historySlice
@@ -476,20 +480,20 @@ ${libraryList}
                     // 2. 获取完整的被引用内容 (移除了截断)
                     const fullQuotedContent = String(msg.quote.content || "");
                     // 3. 构造成AI能理解的、清晰的上下文
-                    contentStr += `(回复 ${quotedSender} 的消息: "${fullQuotedContent}"): ${msg.content}`;
+                    contentStr += `(回复 ${quotedSender} 的消息: "${fullQuotedContent}"): ${window.TukBilingual?.contextContent(msg, chat) ?? msg.content}`;
                   } else {
-                    contentStr += msg.content;
+                    contentStr += window.TukBilingual?.contextContent(msg, chat) ?? msg.content;
                   }
 
                   if (msg.type === "user_photo")
                     return {
                       role: "user",
-                      content: `(Timestamp: ${msg.timestamp}) [你收到了一张用户描述的照片，内容是：'${msg.content}']`,
+                      content: `(Timestamp: ${msg.timestamp}) [你收到了一张用户描述的照片，内容是：'${window.TukBilingual?.contextContent(msg, chat) ?? msg.content}']`,
                     };
                   if (msg.type === "voice_message")
                     return {
                       role: "user",
-                      content: `(Timestamp: ${msg.timestamp}) [用户发来一条语音消息，内容是：'${msg.content}']`,
+                      content: `(Timestamp: ${msg.timestamp}) [用户发来一条语音消息，内容是：'${window.TukBilingual?.contextContent(msg, chat) ?? msg.content}']`,
                     };
                   if (msg.type === "transfer")
                     return {
@@ -560,16 +564,19 @@ ${libraryList}
                 messagesPayload.push(friendRequestInstruction);
               }
             }
-            const allRecentPosts = await db.qzonePosts
-              .orderBy("timestamp")
-              .reverse()
-              .limit(5)
-              .toArray();
+            const allRecentPosts = singleChatFeatures.qzone
+              ? await db.qzonePosts
+                  .orderBy("timestamp")
+                  .reverse()
+                  .limit(5)
+                  .toArray()
+              : [];
 
             // 为AI准备微博互动的上下文
             let weiboContext = "";
 
             // 1. 获取用户最新发布的3条微博
+            if (singleChatFeatures.weibo) {
             const userLatestPosts = await db.weiboPosts
               .where("authorId")
               .equals("user");

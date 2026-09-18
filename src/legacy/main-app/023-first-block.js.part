@@ -523,6 +523,17 @@
               linkedWorldBookIds: [],
               stickerLibrary: [],
               linkedMemories: [],
+              timePerceptionEnabled: true,
+              customTime: "",
+              timeContext: {
+                enabled: true,
+                source: "device",
+                timeZone:
+                  window.TukTimeContext?.getDeviceTimeZone() || "UTC",
+                customTime: "",
+                gapAwareness: "precise",
+                customPrompt: "",
+              },
               // 为用户自己也加上管理员和头衔的初始设置
               isUserAdmin: false,
               myGroupTitle: "",

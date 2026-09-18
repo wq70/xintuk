@@ -241,7 +241,7 @@ ${gameLogText}
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         const messagesForApi = [{ role: 'user', content: '请根据你在系统指令中读到的规则，立即开始你的行动。' }];
-        let isGemini = proxyUrl === GEMINI_API_URL;
+        let isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
         let geminiConfig = toGeminiRequestData(
           model,
           apiKey,
@@ -259,7 +259,7 @@ ${gameLogText}
               body: JSON.stringify({
                 model: model,
                 messages: [{ role: 'system', content: systemPrompt }, ...messagesForApi],
-                temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+                ...window.ApiGenerationParams.current(),
                 response_format: { type: 'json_object' },
               }),
             });

@@ -80,7 +80,12 @@
               },
 
               studio: {
-                tables: ["studioScripts", "studioHistory"],
+                tables: [
+                  "studioScripts",
+                  "studioHistory",
+                  "studioSessions",
+                  "studioMemories",
+                ],
               },
 
               userStickers: {
@@ -135,6 +140,9 @@
                 "weiboPosts",
                 "datingHistory",
                 "pomodoroSessions",
+                "memorySettings",
+                "memoryVectors",
+                "memoryFacts",
               ];
               const relatedKey = {
                 memories: "chatId",
@@ -143,6 +151,9 @@
                 weiboPosts: "authorId",
                 datingHistory: "characterId",
                 pomodoroSessions: "chatId",
+                memorySettings: "chatId",
+                memoryVectors: "chatId",
+                memoryFacts: "chatId",
               };
 
               for (const tableName of relatedDataTables) {
@@ -279,7 +290,14 @@
                   console.log(
                     `正在向表格 "${tableName}" 中补充/覆盖 ${data.data[tableName].length} 条数据...`,
                   );
-                  await db[tableName].bulkPut(data.data[tableName]);
+                  const records = tableName === "worldBooks"
+                    ? data.data[tableName].map((book) =>
+                        window.TukWorldBook.normalizeBook(book, {
+                          source: "supplemental-backup",
+                        }),
+                      )
+                    : data.data[tableName];
+                  await db[tableName].bulkPut(records);
                 }
               }
             });
@@ -355,23 +373,16 @@
             ]);
 
             const transformedWorldBooks = worldBooksFromDB.map((book) => {
-              const newBookFor330 = { ...book };
-              if (
-                typeof newBookFor330.content === "string" &&
-                newBookFor330.content.trim()
-              ) {
-                newBookFor330.content = [
-                  {
-                    keys: [book.name],
-                    comment: `从 EPhone 导入的条目`,
-                    content: book.content,
-                    enabled: true,
-                  },
-                ];
-              } else {
-                newBookFor330.content = [];
-              }
-              return newBookFor330;
+              const normalized = window.TukWorldBook.normalizeBook(book);
+              return {
+                ...normalized,
+                isGlobal: normalized.globallyEnabled,
+                content: normalized.content.map((entry) => ({
+                  ...entry,
+                  keys: [...entry.keys],
+                  enabled: entry.enabled,
+                })),
+              };
             });
 
             const transformedChats = chatsFromDB.map((chat) => {
@@ -419,6 +430,7 @@
               banner:
                 qzoneSettingsFromDB?.banner ||
                 "https://files.catbox.moe/r5heyt.gif",
+              timeContext: qzoneSettingsFromDB?.timeContext,
             };
 
             const transformedDoubanPosts = qzonePostsFromDB
@@ -569,6 +581,10 @@
               "datingSpriteGroups",
               "datingSprites",
               "datingHistory",
+              "memorySettings",
+              "memoryVectors",
+              "memoryFacts",
+              "memoryRecallLogs",
             ];
 
             await db.transaction("rw", existingTables, async () => {
@@ -579,47 +595,25 @@
               }
               console.log("330导入：已清空共有的数据表，准备导入...");
 
-              // 世界书导入逻辑
-              // 不再合并，而是将330的每个词条拆分成独立的世界书条目
+              // 世界书导入逻辑：保留“一本世界书包含多个独立词条”的结构。
               if (data330.worldBooks && Array.isArray(data330.worldBooks)) {
-                const allNewWorldBookEntries = []; // 创建一个新数组来收集所有拆分后的条目
-                let entryCounter = 0; // 用于生成唯一ID
-
-                // 1. 遍历330的每一个“世界书合集”
-                data330.worldBooks.forEach((book_330) => {
-                  if (Array.isArray(book_330.content)) {
-                    // 2. 遍历合集中的每一个词条
-                    book_330.content.forEach((entry) => {
-                      entryCounter++;
-
-                      // 3. 为每个词条生成新的独立世界书名称
-                      // 优先使用词条的 `keys` 作为名称，其次是 `comment`，最后是自动生成
-                      let newName = `导入条目 ${entryCounter}`;
-                      if (entry.keys && entry.keys.length > 0) {
-                        newName = entry.keys.join(", "); // 用关键词作为新名称
-                      } else if (entry.comment) {
-                        newName = entry.comment; // 其次用备注作为新名称
-                      }
-
-                      // 4. 为每个词条创建一个全新的、独立的世界书对象
-                      const newBookEntry = {
-                        id: `imported_wb_${Date.now()}_${entryCounter}`, // 生成唯一ID
-                        name: newName,
-                        content: entry.content || "", // 内容就是词条的内容
-                        categoryId: book_330.categoryId || 0, // 继承原合集的分类ID
-                        isEnabled: entry.enabled !== false, // 继承启用状态，默认为true
-                      };
-
-                      // 5. 将这个全新的独立条目添加到我们的收集中
-                      allNewWorldBookEntries.push(newBookEntry);
-                    });
-                  }
-                });
-
-                // 6. 一次性将所有拆分后的新条目写入数据库
-                await db.worldBooks.bulkPut(allNewWorldBookEntries);
+                const importedBooks = data330.worldBooks.map((book) =>
+                  window.TukWorldBook.normalizeBook(
+                    {
+                      ...book,
+                      id: undefined,
+                      source: {
+                        type: "xinyuan330-backup",
+                        originalId: book.id,
+                        importedAt: Date.now(),
+                      },
+                    },
+                    { source: "xinyuan330-backup" },
+                  ),
+                );
+                await db.worldBooks.bulkAdd(importedBooks);
                 console.log(
-                  `330导入：成功“拆分”并导入 ${allNewWorldBookEntries.length} 条独立世界书条目。`,
+                  `330导入：成功导入 ${importedBooks.length} 本世界书和 ${importedBooks.reduce((sum, book) => sum + book.content.length, 0)} 个词条。`,
                 );
               }
               // 分类信息保持不变，正常导入

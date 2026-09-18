@@ -73,7 +73,7 @@ async function refreshDatingScenes() {
 
   try {
     const messagesForApi = [{ role: "user", content: prompt }];
-    let isGemini = proxyUrl === GEMINI_API_URL;
+    let isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
     let geminiConfig = toGeminiRequestData(
       model,
       apiKey,
@@ -93,7 +93,7 @@ async function refreshDatingScenes() {
           body: JSON.stringify({
             model: model,
             messages: messagesForApi,
-            temperature: 1.1,
+            ...window.ApiGenerationParams.current({ temperature: 1.1 }),
             response_format: { type: "json_object" },
           }),
         });
@@ -1058,31 +1058,16 @@ ${recentChatHistory}
 `;
 
   // 2. 获取所有需要加载的世界书内容
-  let worldBookContext = "";
   const allWorldBookIds = new Set([
     ...(chat.settings.linkedWorldBookIds || []), // 角色自身绑定的世界书
     ...(chat.settings.datingUISettings?.linkedWorldBookIds || []),
     ...(datingGameState.extraWorldBookIds || []), // 本次约会临时挂载的世界书
   ]);
 
-  if (allWorldBookIds.size > 0) {
-    const linkedContents = Array.from(allWorldBookIds)
-      .map((bookId) => {
-        // 注意：这里的 state.worldBooks 需要能被 date.js 访问，请确保它在 main-app.js 中是全局的
-        const worldBook = window.state.worldBooks.find(
-          (wb) => wb.id === bookId,
-        );
-        return worldBook && worldBook.content
-          ? `\n## 世界书: ${worldBook.name}\n${worldBook.content}`
-          : "";
-      })
-      .filter(Boolean)
-      .join("\n");
-
-    if (linkedContents) {
-      worldBookContext = `\n# 核心世界观设定 (你必须严格遵守)\n${linkedContents}\n`;
-    }
-  }
+  let worldBookContext = window.TukWorldBook.buildForChat(chat, {
+    generationType: "quiet",
+    temporaryBookIds: Array.from(allWorldBookIds),
+  });
 
   // 新增代码块结束 ▲▲▲
 
@@ -1167,7 +1152,7 @@ ${recentChatHistory}
 
   try {
     const messagesForApi = [{ role: "user", content: systemPrompt }];
-    let isGemini = proxyUrl === GEMINI_API_URL;
+    let isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
     let geminiConfig = toGeminiRequestData(
       model,
       apiKey,
@@ -1187,7 +1172,7 @@ ${recentChatHistory}
           body: JSON.stringify({
             model: model,
             messages: messagesForApi,
-            temperature: 0.9,
+            ...window.ApiGenerationParams.current({ temperature: 0.9 }),
             response_format: { type: "json_object" },
           }),
         });

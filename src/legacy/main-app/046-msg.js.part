@@ -38,6 +38,9 @@
                 msg.quote = currentReplyContext; // 将引用信息附加到消息对象上
               }
 
+              window.TukBilingual?.onMessageStored(msg, chat, {
+                mode: "chat",
+              });
               chat.history.push(msg);
               await incrementMessageCount(state.activeChatId);
               await db.chats.put(chat);
@@ -195,6 +198,16 @@
                 return; // 阻止保存
               }
 
+              let normalizedApiConfig;
+              try {
+                normalizedApiConfig = window.ApiGenerationParams
+                  ? window.ApiGenerationParams.readForm({ ...state.apiConfig })
+                  : state.apiConfig;
+              } catch (error) {
+                alert(error.message);
+                return;
+              }
+
               state.apiConfig.proxyUrl = document
                 .getElementById("proxy-url")
                 .value.trim();
@@ -203,9 +216,9 @@
                 .value.trim();
               state.apiConfig.model =
                 document.getElementById("model-select").value;
-              state.apiConfig.temperature = parseFloat(
-                document.getElementById("temperature-slider").value,
-              );
+              state.apiConfig.apiProtocol = normalizedApiConfig.apiProtocol;
+              state.apiConfig.generationParams = normalizedApiConfig.generationParams;
+              state.apiConfig.temperature = normalizedApiConfig.temperature;
               // 保存 Minimax 设置
               state.apiConfig.minimaxGroupId = document
                 .getElementById("minimax-group-id")
@@ -343,10 +356,15 @@
               const key = document.getElementById("api-key").value.trim();
               if (!url || !key) return alert("请先填写反代地址和密钥");
               try {
-                let isGemini = url === GEMINI_API_URL;
+                let isGemini = window.ApiGenerationParams
+                  ? window.ApiGenerationParams.isGemini(url, {
+                      ...state.apiConfig,
+                      apiProtocol: document.getElementById("api-protocol-select")?.value || "auto",
+                    })
+                  : url === GEMINI_API_URL;
                 const response = await fetch(
                   isGemini
-                    ? `${GEMINI_API_URL}?key=${getRandomValue(key)}`
+                    ? `${url.replace(/\/$/, "")}?key=${getRandomValue(key)}`
                     : `${url}/v1/models`,
                   isGemini
                     ? undefined
@@ -719,11 +737,15 @@
             .addEventListener("click", async () => {
               const name = await showCustomPrompt("创建世界书", "请输入书名");
               if (name && name.trim()) {
-                const newBook = {
-                  id: "wb_" + Date.now(),
+                const newBook = window.TukWorldBook.normalizeBook({
                   name: name.trim(),
-                  content: "",
-                };
+                  content: [
+                    window.TukWorldBook.defaultEntry({
+                      name: "基础设定",
+                      activationMode: "constant",
+                    }),
+                  ],
+                });
                 await db.worldBooks.add(newBook);
                 state.worldBooks.push(newBook);
                 renderWorldBookScreen();
@@ -733,6 +755,10 @@
           document
             .getElementById("save-world-book-btn")
             .addEventListener("click", async () => {
+              if (window.TukWorldBookUI) {
+                await window.TukWorldBookUI.saveEditor();
+                return;
+              }
               if (!editingWorldBookId) return;
               const book = state.worldBooks.find(
                 (wb) => wb.id === editingWorldBookId,
@@ -823,7 +849,7 @@
                     const apiKey = state.apiConfig.minimaxApiKey;
                     const voiceId = chat.settings.minimaxVoiceId;
 
-                    if (groupId && apiKey && voiceId) {
+                    if (apiKey && voiceId) {
                       // 【播放分支】
                       // 先展开所有文字
                       bubblesToAnimate.forEach((b) => {

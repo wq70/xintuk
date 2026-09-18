@@ -571,7 +571,7 @@
           );
 
           try {
-            let isGemini = proxyUrl === GEMINI_API_URL;
+            let isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
             let messagesForApi;
             if (isGemini) {
               messagesForApi = [{ role: "user", content: systemPrompt }];
@@ -605,7 +605,7 @@
                 : JSON.stringify({
                     model,
                     messages: messagesForApi,
-                    temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+                    ...window.ApiGenerationParams.current(),
                   }),
             );
 
@@ -620,7 +620,7 @@
                   body: JSON.stringify({
                     model: model,
                     messages: messagesForApi,
-                    temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+                    ...window.ApiGenerationParams.current(),
                   }),
                 });
 

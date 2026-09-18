@@ -219,10 +219,14 @@
           }
 
           // 检查当前配置是否匹配任何一个预设
-          const { proxyUrl, apiKey } = state.apiConfig;
+          const { proxyUrl, apiKey, model, apiProtocol } = state.apiConfig;
           const matchingPreset = state.apiPresets
             ? state.apiPresets.find(
-                (p) => p.proxyUrl === proxyUrl && p.apiKey === apiKey,
+                (p) =>
+                  p.proxyUrl === proxyUrl &&
+                  p.apiKey === apiKey &&
+                  (!p.model || p.model === model) &&
+                  (!p.apiProtocol || p.apiProtocol === apiProtocol),
               )
             : null;
 
@@ -249,6 +253,16 @@
             if (selectedPreset) {
               proxyUrlInput.value = selectedPreset.proxyUrl;
               apiKeyInput.value = selectedPreset.apiKey;
+              if (selectedPreset.model) {
+                document.getElementById("model-select").value = selectedPreset.model;
+              }
+              if (window.ApiGenerationParams && (selectedPreset.apiProtocol || selectedPreset.generationParams)) {
+                window.ApiGenerationParams.renderForm({
+                  ...state.apiConfig,
+                  apiProtocol: selectedPreset.apiProtocol || state.apiConfig.apiProtocol,
+                  generationParams: selectedPreset.generationParams || state.apiConfig.generationParams,
+                });
+              }
             }
           }
         }
@@ -314,7 +328,23 @@
             "请为这个配置起个名字：",
           );
           if (name && name.trim()) {
-            const newPreset = { name: name.trim(), proxyUrl, apiKey };
+            let formConfig;
+            try {
+              formConfig = window.ApiGenerationParams
+                ? window.ApiGenerationParams.readForm({ ...state.apiConfig })
+                : state.apiConfig;
+            } catch (error) {
+              await showCustomAlert("参数错误", error.message);
+              return;
+            }
+            const newPreset = {
+              name: name.trim(),
+              proxyUrl,
+              apiKey,
+              model: document.getElementById("model-select").value.trim(),
+              apiProtocol: formConfig.apiProtocol || "auto",
+              generationParams: JSON.parse(JSON.stringify(formConfig.generationParams || {})),
+            };
             const newId = await db.apiPresets.add(newPreset);
 
             if (!state.apiPresets) state.apiPresets = [];
@@ -343,8 +373,20 @@
 
           const preset = state.apiPresets.find((p) => p.id === presetId);
           if (preset) {
+            let formConfig;
+            try {
+              formConfig = window.ApiGenerationParams
+                ? window.ApiGenerationParams.readForm({ ...state.apiConfig })
+                : state.apiConfig;
+            } catch (error) {
+              await showCustomAlert("参数错误", error.message);
+              return;
+            }
             preset.proxyUrl = proxyUrl;
             preset.apiKey = apiKey;
+            preset.model = document.getElementById("model-select").value.trim();
+            preset.apiProtocol = formConfig.apiProtocol || "auto";
+            preset.generationParams = JSON.parse(JSON.stringify(formConfig.generationParams || {}));
             await db.apiPresets.put(preset);
             document
               .getElementById("preset-actions-modal")

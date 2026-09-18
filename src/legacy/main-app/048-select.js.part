@@ -61,33 +61,52 @@
               categories.forEach((category) => {
                 const booksInCategory = booksByCategoryId[category.id] || [];
                 if (booksInCategory.length > 0) {
-                  const allInCategoryChecked = booksInCategory.every((book) =>
-                    linkedIds.has(book.id),
+                  const allInCategoryChecked = booksInCategory.every(
+                    (book) => linkedIds.has(book.id) || book.globallyEnabled,
                   );
 
                   const header = document.createElement("div");
                   header.className = "wb-category-header";
-                  header.innerHTML = `
-			            <span class="arrow">▼</span>
-			            <input type="checkbox" class="wb-category-checkbox" data-category-id="${
-                    category.id
-                  }" ${allInCategoryChecked ? "checked" : ""}>
-			            <span>${category.name}</span>
-			        `;
+                  const categoryArrow = document.createElement("span");
+                  categoryArrow.className = "arrow";
+                  categoryArrow.textContent = "▼";
+                  const categoryCheckbox = document.createElement("input");
+                  categoryCheckbox.type = "checkbox";
+                  categoryCheckbox.className = "wb-category-checkbox";
+                  categoryCheckbox.dataset.categoryId = category.id;
+                  categoryCheckbox.checked = allInCategoryChecked;
+                  const categoryName = document.createElement("span");
+                  categoryName.textContent = category.name;
+                  header.append(
+                    categoryArrow,
+                    categoryCheckbox,
+                    categoryName,
+                  );
 
                   const bookContainer = document.createElement("div");
                   bookContainer.className = "wb-book-container";
                   bookContainer.dataset.containerFor = category.id;
 
                   booksInCategory.forEach((book) => {
-                    const isChecked = linkedIds.has(book.id);
+                    const isExplicitlyLinked = linkedIds.has(book.id);
+                    const isChecked =
+                      isExplicitlyLinked || book.globallyEnabled;
                     const label = document.createElement("label");
-                    // 给书名包一个span，方便CSS做省略号处理
-                    label.innerHTML = `<input type="checkbox" class="wb-book-checkbox" value="${
-                      book.id
-                    }" data-parent-category="${category.id}" ${
-                      isChecked ? "checked" : ""
-                    }> <span class="wb-book-name">${book.name}</span>`;
+                    const checkbox = document.createElement("input");
+                    checkbox.type = "checkbox";
+                    checkbox.className = "wb-book-checkbox";
+                    checkbox.value = book.id;
+                    checkbox.dataset.parentCategory = category.id;
+                    checkbox.dataset.global = String(book.globallyEnabled);
+                    checkbox.dataset.explicitLinked = String(
+                      isExplicitlyLinked,
+                    );
+                    checkbox.checked = isChecked;
+                    checkbox.disabled = book.globallyEnabled;
+                    const bookName = document.createElement("span");
+                    bookName.className = "wb-book-name";
+                    bookName.textContent = `${book.name}${book.globallyEnabled ? " [全局]" : ""}${book.enabled ? "" : " [已关闭]"}`;
+                    label.append(checkbox, bookName);
                     bookContainer.appendChild(label);
                   });
 
@@ -214,6 +233,8 @@
               member.persona;
             document.getElementById("member-avatar-preview").src =
               member.avatar;
+            window.TukTimeContext?.loadMemberSettings(member, state, chat);
+            window.TukBilingual?.loadMemberSettings(member, state, chat);
 
             // ★★★ 我们在这里为新按钮绑定了点击事件 ★★★
             const changeFrameBtn = document.getElementById(
@@ -264,6 +285,8 @@
               member.avatar = document.getElementById(
                 "member-avatar-preview",
               ).src;
+              window.TukTimeContext?.saveMemberSettings(member, state);
+              window.TukBilingual?.saveMemberSettings(member, state, chat);
 
               renderGroupMemberSettings(chat.members);
               document
@@ -339,9 +362,13 @@
               const checkedBooks = document.querySelectorAll(
                 "#world-book-checkboxes-container input.wb-book-checkbox:checked",
               );
-              chat.settings.linkedWorldBookIds = Array.from(checkedBooks).map(
-                (cb) => cb.value,
-              );
+              chat.settings.linkedWorldBookIds = Array.from(checkedBooks)
+                .filter(
+                  (cb) =>
+                    cb.dataset.global !== "true" ||
+                    cb.dataset.explicitLinked === "true",
+                )
+                .map((cb) => cb.value);
 
               if (chat.isGroup) {
                 chat.settings.myNickname = document
@@ -400,6 +427,23 @@
                 chat.settings.weiboInstruction = document
                   .getElementById("weibo-instruction-input")
                   .value.trim();
+                chat.settings.singleChatFeatures = {
+                  innerVoice: document.querySelector(
+                    '[data-single-feature="innerVoice"]',
+                  ).checked,
+                  qzone: document.querySelector(
+                    '[data-single-feature="qzone"]',
+                  ).checked,
+                  weibo: document.querySelector(
+                    '[data-single-feature="weibo"]',
+                  ).checked,
+                  forum: document.querySelector(
+                    '[data-single-feature="forum"]',
+                  ).checked,
+                  loversSpace: document.querySelector(
+                    '[data-single-feature="loversSpace"]',
+                  ).checked,
+                };
                 // 保存视频通话设置
                 chat.settings.visualVideoCallEnabled = document.getElementById(
                   "visual-video-call-switch",
@@ -482,11 +526,7 @@
                 };
               }
 
-              chat.settings.timePerceptionEnabled = document.getElementById(
-                "time-perception-toggle",
-              ).checked;
-              chat.settings.customTime =
-                document.getElementById("custom-time-input").value;
+              await window.TukTimeContext?.saveSettingsForm(chat, state, db);
 
               // --- 保存线下模式设置 ---
               if (!chat.settings.offlineMode) chat.settings.offlineMode = {}; // 初始化
@@ -581,6 +621,7 @@
               }
 
               window.McpApp?.saveChatSettingsFromPanel(chat);
+              window.TukBilingual?.saveSettingsForm(chat, state);
 
               await db.chats.put(chat);
 

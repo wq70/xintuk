@@ -550,6 +550,7 @@
               if (aiMessage) {
                 // 1. 将新消息存入历史记录
                 chat.history.push(aiMessage);
+                window.TukBilingual?.onMessageStored(aiMessage, chat);
 
                 if (!isViewingThisChat || document.hidden) {
                   let notificationText;

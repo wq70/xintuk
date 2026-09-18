@@ -48,7 +48,7 @@
 .tc-toggle input { position: absolute; opacity: 0; pointer-events: none; }
 .tc-toggle span { position: absolute; inset: 0; border-radius: 999px; background: #c7c7cc; transition: 0.2s; }
 .tc-toggle span::after { content: ""; position: absolute; width: 18px; height: 18px; top: 2px; left: 2px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.2); transition: 0.2s; }
-.tc-toggle input:checked + span { background: var(--primary-color, #7169da); }
+.tc-toggle input:checked + span { background: var(--primary-color, #ff8fab); }
 .tc-toggle input:checked + span::after { transform: translateX(16px); }
 
 .tc-mode-picker {
@@ -71,7 +71,7 @@
 .tc-mode-picker button span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tc-mode-picker button strong { font-size: 11px; }
 .tc-mode-picker button span { margin-top: 2px; color: var(--text-secondary, #888); font-size: 9px; }
-.tc-mode-picker button.active { border-color: var(--primary-color, #7169da); background: rgba(113,105,218,.1); }
+.tc-mode-picker button.active { border-color: var(--primary-color, #ff8fab); background: rgba(255, 143, 171, 0.15); }
 .tc-mode-picker.disabled { opacity: .48; pointer-events: none; }
 
 .tc-view-switch {
@@ -127,7 +127,7 @@
 }
 .tc-small-button,
 .tc-secondary-button { color: var(--text-color, #333); background: rgba(120,120,128,.12); }
-.tc-primary-button { color: #fff; background: var(--primary-color, #7169da); }
+.tc-primary-button { color: #fff; background: var(--primary-color, #ff8fab); }
 .tc-danger-button { color: #fff; background: #ff3b30; }
 .tc-small-button:disabled,
 .tc-primary-button:disabled,
@@ -163,12 +163,12 @@
 .tc-textarea { min-height: 92px; resize: vertical; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; line-height: 1.45; }
 .tc-input:focus,
 .tc-select:focus,
-.tc-textarea:focus { border-color: var(--primary-color, #7169da); }
+.tc-textarea:focus { border-color: var(--primary-color, #ff8fab); }
 .tc-inline-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
 .tc-empty { padding: 30px 18px; text-align: center; color: var(--text-secondary, #888); font-size: 12px; }
 .tc-empty strong { display: block; margin-bottom: 6px; color: var(--text-color, #333); font-size: 14px; }
 .tc-code { max-height: 260px; overflow: auto; margin: 8px 0 0; padding: 9px; border-radius: 8px; background: rgba(120,120,128,.09); font-size: 10px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
-.tc-status-line { padding: 8px 9px; border-radius: 9px; background: rgba(113,105,218,.08); color: var(--text-secondary, #666); font-size: 10px; line-height: 1.45; }
+.tc-status-line { padding: 8px 9px; border-radius: 9px; background: rgba(255, 143, 171, 0.12); color: var(--text-secondary, #666); font-size: 10px; line-height: 1.45; }
 
 .tc-sheet-backdrop { position: absolute; inset: 0; z-index: 1200; display: none; align-items: center; justify-content: center; padding: 12px; box-sizing: border-box; background: rgba(0,0,0,.34); }
 .tc-sheet-backdrop.visible { display: flex; }

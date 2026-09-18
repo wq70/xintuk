@@ -876,7 +876,7 @@ ${formattedLog}
 
     try {
       const messagesForApi = [{ role: 'user', content: prompt }];
-      let isGemini = proxyUrl === GEMINI_API_URL;
+      let isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
       let geminiConfig = toGeminiRequestData(model, apiKey, prompt, messagesForApi, isGemini);
 
       const response = isGemini
@@ -887,7 +887,7 @@ ${formattedLog}
             body: JSON.stringify({
               model: model,
               messages: messagesForApi,
-              temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+              ...window.ApiGenerationParams.current(),
             }),
           });
 

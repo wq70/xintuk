@@ -600,6 +600,7 @@
           // --- 将完整的“气泡”和“时间戳”放入容器 ---
           wrapper.appendChild(bubble);
           wrapper.appendChild(timestampEl);
+          window.TukBilingual?.decorateMessageElement(wrapper, msg, chat);
 
           addLongPressListener(wrapper, () =>
             showMessageActions(msg.timestamp),
@@ -746,10 +747,38 @@
         }
         window.formatMessageForContext = formatMessageForContext;
 
+        function getSingleChatFeatures(chat) {
+          const saved = chat?.settings?.singleChatFeatures || {};
+          return {
+            innerVoice: saved.innerVoice === true,
+            qzone: saved.qzone === true,
+            weibo: saved.weibo === true,
+            forum: saved.forum === true,
+            loversSpace: saved.loversSpace === true,
+          };
+        }
+
+        function isSingleChatFeatureActionAllowed(chat, actionType) {
+          if (!chat || chat.isGroup || !actionType) return true;
+          const features = getSingleChatFeatures(chat);
+          if (actionType === "innervoice") return features.innerVoice;
+          if (actionType.startsWith("qzone_")) return features.qzone;
+          if (actionType.startsWith("weibo_")) return features.weibo;
+          if (actionType === "forum_comment") return features.forum;
+          if (
+            actionType.startsWith("ls_") ||
+            actionType.startsWith("lovers_space_")
+          ) {
+            return features.loversSpace;
+          }
+          return true;
+        }
+
         async function triggerAiResponse() {
           if (!state.activeChatId) return;
           const chatId = state.activeChatId;
           const chat = state.chats[state.activeChatId];
+          const singleChatFeatures = getSingleChatFeatures(chat);
           const messagesContainer = document.getElementById("chat-messages");
 
           let summaryContext = "";
@@ -762,26 +791,19 @@
 			${summaries.map((summary, index) => `- 总结${index + 1}: ${summary.content}`).join("\n")}
 			`;
           }
-          // 将世界书读取提到这里，确保线下模式也能生效
-          let worldBookContext = "";
-          if (
-            chat.settings.linkedWorldBookIds &&
-            chat.settings.linkedWorldBookIds.length > 0
-          ) {
-            const linkedContents = chat.settings.linkedWorldBookIds
-              .map((id) => {
-                const book = state.worldBooks.find((b) => b.id === id);
-                // 这里使用了 stripHtmlAndCode 清理函数，确保纯文本
-                return book && book.content
-                  ? `\n\n## 世界书条目: ${book.name}\n${stripHtmlAndCode(book.content)}`
-                  : "";
-              })
-              .filter(Boolean)
-              .join("");
-            if (linkedContents) {
-              worldBookContext = `\n\n# 核心世界观设定 (必须严格遵守以下所有设定)\n${linkedContents}\n`;
-            }
+          if (window.TukMemory) {
+            summaryContext += await window.TukMemory.buildContext({
+              chatId,
+              recentMessages: chat.history
+                .filter((msg) => !msg.isHidden && msg.type !== "summary")
+                .slice(-6),
+              mode: "chat",
+            });
           }
+          // 将世界书读取提到这里，确保线下模式也能生效
+          let worldBookContext = window.TukWorldBook.buildForChat(chat, {
+            generationType: "normal",
+          });
           // --- 线下模式核心拦截逻辑 ---
           if (
             !chat.isGroup &&

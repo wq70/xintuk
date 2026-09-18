@@ -440,7 +440,7 @@
 
           try {
             const { proxyUrl, apiKey, model } = state.apiConfig;
-            let isGemini = proxyUrl === GEMINI_API_URL;
+            let isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
             let messagesForApi = [{ role: "user", content: systemPrompt }];
             let geminiConfig = toGeminiRequestData(
               model,
@@ -461,7 +461,7 @@
                   body: JSON.stringify({
                     model: model,
                     messages: messagesForApi,
-                    temperature: 1.0,
+                    ...window.ApiGenerationParams.current({ temperature: 1.0 }),
                   }),
                 });
 
@@ -876,7 +876,12 @@
             {
               id: "studio",
               name: "小剧场 (所有剧本/演绎记录)",
-              tables: ["studioScripts", "studioHistory"],
+              tables: [
+                "studioScripts",
+                "studioHistory",
+                "studioSessions",
+                "studioMemories",
+              ],
             },
 
             {

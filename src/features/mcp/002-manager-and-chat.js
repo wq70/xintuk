@@ -405,7 +405,7 @@
         : message.content?.text || String(message.content || ""),
     }));
     if (params.systemPrompt) messages.unshift({ role: "system", content: params.systemPrompt });
-    const isGemini = String(config.proxyUrl).replace(/\/$/, "") === "https://generativelanguage.googleapis.com/v1beta/models";
+    const isGemini = window.ApiGenerationParams.isGemini(config.proxyUrl, config);
     if (isGemini) {
       const apiKey = String(config.apiKey).split(",").map((item) => item.trim()).filter(Boolean)[0];
       const systemText = messages.filter((item) => item.role === "system").map((item) => item.content).join("\n\n");
@@ -420,8 +420,11 @@
           ...(systemText ? { systemInstruction: { parts: [{ text: systemText }] } } : {}),
           contents,
           generationConfig: {
-            temperature: Number.isFinite(params.temperature) ? params.temperature : config.temperature || 0.8,
-            maxOutputTokens: Math.min(8192, Math.max(1, Number(params.maxTokens) || 1024)),
+            ...window.ApiGenerationParams.gemini(
+              { temperature: params.temperature },
+              { maxOutputTokens: Math.min(8192, Math.max(1, Number(params.maxTokens) || 1024)) },
+              config,
+            ),
           },
         }),
       });
@@ -437,8 +440,14 @@
       body: JSON.stringify({
         model: config.model,
         messages,
-        temperature: Number.isFinite(params.temperature) ? params.temperature : config.temperature || 0.8,
-        max_tokens: Math.min(8192, Math.max(1, Number(params.maxTokens) || 1024)),
+        ...window.ApiGenerationParams.openAI(
+          { temperature: params.temperature },
+          {
+            maxOutputTokens: Math.min(8192, Math.max(1, Number(params.maxTokens) || 1024)),
+            preferLegacyMaxTokens: true,
+          },
+          config,
+        ),
         stream: false,
       }),
     });
@@ -838,7 +847,7 @@
   function createConfiguredModelSender(thoughtChainRequest) {
     const config = appState()?.apiConfig || {};
     const proxyUrl = String(config.proxyUrl || "").replace(/\/$/, "");
-    const isGemini = proxyUrl === "https://generativelanguage.googleapis.com/v1beta/models";
+    const isGemini = window.ApiGenerationParams.isGemini(proxyUrl, config);
     const key = String(config.apiKey || "").split(",").map((item) => item.trim()).filter(Boolean)[0];
     if (!proxyUrl || !key || !config.model) throw new Error("主聊天 API 尚未完整配置。");
     return async (requestData) => {
@@ -849,9 +858,8 @@
           body: JSON.stringify({
             model: config.model,
             messages: requestData.messages,
-            temperature: parseFloat(config.temperature) || 0.8,
             stream: false,
-            ...(thoughtChainRequest?.openAIOptions || {}),
+            ...window.ApiGenerationParams.mergeOpenAI(thoughtChainRequest?.openAIOptions, {}, {}, config),
             ...(requestData.tools?.length ? { tools: requestData.tools, tool_choice: requestData.requireTool ? "required" : "auto" } : {}),
           }),
           signal: requestData.signal,
@@ -887,7 +895,7 @@
         ...(systemParts.length ? { systemInstruction: { parts: systemParts } } : {}),
         contents,
         generationConfig: {
-          temperature: parseFloat(config.temperature) || 0.8,
+          ...window.ApiGenerationParams.gemini({}, {}, config),
           ...(thoughtChainRequest?.geminiThinkingConfig
             ? { thinkingConfig: thoughtChainRequest.geminiThinkingConfig }
             : {}),

@@ -9,6 +9,13 @@
         async function renderWorldBookScreen() {
           const listEl = document.getElementById("world-book-list");
           listEl.innerHTML = "";
+          const engineSwitch = document.getElementById(
+            "world-book-engine-enabled",
+          );
+          if (engineSwitch) {
+            engineSwitch.checked =
+              state.globalSettings.worldBookEngineEnabled !== false;
+          }
 
           // 1. 同时获取所有书籍和所有分类
           const [books, categories] = await Promise.all([
@@ -16,17 +23,27 @@
             db.worldBookCategories.orderBy("name").toArray(),
           ]);
 
-          state.worldBooks = books; // 确保内存中的数据是同步的
+          const normalizedBooks = books.map((book) =>
+            window.TukWorldBook.normalizeBook(book),
+          );
+          state.worldBooks = normalizedBooks; // 确保内存中的数据是同步的
 
-          if (books.length === 0) {
+          if (normalizedBooks.length === 0) {
             listEl.innerHTML =
               '<p style="text-align:center; color: #8a8a8a; margin-top: 50px;">点击右上角 "+" 创建你的第一本世界书</p>';
             return;
           }
 
           // 2. 将书籍按 categoryId 分组
-          const groupedBooks = books.reduce((acc, book) => {
-            const key = book.categoryId || "uncategorized";
+          const knownCategoryIds = new Set(
+            categories.map((category) => String(category.id)),
+          );
+          const groupedBooks = normalizedBooks.reduce((acc, book) => {
+            const key =
+              book.categoryId != null &&
+              knownCategoryIds.has(String(book.categoryId))
+                ? book.categoryId
+                : "uncategorized";
             if (!acc[key]) {
               acc[key] = [];
             }
@@ -74,6 +91,9 @@
          * @returns {HTMLElement} - 创建好的分组容器
          */
         function createWorldBookGroup(groupName, books) {
+          if (window.TukWorldBookUI) {
+            return window.TukWorldBookUI.createGroup(groupName, books);
+          }
           const groupContainer = document.createElement("div");
           groupContainer.className = "world-book-group-container";
 
@@ -101,9 +121,7 @@
             const item = document.createElement("div");
             item.className = "list-item";
             item.dataset.bookId = book.id;
-            item.innerHTML = `<div class="item-title">${book.name}</div><div class="item-content">${(
-              book.content || "暂无内容..."
-            ).substring(0, 50)}</div>`;
+            item.innerHTML = `<div class="item-title">${book.name}</div><div class="item-content">${window.TukWorldBook.preview(book).substring(0, 50)}</div>`;
             item.addEventListener("click", () => openWorldBookEditor(book.id));
             addLongPressListener(item, async () => {
               const confirmed = await showCustomConfirm(
@@ -112,7 +130,9 @@
                 { confirmButtonClass: "btn-danger" },
               );
               if (confirmed) {
-                await db.worldBooks.delete(book.id);
+                await window.TukWorldBook.deleteBooksAndReferences(db, [
+                  book.id,
+                ]);
                 state.worldBooks = state.worldBooks.filter(
                   (wb) => wb.id !== book.id,
                 );
@@ -127,6 +147,10 @@
         window.renderWorldBookScreenProxy = renderWorldBookScreen;
 
         async function openWorldBookEditor(bookId) {
+          if (window.TukWorldBookUI) {
+            await window.TukWorldBookUI.openEditor(bookId);
+            return;
+          }
           editingWorldBookId = bookId;
           const [book, categories] = await Promise.all([
             db.worldBooks.get(bookId),
@@ -138,7 +162,7 @@
             book.name;
           document.getElementById("world-book-name-input").value = book.name;
           document.getElementById("world-book-content-input").value =
-            book.content;
+            window.TukWorldBook.preview(book);
 
           // 填充分类下拉菜单
           const selectEl = document.getElementById(

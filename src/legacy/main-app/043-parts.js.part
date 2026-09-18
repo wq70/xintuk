@@ -384,6 +384,11 @@
                 // 给UI一点渲染时间
                 await sleep(50);
                 data = await db[task.name].toArray();
+                if (task.name === "memorySettings") {
+                  data.forEach((item) => {
+                    item.vectorApiKey = "";
+                  });
+                }
               } else {
                 data = await db[task.name].get("main");
                 // 安全过滤

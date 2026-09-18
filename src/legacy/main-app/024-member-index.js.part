@@ -349,7 +349,7 @@
               },
             ];
 
-            let isGemini = proxyUrl === GEMINI_API_URL;
+            let isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
             let geminiConfig = toGeminiRequestData(
               model,
               apiKey,
@@ -372,7 +372,7 @@
                       { role: "system", content: systemPromptForCall },
                       ...messagesForApi,
                     ],
-                    temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+                    ...window.ApiGenerationParams.current(),
                   }),
                 });
 

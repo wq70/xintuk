@@ -1,21 +1,21 @@
-			-   **【新】在情侣空间分享书籍**: \`[{"type": "ls_share", "shareType": "book", "title": "书名", "summary": "在这里写下这本书的简介...", "thoughts": "在这里写下你分享这本书的感想..."}]\`
+			-   **【新】在情侣空间分享书籍**: \`[{"type": "ls_share", "shareType": "book", "title": "书名", "summary": "在这里写下这本书的简介...", "thoughts": "在这里写下你分享这本书的感想..."}]\`` : ""}
 
 			# 供你决策的参考信息：
 			-   **你的角色设定**: ${chat.settings.aiPersona}
-			- 情侣空间状态: ${chat.loversSpaceData ? "已开启" : "未开启"}
+			${singleChatFeatures.loversSpace ? `- 情侣空间状态: ${chat.loversSpaceData ? "已开启" : "未开启"}` : ""}
 			${npcContextForAction}
-			${weiboContextForAction}
+			${singleChatFeatures.weibo ? weiboContextForAction : ""}
 			${countdownContext}
 			${worldBookContext}
-			-   **当前时间**: ${currentTime}
 			-   **你们最近的对话摘要**:
 			${recentContextSummary}
             ${summaryContext}
 			${linkedMemoryContext}
-			-   **【【【微博专属设定(必须严格遵守)】】】**
+			${singleChatFeatures.weibo ? `-   **微博专属设定(必须严格遵守)**
 			    - 你的微博职业: ${chat.settings.weiboProfession || "无"}
-			    - 你的微博指令: ${chat.settings.weiboInstruction || "无特殊指令"}
-			${postsContext}
+			    - 你的微博指令: ${chat.settings.weiboInstruction || "无特殊指令"}` : ""}
+			${singleChatFeatures.qzone ? postsContext : ""}
+			${window.TukBilingual?.buildPromptContext(chat, { mode: "background" }) || ""}
 			`;
           let messagesPayload = [
             { role: "system", content: systemPrompt },
@@ -26,7 +26,7 @@
             },
           ];
           try {
-            let isGemini = proxyUrl === GEMINI_API_URL;
+            let isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
             let geminiConfig = toGeminiRequestData(
               model,
               apiKey,
@@ -45,7 +45,7 @@
                   body: JSON.stringify({
                     model: model,
                     messages: messagesPayload,
-                    temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+                    ...window.ApiGenerationParams.current(),
                   }),
                 });
             if (!response.ok) {
@@ -70,9 +70,55 @@
               aiResponseContent,
             );
 
-            const responseArray = parseAiResponse(aiResponseContent);
+            let responseArray = [];
+            let backgroundInnerVoice = null;
+            try {
+              let sanitizedContent = aiResponseContent
+                .replace(/^```json\s*/, "")
+                .replace(/```$/, "")
+                .trim();
+              const parsedResponse = JSON.parse(sanitizedContent);
+              if (Array.isArray(parsedResponse)) {
+                responseArray = parsedResponse;
+              } else if (
+                parsedResponse &&
+                Array.isArray(parsedResponse.chatResponse)
+              ) {
+                responseArray = parsedResponse.chatResponse;
+                if (
+                  singleChatFeatures.innerVoice &&
+                  parsedResponse.innerVoice &&
+                  typeof parsedResponse.innerVoice === "object"
+                ) {
+                  backgroundInnerVoice = parsedResponse.innerVoice;
+                }
+              }
+            } catch (error) {
+              responseArray = parseAiResponse(aiResponseContent);
+            }
+
+            if (backgroundInnerVoice) {
+              const newInnerVoice = {
+                ...backgroundInnerVoice,
+                timestamp: Date.now(),
+              };
+              newInnerVoice.clothing ||= "...";
+              newInnerVoice.behavior ||= "...";
+              newInnerVoice.thoughts ||= "...";
+              newInnerVoice.naughtyThoughts ||= "...";
+              chat.latestInnerVoice = newInnerVoice;
+              if (!chat.innerVoiceHistory) chat.innerVoiceHistory = [];
+              chat.innerVoiceHistory.push(newInnerVoice);
+            }
+
             for (const action of responseArray) {
               if (!action) continue;
+              if (!isSingleChatFeatureActionAllowed(chat, action.type)) {
+                console.warn(
+                  `后台活动已忽略未开启的单聊附加功能指令: ${action.type}`,
+                );
+                continue;
+              }
               if (action.type === "update_status" && action.status_text) {
                 chat.status.text = action.status_text;
                 chat.status.isBusy = action.is_busy || false;
@@ -81,15 +127,32 @@
                 renderChatList();
               }
               if (action.type === "text" && action.content) {
+                const bilingualMetadata =
+                  window.TukBilingual?.extractGeneratedMetadata(
+                    action,
+                    chat,
+                    { mode: "background" },
+                  ) || {};
                 const aiMessage = {
                   role: "assistant",
                   content: String(action.content),
                   timestamp: Date.now(),
+                  ...bilingualMetadata,
                 };
                 chat.unreadCount = (chat.unreadCount || 0) + 1;
                 chat.history.push(aiMessage);
+                window.TukBilingual?.onMessageStored(aiMessage, chat, {
+                  mode: "background",
+                });
                 await db.chats.put(chat);
-                showNotification(chatId, aiMessage.content);
+                showNotification(
+                  chatId,
+                  window.TukBilingual?.notificationContent(
+                    aiMessage,
+                    chat,
+                    aiMessage.content,
+                  ) || aiMessage.content,
+                );
                 renderChatList();
                 console.log(
                   `后台活动: 角色 "${chat.name}" 主动发送了消息: ${aiMessage.content}`,
@@ -417,6 +480,7 @@
           // --- 新增逻辑开始 ---
           const chat = state.chats[state.activeChatId];
           const message = chat.history.find((m) => m.timestamp === timestamp);
+          window.TukBilingual?.updateMessageActions(message, chat);
           const rerollNaiBtn = document.getElementById("reroll-nai-btn");
 
           // 检查消息类型是否为 naiimag
@@ -499,7 +563,7 @@
               qualityToggle: settings.quality_toggle,
             };
 
-            if (model.includes("nai-diffusion-4")) {
+            if (window.isNovelAIModernModel ? window.isNovelAIModernModel(model) : model.includes("nai-diffusion-4")) {
               requestBody = {
                 input: finalPositivePrompt,
                 model: model,
@@ -540,7 +604,13 @@
               };
             }
 
-            let apiUrl = model.includes("nai-diffusion-4")
+            if (window.applyNovelAIAdvancedParameters) {
+              requestBody = window.applyNovelAIAdvancedParameters(
+                requestBody,
+                model,
+              );
+            }
+            let apiUrl = (window.isNovelAIModernModel ? window.isNovelAIModernModel(model) : model.includes("nai-diffusion-4"))
               ? "https://image.novelai.net/ai/generate-image-stream"
               : "https://image.novelai.net/ai/generate-image";
             let corsProxy =

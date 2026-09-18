@@ -131,6 +131,15 @@
             mcpTasks,
             mcpApprovals,
             mcpSettings,
+            memorySettings,
+            memoryVectors,
+            memoryFacts,
+            memoryRecallLogs,
+            promptSettings,
+            promptItems,
+            promptPresets,
+            promptBindings,
+            promptDiagnostics,
           ] = await Promise.all([
             db.chats.toArray(),
             db.worldBooks.toArray(),
@@ -176,6 +185,15 @@
             db.mcpTasks.toArray(),
             db.mcpApprovals.toArray(),
             db.mcpSettings.toArray(),
+            db.memorySettings.toArray(),
+            db.memoryVectors.toArray(),
+            db.memoryFacts.toArray(),
+            db.memoryRecallLogs.toArray(),
+            db.promptSettings.toArray(),
+            db.promptItems.toArray(),
+            db.promptPresets.toArray(),
+            db.promptBindings.toArray(),
+            db.promptDiagnostics.toArray(),
           ]);
 
           // 组装数据
@@ -224,6 +242,15 @@
             mcpTasks,
             mcpApprovals,
             mcpSettings,
+            memorySettings,
+            memoryVectors,
+            memoryFacts,
+            memoryRecallLogs,
+            promptSettings,
+            promptItems,
+            promptPresets,
+            promptBindings,
+            promptDiagnostics,
           });
 
           // 这里省略了 homeScreenState 的详细抓取，因为它依赖 DOM 元素，
@@ -270,6 +297,13 @@
               backupObj.apiConfig.githubToken = "";
               // 清空 Minimax Key
               backupObj.apiConfig.minimaxApiKey = "";
+              // 清空 Pollinations Key，避免随 GitHub 备份泄露
+              backupObj.apiConfig.pollinationsApiKey = "";
+            }
+            if (Array.isArray(backupObj.memorySettings)) {
+              backupObj.memorySettings.forEach((item) => {
+                item.vectorApiKey = "";
+              });
             }
 
             // 重新转换回 JSON 字符串
@@ -698,6 +732,15 @@
                 "mcpTasks",
                 "mcpApprovals",
                 "mcpSettings",
+                "memorySettings",
+                "memoryVectors",
+                "memoryFacts",
+                "memoryRecallLogs",
+                "promptSettings",
+                "promptItems",
+                "promptPresets",
+                "promptBindings",
+                "promptDiagnostics",
               ];
 
               // 世界书格式兼容转换代码
@@ -708,32 +751,11 @@
                   // 当处理世界书表格时，执行特别的转换操作
                   if (tableName === "worldBooks") {
                     console.log("正在检查并转换世界书数据格式以兼容...");
-                    itemsToPut.forEach((book) => {
-                      // 如果 content 是数组 (别人的格式)，则将其转换为字符串 (我的格式)
-                      if (Array.isArray(book.content)) {
-                        console.log(
-                          `检测到数组格式的世界书: "${book.name}"，正在转换为字符串...`,
-                        );
-
-                        // 将数组中的每个条目对象转换为格式化的字符串
-                        const convertedEntries = book.content.map((entry) => {
-                          const stringParts = [];
-                          if (entry.comment) {
-                            stringParts.push(`[备注: ${entry.comment}]`);
-                          }
-                          if (entry.keys && entry.keys.length > 0) {
-                            stringParts.push(
-                              `[关键词: ${entry.keys.join(", ")}]`,
-                            );
-                          }
-                          stringParts.push(entry.content); // 条目主要内容
-                          return stringParts.join("\n"); // 每个条目的内部用换行分隔
-                        });
-
-                        // 将所有转换后的条目字符串用一个明显的分隔符连接起来
-                        book.content = convertedEntries.join("\n\n---\n\n");
-                      }
-                    });
+                    itemsToPut = itemsToPut.map((book) =>
+                      window.TukWorldBook.normalizeBook(book, {
+                        source: "backup",
+                      }),
+                    );
                   }
 
                   // 过滤并保存数据 (这部分逻辑保持不变)
@@ -806,62 +828,43 @@
           }
         }
 
-        function applyCustomFont(fontUrl, isPreviewOnly = false) {
+        async function applyCustomFont(fontUrl, isPreviewOnly = false, presetId = "global") {
           if (!fontUrl) {
-            // 如果没有提供字体链接（比如恢复默认），就清空样式
             dynamicFontStyle.innerHTML = "";
             document.getElementById("font-preview").style.fontFamily = "";
-            return;
+            return true;
           }
 
-          // 这是一个统一的内部名字
-          const fontName = "custom-user-font";
-
-          // 这是定义字体的样式规则
-          const newStyle = `
-			        @font-face {
-			          font-family: '${fontName}';
-			          src: url('${fontUrl}');
-			          font-display: swap;
-			        }`;
-
-          if (isPreviewOnly) {
-            // 如果只是预览，这个逻辑保持不变
-            const previewStyle =
-              document.getElementById("preview-font-style") ||
-              document.createElement("style");
-            previewStyle.id = "preview-font-style";
-            previewStyle.innerHTML = newStyle;
-            if (!document.getElementById("preview-font-style"))
-              document.head.appendChild(previewStyle);
-            document.getElementById("font-preview").style.fontFamily =
-              `'${fontName}', 'bulangni', sans-serif`;
-          } else {
-            // 如果是全局应用，就同时定义字体并告诉整个 body 去使用它
-            dynamicFontStyle.innerHTML = `
-			            ${newStyle}
-			            body {
-			              font-family: '${fontName}', 'bulangni', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
-			            }`;
+          try {
+            const { family } = await loadFontFace({ id: presetId, url });
+            if (isPreviewOnly) {
+              document.getElementById("font-preview").style.fontFamily =
+                `'${family}', 'bulangni', sans-serif`;
+            } else {
+              dynamicFontStyle.textContent = `
+                body {
+                  font-family: '${family}', 'bulangni', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+                }`;
+            }
+            return true;
+          } catch (error) {
+            console.error("字体加载失败:", error);
+            const status = document.getElementById("font-current-status");
+            if (status) status.textContent = `加载失败：${error.message}`;
+            return false;
           }
         }
 
-        async function resetToDefaultFont() {
-          // 1. 清除全局字体样式
+        async function resetToDefaultFont(showFeedback = true) {
           dynamicFontStyle.innerHTML = "";
-
-          // 2. 更新并保存设置
           state.globalSettings.fontUrl = "";
+          state.globalSettings.fontPresetId = "";
           await db.globalSettings.put(state.globalSettings);
-
-          // 3. 明确地将全局预览区的字体也恢复为默认
           const globalPreview = document.getElementById("font-preview");
-          globalPreview.style.fontFamily = ""; // 移除内联样式
-
-          // 4. 应用一下空的字体设置，确保所有地方都恢复
-          applyCustomFont("", true);
-
-          alert("已恢复默认字体。");
+          globalPreview.style.fontFamily = "";
+          await applyCustomFont("", true);
+          if (document.getElementById("font-preset-container")) await renderFontPresets();
+          if (showFeedback) await showCustomAlert("字体已恢复", "已恢复默认字体。");
         }
 
         async function loadAllDataFromDB() {

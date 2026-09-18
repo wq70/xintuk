@@ -1,13 +1,7 @@
-          document
-            .getElementById("time-perception-toggle")
-            .addEventListener("change", (e) => {
-              const customTimeContainer = document.getElementById(
-                "custom-time-container",
-              );
-              customTimeContainer.style.display = e.target.checked
-                ? "none"
-                : "block";
-            });
+          window.TukTimeContext?.bindSettingsUI(
+            () => state.chats[state.activeChatId],
+            () => state,
+          );
 
           document
             .getElementById("char-heart-btn")

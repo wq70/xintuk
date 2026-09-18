@@ -459,7 +459,7 @@ ${extraContext}
       .join('\n')}\n# 输出格式: 你的回复【必须且只能】是一个严格的JSON对象，格式如下:\n${jsonFormat}`;
 
     try {
-      let isGemini = proxyUrl === GEMINI_API_URL;
+      let isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
       let messagesForApi = [{ role: 'user', content: systemPrompt }];
       let geminiConfig = toGeminiRequestData(
         model,
@@ -478,7 +478,7 @@ ${extraContext}
             body: JSON.stringify({
               model,
               messages: messagesForApi,
-              temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+              ...window.ApiGenerationParams.current(),
               response_format: { type: 'json_object' },
             }),
           });

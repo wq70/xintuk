@@ -82,7 +82,7 @@ ${publicFiguresContext}
 `;
   // (后续 API 调用代码保持不变)
   try {
-    let isGemini = proxyUrl === GEMINI_API_URL;
+    let isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
     let messagesForApi = [{ role: "user", content: systemPrompt }];
     let geminiConfig = toGeminiRequestData(
       model,
@@ -105,7 +105,7 @@ ${publicFiguresContext}
             body: JSON.stringify({
               model,
               messages: messagesForApi,
-              temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+              ...window.ApiGenerationParams.current(),
               response_format: { type: "json_object" },
             }),
           },
@@ -264,7 +264,7 @@ ${existingCommentsText.substring(0, 300)}
 `;
 
   try {
-    let isGemini = proxyUrl === GEMINI_API_URL;
+    let isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
     let messagesForApi = [{ role: "user", content: systemPrompt }];
     let geminiConfig = toGeminiRequestData(
       model,
@@ -288,7 +288,7 @@ ${existingCommentsText.substring(0, 300)}
             body: JSON.stringify({
               model,
               messages: messagesForApi,
-              temperature: 0.8,
+              ...window.ApiGenerationParams.current({ temperature: 0.8 }),
               response_format: { type: "json_object" },
             }),
           },
@@ -605,7 +605,7 @@ ${commenterContext}
 `;
 
   try {
-    let isGemini = proxyUrl === GEMINI_API_URL;
+    let isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
     let messagesForApi = [{ role: "user", content: systemPrompt }];
     let geminiConfig = toGeminiRequestData(
       model,
@@ -627,7 +627,7 @@ ${commenterContext}
           body: JSON.stringify({
             model: model,
             messages: messagesForApi,
-            temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+            ...window.ApiGenerationParams.current(),
             response_format: { type: "json_object" },
           }),
         });

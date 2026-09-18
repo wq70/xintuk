@@ -155,7 +155,11 @@
           updateUnreadIndicator(storedCount);
 
           if (state.globalSettings && state.globalSettings.fontUrl) {
-            applyCustomFont(state.globalSettings.fontUrl);
+            applyCustomFont(
+              state.globalSettings.fontUrl,
+              false,
+              state.globalSettings.fontPresetId || "global",
+            );
           }
 
           // 初始化时，自动加载并应用已保存的主题
@@ -645,10 +649,26 @@
                     }, // 初始化线下模式
                     timePerceptionEnabled: true, // 初始化时间感知
                     customTime: "", // 初始化自定义时间
+                    timeContext: {
+                      enabled: true,
+                      source: "device",
+                      timeZone:
+                        window.TukTimeContext?.getDeviceTimeZone() || "UTC",
+                      customTime: "",
+                      gapAwareness: "precise",
+                      customPrompt: "",
+                    },
                     isCoupleAvatar: false, // 初始化情侣头像开关
                     coupleAvatarDescription: "", // 初始化情侣头像描述
                     weiboProfession: "", // 初始化微博职业
                     weiboInstruction: "", // 初始化微博指令
+                    singleChatFeatures: {
+                      innerVoice: false,
+                      qzone: false,
+                      weibo: false,
+                      forum: false,
+                      loversSpace: false,
+                    },
                   },
                   history: [],
                   musicData: { totalTime: 0 },

@@ -114,7 +114,7 @@ ${extraContext}
       messagesForApi.push({ role: "user", content: systemPrompt });
     }
 
-    let isGemini = proxyUrl === GEMINI_API_URL;
+    let isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
     let geminiConfig = toGeminiRequestData(
       model,
       apiKey,
@@ -137,7 +137,7 @@ ${extraContext}
             body: JSON.stringify({
               model: model,
               messages: messagesForApi,
-              temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+              ...window.ApiGenerationParams.current(),
             }),
           },
     );
@@ -323,7 +323,7 @@ ${existingDmsContext}
 现在，请开始生成【只有粉丝发言】的私信列表。`;
   try {
     const messagesForApi = [{ role: "user", content: systemPrompt }];
-    let isGemini = proxyUrl === GEMINI_API_URL;
+    let isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
     let geminiConfig = toGeminiRequestData(
       model,
       apiKey,
@@ -344,7 +344,7 @@ ${existingDmsContext}
           body: JSON.stringify({
             model: model,
             messages: messagesForApi,
-            temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+            ...window.ApiGenerationParams.current(),
             response_format: { type: "json_object" },
           }),
         });
@@ -693,7 +693,7 @@ ${conversation.messages
 
   try {
     const messagesForApi = [{ role: "user", content: systemPrompt }];
-    let isGemini = proxyUrl === GEMINI_API_URL;
+    let isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
     let geminiConfig = toGeminiRequestData(
       model,
       apiKey,
@@ -714,7 +714,7 @@ ${conversation.messages
           body: JSON.stringify({
             model: model,
             messages: messagesForApi,
-            temperature: 1.0,
+            ...window.ApiGenerationParams.current({ temperature: 1.0 }),
             response_format: { type: "json_object" },
           }),
         });
@@ -849,7 +849,7 @@ ${existingDmsContext}
 
   try {
     const messagesForApi = [{ role: "user", content: systemPrompt }];
-    let isGemini = proxyUrl === GEMINI_API_URL;
+    let isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
     let geminiConfig = toGeminiRequestData(
       model,
       apiKey,
@@ -870,7 +870,7 @@ ${existingDmsContext}
           body: JSON.stringify({
             model: model,
             messages: messagesForApi,
-            temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+            ...window.ApiGenerationParams.current(),
             response_format: { type: "json_object" },
           }),
         });

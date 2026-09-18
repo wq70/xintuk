@@ -435,9 +435,11 @@
         // --- 4. 组装请求体 ---
         const body = {
           contents: contents,
-          generationConfig: {
-            temperature: parseFloat(temperature) || 0.8,
-          },
+          generationConfig: window.ApiGenerationParams
+            ? window.ApiGenerationParams.gemini(
+                typeof temperature === "undefined" ? {} : { temperature },
+              )
+            : { temperature: Number.isFinite(Number(temperature)) ? Number(temperature) : 0.8 },
         };
 
         // 只有当 systemInstruction 不为空时才添加该字段
@@ -447,8 +449,11 @@
           };
         }
 
+        const geminiBaseUrl = String(
+          window.state?.apiConfig?.proxyUrl || GEMINI_API_URL,
+        ).replace(/\/$/, "");
         return {
-          url: `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${getRandomValue(
+          url: `${geminiBaseUrl}/${model}:generateContent?key=${getRandomValue(
             apiKey,
           )}`,
           data: {

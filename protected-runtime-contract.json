@@ -1,9 +1,9 @@
 {
-  "elementIdCount": 2060,
-  "elementIdOrderHash": "28a4d64290c4e56fb5bdc33fee472c85aa5a7a8f625902694efd51d077f7b3de",
-  "screenCount": 64,
-  "screenIdOrderHash": "997acdf8df90783fef8f92ac18f0019e2813fb1492b0b5f4460d26215c5a9efd",
-  "inlineHandlerCount": 58,
+  "elementIdCount": 2212,
+  "elementIdOrderHash": "d8127a141ab8a4baf32323aa158c23fc46072659a4dcd2f7e6e2f7b960835612",
+  "screenCount": 65,
+  "screenIdOrderHash": "777313d8299df3a209938f5ae461306fe150ee7b345d9242e81a64f3d26a0601",
+  "inlineHandlerCount": 60,
   "scriptReferences": [
     "https://unpkg.com/dexie/dist/dexie.js",
     "https://cdn.jsdelivr.net/npm/marked/marked.min.js",
@@ -28,7 +28,8 @@
     "https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js",
     "avatar-frames.js",
     "mcp.js",
-    "thought-chain.js"
+    "thought-chain.js",
+    "prompt-center.js"
   ],
-  "databaseSchemaHash": "4116b2e8bb98e6971866d3acd342719d44e1dd3d64d33c3a4bbe442ccc1c6aac"
+  "databaseSchemaHash": "fa8db8829dd2531f7697ff943d579c9b4edd6fdf3b01a084edde02c660285ffd"
 }

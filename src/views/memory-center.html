@@ -1,0 +1,19 @@
+    <div id="tuk-memory-center-modal" class="modal tuk-memory-modal" aria-hidden="true">
+      <div class="modal-content tuk-memory-shell">
+        <div class="modal-header tuk-memory-header">
+          <button type="button" id="tuk-memory-close-btn" class="tuk-memory-header-btn" aria-label="关闭长期记忆中心">‹</button>
+          <span id="tuk-memory-title">长期记忆中心</span>
+          <button type="button" id="tuk-memory-refresh-btn" class="tuk-memory-header-btn tuk-memory-refresh">刷新</button>
+        </div>
+        <div class="tuk-memory-chat-line" id="tuk-memory-chat-line"></div>
+        <div class="tuk-memory-tabs" role="tablist" aria-label="长期记忆类型">
+          <button type="button" class="active" data-memory-tab="text" role="tab">文字</button>
+          <button type="button" data-memory-tab="vector" role="tab">向量</button>
+          <button type="button" data-memory-tab="table" role="tab">表格</button>
+          <button type="button" data-memory-tab="settings" role="tab">设置</button>
+          <button type="button" data-memory-tab="recall" role="tab">本轮注入</button>
+        </div>
+        <div id="tuk-memory-content" class="tuk-memory-content"></div>
+        <div id="tuk-memory-toast" class="tuk-memory-toast" aria-live="polite"></div>
+      </div>
+    </div>

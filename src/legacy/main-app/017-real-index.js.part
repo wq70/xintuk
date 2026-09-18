@@ -260,50 +260,26 @@
                       ? msgData.prompt.slice(0, 9)
                       : [msgData.prompt];
 
-                    const pollApiKey = state.apiConfig.pollinationsApiKey;
-                    const generatedImageUrls = [];
-
-                    // 使用 Promise.all 并行处理请求，提高速度
-                    await Promise.all(
-                      prompts.map(async (prompt) => {
-                        const encodedPrompt = encodeURIComponent(prompt);
-                        const url = `https://image.pollinations.ai/prompt/${encodedPrompt}?nologo=true&width=1024&height=1024`;
-
-                        try {
-                          if (pollApiKey) {
-                            // 如果有 Key，使用 fetch 获取并转为 Base64
-                            const res = await fetch(url, {
-                              headers: {
-                                Authorization: `Bearer ${pollApiKey}`,
-                              },
-                            });
-                            if (res.ok) {
-                              const blob = await res.blob();
-                              const base64 = await new Promise((resolve) => {
-                                const reader = new FileReader();
-                                reader.onloadend = () => resolve(reader.result);
-                                reader.readAsDataURL(blob);
-                              });
-                              generatedImageUrls.push(base64);
-                            } else {
-                              console.warn(
-                                `Pollinations fetch failed: ${res.status}, falling back to URL`,
-                              );
-                              generatedImageUrls.push(url);
-                            }
-                          } else {
-                            // 没有 Key，直接使用 URL
-                            generatedImageUrls.push(url);
-                          }
-                        } catch (e) {
-                          console.error(
-                            "Pollinations image generation error:",
-                            e,
-                          );
-                          generatedImageUrls.push(url); // 出错时回退到 URL 尝试
-                        }
-                      }),
+                    // 统一走全局生成器，保留旧 Fallback，并按输入索引稳定回填多图顺序。
+                    const generatedResults = await Promise.allSettled(
+                      prompts.map((prompt) =>
+                        window.generatePollinationsImage(prompt, {
+                          nologo: true,
+                          width: 1024,
+                          height: 1024,
+                        }),
+                      ),
                     );
+                    const generatedImageUrls = generatedResults
+                      .filter((result) => result.status === "fulfilled")
+                      .map((result) => result.value);
+                    const failedCount = generatedResults.length - generatedImageUrls.length;
+                    if (failedCount) {
+                      const failureText = generatedImageUrls.length
+                        ? `${failedCount} 张图片生成失败，其余图片已保留`
+                        : `图片生成失败：${generatedResults[0]?.reason?.message || "服务暂时不可用"}`;
+                      newPost.content = `${newPost.content}${newPost.content ? "\n" : ""}[${failureText}]`;
+                    }
 
                     newPost.imageUrls = generatedImageUrls;
 
@@ -373,7 +349,7 @@
                         // ★★★ V4/V4.5 和 V3 使用不同的请求体格式 ★★★
                         let requestBody;
 
-                        if (model.includes("nai-diffusion-4")) {
+                        if (window.isNovelAIModernModel ? window.isNovelAIModernModel(model) : model.includes("nai-diffusion-4")) {
                           // V4/V4.5 使用新格式 (params_version: 3)
                           requestBody = {
                             input: finalPositivePrompt,
@@ -462,13 +438,19 @@
                           };
                         }
 
+                        if (window.applyNovelAIAdvancedParameters) {
+                          requestBody = window.applyNovelAIAdvancedParameters(
+                            requestBody,
+                            model,
+                          );
+                        }
                         console.log("🚀 发送NAI请求:", requestBody);
 
                         // 根据模型选择不同的API端点
                         let apiUrl;
 
                         // V4/V4.5 模型使用流式端点
-                        if (model.includes("nai-diffusion-4")) {
+                        if (window.isNovelAIModernModel ? window.isNovelAIModernModel(model) : model.includes("nai-diffusion-4")) {
                           // V4/V4.5 默认使用流式端点
                           apiUrl =
                             "https://image.novelai.net/ai/generate-image-stream";

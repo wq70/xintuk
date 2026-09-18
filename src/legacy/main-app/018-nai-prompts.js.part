@@ -41,7 +41,7 @@
                     // ★★★ V4/V4.5 和 V3 使用不同的请求体格式 ★★★
                     let requestBody;
 
-                    if (model.includes("nai-diffusion-4")) {
+                    if (window.isNovelAIModernModel ? window.isNovelAIModernModel(model) : model.includes("nai-diffusion-4")) {
                       // V4/V4.5 使用新格式 (params_version: 3)
                       requestBody = {
                         input: finalPositivePrompt,
@@ -130,13 +130,19 @@
                       };
                     }
 
+                    if (window.applyNovelAIAdvancedParameters) {
+                      requestBody = window.applyNovelAIAdvancedParameters(
+                        requestBody,
+                        model,
+                      );
+                    }
                     console.log("🚀 发送NAI请求:", requestBody);
 
                     // ★★★ 根据模型选择不同的API端点 ★★★
                     let apiUrl;
 
                     // V4/V4.5 模型使用流式端点
-                    if (model.includes("nai-diffusion-4")) {
+                    if (window.isNovelAIModernModel ? window.isNovelAIModernModel(model) : model.includes("nai-diffusion-4")) {
                       // V4/V4.5 默认使用流式端点
                       apiUrl =
                         "https://image.novelai.net/ai/generate-image-stream";

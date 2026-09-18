@@ -284,7 +284,7 @@ ${JSON.stringify(publicFigures, null, 2)}
     const messagesForApi = [{ role: "user", content: prompt }];
 
     try {
-      let isGemini = proxyUrl === GEMINI_API_URL;
+      let isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
       let geminiConfig = toGeminiRequestData(
         model,
         apiKey,
@@ -304,7 +304,7 @@ ${JSON.stringify(publicFigures, null, 2)}
             body: JSON.stringify({
               model: model,
               messages: messagesForApi,
-              temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+              ...window.ApiGenerationParams.current(),
               response_format: { type: "json_object" },
             }),
           });
@@ -424,7 +424,7 @@ ${JSON.stringify(publicFigures, null, 2)}
     const messagesForApi = [{ role: "user", content: prompt }];
 
     try {
-      let isGemini = proxyUrl === GEMINI_API_URL;
+      let isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
       let geminiConfig = toGeminiRequestData(
         model,
         apiKey,
@@ -444,7 +444,7 @@ ${JSON.stringify(publicFigures, null, 2)}
             body: JSON.stringify({
               model: model,
               messages: messagesForApi,
-              temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+              ...window.ApiGenerationParams.current(),
               response_format: { type: "json_object" },
             }),
           });
@@ -745,7 +745,7 @@ ${lastChapter.content || ""}
 
     const messagesForApi = [{ role: "user", content: prompt }];
     try {
-      let isGemini = proxyUrl === GEMINI_API_URL;
+      let isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
       let geminiConfig = toGeminiRequestData(
         model,
         apiKey,
@@ -764,7 +764,7 @@ ${lastChapter.content || ""}
             body: JSON.stringify({
               model: model,
               messages: messagesForApi,
-              temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+              ...window.ApiGenerationParams.current(),
               response_format: { type: "json_object" },
             }),
           });

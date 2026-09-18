@@ -9,7 +9,7 @@
       <div class="form-container settings-scroll-container">
         <!-- 1. 锁屏与安全卡片 -->
         <div class="settings-group-card">
-          <div class="settings-section-title">🔒 锁屏与安全</div>
+          <div class="settings-section-title">锁屏与安全</div>
 
           <div class="setting-row">
             <label class="setting-label">启用锁屏界面</label>
@@ -65,8 +65,8 @@
                 class="moe-input select"
                 style="flex: 1"
               ></select>
-              <button id="rename-theme-btn" class="btn-icon">✏️</button>
-              <button id="delete-theme-btn" class="btn-icon danger">🗑️</button>
+              <button id="rename-theme-btn" class="btn-icon">编辑</button>
+              <button id="delete-theme-btn" class="btn-icon danger">删除</button>
             </div>
             <textarea
               id="theme-css-editor"
@@ -114,7 +114,7 @@
 
         <!-- 2. 主屏幕视觉卡片 -->
         <div class="settings-group-card">
-          <div class="settings-section-title">📱 主屏幕视觉</div>
+          <div class="settings-section-title">主屏幕视觉</div>
 
           <div class="setting-row">
             <label class="setting-label">显示状态栏</label>
@@ -257,7 +257,7 @@
 
         <!-- ★★★ 新增：路人头像库卡片 ★★★ -->
         <div class="settings-group-card">
-          <div class="settings-section-title">👥 全局路人头像库</div>
+          <div class="settings-section-title">全局路人头像库</div>
           <div class="setting-item">
             <label>用于生成随机NPC、评论区的头像</label>
             <div class="moe-btn-group">
@@ -265,10 +265,10 @@
                 id="manage-passerby-avatars-btn"
                 class="moe-btn-secondary"
               >
-                📂 管理图库
+                管理图库
               </button>
               <button id="add-passerby-avatar-btn" class="moe-btn-secondary">
-                ➕ 添加头像
+                添加头像
               </button>
             </div>
           </div>
@@ -276,7 +276,7 @@
 
         <!-- 3. App 图标与名称卡片 -->
         <div class="settings-group-card">
-          <div class="settings-section-title">🎨 图标与名称</div>
+          <div class="settings-section-title">图标与名称</div>
           <div class="setting-item">
             <label>App 图标定制</label>
             <div id="icon-settings-grid" class="icon-grid-compact">
@@ -300,7 +300,7 @@
 
         <!-- 4. 声音与背景卡片 -->
         <div class="settings-group-card">
-          <div class="settings-section-title">🎵 声音与背景</div>
+          <div class="settings-section-title">声音与背景</div>
 
           <div class="setting-item">
             <label>来电铃声 URL</label>
@@ -366,7 +366,7 @@
 
       <!-- ★★★ 悬浮保存按钮 ★★★ -->
       <button id="save-wallpaper-btn" class="moe-fab-save">
-        💾<span style="font-size: 12px; display: block; margin-top: -2px"
+        <span style="font-size: 14px; display: block"
           >保存</span
         >
       </button>
@@ -392,40 +392,68 @@
         <!-- 保留这个占位符，让标题能完美居中 -->
       </div>
       <div class="form-container" style="gap: 20px">
-        <p
-          style="
-            font-size: 13px;
-            color: #ff6b6b;
-            background-color: rgba(255, 107, 107, 0.1);
-            padding: 10px;
-            border-radius: 8px;
-            border: 1px solid rgba(255, 107, 107, 0.2);
-            text-align: center;
-            width: 100%;
-            box-sizing: border-box;
-          "
-        >
-          字体太大了导入本地字体会闪退！最好用url。
-        </p>
-        <!-- 字体预设卡槽的容器 -->
+        <div class="font-library-notice" role="note">
+          本地字体会保存在当前浏览器中。中文字体通常较大，优先使用 WOFF2
+          可减少空间占用。
+        </div>
+
+        <section class="font-current-card" aria-labelledby="font-current-title">
+          <div class="font-current-copy">
+            <span id="font-current-title">当前字体</span>
+            <strong id="font-current-name">默认字体</strong>
+            <small id="font-current-status">使用应用默认字体</small>
+          </div>
+          <button
+            type="button"
+            class="preset-btn secondary font-current-reset"
+            id="reset-font-btn"
+          >
+            恢复默认
+          </button>
+        </section>
+
+        <div class="font-library-toolbar">
+          <button type="button" class="preset-btn secondary" id="add-font-url-btn">
+            URL 添加
+          </button>
+          <button type="button" class="preset-btn" id="add-font-local-btn">
+            本地添加
+          </button>
+        </div>
+
+        <div class="font-library-search-row">
+          <input
+            type="search"
+            id="font-library-search"
+            placeholder="搜索字体"
+            autocomplete="off"
+            aria-label="搜索字体"
+          />
+          <span id="font-library-count" aria-live="polite">0 个字体</span>
+        </div>
+
+        <!-- 字体预设列表的容器 -->
         <div id="font-preset-container">
-          <!-- 5个卡槽将由JavaScript动态生成在这里 -->
+          <!-- 字体卡片将由 JavaScript 动态生成在这里 -->
         </div>
 
         <!-- 全局字体预览区 -->
         <div class="form-group" style="width: 100%">
           <label>当前全局字体预览</label>
           <div id="font-preview">
-            <p style="font-size: 20px; margin: 0 0 10px 0">
-              你好世界 Hello World
+            <p class="font-preview-heading">你好世界 Hello World 12345</p>
+            <p class="font-preview-body">
+              春风又绿江南岸。标点：“”‘’！？ ¥123.45
             </p>
-            <p style="margin: 0">这是全局字体预览效果，12345。</p>
           </div>
+          <input
+            type="text"
+            id="font-preview-input"
+            class="font-preview-input"
+            placeholder="输入文字测试当前字体"
+            autocomplete="off"
+          />
         </div>
-
-        <button class="form-button form-button-secondary" id="reset-font-btn">
-          恢复默认字体
-        </button>
       </div>
     </div>
 

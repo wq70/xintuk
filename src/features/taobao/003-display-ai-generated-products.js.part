@@ -71,8 +71,7 @@ async function loadAndDisplayAiProductImage(productData, cardElement) {
       imageContainer.innerHTML = `<img src="${imageUrl}" class="product-image" alt="${productData.name}">`;
     }
   } catch (error) {
-    // 理论上，因为 generateAndLoadImage 是无限重试，这里很难被触发
-    // 但为了代码健壮性，我们仍然处理这个万一
+    // 有限重试失败时给用户明确占位反馈。
     console.error(`为商品 "${productData.name}" 生成图片失败:`, error);
     if (document.body.contains(imageContainer)) {
       imageContainer.innerHTML = `<span>图片加载失败</span>`;
@@ -118,7 +117,7 @@ async function handleGenerateProductsAI() {
     const messagesForApi = [{ role: "user", content: prompt }];
 
     // 恢复对 Gemini 和 OpenAI 的兼容判断逻辑
-    const isGemini = proxyUrl === GEMINI_API_URL;
+    const isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
     const requestData = isGemini
       ? toGeminiRequestData(model, apiKey, prompt, messagesForApi, isGemini)
       : {
@@ -132,7 +131,7 @@ async function handleGenerateProductsAI() {
             body: JSON.stringify({
               model: model,
               messages: messagesForApi,
-              temperature: 1.1,
+              ...window.ApiGenerationParams.current({ temperature: 1.1 }),
               response_format: { type: "json_object" },
             }),
           },

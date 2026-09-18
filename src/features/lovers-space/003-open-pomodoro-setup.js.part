@@ -329,24 +329,9 @@ async function triggerPomodoroBreakResponse(userText) {
   // --- 2. 准备上下文 ---
 
   // 2.1 世界书
-  let worldBookContext = "";
-  if (
-    chat.settings.linkedWorldBookIds &&
-    chat.settings.linkedWorldBookIds.length > 0
-  ) {
-    const linkedContents = chat.settings.linkedWorldBookIds
-      .map((id) => {
-        const book = state.worldBooks.find((b) => b.id === id);
-        return book && book.content
-          ? `\n\n## 世界书条目: ${book.name}\n${book.content}`
-          : "";
-      })
-      .filter(Boolean)
-      .join("");
-    if (linkedContents) {
-      worldBookContext = `\n# 核心世界观设定 (必须参考)\n${linkedContents}\n`;
-    }
-  }
+  let worldBookContext = window.TukWorldBook.buildForChat(chat, {
+    generationType: "quiet",
+  });
 
   // 2.2 用户信息
   const userNickname = chat.settings.myNickname || "我";
@@ -398,7 +383,7 @@ async function triggerPomodoroBreakResponse(userText) {
   ];
 
   try {
-    let isGemini = proxyUrl.includes("generativelanguage");
+    let isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
     let geminiConfig = toGeminiRequestData(
       model,
       apiKey,
@@ -418,7 +403,7 @@ async function triggerPomodoroBreakResponse(userText) {
           body: JSON.stringify({
             model: model,
             messages: messagesForApi,
-            temperature: 0.85, // 稍微再调高一点点温度，让闲聊更有趣
+            ...window.ApiGenerationParams.current({ temperature: 0.85 }), // 保留该场景的原有温度偏好，并服从渠道开关
           }),
         });
 
@@ -756,7 +741,7 @@ async function triggerPomodoroAIResponse(triggerType) {
   };
 
   try {
-    let isGemini = proxyUrl === GEMINI_API_URL;
+    let isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
 
     let requestBody;
     let requestUrl = `${proxyUrl}/v1/chat/completions`;
@@ -766,14 +751,14 @@ async function triggerPomodoroAIResponse(triggerType) {
     };
 
     if (isGemini) {
-      requestUrl = `${GEMINI_API_URL}/${model}:generateContent?key=${getRandomValue(
+      requestUrl = `${String(proxyUrl).replace(/\/$/, "")}/${model}:generateContent?key=${getRandomValue(
         apiKey,
       )}`;
       requestHeaders = { "Content-Type": "application/json" };
       requestBody = {
         contents: [userMessage],
         generationConfig: {
-          temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+          ...window.ApiGenerationParams.current(),
           response_mime_type: "application/json",
         },
         systemInstruction: {
@@ -784,7 +769,7 @@ async function triggerPomodoroAIResponse(triggerType) {
       requestBody = {
         model: model,
         messages: [{ role: "system", content: systemPrompt }, userMessage],
-        temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+        ...window.ApiGenerationParams.current(),
         response_format: { type: "json_object" },
       };
     }

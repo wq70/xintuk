@@ -75,15 +75,9 @@
           });
 
           // 2. 世界书
-          let wbText = "";
-          if (settings.linkedWorldBookIds) {
-            wbText = settings.linkedWorldBookIds
-              .map((id) => {
-                const b = state.worldBooks.find((wb) => wb.id === id);
-                return b ? b.content : "";
-              })
-              .join("");
-          }
+          let wbText = window.TukWorldBook.buildForChat(chat, {
+            generationType: "quiet",
+          });
           breakdown.push({
             name: "世界书",
             count: calculateTokenCount(wbText),
@@ -178,20 +172,9 @@
           }
 
           // 2. 添加世界书内容
-          if (
-            settings.linkedWorldBookIds &&
-            settings.linkedWorldBookIds.length > 0
-          ) {
-            const linkedContents = settings.linkedWorldBookIds
-              .map((bookId) => {
-                const worldBook = state.worldBooks.find(
-                  (wb) => wb.id === bookId,
-                );
-                return worldBook ? worldBook.content : "";
-              })
-              .join("\n");
-            combinedText += linkedContents;
-          }
+          combinedText += window.TukWorldBook.buildForChat(chat, {
+            generationType: "quiet",
+          });
 
           // 3. 添加所有总结作为长期记忆
           const summaryContext = chat.history

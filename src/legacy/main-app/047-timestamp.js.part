@@ -555,6 +555,9 @@
                 isGroup ? "none" : "block";
               document.getElementById("weibo-instruction-group").style.display =
                 isGroup ? "none" : "block";
+              document.querySelector(
+                "[data-single-chat-features-group]",
+              ).style.display = isGroup ? "none" : "block";
               // 根据是否为群聊，显示或隐藏“好友分组”区域
               document.getElementById("assign-group-section").style.display =
                 isGroup ? "none" : "block";
@@ -667,24 +670,8 @@
                 newSelectBox.classList.toggle("expanded");
               });
 
-              const timeToggle = document.getElementById(
-                "time-perception-toggle",
-              );
-              const customTimeContainer = document.getElementById(
-                "custom-time-container",
-              );
-              const customTimeInput =
-                document.getElementById("custom-time-input");
-
-              // 如果是旧聊天，给一个默认值 true（开启）
-              const isTimeEnabled = chat.settings.timePerceptionEnabled ?? true;
-              timeToggle.checked = isTimeEnabled;
-              customTimeInput.value = chat.settings.customTime || "";
-
-              // 根据开关状态，决定是否显示自定义时间输入框
-              customTimeContainer.style.display = isTimeEnabled
-                ? "none"
-                : "block";
+              window.TukTimeContext?.loadSettingsForm(chat, state);
+              window.TukBilingual?.loadSettingsForm(chat, state);
 
               const bgPreview = document.getElementById("bg-preview");
               const removeBgBtn = document.getElementById("remove-bg-btn");
@@ -741,6 +728,13 @@
                   chat.settings.weiboProfession || "";
                 document.getElementById("weibo-instruction-input").value =
                   chat.settings.weiboInstruction || "";
+                const singleChatFeatures = getSingleChatFeatures(chat);
+                Object.entries(singleChatFeatures).forEach(([key, enabled]) => {
+                  const input = document.querySelector(
+                    `[data-single-feature="${key}"]`,
+                  );
+                  if (input) input.checked = enabled;
+                });
                 document.getElementById("ai-avatar-preview").src =
                   chat.settings.aiAvatar || defaultAvatar;
                 document.getElementById("minimax-voice-id-input").value =
@@ -774,6 +768,9 @@
                   const speed = chat.settings.speed ?? 1.0; // 使用 ?? 确保即使值为0也能正确处理
                   speedSlider.value = speed;
                   speedValueDisplay.textContent = parseFloat(speed).toFixed(1);
+                  if (window.loadCharacterAudioSettings) {
+                    window.loadCharacterAudioSettings(chat);
+                  }
                 }
 
                 // 为语速滑块添加实时更新显示值的事件

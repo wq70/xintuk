@@ -771,36 +771,14 @@
           }
 
           try {
-            const lastMessage = chat.history.slice(-1)[0];
-            const timeSinceLastMessage = lastMessage
-              ? (Date.now() - lastMessage.timestamp) / 1000 / 60
-              : Infinity; // in minutes
-
             const membersList = chat.members
               .map((m) => `- ${m.groupNickname} (人设: ${m.persona})`)
               .join("\n");
             const myNickname = chat.settings.myNickname || "我";
 
-            let worldBookContent = "";
-            if (
-              chat.settings.linkedWorldBookIds &&
-              chat.settings.linkedWorldBookIds.length > 0
-            ) {
-              const linkedContents = chat.settings.linkedWorldBookIds
-                .map((bookId) => {
-                  const worldBook = state.worldBooks.find(
-                    (wb) => wb.id === bookId,
-                  );
-                  return worldBook && worldBook.content
-                    ? `\n\n## 世界书: ${worldBook.name}\n${worldBook.content}`
-                    : "";
-                })
-                .filter(Boolean)
-                .join("");
-              if (linkedContents) {
-                worldBookContent = `\n\n# 核心世界观设定 (你必须严格遵守)\n${linkedContents}\n`;
-              }
-            }
+            let worldBookContent = window.TukWorldBook.buildForChat(chat, {
+              generationType: "quiet",
+            });
             let musicContext = "";
             // 注意：后台群聊活动通常不与特定的“一起听歌”会话绑定，因此这里我们提供一个空的音乐上下文。
             // 如果未来需要更复杂的功能，可以在此扩展。
@@ -810,17 +788,24 @@
             let sharedContext = "";
             // 后台群聊活动中不存在用户分享聊天记录的上下文，因此这里为空。
 
-            const now = new Date();
-            const currentTime = now.toLocaleTimeString("zh-CN", {
-              hour: "numeric",
-              minute: "numeric",
-              hour12: true,
-            });
+            const groupBackgroundTimeContext =
+              window.TukTimeContext?.buildContext({
+                chat,
+                state,
+                mode: "group_background",
+              }).prompt || "";
 
-            const summaryContext = chat.history
+            let summaryContext = chat.history
               .filter((msg) => msg.type === "summary")
               .map((s) => s.content)
               .join("\n");
+            if (window.TukMemory) {
+              summaryContext += await window.TukMemory.buildContext({
+                chatId: chat.id,
+                recentMessages: chat.history.filter((msg) => !msg.isHidden && msg.type !== "summary").slice(-6),
+                mode: "group_background",
+              });
+            }
             const replyRange = chat.settings.replyCountRange || {
               min: 3,
               max: 8,
@@ -829,9 +814,8 @@
             // updated by lrq 251027
             const systemPrompt = `
 			# 任务
-			你是一个群聊后台模拟器。当前时间是${currentTime}，群聊 "${chat.name}" 已经沉寂了 ${Math.round(
-        timeSinceLastMessage,
-      )} 分钟，用户(昵称: "${chat.settings.myNickname || "我"}")不在线。
+			你是一个群聊后台模拟器。用户(昵称: "${chat.settings.myNickname || "我"}")不在线。
+			${groupBackgroundTimeContext}
 			你的任务是根据下方每个角色的人设，在他们之间【自发地】生成一段自然的对话。
 			# 【对话节奏铁律 (至关重要！)】
 			你的回复【必须】模拟真人的打字和思考习惯。你应该将你想说的话，拆分成${replyCountInstruction}条消息气泡来发送，**绝对不要一次性发送一大段文字！** 每条消息最好不要超过30个字，这会让对话看起来更自然、更真实。
@@ -873,12 +857,13 @@
 			${recentContextSummary}
             ${summaryContext}
 			${linkedMemoryContext}
+			${window.TukBilingual?.buildPromptContext(chat, { mode: "background" }) || ""}
 
 			现在，请严格遵守以上所有规则，开始你的模拟。`;
 
             const messagesPayload = [{ role: "user", content: systemPrompt }];
 
-            let isGemini = proxyUrl === GEMINI_API_URL;
+            let isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
             let geminiConfig = toGeminiRequestData(
               model,
               apiKey,
@@ -898,7 +883,7 @@
                   body: JSON.stringify({
                     model: model,
                     messages: messagesPayload,
-                    temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+                    ...window.ApiGenerationParams.current(),
                   }),
                 });
 

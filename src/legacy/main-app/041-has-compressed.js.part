@@ -135,6 +135,11 @@
             "mcpTasks",
             "mcpApprovals",
             "mcpSettings",
+            "promptSettings",
+            "promptItems",
+            "promptPresets",
+            "promptBindings",
+            "promptDiagnostics",
           ];
 
           const stream = new ReadableStream({
@@ -694,7 +699,10 @@
 
           if (confirmed) {
             const idsToDelete = Array.from(selectedWorldBooks);
-            await db.worldBooks.bulkDelete(idsToDelete);
+            await window.TukWorldBook.deleteBooksAndReferences(
+              db,
+              idsToDelete,
+            );
 
             state.worldBooks = state.worldBooks.filter(
               (wb) => !idsToDelete.includes(wb.id),
@@ -741,7 +749,10 @@
               .toArray();
             const bookIdsToDelete = booksToDelete.map((book) => book.id);
             if (bookIdsToDelete.length > 0) {
-              await db.worldBooks.bulkDelete(bookIdsToDelete);
+              await window.TukWorldBook.deleteBooksAndReferences(
+                db,
+                bookIdsToDelete,
+              );
               state.worldBooks = state.worldBooks.filter(
                 (wb) => !bookIdsToDelete.includes(wb.id),
               );
@@ -783,6 +794,9 @@
          * 渲染世界书列表的辅助函数（移除了旧的点击事件绑定）
          */
         function createWorldBookGroup(groupName, books) {
+          if (window.TukWorldBookUI) {
+            return window.TukWorldBookUI.createGroup(groupName, books);
+          }
           const groupContainer = document.createElement("div");
           groupContainer.className = "world-book-group-container";
 
@@ -809,9 +823,7 @@
             const item = document.createElement("div");
             item.className = "list-item";
             item.dataset.bookId = book.id;
-            item.innerHTML = `<div class="item-title">${book.name}</div><div class="item-content">${(
-              book.content || "暂无内容..."
-            ).substring(0, 50)}</div>`;
+            item.innerHTML = `<div class="item-title">${book.name}</div><div class="item-content">${window.TukWorldBook.preview(book).substring(0, 50)}</div>`;
 
             // 旧的 item.addEventListener('click', ...) 已被移除，由事件委托统一处理
 
@@ -822,7 +834,9 @@
                 { confirmButtonClass: "btn-danger" },
               );
               if (confirmed) {
-                await db.worldBooks.delete(book.id);
+                await window.TukWorldBook.deleteBooksAndReferences(db, [
+                  book.id,
+                ]);
                 state.worldBooks = state.worldBooks.filter(
                   (wb) => wb.id !== book.id,
                 );

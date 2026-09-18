@@ -147,7 +147,7 @@
                 content: "请根据你在系统指令中读到的规则，立即开始你的行动。",
               },
             ];
-            let isGemini = proxyUrl === GEMINI_API_URL;
+            let isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
             let geminiConfig = toGeminiRequestData(
               model,
               apiKey,
@@ -171,7 +171,7 @@
                       { role: "system", content: systemPrompt },
                       ...messagesForApi,
                     ],
-                    temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+                    ...window.ApiGenerationParams.current(),
                   }),
                 });
 
@@ -432,6 +432,8 @@
          * @param {string} chatId - 当前聊天的ID
          */
         async function checkAndTriggerSummary(chatId) {
+          // 三种长期记忆并列运行；向量和表格均为独立开关，失败不阻断原有总结。
+          void window.TukMemory?.processChat(chatId);
           if (isSummarizing) return;
 
           const chat = state.chats[chatId];
@@ -582,7 +584,7 @@
               );
             }
 
-            const isGemini = proxyUrl === GEMINI_API_URL;
+            const isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
             const messagesForApi = [{ role: "user", content: systemPrompt }];
             const geminiConfig = toGeminiRequestData(
               model,
@@ -603,7 +605,7 @@
                   body: JSON.stringify({
                     model: model,
                     messages: messagesForApi,
-                    temperature: parseFloat(state.apiConfig.temperature) || 0.3,
+                    ...window.ApiGenerationParams.current(),
                   }),
                 });
 
@@ -804,7 +806,7 @@
               body: JSON.stringify({
                 model: model,
                 messages: [{ role: "user", content: systemPrompt }],
-                temperature: parseFloat(state.apiConfig.temperature) || 0.5,
+                ...window.ApiGenerationParams.current(),
               }),
             });
 

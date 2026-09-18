@@ -13,18 +13,30 @@
             if (Array.isArray(messagesArray) && messagesArray.length > 0) {
               let messageTimestamp = Date.now();
               let firstMessageContent = "";
+              let firstStoredMessage = null;
 
               messagesArray.forEach((msgData, index) => {
                 if (msgData.name && msgData.message) {
+                  const bilingualMetadata =
+                    window.TukBilingual?.extractGeneratedMetadata(
+                      msgData,
+                      chat,
+                      { mode: "background" },
+                    ) || {};
                   const aiMessage = {
                     role: "assistant",
                     senderName: msgData.name,
                     content: String(msgData.message),
                     timestamp: messageTimestamp++,
+                    ...bilingualMetadata,
                   };
                   chat.history.push(aiMessage);
+                  window.TukBilingual?.onMessageStored(aiMessage, chat, {
+                    mode: "background",
+                  });
                   if (index === 0) {
                     firstMessageContent = `${msgData.name}: ${msgData.message}`;
+                    firstStoredMessage = aiMessage;
                   }
                 }
               });
@@ -49,7 +61,13 @@
                 bgSenderAvatar = chat.settings.aiAvatar;
               }
 
-              showNotification(chatId, firstMessageContent, bgSenderAvatar);
+              showNotification(
+                chatId,
+                firstStoredMessage
+                  ? `${firstStoredMessage.senderName}: ${window.TukBilingual?.notificationContent(firstStoredMessage, chat, firstStoredMessage.content) || firstStoredMessage.content}`
+                  : firstMessageContent,
+                bgSenderAvatar,
+              );
 
               // 保存并刷新UI
               await db.chats.put(chat);

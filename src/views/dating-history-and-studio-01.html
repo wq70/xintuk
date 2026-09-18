@@ -278,6 +278,21 @@
           <span class="action-btn" id="studio-history-btn">故事记录</span>
         </div>
       </div>
+      <div class="studio-home-tools" aria-label="剧本筛选与继续演绎">
+        <button id="studio-resume-btn" class="studio-resume-card" type="button" hidden>
+          <span class="studio-resume-copy">
+            <strong id="studio-resume-title">继续上次演绎</strong>
+            <small id="studio-resume-meta"></small>
+          </span>
+          <span class="studio-resume-arrow" aria-hidden="true">›</span>
+        </button>
+        <div class="studio-filter-row">
+          <input id="studio-search-input" type="search" placeholder="搜索剧本名称、标签或题材" />
+          <select id="studio-genre-filter" aria-label="按题材筛选">
+            <option value="">全部题材</option>
+          </select>
+        </div>
+      </div>
       <div id="studio-script-list" class="list-container">
         <!-- 剧本列表将由JS动态生成在这里 -->
       </div>
@@ -350,6 +365,45 @@
           ></textarea>
         </div>
 
+        <details class="studio-advanced-editor">
+          <summary>玩法与剧情细节（可选）</summary>
+          <div class="studio-editor-grid">
+            <div class="form-group">
+              <label for="studio-genre-input">题材</label>
+              <input id="studio-genre-input" type="text" placeholder="如：日常、悬疑、治愈" />
+            </div>
+            <div class="form-group">
+              <label for="studio-duration-select">建议时长</label>
+              <select id="studio-duration-select">
+                <option value="short">约 5 分钟</option>
+                <option value="medium" selected>约 15 分钟</option>
+                <option value="long">约 30 分钟</option>
+                <option value="serial">连续剧</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="studio-tags-input">标签</label>
+            <input id="studio-tags-input" type="text" placeholder="用逗号分隔，如：雨夜, 双向暗恋, 轻松" />
+          </div>
+          <div class="form-group">
+            <label for="studio-tone-input">氛围与节奏</label>
+            <textarea id="studio-tone-input" rows="2" placeholder="如：温柔慢热，冲突适中，结尾保留余韵"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="studio-events-input">关键事件 / 线索 / 道具</label>
+            <textarea id="studio-events-input" rows="3" placeholder="每行一个，可写触发条件或用途"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="studio-endings-input">可选结局</label>
+            <textarea id="studio-endings-input" rows="3" placeholder="每行一个结局方向；留空时由导演自然判断"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="studio-boundaries-input">内容边界</label>
+            <textarea id="studio-boundaries-input" rows="2" placeholder="不希望出现的内容或需要淡出的情节"></textarea>
+          </div>
+        </details>
+
         <div style="display: flex; gap: 10px; margin-top: 20px">
           <button
             id="export-studio-script-btn"
@@ -382,13 +436,34 @@
         <span class="back-btn" id="exit-studio-play-btn">‹</span>
         <span id="studio-play-title">剧本名称</span>
         <div class="header-actions">
+          <span class="action-btn" id="studio-pause-play-btn">暂存</span>
           <span class="action-btn" id="reroll-studio-play-btn">刷新</span>
         </div>
+      </div>
+      <div id="studio-play-hud" class="studio-play-hud" hidden>
+        <div class="studio-hud-main">
+          <span id="studio-scene-label">开场</span>
+          <span id="studio-turn-label">第 0 回合</span>
+        </div>
+        <div class="studio-progress-track" aria-label="剧情进度">
+          <span id="studio-progress-bar"></span>
+        </div>
+        <div id="studio-state-chips" class="studio-state-chips"></div>
       </div>
       <div id="studio-play-messages" class="chat-messages">
         <!-- 演绎过程将由JS动态生成在这里 -->
       </div>
       <div id="studio-play-input-area" class="chat-input-area">
+        <div id="studio-suggestion-list" class="studio-suggestion-list" aria-label="行动建议"></div>
+        <div class="studio-action-strip" aria-label="行动类型">
+          <button type="button" data-studio-action="说">说</button>
+          <button type="button" data-studio-action="做">做</button>
+          <button type="button" data-studio-action="观察">观察</button>
+          <button type="button" data-studio-action="使用">使用</button>
+          <button type="button" data-studio-action="悄悄话">悄悄话</button>
+          <button type="button" data-studio-action="戏外">戏外聊聊</button>
+          <button type="button" data-studio-action="命运骰">命运骰</button>
+        </div>
         <div class="chat-input-main-row">
           <textarea
             id="studio-play-input"
@@ -402,123 +477,6 @@
       </div>
     </div>
 
-    <!-- 4. 角色选择模态框 -->
-    <div id="studio-role-selection-modal" class="modal">
-      <div class="modal-content" style="height: auto">
-        <div class="modal-header">
-          <span>选择角色与身份</span>
-        </div>
-        <div class="modal-body">
-          <!-- 角色1 -->
-          <div class="form-group">
-            <label>人物1</label>
-            <p id="studio-role1-desc" class="role-description"></p>
-            <!-- 新增：由谁扮演 -->
-            <div class="player-selection-group">
-              <label
-                ><input type="radio" name="player-role1" value="user" checked />
-                由我扮演</label
-              >
-              <label
-                ><input type="radio" name="player-role1" value="ai" />
-                由AI扮演</label
-              >
-            </div>
-            <!-- 修改：下拉框现在只选择身份 -->
-            <label
-              style="
-                font-size: 13px;
-                color: var(--text-secondary);
-                margin-top: 10px;
-              "
-              >使用此身份:</label
-            >
-            <select id="studio-role1-identity-select"></select>
-          </div>
-
-          <hr style="opacity: 0.2; margin: 15px 0" />
-
-          <!-- 角色2 -->
-          <div class="form-group">
-            <label>人物2</label>
-            <p id="studio-role2-desc" class="role-description"></p>
-            <!-- 新增：由谁扮演 -->
-            <div class="player-selection-group">
-              <label
-                ><input type="radio" name="player-role2" value="user" />
-                由我扮演</label
-              >
-              <label
-                ><input type="radio" name="player-role2" value="ai" />
-                由AI扮演</label
-              >
-            </div>
-            <!-- 修改：下拉框现在只选择身份 -->
-            <label
-              style="
-                font-size: 13px;
-                color: var(--text-secondary);
-                margin-top: 10px;
-              "
-              >使用此身份:</label
-            >
-            <select id="studio-role2-identity-select"></select>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button class="cancel" id="cancel-role-selection-btn">取消</button>
-          <button class="save" id="confirm-role-selection-btn">进入剧本</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 5. 演绎成功/结束模态框 -->
-    <div id="studio-summary-modal" class="modal">
-      <div class="modal-content" style="height: auto; max-height: 80%">
-        <div class="modal-header">
-          <span id="studio-summary-title">演绎成功！</span>
-        </div>
-        <div
-          class="modal-body"
-          id="studio-summary-content"
-          style="white-space: pre-wrap; line-height: 1.7"
-        >
-          <!-- 故事目标和总结将显示在这里 -->
-        </div>
-        <div class="modal-footer">
-          <button class="cancel" id="generate-novel-btn">生成小说</button>
-          <button class="save" id="close-studio-summary-btn">关闭</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 6. 小说分享模态框 -->
-    <div id="studio-novel-share-modal" class="modal">
-      <div class="modal-content" style="height: 80%">
-        <div class="modal-header">
-          <span>生成的小说</span>
-        </div>
-        <div
-          class="modal-body"
-          id="studio-novel-content"
-          style="
-            white-space: pre-wrap;
-            line-height: 1.7;
-            text-align: left;
-            background: #f9f9f9;
-            padding: 15px;
-            border-radius: 8px;
-          "
-        >
-          <!-- 小说内容将由JS动态生成在这里 -->
-        </div>
-        <div class="modal-footer">
-          <button class="cancel" id="share-novel-btn">分享给角色</button>
-          <button class="save" id="close-novel-share-btn">关闭</button>
-        </div>
-      </div>
-    </div>
-
     <!-- 小剧场 - 故事记录屏幕 -->
     <div id="studio-history-screen" class="screen">
       <div class="header">
@@ -527,8 +485,41 @@
         <span style="width: 30px"></span>
         <!-- 占位符 -->
       </div>
+      <div class="studio-history-tools">
+        <input id="studio-history-search" type="search" placeholder="搜索故事或参与者" />
+        <select id="studio-history-filter" aria-label="筛选故事状态">
+          <option value="">全部记录</option>
+          <option value="completed">已完成</option>
+          <option value="ended">中途结束</option>
+          <option value="playing">进行中</option>
+          <option value="deleted">回收站</option>
+        </select>
+      </div>
       <div id="studio-history-list" class="list-container">
         <!-- 故事记录列表将由JS动态生成在这里 -->
+      </div>
+    </div>
+
+    <div id="studio-history-detail-modal" class="modal">
+      <div class="modal-content studio-history-detail-content">
+        <div class="modal-header">
+          <span id="studio-history-detail-title">故事详情</span>
+        </div>
+        <div class="modal-body">
+          <div id="studio-history-detail-meta" class="studio-history-detail-meta"></div>
+          <div class="studio-history-tabs" role="tablist">
+            <button type="button" data-studio-history-tab="story" class="active">作品</button>
+            <button type="button" data-studio-history-tab="transcript">原始演绎</button>
+            <button type="button" data-studio-history-tab="choices">关键选择</button>
+            <button type="button" data-studio-history-tab="branches">刷新分支</button>
+          </div>
+          <div id="studio-history-detail-body" class="studio-history-detail-body"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="studio-history-restore-btn" hidden>恢复记录</button>
+          <button class="cancel" id="studio-history-replay-btn">重新演绎</button>
+          <button class="save" id="studio-history-detail-close-btn">关闭</button>
+        </div>
       </div>
     </div>
 

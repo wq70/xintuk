@@ -69,6 +69,29 @@
               console.log(`为旧角色 "${chat.name}" 补全了微博设置属性。`);
             }
 
+            // 单聊附加内容默认关闭；只补缺失字段，不覆盖用户已有选择。
+            if (!chat.isGroup) {
+              const savedFeatures = chat.settings.singleChatFeatures || {};
+              const normalizedFeatures = {
+                innerVoice: savedFeatures.innerVoice === true,
+                qzone: savedFeatures.qzone === true,
+                weibo: savedFeatures.weibo === true,
+                forum: savedFeatures.forum === true,
+                loversSpace: savedFeatures.loversSpace === true,
+              };
+              if (
+                !chat.settings.singleChatFeatures ||
+                Object.keys(normalizedFeatures).some(
+                  (key) =>
+                    chat.settings.singleChatFeatures[key] !==
+                    normalizedFeatures[key],
+                )
+              ) {
+                chat.settings.singleChatFeatures = normalizedFeatures;
+                needsUpdate = true;
+              }
+            }
+
             if (!chat.musicData) chat.musicData = { totalTime: 0 };
             if (
               chat.settings &&
@@ -393,13 +416,26 @@
             minimaxGroupId: "",
             minimaxApiKey: "",
             minimaxProvider: "cn",
-            minimaxSpeechModel: "speech-01-turbo",
+            minimaxSpeechModel: "speech-2.8-turbo",
             pollinationsApiKey: "", // <--- 新增这一行
+            pollinationsModel: "flux",
+            pollinationsWidth: 1024,
+            pollinationsHeight: 1024,
+            pollinationsSeed: -1,
+            pollinationsQuality: "medium",
+            pollinationsLegacyFallback: true,
+            minimaxAudioFormat: "mp3",
+            minimaxSampleRate: 32000,
+            minimaxBitrate: 128000,
+            minimaxChannel: 1,
           };
 
           // 兼容旧数据，如果加载的设置里没有温度，也给一个默认值
           if (typeof state.apiConfig.temperature === "undefined") {
             state.apiConfig.temperature = 0.8;
+          }
+          if (window.ApiGenerationParams) {
+            window.ApiGenerationParams.normalizeApiConfig(state.apiConfig);
           }
 
           state.globalSettings = globalSettings || {
@@ -412,6 +448,7 @@
             lockscreenWallpaper: "linear-gradient(135deg, #764ba2, #667eea)",
             password: "",
             fontUrl: "",
+            fontPresetId: "",
             enableBackgroundActivity: false,
             backgroundActivityInterval: 60,
             blockCooldownHours: 1,
@@ -450,6 +487,19 @@
           if (!state.globalSettings.appLabels) {
             state.globalSettings.appLabels = {};
           }
+          if (
+            typeof state.globalSettings.worldBookEngineEnabled === "undefined"
+          ) {
+            state.globalSettings.worldBookEngineEnabled = true;
+          }
+          if (!Number.isFinite(state.globalSettings.worldBookTokenBudget)) {
+            state.globalSettings.worldBookTokenBudget = 4096;
+          }
+          if (
+            typeof state.globalSettings.worldBookIncludeNames === "undefined"
+          ) {
+            state.globalSettings.worldBookIncludeNames = true;
+          }
 
           if (
             typeof state.globalSettings.imageCompressionQuality === "undefined"
@@ -474,7 +524,11 @@
           state.userStickers = userStickers || [];
           userStickerCategories = localUserStickerCategories || [];
           state.charStickers = charStickers || [];
-          state.worldBooks = worldBooks || [];
+          state.worldBooks = (worldBooks || []).map((book) =>
+            window.TukWorldBook
+              ? window.TukWorldBook.normalizeBook(book)
+              : book,
+          );
           currentDatingScenes = datingScenes || [];
           // 加载播放列表并注入“隐形”保活音频
           window.state.musicState.playlist = musicLib?.playlist || [];

@@ -293,6 +293,19 @@
               ></textarea>
             </div>
 
+            <div class="form-group" data-single-chat-features-group>
+              <div class="moe-divider"></div>
+              <label>AI 附加内容</label>
+              <p style="font-size:12px;color:#999;margin:4px 0 8px">默认关闭；开启后才向角色提供对应提示词和内容。</p>
+              <div class="moe-details-box" style="padding: 4px 12px">
+                <label class="toggle-switch-label single-feature-toggle"><span class="toggle-switch-text">生成心声</span><input type="checkbox" data-single-feature="innerVoice"><span class="toggle-switch-slider"></span></label>
+                <label class="toggle-switch-label single-feature-toggle"><span class="toggle-switch-text">互动动态</span><input type="checkbox" data-single-feature="qzone"><span class="toggle-switch-slider"></span></label>
+                <label class="toggle-switch-label single-feature-toggle"><span class="toggle-switch-text">互动微博</span><input type="checkbox" data-single-feature="weibo"><span class="toggle-switch-slider"></span></label>
+                <label class="toggle-switch-label single-feature-toggle"><span class="toggle-switch-text">互动小组论坛</span><input type="checkbox" data-single-feature="forum"><span class="toggle-switch-slider"></span></label>
+                <label class="toggle-switch-label single-feature-toggle"><span class="toggle-switch-text">互动情侣空间</span><input type="checkbox" data-single-feature="loversSpace"><span class="toggle-switch-slider"></span></label>
+              </div>
+            </div>
+
             <!-- 关联设定 -->
             <div class="moe-divider"></div>
             <div class="form-group" id="world-book-link-group">
@@ -528,6 +541,17 @@
               </div>
             </div>
 
+            <div class="form-group tuk-memory-center-entry-row">
+              <button
+                type="button"
+                id="open-memory-center-btn"
+                class="moe-btn-secondary tuk-memory-center-entry"
+              >
+                长期记忆中心
+                <span>文字 · 向量 · 表格</span>
+              </button>
+            </div>
+
             <!-- 续火花 -->
             <div class="form-group" id="streak-settings-section">
               <label class="toggle-switch-label">
@@ -629,21 +653,11 @@
 
             <div class="form-group">
               <label class="toggle-switch-label">
-                <span class="toggle-switch-text">实时时间感知</span>
+                <span class="toggle-switch-text">向角色提供时间上下文</span>
                 <input type="checkbox" id="time-perception-toggle" checked />
                 <span class="toggle-switch-slider"></span>
               </label>
-              <div
-                id="custom-time-container"
-                style="display: none; margin-top: 5px"
-              >
-                <label>自定义时间</label>
-                <input
-                  type="datetime-local"
-                  id="custom-time-input"
-                  class="moe-input"
-                />
-              </div>
+              <div id="time-context-settings-host"></div>
             </div>
           </div>
 
@@ -660,7 +674,12 @@
                 id="minimax-voice-id-input"
                 class="moe-input"
                 placeholder="例如：male-01"
+                list="minimax-voice-options"
               />
+              <datalist id="minimax-voice-options"></datalist>
+              <button type="button" id="preview-character-voice-btn" class="moe-btn-small media-inline-button">
+                试听当前音色
+              </button>
             </div>
 
             <div class="form-group" id="minimax-language-boost-group">
@@ -736,6 +755,42 @@
                 value="1.0"
                 class="moe-slider"
               />
+            </div>
+
+            <div id="minimax-character-advanced" class="media-character-audio-settings">
+              <div class="media-settings-grid">
+                <div class="form-group">
+                  <label>音量: <span id="minimax-volume-value">1.0</span></label>
+                  <input type="range" id="minimax-volume-slider" min="0.1" max="10" step="0.1" value="1" class="moe-slider" />
+                </div>
+                <div class="form-group">
+                  <label>音高: <span id="minimax-pitch-value">0</span></label>
+                  <input type="range" id="minimax-pitch-slider" min="-12" max="12" step="1" value="0" class="moe-slider" />
+                </div>
+              </div>
+              <div class="form-group">
+                <label>语音情绪</label>
+                <select id="minimax-emotion-select" class="moe-input">
+                  <option value="">自动/默认</option>
+                  <option value="happy">开心</option>
+                  <option value="sad">悲伤</option>
+                  <option value="angry">生气</option>
+                  <option value="fearful">恐惧</option>
+                  <option value="disgusted">厌恶</option>
+                  <option value="surprised">惊讶</option>
+                  <option value="calm">平静</option>
+                  <option value="fluent">流畅</option>
+                  <option value="whisper">耳语</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>角色发音词典</label>
+                <textarea id="minimax-pronunciation-dict" class="moe-input media-textarea" rows="2" placeholder="每行一个：原词/读音"></textarea>
+              </div>
+              <div class="media-inline-toggles">
+                <label><input type="checkbox" id="minimax-sound-tags-enabled" checked /> 保留笑声/呼吸等标签</label>
+                <label><input type="checkbox" id="minimax-inline-pronunciation-enabled" checked /> 保留拼音/IPA/粤拼</label>
+              </div>
             </div>
 
             <div class="form-group" id="video-call-settings-group">

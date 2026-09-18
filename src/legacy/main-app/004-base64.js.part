@@ -28,17 +28,7 @@
 
         const projectStorage = {
           getItem(key) {
-            const scopedKey = getScopedStorageKey(key);
-            const scopedValue = localStorage.getItem(scopedKey);
-            if (scopedValue !== null) return scopedValue;
-            if (localStorage.getItem(getScopedStorageKey("__cleared__")) === "true") {
-              return null;
-            }
-
-            // 仅在新命名空间中尚无值时兼容读取旧键，并立即复制，保留用户原有设置。
-            const legacyValue = localStorage.getItem(key);
-            if (legacyValue !== null) localStorage.setItem(scopedKey, legacyValue);
-            return legacyValue;
+            return localStorage.getItem(getScopedStorageKey(key));
           },
           setItem(key, value) {
             localStorage.setItem(getScopedStorageKey(key), value);
@@ -163,7 +153,7 @@
         // 动态初始化数据库函数
         async function initDatabase(userId) {
           db = new Dexie(getProjectDatabaseName(userId));
-          db.version(63).stores({
+          db.version(66).stores({
             // 版本号从 51 升级到 52
             chats:
               "&id, isGroup, groupId, ownerId, isPinned, characterPhoneData, latestInnerVoice, innerVoiceHistory, loversSpaceData.emotionDiaries, settings.summary, settings.weiboNickname, settings.innerVoiceHideHeaderBorder, settings.innerVoiceAdopterLabelFormat, interactionStats, unlockedSymbols, settings.selectedIntimacyBadge",
@@ -219,6 +209,8 @@
             elemeOrders: "++id, recipientId, timestamp",
             studioScripts: "++id, name",
             studioHistory: "++id, timestamp",
+            studioSessions: "&id, status, updatedAt, scriptId, aiChatId",
+            studioMemories: "&id, aiChatId, createdAt, sessionId",
             tukeyAccounts: "++id, category, type", // 这是你已有的，保持不变
             tukeyAccountingGroups: "&id", // 记账群聊设置 (id, name, members, replySettings)
             tukeyAccountingRecords:
@@ -237,10 +229,21 @@
             mcpTasks: "&id, connectionId, status, updatedAt",
             mcpApprovals: "&id, connectionId, toolName, scope, updatedAt",
             mcpSettings: "&id",
+            memorySettings: "&id, chatId, updatedAt",
+            memoryVectors: "&id, chatId, sourceType, timestamp, provider, contentHash",
+            memoryFacts: "&id, chatId, status, category, updatedAt, [chatId+status]",
+            memoryRecallLogs: "&id, chatId, timestamp, mode",
+            promptSettings: "&id, updatedAt",
+            promptItems: "&id, featureId, kind, updatedAt",
+            promptPresets: "&id, name, updatedAt",
+            promptBindings: "&id, scopeType, scopeId, featureId",
+            promptDiagnostics: "++id, timestamp, featureId",
           });
           window.db = db;
           await db.open();
-          await migrateLegacyDatabaseIfNeeded(userId);
+          // 不再自动读取通用的 GeminiChatDB。该数据库可能属于同源运行的
+          // xinyuan330 或其他项目；世界书等旧数据只能由用户在诊断工具中
+          // 主动选择并确认后，以只读副本的方式导入。
           console.log(`[System] 已加载用户 ${userId} 的独立数据库`);
         }
         // === 修改结束 ===
@@ -337,198 +340,410 @@
           const newTheme = toggleSwitch.checked ? "dark" : "light";
           applyTheme(newTheme);
         }
-        /**
-         * 【全新】在应用启动时，预加载所有已保存的字体预设
-         */
-        async function loadAllFontPresetsOnStartup() {
-          console.log("正在预加载所有字体预设...");
+        const fontPresetFaces = new Map();
+        let fontPreviewObserver = null;
+
+        function getSortedFontPresets(presets) {
+          return [...(presets || [])].sort((a, b) => {
+            const orderA = Number.isFinite(a.sortOrder) ? a.sortOrder : Infinity;
+            const orderB = Number.isFinite(b.sortOrder) ? b.sortOrder : Infinity;
+            return orderA - orderB || (a.createdAt || 0) - (b.createdAt || 0) ||
+              String(a.id).localeCompare(String(b.id));
+          });
+        }
+
+        function inferFontSourceType(url) {
+          return String(url || "").startsWith("data:") ? "local" : "url";
+        }
+
+        function inferFontFormat(value) {
+          const source = String(value || "").toLowerCase().split(/[?#]/)[0];
+          const match = source.match(/\.(woff2|woff|ttf|otf)$/);
+          return match ? match[1].toUpperCase() : "字体文件";
+        }
+
+        function formatFontSize(bytes) {
+          if (!Number.isFinite(bytes) || bytes <= 0) return "大小未知";
+          if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+          return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+        }
+
+        function escapeFontMarkup(value) {
+          return String(value ?? "")
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#39;");
+        }
+
+        function getFontFamilyName(id) {
+          const value = String(id);
+          let hash = 2166136261;
+          for (let index = 0; index < value.length; index += 1) {
+            hash ^= value.charCodeAt(index);
+            hash = Math.imul(hash, 16777619);
+          }
+          return `user-font-${(hash >>> 0).toString(36)}`;
+        }
+
+        async function loadFontFace(preset, forceReload = false) {
+          if (!preset?.url) throw new Error("字体来源为空");
+          const key = String(preset.id);
+          if (!forceReload && fontPresetFaces.has(key)) {
+            return fontPresetFaces.get(key);
+          }
+          const family = getFontFamilyName(key);
+          const face = new FontFace(family, `url(${JSON.stringify(preset.url)})`);
+          const timeout = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("字体加载超时，请检查链接或网络")), 15000),
+          );
+          const loadedFace = await Promise.race([face.load(), timeout]);
+          document.fonts.add(loadedFace);
+          const result = { face: loadedFace, family };
+          fontPresetFaces.set(key, result);
+          return result;
+        }
+
+        async function migrateFontPresetMetadata() {
           const presets = await db.fontPresets.toArray();
-          if (presets && presets.length > 0) {
-            presets.forEach((preset) => {
-              // 我们复用已有的 loadFontForPreview 函数来加载每个字体
-              loadFontForPreview(preset);
-            });
-            console.log(`成功预加载了 ${presets.length} 个字体。`);
+          const sorted = getSortedFontPresets(presets);
+          const updates = [];
+          sorted.forEach((preset, index) => {
+            const migrated = { ...preset };
+            let changed = false;
+            if (!Number.isFinite(migrated.sortOrder)) {
+              migrated.sortOrder = index;
+              changed = true;
+            }
+            if (!migrated.sourceType) {
+              migrated.sourceType = inferFontSourceType(migrated.url);
+              changed = true;
+            }
+            if (!migrated.format) {
+              migrated.format = inferFontFormat(migrated.url);
+              changed = true;
+            }
+            if (!migrated.createdAt) {
+              const timestamp = Number(String(migrated.id).match(/\d+/)?.[0]);
+              migrated.createdAt = Number.isFinite(timestamp) ? timestamp : Date.now() + index;
+              changed = true;
+            }
+            if (changed) updates.push(migrated);
+          });
+          if (updates.length) await db.fontPresets.bulkPut(updates);
+        }
+
+        async function loadAllFontPresetsOnStartup() {
+          await migrateFontPresetMetadata();
+          let activeId = state.globalSettings?.fontPresetId;
+          const presets = await db.fontPresets.toArray();
+          const storedActive = activeId ? await db.fontPresets.get(activeId) : null;
+          if (!storedActive && state.globalSettings?.fontUrl) {
+            const matched = presets.find((preset) => preset.url === state.globalSettings.fontUrl);
+            if (matched) {
+              activeId = matched.id;
+              state.globalSettings.fontPresetId = matched.id;
+              await db.globalSettings.put(state.globalSettings);
+            }
+          }
+          if (activeId) {
+            const activePreset = await db.fontPresets.get(activeId);
+            if (activePreset) await loadFontFace(activePreset).catch(() => null);
           }
         }
 
-        /**
-         * 渲染字体预设的10个卡槽
-         */
+        function createFontButton(label, className, presetId, handler, disabled = false) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = `preset-btn ${className}`.trim();
+          button.textContent = label;
+          button.dataset.presetId = String(presetId);
+          button.disabled = disabled;
+          button.onclick = handler;
+          return button;
+        }
+
         async function renderFontPresets() {
           const container = document.getElementById("font-preset-container");
-          container.innerHTML = ""; // 清空旧内容
+          if (!container) return;
+          const allPresets = getSortedFontPresets(await db.fontPresets.toArray());
+          const searchInput = document.getElementById("font-library-search");
+          const query = String(searchInput?.value || "").trim().toLocaleLowerCase();
+          const presets = query
+            ? allPresets.filter((preset) => String(preset.name || "").toLocaleLowerCase().includes(query))
+            : allPresets;
+          container.replaceChildren();
 
-          // 1. 从数据库读取所有已保存的预设，并确保它是一个数组
-          const presets = (await db.fontPresets.toArray()) || [];
-
-          // 我们不再依赖 presets 的长度来循环，而是无条件地循环10次，创建10个卡槽。
-          for (let i = 0; i < 10; i++) {
-            const slot = document.createElement("div");
-            slot.className = "font-preset-slot";
-
-            // 3. 在循环内部，再判断当前索引 i 是否在已保存的 presets 数组中有对应的数据。
-            const preset = presets[i];
-
-            if (preset) {
-              // 如果这个卡槽有数据，就渲染成“已填充”的样式
-              slot.innerHTML = `
-			                <div class="font-preview-text" data-preset-id="${preset.id}">Abc 你好</div>
-			                <div class="font-preset-info">名称: ${preset.name}</div>
-			                <div class="font-preset-actions">
-			                    <button class="preset-btn apply-btn" data-preset-id="${preset.id}">应用</button>
-			                    <button class="preset-btn delete-btn delete" data-preset-id="${preset.id}">删除</button>
-			                </div>
-			            `;
-            } else {
-              // 如果这个卡槽在数据库中没有对应的数据，就渲染成“空卡槽”的样式
-              slot.classList.add("empty");
-              slot.innerHTML = `
-			                <div class="font-preset-info">卡槽 ${i + 1} 为空</div>
-			                <div class="font-preset-actions">
-			                    <button class="preset-btn secondary upload-url-btn" data-slot-index="${i}">URL上传</button>
-			                    <button class="preset-btn secondary upload-local-btn" data-slot-index="${i}">本地上传</button>
-			                </div>
-			            `;
-            }
-            // 4. 将创建好的卡槽（无论空的还是满的）添加到容器中
-            container.appendChild(slot);
+          const count = document.getElementById("font-library-count");
+          const localBytes = allPresets.reduce((sum, preset) => sum + (Number(preset.size) || 0), 0);
+          if (count) {
+            const totalLabel = localBytes > 0
+              ? `${allPresets.length} 个 · ${formatFontSize(localBytes)}`
+              : `${allPresets.length} 个字体`;
+            count.textContent = query ? `${presets.length}/${totalLabel}` : totalLabel;
           }
 
-          // 5. 预览字体和绑定事件的逻辑保持不变
-          presets.forEach((preset) => {
-            if (preset) {
-              loadFontForPreview(preset);
+          const activeId = state.globalSettings?.fontPresetId;
+          const activePreset = activeId
+            ? allPresets.find((preset) => String(preset.id) === String(activeId))
+            : null;
+          const compatibleActivePreset = activePreset ||
+            allPresets.find((preset) => preset.url === state.globalSettings?.fontUrl);
+          const hasCompatibleCustomFont = !compatibleActivePreset && Boolean(state.globalSettings?.fontUrl);
+          const currentName = document.getElementById("font-current-name");
+          const currentStatus = document.getElementById("font-current-status");
+          if (currentName) currentName.textContent = compatibleActivePreset?.name ||
+            (hasCompatibleCustomFont ? "自定义字体" : "默认字体");
+          if (currentStatus) currentStatus.textContent = compatibleActivePreset
+            ? `${compatibleActivePreset.sourceType === "local" ? "本地字体" : "URL 字体"} · 已应用到全局`
+            : hasCompatibleCustomFont ? "旧配置兼容模式 · 已应用到全局" : "使用应用默认字体";
+
+          if (!presets.length) {
+            const empty = document.createElement("div");
+            empty.className = "font-preset-slot empty";
+            empty.textContent = query
+              ? "没有匹配的字体，请更换关键词"
+              : "字体库为空，可通过 URL 或本地文件添加";
+            container.appendChild(empty);
+          }
+
+          presets.forEach((preset, index) => {
+            const actualIndex = allPresets.findIndex((item) => String(item.id) === String(preset.id));
+            const slot = document.createElement("article");
+            slot.className = "font-preset-slot";
+
+            const preview = document.createElement("div");
+            preview.className = "font-preview-text";
+            preview.dataset.presetId = String(preset.id);
+            preview.textContent = "你好 Hello 123 · 字体预览";
+
+            const info = document.createElement("div");
+            info.className = "font-preset-info";
+            const nameRow = document.createElement("div");
+            nameRow.className = "font-preset-name-row";
+            const name = document.createElement("span");
+            name.className = "font-preset-name";
+            name.textContent = preset.name || "未命名字体";
+            name.title = name.textContent;
+            nameRow.appendChild(name);
+            if (compatibleActivePreset && String(compatibleActivePreset.id) === String(preset.id)) {
+              const badge = document.createElement("span");
+              badge.className = "font-preset-badge";
+              badge.textContent = "使用中";
+              nameRow.appendChild(badge);
             }
+            const meta = document.createElement("small");
+            meta.className = "font-preset-meta";
+            meta.textContent = `${preset.sourceType === "local" ? "本地" : "URL"} · ${preset.format || inferFontFormat(preset.url)} · ${formatFontSize(preset.size)}`;
+            info.append(nameRow, meta);
+
+            const actions = document.createElement("div");
+            actions.className = "font-preset-actions";
+            actions.append(
+              createFontButton("应用", "apply-btn", preset.id, () => applyFontPreset(preset.id), Boolean(compatibleActivePreset && String(compatibleActivePreset.id) === String(preset.id))),
+              createFontButton("重命名", "secondary rename-btn", preset.id, () => renameFontPreset(preset.id)),
+              createFontButton("上移", "secondary move-up-btn", preset.id, () => moveFontPreset(preset.id, -1), actualIndex === 0 || Boolean(query)),
+              createFontButton("下移", "secondary move-down-btn", preset.id, () => moveFontPreset(preset.id, 1), actualIndex === allPresets.length - 1 || Boolean(query)),
+              createFontButton("删除", "delete delete-btn", preset.id, () => deleteFontPreset(preset.id)),
+            );
+            slot.append(preview, info, actions);
+            container.appendChild(slot);
           });
+
+          if (fontPreviewObserver) fontPreviewObserver.disconnect();
+          if ("IntersectionObserver" in window) {
+            fontPreviewObserver = new IntersectionObserver((entries) => {
+              entries.forEach((entry) => {
+                if (!entry.isIntersecting) return;
+                const preset = allPresets.find((item) => String(item.id) === entry.target.dataset.presetId);
+                if (preset) loadFontForPreview(preset);
+                fontPreviewObserver.unobserve(entry.target);
+              });
+            }, { root: document.getElementById("font-settings-screen"), rootMargin: "120px" });
+            container.querySelectorAll(".font-preview-text").forEach((element) => fontPreviewObserver.observe(element));
+          } else {
+            presets.forEach(loadFontForPreview);
+          }
 
           addFontPresetButtonListeners();
         }
 
-        /**
-         * 为单个预设加载字体以供预览
-         * @param {object} preset - 字体预设对象 {id, name, url}
-         */
-        function loadFontForPreview(preset) {
-          const styleId = `font-style-${preset.id}`;
-          if (document.getElementById(styleId)) return;
-
-          const style = document.createElement("style");
-          style.id = styleId;
-
-          // 直接创建一条高优先级的CSS规则来应用字体
-          style.innerHTML = `
-			        @font-face {
-			            font-family: 'preset-${preset.id}';
-			            src: url('${preset.url}');
-			            font-display: swap;
-			        }
-
-			        .font-preview-text[data-preset-id="${preset.id}"] {
-			            font-family: 'preset-${preset.id}', sans-serif !important;
-			        }
-			    `;
-
-          document.head.appendChild(style);
-        }
-
-        /**
-         * 为预设卡槽中的所有按钮统一添加事件监听器
-         */
-        function addFontPresetButtonListeners() {
-          document.querySelectorAll(".upload-url-btn").forEach((btn) => {
-            btn.onclick = () =>
-              handleUploadFontUrl(parseInt(btn.dataset.slotIndex));
-          });
-          document.querySelectorAll(".upload-local-btn").forEach((btn) => {
-            btn.onclick = () =>
-              handleUploadFontLocal(parseInt(btn.dataset.slotIndex));
-          });
-          document.querySelectorAll(".apply-btn").forEach((btn) => {
-            btn.onclick = () => applyFontPreset(btn.dataset.presetId);
-          });
-          document.querySelectorAll(".delete-btn").forEach((btn) => {
-            btn.onclick = () => deleteFontPreset(btn.dataset.presetId);
-          });
-        }
-
-        /**
-         * 处理通过URL上传字体
-         * @param {number} slotIndex - 卡槽的索引 (0-4)
-         */
-        async function handleUploadFontUrl(slotIndex) {
-          const url = await showCustomPrompt(
-            "字体URL",
-            "请输入字体的网络链接(.ttf, .otf等)",
-          );
-          if (!url || !url.trim().startsWith("http")) {
-            if (url !== null) alert("请输入一个有效的URL！");
-            return;
-          }
-          const name = await showCustomPrompt(
-            "字体命名",
-            "请为这个字体起个名字",
-          );
-          if (!name || !name.trim()) {
-            if (name !== null) alert("名字不能为空！");
-            return;
-          }
-          await saveFontPreset(slotIndex, name.trim(), url.trim());
-        }
-
-        /**
-         * 处理通过本地文件上传字体
-         * @param {number} slotIndex - 卡槽的索引 (0-4)
-         */
-        function handleUploadFontLocal(slotIndex) {
-          const input = document.getElementById("font-preset-local-upload");
-          input.onchange = async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            const name = await showCustomPrompt(
-              "字体命名",
-              "请为这个字体起个名字",
-              file.name.replace(/\.[^/.]+$/, ""),
-            );
-            if (!name || !name.trim()) {
-              if (name !== null) alert("名字不能为空！");
-              return;
-            }
-
-            // 使用FileReader将字体文件转为Base64 Data URL
-            const reader = new FileReader();
-            reader.onload = async (event) => {
-              await saveFontPreset(slotIndex, name.trim(), event.target.result);
-            };
-
-            reader.readAsDataURL(file);
-          };
-          input.click(); // 触发文件选择框
-        }
-        async function saveFontPreset(slotIndex, name, url) {
+        async function loadFontForPreview(preset) {
+          const preview = [...document.querySelectorAll(".font-preview-text")]
+            .find((element) => element.dataset.presetId === String(preset.id));
+          if (!preview) return;
+          preview.dataset.loadState = "loading";
           try {
-            const presets = await db.fontPresets.toArray();
-            const newPreset = { id: "font_" + Date.now(), name, url };
-            presets.splice(slotIndex, 0, newPreset);
-
-            // 将 slice(0, 5) 修改为 slice(0, 10)
-            const presetsToSave = presets.slice(0, 10);
-
-            await db.transaction("rw", db.fontPresets, async () => {
-              await db.fontPresets.clear();
-              await db.fontPresets.bulkPut(presetsToSave);
-            });
-
-            await renderFontPresets();
-            alert(`字体 "${name}" 已成功保存到卡槽 ${slotIndex + 1}！`);
+            const { family } = await loadFontFace(preset);
+            preview.style.fontFamily = `'${family}', 'bulangni', sans-serif`;
+            preview.dataset.loadState = "loaded";
           } catch (error) {
+            preview.dataset.loadState = "failed";
+            preview.title = `加载失败：${error.message}`;
+            preview.textContent = "字体加载失败，可删除后重新添加";
+          }
+        }
+
+        function addFontPresetButtonListeners() {
+          const urlButton = document.getElementById("add-font-url-btn");
+          const localButton = document.getElementById("add-font-local-btn");
+          const searchInput = document.getElementById("font-library-search");
+          const previewInput = document.getElementById("font-preview-input");
+          if (urlButton) urlButton.onclick = handleUploadFontUrl;
+          if (localButton) localButton.onclick = handleUploadFontLocal;
+          if (searchInput) searchInput.oninput = renderFontPresets;
+          if (previewInput) previewInput.oninput = () => {
+            const heading = document.querySelector("#font-preview .font-preview-heading");
+            if (heading) heading.textContent = previewInput.value.trim() || "你好世界 Hello World 12345";
+          };
+        }
+
+        async function handleUploadFontUrl() {
+          const value = await showCustomPrompt("字体URL", "请输入字体文件的 HTTPS 或 HTTP 直链");
+          if (value === null) return;
+          let parsedUrl;
+          try {
+            parsedUrl = new URL(value.trim());
+            if (!/^https?:$/.test(parsedUrl.protocol)) throw new Error("protocol");
+          } catch (_) {
+            await showCustomAlert("无法添加字体", "请输入有效的 HTTP 或 HTTPS 字体链接。");
+            return;
+          }
+          const name = await showCustomPrompt("字体命名", "请为这个字体起个名字");
+          if (!name?.trim()) {
+            if (name !== null) await showCustomAlert("无法添加字体", "字体名称不能为空。");
+            return;
+          }
+          await saveFontPreset(name.trim(), parsedUrl.href, {
+            sourceType: "url",
+            format: inferFontFormat(parsedUrl.pathname),
+          });
+        }
+
+        function detectLocalFontFormat(buffer) {
+          const bytes = new Uint8Array(buffer.slice(0, 4));
+          const ascii = String.fromCharCode(...bytes);
+          if (ascii === "wOF2") return "WOFF2";
+          if (ascii === "wOFF") return "WOFF";
+          if (ascii === "OTTO") return "OTF";
+          if (bytes[0] === 0 && bytes[1] === 1 && bytes[2] === 0 && bytes[3] === 0) return "TTF";
+          return "";
+        }
+
+        function readFileAsDataUrl(file) {
+          return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = () => reject(reader.error || new Error("无法读取字体文件"));
+            reader.readAsDataURL(file);
+          });
+        }
+
+        function handleUploadFontLocal() {
+          const input = document.getElementById("font-preset-local-upload");
+          input.value = "";
+          input.onchange = async (event) => {
+            const file = event.target.files?.[0];
+            if (!file) return;
+            try {
+              const header = await file.slice(0, 4).arrayBuffer();
+              const format = detectLocalFontFormat(header);
+              if (!format) {
+                await showCustomAlert(
+                  "无法添加字体",
+                  "无法识别这个字体文件，请选择有效的 WOFF2、WOFF、TTF 或 OTF 文件。",
+                );
+                return;
+              }
+              if (file.size > 12 * 1024 * 1024) {
+                const confirmed = await showCustomConfirm(
+                  "字体文件较大",
+                  `这个字体约 ${formatFontSize(file.size)}，保存和加载时可能较慢。是否继续？`,
+                );
+                if (!confirmed) return;
+              }
+              const name = await showCustomPrompt(
+                "字体命名",
+                "请为这个字体起个名字",
+                escapeFontMarkup(file.name.replace(/\.[^/.]+$/, "")),
+              );
+              if (!name?.trim()) {
+                if (name !== null) await showCustomAlert("无法添加字体", "字体名称不能为空。");
+                return;
+              }
+              const dataUrl = await readFileAsDataUrl(file);
+              await saveFontPreset(name.trim(), dataUrl, {
+                sourceType: "local",
+                format,
+                size: file.size,
+              });
+            } catch (error) {
+              console.error("读取本地字体失败:", error);
+              await showCustomAlert("读取字体失败", escapeFontMarkup(error.message));
+            } finally {
+              input.value = "";
+            }
+          };
+          input.click();
+        }
+
+        async function saveFontPreset(name, url, metadata = {}) {
+          const now = Date.now();
+          const id = `font_${globalThis.crypto?.randomUUID?.() || `${now}_${Math.random().toString(36).slice(2)}`}`;
+          const count = document.getElementById("font-library-count");
+          if (count) count.textContent = "正在验证字体…";
+          try {
+            const presets = getSortedFontPresets(await db.fontPresets.toArray());
+            const newPreset = {
+              id,
+              name,
+              url,
+              sourceType: metadata.sourceType || inferFontSourceType(url),
+              format: metadata.format || inferFontFormat(url),
+              size: metadata.size || 0,
+              sortOrder: presets.length,
+              createdAt: now,
+              updatedAt: now,
+            };
+            await loadFontFace(newPreset, true);
+            await db.fontPresets.put(newPreset);
+            await renderFontPresets();
+            await showCustomAlert("字体已添加", `“${escapeFontMarkup(name)}”已添加到字体库。`);
+          } catch (error) {
+            const loaded = fontPresetFaces.get(id);
+            if (loaded?.face) document.fonts.delete(loaded.face);
+            fontPresetFaces.delete(id);
             console.error("保存字体预设失败:", error);
-            alert(
-              `保存字体失败，数据已自动回滚，你之前的字体数据是安全的。错误: ${error.message}`,
+            await showCustomAlert(
+              "字体未保存",
+              `${escapeFontMarkup(error.message)}。原有字体数据未受影响。`,
             );
             await renderFontPresets();
           }
+        }
+
+        async function renameFontPreset(presetId) {
+          const preset = await db.fontPresets.get(presetId);
+          if (!preset) return;
+          const name = await showCustomPrompt(
+            "重命名字体",
+            "请输入新的字体名称",
+            escapeFontMarkup(preset.name),
+          );
+          if (!name?.trim() || name.trim() === preset.name) return;
+          await db.fontPresets.update(presetId, { name: name.trim(), updatedAt: Date.now() });
+          await renderFontPresets();
+        }
+
+        async function moveFontPreset(presetId, direction) {
+          const presets = getSortedFontPresets(await db.fontPresets.toArray());
+          const index = presets.findIndex((preset) => String(preset.id) === String(presetId));
+          const targetIndex = index + direction;
+          if (index < 0 || targetIndex < 0 || targetIndex >= presets.length) return;
+          [presets[index], presets[targetIndex]] = [presets[targetIndex], presets[index]];
+          await db.fontPresets.bulkPut(presets.map((preset, order) => ({ ...preset, sortOrder: order })));
+          await renderFontPresets();
         }
 
         /**
@@ -540,18 +755,21 @@
           if (!preset) return;
           const confirmed = await showCustomConfirm(
             "确认删除",
-            `确定要删除字体 "${preset.name}" 吗？`,
+            "确定要删除这个字体吗？删除后无法从字体库恢复。",
             {
               confirmButtonClass: "btn-danger",
             },
           );
           if (confirmed) {
+            const isActive = String(state.globalSettings?.fontPresetId || "") === String(presetId) ||
+              (!state.globalSettings?.fontPresetId && state.globalSettings?.fontUrl === preset.url);
+            if (isActive) await resetToDefaultFont(false);
             await db.fontPresets.delete(presetId);
-
-            // 从DOM中移除对应的预览样式
-            const styleTag = document.getElementById(`font-style-${presetId}`);
-            if (styleTag) styleTag.remove();
-
+            const loaded = fontPresetFaces.get(String(presetId));
+            if (loaded?.face) document.fonts.delete(loaded.face);
+            fontPresetFaces.delete(String(presetId));
+            const remaining = getSortedFontPresets(await db.fontPresets.toArray());
+            await db.fontPresets.bulkPut(remaining.map((item, order) => ({ ...item, sortOrder: order })));
             await renderFontPresets();
           }
         }
@@ -563,12 +781,32 @@
         async function applyFontPreset(presetId) {
           const preset = await db.fontPresets.get(presetId);
           if (preset) {
-            // 调用你已有的全局字体应用函数
-            applyCustomFont(preset.url, false);
-            // 保存到全局设置
-            state.globalSettings.fontUrl = preset.url;
-            await db.globalSettings.put(state.globalSettings);
-            alert(`已将全局字体更换为 "${preset.name}"！`);
+            const applyButton = [...document.querySelectorAll(".apply-btn")]
+              .find((button) => button.dataset.presetId === String(presetId));
+            if (applyButton) {
+              applyButton.disabled = true;
+              applyButton.textContent = "加载中";
+            }
+            try {
+              await loadFontFace(preset);
+              const applied = await applyCustomFont(preset.url, false, preset.id);
+              if (!applied) throw new Error("字体无法应用");
+              state.globalSettings.fontUrl = preset.url;
+              state.globalSettings.fontPresetId = preset.id;
+              await db.globalSettings.put(state.globalSettings);
+              await renderFontPresets();
+              await showCustomAlert(
+                "字体已应用",
+                `已将全局字体更换为“${escapeFontMarkup(preset.name)}”。`,
+              );
+            } catch (error) {
+              console.error("应用字体失败:", error);
+              await showCustomAlert(
+                "字体应用失败",
+                `${escapeFontMarkup(error.message)}。当前字体保持不变。`,
+              );
+              await renderFontPresets();
+            }
           }
         }
 
@@ -802,10 +1040,26 @@
               },
               timePerceptionEnabled: true,
               customTime: "",
+              timeContext: {
+                enabled: true,
+                source: "device",
+                timeZone:
+                  window.TukTimeContext?.getDeviceTimeZone() || "UTC",
+                customTime: "",
+                gapAwareness: "precise",
+                customPrompt: "",
+              },
               isCoupleAvatar: false,
               coupleAvatarDescription: "",
               weiboProfession: "",
               weiboInstruction: "",
+              singleChatFeatures: {
+                innerVoice: false,
+                qzone: false,
+                weibo: false,
+                forum: false,
+                loversSpace: false,
+              },
               visualVideoCallEnabled: false,
               charVideoImage: "",
               userVideoImage: "",
@@ -881,7 +1135,10 @@
             console.log("检测到外层 world 字段格式，开始导入...");
             const newCategory = { name: characterName };
             const newCategoryId = await db.worldBookCategories.add(newCategory);
-            await parseAndSaveWorldBooks(data.world, newCategoryId);
+            await saveWorldBookEntriesFromArray(
+              [{ name: characterName, content: data.world, constant: true }],
+              newCategoryId,
+            );
             worldBookFound = true;
           }
 
@@ -894,7 +1151,16 @@
             console.log("检测到旧版 world_info 字段格式，开始导入...");
             const newCategory = { name: characterName };
             const newCategoryId = await db.worldBookCategories.add(newCategory);
-            await parseAndSaveWorldBooks(charData.world_info, newCategoryId);
+            await saveWorldBookEntriesFromArray(
+              [
+                {
+                  name: characterName,
+                  content: charData.world_info,
+                  constant: true,
+                },
+              ],
+              newCategoryId,
+            );
             worldBookFound = true;
           }
 
@@ -916,42 +1182,28 @@
          * @param {number} categoryId - 这些世界书所属的分类ID
          */
         async function saveWorldBookEntriesFromArray(entriesArray, categoryId) {
-          const newBooks = [];
-
-          for (const entry of entriesArray) {
-            // 优先使用 comment 字段作为标题，如果它存在且不为空。
-            // 否则，再尝试使用 keys 数组。
-            // 如果都没有，就给一个默认名字。
-            const entryName =
-              entry.comment && entry.comment.trim()
-                ? entry.comment.trim()
-                : entry.keys && entry.keys.length > 0
-                  ? entry.keys.join(", ")
-                  : "未命名条目";
-
-            // 检查条目是否有效 (有名字、有内容，并且是启用的)
-            // (typeof entry.enabled === 'undefined' || entry.enabled) 是为了兼容没有 enabled 字段的卡片
-            if (
-              entryName !== "未命名条目" &&
-              entry.content &&
-              (typeof entry.enabled === "undefined" || entry.enabled)
-            ) {
-              newBooks.push({
-                id: "wb_" + Date.now() + Math.random(),
-                name: entryName, // 使用我们智能获取到的名字
-                content: entry.content,
-                categoryId: categoryId,
-              });
-            }
-          }
-
-          if (newBooks.length > 0) {
-            await db.worldBooks.bulkAdd(newBooks);
+          const validEntries = entriesArray.filter(
+            (entry) => entry && typeof entry.content === "string" && entry.content.trim(),
+          );
+          if (validEntries.length > 0) {
+            const category = await db.worldBookCategories.get(categoryId);
+            const newBook = window.TukWorldBook.normalizeBook(
+              {
+                name: category?.name || "角色世界书",
+                categoryId,
+                content: validEntries,
+                source: { type: "character-card", importedAt: Date.now() },
+              },
+              { source: "character-card" },
+            );
+            await db.worldBooks.add(newBook);
             // 确保 state.worldBooks 也被更新，以便UI能立即显示
             const allBooks = await db.worldBooks.toArray();
-            state.worldBooks = allBooks;
+            state.worldBooks = allBooks.map((book) =>
+              window.TukWorldBook.normalizeBook(book),
+            );
             console.log(
-              `成功导入 ${newBooks.length} 个世界书条目到分类ID: ${categoryId}`,
+              `成功导入 1 本世界书和 ${validEntries.length} 个词条到分类ID: ${categoryId}`,
             );
           }
         }
@@ -994,6 +1246,9 @@
           if (screenId === "thought-chain-screen") {
             window.ThoughtChainApp?.open();
           }
+          if (screenId === "prompt-center-screen") {
+            window.PromptCenterApp?.open();
+          }
 
           document
             .querySelectorAll(".screen")
@@ -1009,7 +1264,11 @@
 
           if (screenId === "font-settings-screen") {
             document.getElementById("font-preview").style.fontFamily = "";
-            applyCustomFont(state.globalSettings.fontUrl || "", true);
+            applyCustomFont(
+              state.globalSettings.fontUrl || "",
+              true,
+              state.globalSettings.fontPresetId || "active-preview",
+            );
             renderFontPresets();
           }
         }

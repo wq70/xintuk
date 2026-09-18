@@ -44,6 +44,7 @@
                     await endListenTogetherSession(false);
                   delete state.chats[chat.id];
                   if (state.activeChatId === chat.id) state.activeChatId = null;
+                  await window.TukMemory?.deleteChatData(chat.id);
                   await db.chats.delete(chat.id);
                   await renderChatList();
                 } else {

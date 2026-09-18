@@ -1,0 +1,57 @@
+    <div id="prompt-center-screen" class="screen">
+      <div class="header pc-app-header">
+        <span class="back-btn" onclick="showScreen('home-screen')">‹</span>
+        <span>提示词中心</span>
+        <div class="pc-header-actions">
+          <button id="pc-reset-prompts-btn" class="action-button" type="button">重置</button>
+          <button id="pc-import-btn" class="action-button" type="button">导入</button>
+        </div>
+      </div>
+
+      <div class="pc-app-body">
+        <section class="pc-overview" aria-live="polite">
+          <div class="pc-overview-copy">
+            <strong id="pc-overview-title">自定义提示词已关闭</strong>
+            <span id="pc-overview-detail">所有 AI 请求保持项目原始行为</span>
+          </div>
+          <label class="pc-toggle" aria-label="自定义提示词总开关">
+            <input id="pc-master-switch" type="checkbox" />
+            <span></span>
+          </label>
+        </section>
+
+        <div class="pc-view-switch" role="tablist" aria-label="提示词中心设置">
+          <button class="active" type="button" data-pc-view="items">条目</button>
+          <button type="button" data-pc-view="features">范围</button>
+          <button type="button" data-pc-view="presets">预设</button>
+          <button type="button" data-pc-view="tools">工具</button>
+        </div>
+
+        <div id="pc-main-content" class="pc-main-content"></div>
+      </div>
+
+      <input id="pc-import-input" type="file" accept="application/json,.json" hidden />
+
+      <div id="pc-sheet-backdrop" class="pc-sheet-backdrop" aria-hidden="true">
+        <section class="pc-sheet" role="dialog" aria-modal="true" aria-labelledby="pc-sheet-title">
+          <div class="pc-sheet-header">
+            <strong id="pc-sheet-title">提示词中心</strong>
+            <button id="pc-sheet-close" class="pc-icon-button" type="button" aria-label="关闭">×</button>
+          </div>
+          <div id="pc-sheet-body" class="pc-sheet-body"></div>
+          <div id="pc-sheet-actions" class="pc-sheet-actions"></div>
+        </section>
+      </div>
+
+      <div id="pc-picker-backdrop" class="pc-picker-backdrop" aria-hidden="true">
+        <section class="pc-picker" role="dialog" aria-modal="true" aria-labelledby="pc-picker-title">
+          <div class="pc-picker-header">
+            <strong id="pc-picker-title">选择范围</strong>
+            <button id="pc-picker-close" class="pc-icon-button" type="button" aria-label="关闭">×</button>
+          </div>
+          <div id="pc-picker-options" class="pc-picker-options"></div>
+        </section>
+      </div>
+
+      <div id="pc-toast" class="pc-toast" role="status" aria-live="polite"></div>
+    </div>

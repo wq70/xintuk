@@ -314,6 +314,8 @@
             ><textarea id="member-persona-input" rows="4"></textarea>
           </div>
 
+          <div id="member-time-settings-host"></div>
+
           <div class="form-group">
             <label>头像</label>
             <div class="avatar-upload">
@@ -756,6 +758,50 @@
             </div>
           </div>
 
+          <div class="media-nai-advanced-section">
+            <div class="settings-section-title">构图与模型能力</div>
+            <div class="media-settings-grid">
+              <div class="form-group">
+                <label>噪声调度</label>
+                <select id="nai-noise-schedule" class="moe-input">
+                  <option value="karras">Karras</option>
+                  <option value="native">Native</option>
+                  <option value="exponential">Exponential</option>
+                  <option value="polyexponential">Polyexponential</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>CFG Rescale</label>
+                <input id="nai-cfg-rescale" class="moe-input" type="number" min="0" max="1" step="0.05" value="0" />
+              </div>
+            </div>
+            <div class="media-inline-toggles">
+              <label><input type="checkbox" id="nai-transparent-bg" /> V5 透明背景</label>
+              <label><input type="checkbox" id="nai-furry-mode" /> Furry 模式</label>
+              <label><input type="checkbox" id="nai-background-mode" /> 无人物背景模式</label>
+            </div>
+            <div class="form-group">
+              <label>角色独立提示词（每行一个角色）</label>
+              <textarea id="nai-character-prompts" class="moe-input media-textarea" rows="3" placeholder="角色1提示词&#10;角色2提示词"></textarea>
+            </div>
+          </div>
+
+          <div class="media-nai-advanced-section">
+            <div class="settings-section-title">Vibe 氛围组与参考图</div>
+            <p class="media-help-text">支持图片素材、本项目氛围组 JSON 的导入导出；无法解析的原生 Vibe 文件会原样保管并随氛围组导出，不会冒充已生效素材。</p>
+            <input id="nai-vibe-file-input" type="file" accept="image/png,image/jpeg,image/webp,.json,.naiv4vibe,.naiv4vibeBundle" multiple hidden />
+            <div class="moe-btn-group media-compact-actions">
+              <button type="button" id="nai-import-vibes-btn" class="moe-btn-secondary">导入 Vibe/图片</button>
+              <button type="button" id="nai-export-vibes-btn" class="moe-btn-secondary">导出氛围组</button>
+              <button type="button" id="nai-clear-vibes-btn" class="moe-btn-secondary">清空当前组</button>
+            </div>
+            <div id="nai-vibe-list" class="media-vibe-list" aria-live="polite"></div>
+            <div class="media-inline-toggles">
+              <label><input type="checkbox" id="nai-normalize-vibes" checked /> 自动归一化强度</label>
+            </div>
+            <p id="nai-reference-compatibility-note" class="media-help-text"></p>
+          </div>
+
           <div class="form-group">
             <label style="color: #333">默认正面提示词</label>
             <textarea
@@ -819,9 +865,9 @@ lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer
                 border-radius: 4px;
               "
             >
-              <option value="">❌ 直连（无代理）</option>
-              <option value="https://corsproxy.io/?" selected>
-                ✅ corsproxy.io（推荐）
+              <option value="" selected>✅ 直连（推荐）</option>
+              <option value="https://corsproxy.io/?">
+                corsproxy.io（兼容旧配置）
               </option>
               <option value="https://api.allorigins.win/raw?url=">
                 allorigins.win
@@ -832,7 +878,7 @@ lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer
               <option value="custom">自定义代理</option>
             </select>
             <small style="color: #e74c3c; display: block; margin-top: 8px">
-              ⚠️ 本地运行会遇到CORS跨域问题，需使用代理。推荐使用 corsproxy.io
+              ⚠️ 公共代理能够读取请求中的 API Key，仅为旧配置兼容保留。建议直连或使用自己的可信代理。
             </small>
           </div>
 

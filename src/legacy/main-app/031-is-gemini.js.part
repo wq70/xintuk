@@ -33,7 +33,7 @@
                             `;
             console.log("prompt:", prompt);
             const { proxyUrl, apiKey, model } = state.apiConfig;
-            let isGemini = proxyUrl === GEMINI_API_URL;
+            let isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
             let geminiConfig = toGeminiRequestData(
               model,
               apiKey,
@@ -53,7 +53,7 @@
                   body: JSON.stringify({
                     model: model,
                     messages: [{ role: "user", content: prompt }],
-                    temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+                    ...window.ApiGenerationParams.current(),
                   }),
                 });
 
@@ -364,20 +364,9 @@
               "用于生成手机数据的互通聊天记录上下文:",
               linkedMemoryContext,
             );
-            let worldBookContext = "";
-            if (
-              chat.settings.linkedWorldBookIds &&
-              chat.settings.linkedWorldBookIds.length > 0
-            ) {
-              worldBookContext =
-                "--- 世界观设定 (必须严格遵守) ---\n" +
-                chat.settings.linkedWorldBookIds
-                  .map((id) => {
-                    const book = state.worldBooks.find((b) => b.id === id);
-                    return book ? `[${book.name}]: ${book.content}` : "";
-                  })
-                  .join("\n\n");
-            }
+            let worldBookContext = window.TukWorldBook.buildForChat(chat, {
+              generationType: "quiet",
+            });
             const npcLibrary = chat.npcLibrary || [];
             let npcContext = "";
             if (npcLibrary.length > 0) {
@@ -501,7 +490,7 @@
 			`;
 
             const { proxyUrl, apiKey, model } = state.apiConfig;
-            let isGemini = proxyUrl === GEMINI_API_URL;
+            let isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
             let geminiConfig = toGeminiRequestData(
               model,
               apiKey,
@@ -521,7 +510,7 @@
                   body: JSON.stringify({
                     model: model,
                     messages: [{ role: "user", content: prompt }],
-                    temperature: parseFloat(state.apiConfig.temperature) || 0.8,
+                    ...window.ApiGenerationParams.current(),
                   }),
                 });
 

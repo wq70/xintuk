@@ -83,84 +83,16 @@
             }
             // --- 红包状态播报模块结束 ---
 
-            let now;
-            // 2. 检查时间感知开关是否打开 (北京时间转换逻辑)
-            if (chat.settings.timePerceptionEnabled ?? true) {
-              // 开关打开，使用真实的北京时间
-              const localNow = new Date();
-              const utcMilliseconds =
-                localNow.getTime() + localNow.getTimezoneOffset() * 60000;
-              const beijingMilliseconds = utcMilliseconds + 3600000 * 8;
-              now = new Date(beijingMilliseconds);
-            } else {
-              // 开关关闭，尝试使用自定义时间
-              if (chat.settings.customTime) {
-                now = new Date(chat.settings.customTime);
-              } else {
-                // 如果自定义时间为空，则安全地退回到真实的北京时间
-                const localNow = new Date();
-                const utcMilliseconds =
-                  localNow.getTime() + localNow.getTimezoneOffset() * 60000;
-                const beijingMilliseconds = utcMilliseconds + 3600000 * 8;
-                now = new Date(beijingMilliseconds);
-              }
-            }
+            const resolvedTimeContext = window.TukTimeContext?.buildContext({
+              chat,
+              state,
+              mode: "chat",
+            }) || { prompt: "", character: null, user: null };
+            const timeContext = resolvedTimeContext.prompt;
 
-            // 3. 后续的时间差计算逻辑 (这部分保持不变)
-            const currentTime = now.toLocaleString("zh-CN", {
-              dateStyle: "full",
-              timeStyle: "short",
+            let worldBookContent = window.TukWorldBook.buildForChat(chat, {
+              generationType: "normal",
             });
-            let timeContext = `\n- **当前时间**: ${currentTime}`;
-            const lastAiMessage = historySlice
-              .filter((m) => m.role === "assistant" && !m.isHidden)
-              .slice(-1)[0];
-
-            if (lastAiMessage) {
-              const lastTime = new Date(lastAiMessage.timestamp);
-              const realNow = new Date();
-              const diffMinutes = Math.floor(
-                (realNow - lastTime) / (1000 * 60),
-              );
-
-              if (diffMinutes < 5) {
-                timeContext += "\n- **对话状态**: 你们的对话刚刚还在继续。";
-              } else if (diffMinutes < 60) {
-                timeContext += `\n- **对话状态**: 你们在${diffMinutes}分钟前聊过。`;
-              } else {
-                const diffHours = Math.floor(diffMinutes / 60);
-                if (diffHours < 24) {
-                  timeContext += `\n- **对话状态**: 你们在${diffHours}小时前聊过。`;
-                } else {
-                  const diffDays = Math.floor(diffHours / 24);
-                  timeContext += `\n- **对话状态**: 你们已经有${diffDays}天没有聊天了。`;
-                }
-              }
-            } else {
-              timeContext += "\n- **对话状态**: 这是你们的第一次对话。";
-            }
-
-            let worldBookContent = "";
-            if (
-              chat.settings.linkedWorldBookIds &&
-              chat.settings.linkedWorldBookIds.length > 0
-            ) {
-              const linkedContents = chat.settings.linkedWorldBookIds
-                .map((bookId) => {
-                  const worldBook = state.worldBooks.find(
-                    (wb) => wb.id === bookId,
-                  );
-
-                  return worldBook && worldBook.content
-                    ? `\n\n## 世界书: ${worldBook.name}\n${stripHtmlAndCode(worldBook.content)}`
-                    : "";
-                })
-                .filter(Boolean)
-                .join("");
-              if (linkedContents) {
-                worldBookContent = `\n\n# 核心世界观设定 (必须严格遵守以下所有设定)，里面可能会包含HTML小剧场，在捕获到关键词后输出\n${linkedContents}\n`;
-              }
-            }
             let musicContext = "";
             const countdownContext = await getCountdownContext(chatId); // <--- 把chatId传进去
             const streakContext = await getStreakContext(chat);
@@ -323,7 +255,7 @@
             );
 
             // 如果找到了
-            if (repostMessage) {
+            if (singleChatFeatures.forum && repostMessage) {
               const payload = repostMessage.payload;
               // 就为AI准备一段专属指令
               repostContext = `
@@ -390,7 +322,7 @@
 			# 群成员列表及人设 (name字段是你要使用的【本名】)
 			${chat.members.map((m) => `- **${m.originalName}**: (群昵称为: ${m.groupNickname}) 人设: ${m.persona}`).join("\n")}
 			6.  **禁止出戏**: 绝不能透露你是AI、模型，或提及“扮演”、“生成”等词语。并且不能一直要求和用户见面，这是线上聊天，决不允许出现或者发展线下剧情！！
-			7.  **情景感知**: 注意当前时间是 ${currentTime}。
+			${timeContext ? `7.  **情景感知**: 请遵守下方时间上下文，不要混淆用户和群成员的当地时间。` : ""}
 			8.  **红包互动**:
 			    - **抢红包**: 当群里出现红包时，你可以根据自己的性格决定是否使用 \`open_red_packet\` 指令去抢。在这个世界里，发红包的人自己也可以参与抢红包，这是一种活跃气氛的有趣行为！
 			    - **【【【重要：对结果做出反应】】】**: 当你执行抢红包指令后，系统会通过一条隐藏的 \`[系统提示：你抢到了XX元...]\` 来告诉你结果。你【必须】根据你抢到的金额、以及系统是否告知你“手气王”是谁，来发表符合你人设的评论。例如，抢得少可以自嘲，抢得多可以炫耀，看到别人是手气王可以祝贺或嫉妒。
@@ -463,12 +395,14 @@
 			${summaryContext}
 			${announcementContext}
 			${redPacketContext}
+			${timeContext}
 			${worldBookContent}
 			${musicContext}
 			${countdownContext} 
 			${sharedContext}
 			${stickerContext}
 			${linkedMemoryContext}
+			${window.TukBilingual?.buildPromptContext(chat, { mode: "group" }) || ""}
 
 			# 用户的角色
 			- **${myNickname}**: ${chat.settings.myPersona}
@@ -550,20 +484,20 @@
                     // 2. 获取完整的被引用内容 (移除了截断)
                     const fullQuotedContent = String(msg.quote.content || "");
                     // 3. 构造成AI能理解的、清晰的上下文
-                    contentStr += `(回复 ${quotedSender} 的消息: "${fullQuotedContent}"): ${msg.content}`;
+                    contentStr += `(回复 ${quotedSender} 的消息: "${fullQuotedContent}"): ${window.TukBilingual?.contextContent(msg, chat) ?? msg.content}`;
                   } else {
-                    contentStr += msg.content;
+                    contentStr += window.TukBilingual?.contextContent(msg, chat) ?? msg.content;
                   }
 
                   if (msg.type === "user_photo")
                     return {
                       role: "user",
-                      content: `(Timestamp: ${msg.timestamp}) [你收到了一张用户描述的照片，内容是：'${msg.content}']`,
+                      content: `(Timestamp: ${msg.timestamp}) [你收到了一张用户描述的照片，内容是：'${window.TukBilingual?.contextContent(msg, chat) ?? msg.content}']`,
                     };
                   if (msg.type === "voice_message")
                     return {
                       role: "user",
-                      content: `(Timestamp: ${msg.timestamp}) [用户发来一条语音消息，内容是：'${msg.content}']`,
+                      content: `(Timestamp: ${msg.timestamp}) [用户发来一条语音消息，内容是：'${window.TukBilingual?.contextContent(msg, chat) ?? msg.content}']`,
                     };
                   if (msg.type === "transfer")
                     return {

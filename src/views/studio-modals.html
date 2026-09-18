@@ -1,0 +1,89 @@
+    <!-- 小剧场角色选择模态框 -->
+    <div id="studio-role-selection-modal" class="modal">
+      <div class="modal-content studio-role-modal-content">
+        <div class="modal-header"><span>选择角色与身份</span></div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>人物1</label>
+            <p id="studio-role1-desc" class="role-description"></p>
+            <div class="player-selection-group">
+              <label><input type="radio" name="player-role1" value="user" checked />由我扮演</label>
+              <label><input type="radio" name="player-role1" value="ai" />由AI扮演</label>
+            </div>
+            <label class="studio-field-note">使用此身份:</label>
+            <select id="studio-role1-identity-select"></select>
+          </div>
+          <hr class="studio-divider" />
+          <div class="form-group">
+            <label>人物2</label>
+            <p id="studio-role2-desc" class="role-description"></p>
+            <div class="player-selection-group">
+              <label><input type="radio" name="player-role2" value="user" />由我扮演</label>
+              <label><input type="radio" name="player-role2" value="ai" checked />由AI扮演</label>
+            </div>
+            <label class="studio-field-note">使用此身份:</label>
+            <select id="studio-role2-identity-select"></select>
+          </div>
+          <hr class="studio-divider" />
+          <div class="studio-play-settings">
+            <div class="studio-editor-grid">
+              <div class="form-group">
+                <label for="studio-play-mode-select">玩法</label>
+                <select id="studio-play-mode-select">
+                  <option value="free">自由演绎</option>
+                  <option value="guided" selected>剧情引导</option>
+                  <option value="challenge">剧情挑战</option>
+                  <option value="daily">日常陪伴</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="studio-reply-length-select">回复长度</label>
+                <select id="studio-reply-length-select">
+                  <option value="short">简短</option>
+                  <option value="medium" selected>适中</option>
+                  <option value="long">细腻</option>
+                </select>
+              </div>
+            </div>
+            <label class="studio-toggle-row"><input id="studio-show-suggestions-toggle" type="checkbox" checked /><span>显示情境化行动建议</span></label>
+            <label class="studio-toggle-row"><input id="studio-opening-response-toggle" type="checkbox" /><span>由角色先接住开场</span></label>
+            <label class="studio-toggle-row"><input id="studio-memory-reference-toggle" type="checkbox" /><span>允许引用已确认的剧场共同记忆</span></label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="cancel-role-selection-btn">取消</button>
+          <button class="save" id="confirm-role-selection-btn">进入剧本</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 小剧场演绎结算模态框 -->
+    <div id="studio-summary-modal" class="modal">
+      <div class="modal-content studio-summary-modal-content">
+        <div class="modal-header"><span id="studio-summary-title">演绎成功！</span></div>
+        <div class="modal-body" id="studio-summary-content">
+          <div id="studio-summary-details"></div>
+          <div class="studio-summary-extra-actions">
+            <button type="button" id="studio-save-memory-btn">保存为共同回忆</button>
+            <button type="button" id="studio-aftertalk-btn">听听角色的演后感</button>
+            <button type="button" id="studio-replay-btn">重新演绎</button>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel" id="generate-novel-btn">生成小说</button>
+          <button class="save" id="close-studio-summary-btn">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 小剧场小说分享模态框：保留原入口与按钮 -->
+    <div id="studio-novel-share-modal" class="modal">
+      <div class="modal-content" style="height: 80%">
+        <div class="modal-header"><span>生成的小说</span></div>
+        <div class="modal-body" id="studio-novel-content"></div>
+        <div class="modal-footer">
+          <button class="cancel" id="share-novel-btn">分享给角色</button>
+          <button class="save" id="close-novel-share-btn">关闭</button>
+        </div>
+      </div>
+    </div>

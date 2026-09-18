@@ -702,63 +702,10 @@ function selectGenericImagePrompt(productName) {
 }
 
 async function generateAndLoadImage(prompt) {
-  while (true) {
-    try {
-      const encodedPrompt = encodeURIComponent(prompt);
-      const seed = Math.floor(Math.random() * 100000);
-
-      // 1. 获取 API Key (从全局状态获取)
-      const pollApiKey = state.apiConfig.pollinationsApiKey;
-      console.log(`正在使用 API Key: ${pollApiKey}`);
-
-      // 2. 构建基础 URL
-      let primaryUrl = `https://gen.pollinations.ai/image/${encodedPrompt}?width=1024&height=640&seed=${seed}&model=flux`;
-
-      // === 分支 A: 如果有 API Key，使用 fetch 发送带 Header 的请求 ===
-      if (pollApiKey) {
-        primaryUrl += `&key=${pollApiKey}`;
-        console.log(`使用带Key的URL: ${primaryUrl}`);
-        console.log("正在使用 Pollinations API Key 生成图片...");
-        const response = await fetch(primaryUrl, {
-          method: "GET",
-        });
-
-        if (!response.ok) {
-          throw new Error(`API请求失败: ${response.status}`);
-        }
-
-        // 获取二进制数据并转换为 Blob URL
-        const blob = await response.blob();
-        const objectUrl = URL.createObjectURL(blob);
-        return objectUrl; // 返回 Blob URL
-      }
-
-      // === 分支 B: 如果没有 API Key 或 API Key 请求失败，走原来的公开接口逻辑 ===
-
-      // 定义加载器辅助函数
-      const loadImage = (url) =>
-        new Promise((resolve, reject) => {
-          const img = new Image();
-          img.src = url;
-          img.onload = () => resolve(url);
-          img.onerror = () => reject(new Error(`URL加载失败: ${url}`));
-        });
-
-      const imageUrl = await loadImage(primaryUrl).catch(async () => {
-        console.warn(`主URL加载失败，尝试备用URL for: ${prompt}`);
-        const fallbackUrl = `https://pollinations.ai/p/${encodedPrompt}?width=1024&height=640&seed=${seed}`;
-        return await loadImage(fallbackUrl);
-      });
-
-      // 如果成功加载，返回 URL
-      return imageUrl;
-    } catch (error) {
-      // 如果彻底失败（Fetch失败 或 Image加载失败）
-      console.error(`图片生成失败，将在5秒后重试。错误: ${error.message}`);
-      // 等待5秒钟，然后循环继续，开始下一次尝试 (无限重试机制)
-      await new Promise((resolve) => setTimeout(resolve, 5000));
-    }
-  }
+  return window.generatePollinationsImage(prompt, {
+    width: 1024,
+    height: 640,
+  });
 }
 
 /**
@@ -767,37 +714,10 @@ async function generateAndLoadImage(prompt) {
  * @returns {Promise<string>} - 返回一个Promise，它最终会resolve为一个有效的图片URL
  */
 async function generateAndLoadImage(prompt) {
-  while (true) {
-    try {
-      const encodedPrompt = encodeURIComponent(prompt);
-      const seed = Math.floor(Math.random() * 100000);
-
-      // 尝试主域名
-      const primaryUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=640&seed=${seed}`;
-
-      const loadImage = (url) =>
-        new Promise((resolve, reject) => {
-          const img = new Image();
-          img.src = url;
-          img.onload = () => resolve(url);
-          img.onerror = () => reject(new Error(`URL加载失败: ${url}`));
-        });
-
-      const imageUrl = await loadImage(primaryUrl).catch(async () => {
-        console.warn(`主URL加载失败，尝试备用URL for: ${prompt}`);
-        const fallbackUrl = `https://pollinations.ai/p/${encodedPrompt}?width=1024&height=640&seed=${seed}`;
-        return await loadImage(fallbackUrl);
-      });
-
-      // 如果任何一个URL成功加载，就返回结果，并跳出循环
-      return imageUrl;
-    } catch (error) {
-      // 如果主域名和备用域名都失败了...
-      console.error(`图片生成彻底失败，将在5秒后重试。错误: ${error.message}`);
-      // 等待5秒钟，然后循环会继续，开始下一次尝试
-      await new Promise((resolve) => setTimeout(resolve, 5000));
-    }
-  }
+  return window.generatePollinationsImage(prompt, {
+    width: 1024,
+    height: 640,
+  });
 }
 
 /**
@@ -925,8 +845,7 @@ async function generateImageForProduct(productName) {
   const imagePrompt = selectGenericImagePrompt(productName);
   console.log(`为“${productName}”选定的提示词:`, imagePrompt);
 
-  // 2. 调用已具备“无限重试”功能的核心图片生成函数
-  // 这个函数会一直尝试，直到成功返回一个图片URL
+  // 2. 调用统一的有限重试图片生成函数
   try {
     const imageUrl = await window.generatePollinationsImage(imagePrompt, {
       width: 1024,
@@ -936,8 +855,7 @@ async function generateImageForProduct(productName) {
     });
     return imageUrl;
   } catch (error) {
-    // 理论上，由于 generateAndLoadImage 是无限循环，代码不会执行到这里。
-    // 但为了代码健壮性，我们仍然保留一个最终的备用方案。
+    // 统一生成器会在有限重试后抛错，这里保留原来的默认图片 Fallback。
     console.error(
       `[终极捕获] 为 "${productName}" 生成图片时发生不可预知的错误:`,
       error,

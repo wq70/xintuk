@@ -1,0 +1,57 @@
+.world-book-toolbar { display:flex; align-items:center; gap:7px; padding:8px 12px; border-bottom:1px solid var(--border-color,#e8e8e8); background:var(--secondary-bg,#fff); }
+.world-book-toolbar input[type="search"] { min-width:0; flex:1; height:30px; padding:5px 9px; border:1px solid var(--border-color,#ddd); border-radius:7px; background:var(--secondary-bg,#fff); color:var(--text-primary,#333); font-size:12px; }
+.world-book-engine-toggle,.world-book-switch-item { display:inline-flex; align-items:center; gap:6px; min-width:0; color:var(--text-primary,#333); font-size:12px; white-space:nowrap; }
+.world-book-engine-toggle input,.world-book-switch-item input { position:absolute; opacity:0; pointer-events:none; }
+.world-book-toggle-slider { position:relative; flex:0 0 auto; width:28px; height:16px; border-radius:999px; background:#c7c7cc; transition:background .18s ease; }
+.world-book-toggle-slider::after { content:""; position:absolute; top:2px; left:2px; width:12px; height:12px; border-radius:50%; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.18); transition:transform .18s ease; }
+.world-book-engine-toggle input:checked+.world-book-toggle-slider,.world-book-switch-item input:checked+.world-book-toggle-slider { background:var(--accent-color,#6e9ee8); }
+.world-book-engine-toggle input:checked+.world-book-toggle-slider::after,.world-book-switch-item input:checked+.world-book-toggle-slider::after { transform:translateX(12px); }
+.world-book-compact-btn,.world-book-icon-btn { appearance:none; border:1px solid var(--border-color,#ddd); border-radius:7px; background:var(--secondary-bg,#fff); color:var(--text-primary,#333); font:inherit; font-size:12px; line-height:1.2; padding:6px 9px; cursor:pointer; }
+.world-book-compact-btn:disabled { opacity:.45; cursor:default; }
+.world-book-primary-btn { border-color:var(--accent-color,#6e9ee8); background:var(--accent-color,#6e9ee8); color:#fff; }
+.world-book-icon-btn { border:0; padding:2px 6px; background:transparent; font-size:22px; }
+.world-book-switch-row { display:flex; flex-wrap:wrap; align-items:center; gap:12px 18px; padding:2px 0 10px; }
+.world-book-settings-panel { margin-bottom:12px; border:1px solid var(--border-color,#e5e5e5); border-radius:8px; overflow:hidden; }
+.world-book-settings-panel summary { padding:9px 10px; cursor:pointer; color:var(--text-secondary,#666); font-size:13px; }
+.world-book-settings-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; padding:0 10px 10px; }
+.world-book-settings-grid label { min-width:0; color:var(--text-secondary,#666); font-size:11px; }
+.world-book-settings-grid input[type="number"] { box-sizing:border-box; width:100%; margin-top:4px; padding:6px 7px; border:1px solid var(--border-color,#ddd); border-radius:6px; background:var(--secondary-bg,#fff); color:var(--text-primary,#333); }
+.world-book-settings-grid .world-book-checkline { display:flex; align-items:center; gap:6px; min-height:31px; }
+.world-book-entry-heading,.world-book-section-title-row { display:flex; align-items:center; justify-content:space-between; gap:8px; min-width:0; margin:6px 0 9px; }
+.world-book-entry-heading>div:first-child { min-width:0; display:flex; align-items:baseline; gap:7px; }
+#world-book-entry-count { color:var(--text-secondary,#888); font-size:11px; white-space:nowrap; }
+.world-book-entry-actions,.world-book-tool-actions { display:flex; flex-wrap:wrap; gap:5px; justify-content:flex-end; }
+#world-book-entries-container { display:flex; flex-direction:column; gap:9px; padding-bottom:24px; }
+.world-book-entry-card { border:1px solid var(--border-color,#e4e4e4); border-radius:9px; background:var(--secondary-bg,#fff); overflow:hidden; }
+.world-book-entry-card.is-disabled { opacity:.68; }
+.world-book-entry-summary { display:flex; align-items:center; gap:8px; min-width:0; padding:9px 10px; cursor:pointer; }
+.world-book-entry-summary-main { min-width:0; flex:1; }
+.world-book-entry-summary-name { display:block; overflow:hidden; color:var(--text-primary,#333); font-size:13px; font-weight:600; text-overflow:ellipsis; white-space:nowrap; }
+.world-book-entry-summary-meta { display:block; overflow:hidden; margin-top:2px; color:var(--text-secondary,#888); font-size:10px; text-overflow:ellipsis; white-space:nowrap; }
+.world-book-entry-expand { flex:0 0 auto; color:var(--text-secondary,#888); transition:transform .16s ease; }
+.world-book-entry-card.is-open .world-book-entry-expand { transform:rotate(180deg); }
+.world-book-entry-body { display:none; padding:0 10px 10px; border-top:1px solid var(--border-color,#eee); }
+.world-book-entry-card.is-open .world-book-entry-body { display:block; }
+.world-book-entry-body .form-group { margin-top:9px; margin-bottom:0; }
+.world-book-entry-row { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:9px; }
+.world-book-entry-body input,.world-book-entry-body select,.world-book-entry-body textarea { box-sizing:border-box; width:100%; min-width:0; }
+.world-book-entry-body label { color:var(--text-secondary,#666); font-size:11px; }
+.world-book-entry-options { margin-top:9px; border-top:1px dashed var(--border-color,#ddd); }
+.world-book-entry-options summary { padding:8px 0 3px; color:var(--text-secondary,#777); font-size:11px; cursor:pointer; }
+.world-book-entry-footer { display:flex; justify-content:flex-end; padding-top:9px; }
+.world-book-entry-delete { color:#d14b4b; }
+.world-book-list-meta { display:flex; align-items:center; gap:5px; min-width:0; margin-top:3px; color:var(--text-secondary,#888); font-size:10px; }
+.world-book-badge { flex:0 0 auto; padding:1px 5px; border-radius:999px; background:color-mix(in srgb,var(--accent-color,#6e9ee8) 13%,transparent); color:var(--accent-color,#527fbe); }
+.world-book-status-off { background:rgba(140,140,140,.12); color:var(--text-secondary,#888); }
+.world-book-tools-content { width:min(92vw,560px); max-height:86vh; }
+.world-book-tools-body { overflow-y:auto; }
+.world-book-tools-body section+section { margin-top:15px; padding-top:13px; border-top:1px solid var(--border-color,#eee); }
+.world-book-global-settings { padding:0 0 9px; }
+.world-book-tools-body h3,.world-book-section-title-row h3 { margin:0 0 8px; color:var(--text-primary,#333); font-size:13px; }
+.world-book-section-title-row h3 { margin:0; }
+.world-book-diagnostic-summary,.world-book-test-results,.world-book-runtime-logs { padding:8px; border-radius:7px; background:rgba(127,127,127,.08); color:var(--text-secondary,#666); font-size:11px; line-height:1.55; white-space:pre-wrap; overflow-wrap:anywhere; }
+.world-book-test-results,.world-book-runtime-logs { max-height:180px; margin-top:8px; overflow-y:auto; }
+.world-book-tools-body textarea { box-sizing:border-box; width:100%; margin-bottom:7px; }
+.world-book-tool-note { margin:7px 0 0; color:var(--text-secondary,#888); font-size:10px; line-height:1.45; }
+@media(max-width:390px){.world-book-toolbar{gap:5px;padding-inline:9px}.world-book-engine-toggle>span:last-child{max-width:48px;overflow:hidden;text-overflow:ellipsis}.world-book-compact-btn{padding-inline:7px}.world-book-settings-grid,.world-book-entry-row{grid-template-columns:minmax(0,1fr)}.world-book-entry-heading{align-items:flex-start}.world-book-entry-actions{max-width:156px}}
+@media(max-width:320px){.world-book-toolbar{flex-wrap:wrap}.world-book-toolbar input[type="search"]{order:3;flex-basis:100%}.world-book-entry-heading{display:block}.world-book-entry-actions{max-width:none;justify-content:flex-start;margin-top:6px}}

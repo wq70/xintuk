@@ -15,6 +15,12 @@ const checkClassicScript = (source, label) => {
   if (result.status !== 0) failures.push(`${label}: classic-script syntax check failed\n${result.stderr}`);
 };
 
+const memoryViewIndex = mappings["index.html"].indexOf("src/views/memory-center.html");
+const chatSettingsEndIndex = mappings["index.html"].indexOf("src/views/chat-settings-and-modals-03.html");
+if (memoryViewIndex !== -1 && memoryViewIndex <= chatSettingsEndIndex) {
+  failures.push("memory center view must remain outside the split chat settings markup");
+}
+
 async function collectFiles(directory) {
   const files = [];
   for (const entry of await readdir(directory, { withFileTypes: true })) {
@@ -53,7 +59,7 @@ const runtimeScriptReferences = [...runtimeHtml.matchAll(/<script\s+src="([^"]+)
   .map((match) => match[1])
   .filter((reference) => !reference.startsWith("runtime/"));
 const inlineHandlerCount = [...templateHtml.matchAll(/\bon(?:click|change|input|submit|load|error|keydown|keyup)=/g)].length;
-const schema = mainScript.match(/db\.version\(63\)\.stores\(\{[\s\S]*?\n\s*\}\);/)?.[0];
+const schema = mainScript.match(/db\.version\(\d+\)\.stores\(\{[\s\S]*?\n\s*\}\);/)?.[0];
 
 if (elementIds.length !== contract.elementIdCount || hashList(elementIds) !== contract.elementIdOrderHash) failures.push("protected DOM id contract changed");
 if (screenIds.length !== contract.screenCount || hashList(screenIds) !== contract.screenIdOrderHash) failures.push("protected screen contract changed");

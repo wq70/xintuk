@@ -6,6 +6,8 @@
     "build": "node scripts/build.mjs",
     "check": "node scripts/check-architecture.mjs",
     "check:music": "node scripts/check-music-integration.mjs",
-    "check:thought-chain": "node scripts/check-thought-chain.mjs"
+    "check:thought-chain": "node scripts/check-thought-chain.mjs",
+    "check:api-params": "node scripts/check-api-generation-params.mjs",
+    "check:prompt-center": "node scripts/check-prompt-center.mjs"
   }
 }

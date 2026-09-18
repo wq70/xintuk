@@ -72,20 +72,9 @@ async function generateHouseData(charId, includeComputer = true) {
     const { proxyUrl, apiKey, model } = state.apiConfig;
     if (!proxyUrl || !apiKey || !model) throw new Error("API未配置");
 
-    let worldBookContext = "";
-    if (
-      chat.settings.linkedWorldBookIds &&
-      chat.settings.linkedWorldBookIds.length > 0
-    ) {
-      worldBookContext =
-        "--- 世界观设定 (必须严格遵守) ---\n" +
-        chat.settings.linkedWorldBookIds
-          .map((id) => {
-            const book = state.worldBooks.find((b) => b.id === id);
-            return book ? `[${book.name}]: ${book.content}` : "";
-          })
-          .join("\n\n");
-    }
+    let worldBookContext = window.TukWorldBook.buildForChat(chat, {
+      generationType: "quiet",
+    });
     const userNickname = chat.settings.myNickname || "我";
 
     const recentHistory = chat.history
@@ -207,7 +196,7 @@ async function generateHouseData(charId, includeComputer = true) {
 
     // ... (后续的API调用请求代码保持不变) ...
     const messagesForApi = [{ role: "user", content: systemPrompt }];
-    let isGemini = proxyUrl === GEMINI_API_URL;
+    let isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
     let geminiConfig = toGeminiRequestData(
       model,
       apiKey,
@@ -227,7 +216,7 @@ async function generateHouseData(charId, includeComputer = true) {
           body: JSON.stringify({
             model: model,
             messages: messagesForApi,
-            temperature: 0.8,
+            ...window.ApiGenerationParams.current({ temperature: 0.8 }),
           }),
         });
 
@@ -589,7 +578,7 @@ async function handleContinueKkSearch() {
 			}
 			`;
     const messagesForApi = [{ role: "user", content: systemPrompt }];
-    let isGemini = proxyUrl === GEMINI_API_URL;
+    let isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
     let geminiConfig = toGeminiRequestData(
       model,
       apiKey,
@@ -609,7 +598,7 @@ async function handleContinueKkSearch() {
           body: JSON.stringify({
             model: model,
             messages: messagesForApi,
-            temperature: 0.9,
+            ...window.ApiGenerationParams.current({ temperature: 0.9 }),
           }),
         });
 
@@ -988,7 +977,7 @@ async function generateMoreSteamGames() {
 			}
 			`;
     const messagesForApi = [{ role: "user", content: prompt }];
-    let isGemini = proxyUrl === GEMINI_API_URL;
+    let isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
     let geminiConfig = toGeminiRequestData(
       model,
       apiKey,
@@ -1008,7 +997,7 @@ async function generateMoreSteamGames() {
           body: JSON.stringify({
             model: model,
             messages: messagesForApi,
-            temperature: 0.9,
+            ...window.ApiGenerationParams.current({ temperature: 0.9 }),
           }),
         });
 
@@ -1107,14 +1096,9 @@ async function generateInitialSurveillanceFeeds(charId) {
     if (!proxyUrl || !apiKey || !model) throw new Error("API未配置");
 
     // 提取世界书、聊天记录和用户人设作为上下文
-    const worldBookContext = (
-      await Promise.all(
-        (chat.settings.linkedWorldBookIds || []).map(async (id) => {
-          const book = await db.worldBooks.get(id);
-          return book ? `\n## 世界书: ${book.name}\n${book.content}` : "";
-        }),
-      )
-    ).join("");
+    const worldBookContext = window.TukWorldBook.buildForChat(chat, {
+      generationType: "quiet",
+    });
 
     const recentHistory = chat.history
       .slice(-10)
@@ -1172,7 +1156,7 @@ async function generateInitialSurveillanceFeeds(charId) {
 			`;
 
     const messagesForApi = [{ role: "user", content: systemPrompt }];
-    let isGemini = proxyUrl === GEMINI_API_URL;
+    let isGemini = window.ApiGenerationParams.isGemini(proxyUrl, window.state?.apiConfig);
     let geminiConfig = toGeminiRequestData(
       model,
       apiKey,
@@ -1192,7 +1176,7 @@ async function generateInitialSurveillanceFeeds(charId) {
           body: JSON.stringify({
             model: model,
             messages: messagesForApi,
-            temperature: 0.8,
+            ...window.ApiGenerationParams.current({ temperature: 0.8 }),
           }),
         });
 

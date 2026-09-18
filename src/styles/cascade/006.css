@@ -16,16 +16,17 @@
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 15px; /* 卡槽之间的间距 */
+  gap: 10px;
 }
 
 .font-preset-slot {
   border: 1px solid var(--border-color);
-  border-radius: 12px;
-  padding: 15px;
+  border-radius: 10px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 9px;
+  min-width: 0;
 }
 
 #phone-screen.dark-mode .font-preset-slot {
@@ -35,17 +36,21 @@
 .font-preset-slot.empty {
   justify-content: center;
   align-items: center;
-  min-height: 80px;
+  min-height: 72px;
   border-style: dashed;
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-align: center;
 }
 
 .font-preview-text {
-  font-size: 22px;
-  padding: 10px;
+  font-size: 20px;
+  padding: 8px;
   border-radius: 8px;
   text-align: center;
   min-height: 30px;
   transition: font-family 0.3s ease;
+  overflow-wrap: anywhere;
 }
 
 #phone-screen.dark-mode .font-preview-text {
@@ -57,24 +62,68 @@
   font-size: 14px;
   color: var(--text-secondary);
   font-weight: 500;
+  min-width: 0;
+}
+
+.font-preset-name-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.font-preset-name {
+  color: var(--text-primary);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.font-preset-badge {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent-color) 12%, transparent);
+  color: var(--accent-color);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.font-preset-meta {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  font-weight: 400;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .font-preset-actions {
   display: flex;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 7px;
   width: 100%;
 }
 
 .preset-btn {
   flex: 1;
-  padding: 10px;
+  min-width: 58px;
+  padding: 8px 9px;
   border: none;
   border-radius: 8px;
-  font-size: 14px;
+  font-family: inherit;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   background-color: var(--accent-color);
   color: white;
+}
+
+.preset-btn:disabled {
+  cursor: default;
+  opacity: 0.55;
 }
 
 .preset-btn.secondary {
@@ -93,6 +142,128 @@
   border: 1px solid #ffc2d1;
   max-width: 80px; /* 让删除按钮窄一点 */
   flex: 0 0 auto;
+}
+
+.font-library-notice {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 9px 10px;
+  border: 1px solid color-mix(in srgb, var(--accent-color) 20%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent-color) 7%, transparent);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.font-current-card {
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+}
+
+.font-current-copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.font-current-copy > span,
+.font-current-copy > small {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.font-current-copy > strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.font-current-reset {
+  flex: 0 0 auto;
+}
+
+.font-library-toolbar {
+  width: 100%;
+  display: flex;
+  gap: 8px;
+}
+
+.font-library-search-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#font-library-search,
+.font-preview-input {
+  min-width: 0;
+  box-sizing: border-box;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--secondary-bg);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+#font-library-search {
+  flex: 1;
+  padding: 8px 10px;
+}
+
+#font-library-count {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.font-preview-input {
+  width: 100%;
+  margin-top: 8px;
+  padding: 9px 10px;
+}
+
+#font-library-search:focus,
+.font-preview-input:focus {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-color) 14%, transparent);
+}
+
+.font-preview-heading {
+  margin: 0 0 8px;
+  font-size: 19px;
+  font-weight: 600;
+}
+
+.font-preview-body {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 340px) {
+  .font-preset-actions .preset-btn {
+    flex-basis: calc(50% - 4px);
+  }
+
+  .font-current-card {
+    align-items: flex-start;
+  }
 }
 /* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
 /* 【美化 V2】让后台活动设置的按钮更圆润、更立体 */
@@ -350,7 +521,7 @@
 }
 
 /* --- 2. 【核心】重新定义主屏幕布局 --- */
-/* 
+/*
    这将把你的主屏幕从一个简单的垂直列表，变成一个撑满全屏、
    使用Flexbox布局的强大容器，为新的“桌面式”布局打下基础。
 */
@@ -1183,6 +1354,19 @@
   transform: translateX(20px);
 }
 
+.single-feature-toggle {
+  padding: 6px 0;
+}
+
+.single-feature-toggle .toggle-switch-text {
+  font-size: 13px;
+}
+
+.single-feature-toggle .toggle-switch-slider {
+  transform: scale(0.8);
+  transform-origin: right center;
+}
+
 /* ▲▲▲ 新样式粘贴结束 ▲▲▲ */
 /* ▼▼▼ 这是为你新增的颜色样式 ▼▼▼ */
 
@@ -1267,4 +1451,4 @@
   overflow: hidden; /* 防止内容过长溢出 */
 }
 
-/* 名字和时间的容器 */
+/* 名字和时间的容器 */
