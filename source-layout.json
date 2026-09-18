@@ -6,6 +6,7 @@
       "src/views/mcp.html",
       "src/views/thought-chain.html",
       "src/views/prompt-center.html",
+      "src/views/update-log.html",
       "src/views/weibo.html",
       "src/views/world-book-and-api-settings.html",
       "src/views/chat-and-albums-01.html",
@@ -98,6 +99,7 @@
       "src/features/media/media-integration.js",
       "src/features/memory/app.js",
       "src/features/bilingual/app.js"
+      ,"src/features/update-log/app.js"
     ],
     "style.css": [
       "src/styles/cascade/001.css",
@@ -127,6 +129,7 @@
       "src/styles/cascade/025-time-context.css",
       "src/styles/cascade/026-api-generation-params.css",
       "src/styles/cascade/027-prompt-center.css",
+      "src/features/update-log/update-log.css",
       "src/features/music/music-integration.css",
       "src/features/media/media-integration.css",
       "src/features/studio/studio-enhancements.css",

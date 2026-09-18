@@ -25,6 +25,7 @@
 @import url("./src/styles/cascade/025-time-context.css");
 @import url("./src/styles/cascade/026-api-generation-params.css");
 @import url("./src/styles/cascade/027-prompt-center.css");
+@import url("./src/features/update-log/update-log.css");
 @import url("./src/features/music/music-integration.css");
 @import url("./src/features/media/media-integration.css");
 @import url("./src/features/studio/studio-enhancements.css");

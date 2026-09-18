@@ -1,0 +1,101 @@
+    <!-- 更新日志入口与本次更新提示 -->
+    <div id="update-log-screen" class="screen update-log-screen">
+      <div class="update-log-header">
+        <span class="back-btn" onclick="showScreen('home-screen')">‹</span>
+        <span class="update-log-title">更新日志</span>
+        <span class="update-log-header-spacer" aria-hidden="true"></span>
+      </div>
+      <div class="update-log-body">
+        <div class="update-log-intro">
+          <div>
+            <p class="update-log-kicker">版本更新</p>
+            <h1>9.18 本次更新</h1>
+          </div>
+          <span class="update-log-date">2026.09.18</span>
+        </div>
+        <div class="update-log-list" id="update-log-list">
+          <article class="update-log-item"><h2>项目结构整理</h2><p>进一步拆分和整理项目文件，将较大的功能文件拆分为多个独立模块，降低后续维护和修复时不同功能互相影响的情况。本次结构调整范围较大，如遇异常欢迎及时反馈。</p></article>
+          <article class="update-log-item"><h2>新增 MCP 功能</h2><p>新增 MCP 功能入口，支持添加和管理 MCP 连接、连接状态检测及相关工具调用，并优化 MCP 与聊天功能之间的配合。</p></article>
+          <article class="update-log-item"><h2>数据与存储</h2><p>修复存储相关问题，优化部分数据保存、读取及恢复逻辑。</p></article>
+          <article class="update-log-item"><h2>音乐功能优化</h2><p>修复音乐搜索相关问题，新增扫码登录，优化音乐服务连接及部分播放器逻辑，并修复部分音乐无法正常获取或播放的问题。</p></article>
+          <article class="update-log-item"><h2>新增思维链功能</h2><p>新增独立思维链设置，支持配置思考内容相关规则，优化思维链与正常回复之间的处理，并新增对应的设置与检查逻辑。</p></article>
+          <article class="update-log-item"><h2>生图、时间与小剧场</h2><p>优化两个生图功能及音乐功能，修复部分 API 参数、生成及调用异常；优化时间感知、小剧场功能及相关生成与显示逻辑。</p></article>
+          <article class="update-log-item"><h2>字体与世界书</h2><p>优化字体相关设置和部分页面的文字显示效果，优化世界书功能，修复部分世界书使用及显示问题。</p></article>
+          <article class="update-log-item"><h2>新增双语功能</h2><p>感谢 1900老师 授权。支持聊天双语输出，优化原文与翻译内容的处理，可以根据实际需要控制相关功能。</p></article>
+          <article class="update-log-item"><h2>功能独立开关</h2><p>新增心声、动态、微博、情侣空间等功能的独立开关，默认关闭。关闭后不会向模型注入对应功能的提示词，可减少无关提示词对当前聊天的影响。</p></article>
+          <article class="update-log-item"><h2>API 与提示词管理</h2><p>优化 API 属性及相关参数处理，提高不同 API 配置下的兼容性；新增自定义提示词与提示词分层管理，优化提示词管理入口及检查机制。</p><p class="update-log-note">分层设计灵感来源于 1900老师，感谢分享与授权。</p></article>
+          <article class="update-log-item"><h2>结构检查机制</h2><p>对项目结构增加更多检查机制，用于检测拆分后的模块、思维链、音乐及相关功能是否正常加载。</p></article>
+        </div>
+        <p class="update-log-footnote">本次更新涉及较多底层文件拆分。如发现以前正常的功能无法使用，请反馈具体功能及操作步骤。</p>
+      </div>
+    </div>
+
+    <div id="update-notice-modal" class="modal update-notice-modal" aria-hidden="true">
+      <div class="modal-content update-notice-content" role="dialog" aria-modal="true" aria-labelledby="update-notice-title">
+        <div class="modal-header update-notice-header">
+          <div class="update-notice-header-left">
+            <span class="update-notice-badge">NEW VERSION</span>
+            <span id="update-notice-title" class="update-notice-title-text">9.18 本次更新</span>
+          </div>
+          <button type="button" class="update-notice-close" id="update-notice-close" aria-label="关闭">×</button>
+        </div>
+        <div class="modal-body update-notice-body">
+          <div class="update-notice-summary-box">
+            <p class="update-notice-summary">本次更新主要围绕项目结构拆分、MCP功能扩展、思维链、音乐体验与提示词体系全面展开。</p>
+          </div>
+          <div class="update-notice-feed">
+            <div class="update-feed-item">
+              <div class="update-feed-tag">项目结构整理</div>
+              <p class="update-feed-text">进一步拆分和整理项目文件，将较大的功能文件拆分为多个独立模块，降低后续维护和修复时不同功能互相影响的情况。本次结构调整范围较大，如遇异常欢迎及时反馈。</p>
+            </div>
+            <div class="update-feed-item">
+              <div class="update-feed-tag">新增 MCP 功能</div>
+              <p class="update-feed-text">新增 MCP 功能入口，支持添加和管理 MCP 连接、连接状态检测及相关工具调用，并优化 MCP 与聊天功能之间的配合。</p>
+            </div>
+            <div class="update-feed-item">
+              <div class="update-feed-tag">数据与存储</div>
+              <p class="update-feed-text">修复存储相关问题，优化部分数据保存、读取及恢复逻辑。</p>
+            </div>
+            <div class="update-feed-item">
+              <div class="update-feed-tag">音乐功能优化</div>
+              <p class="update-feed-text">修复音乐搜索相关问题，新增扫码登录，优化音乐服务连接及部分播放器逻辑，并修复部分音乐无法正常获取或播放的问题。</p>
+            </div>
+            <div class="update-feed-item">
+              <div class="update-feed-tag">新增思维链功能</div>
+              <p class="update-feed-text">新增独立思维链设置，支持配置思考内容相关规则，优化思维链与正常回复之间的处理，并新增对应的设置与检查逻辑。</p>
+            </div>
+            <div class="update-feed-item">
+              <div class="update-feed-tag">生图、时间与小剧场</div>
+              <p class="update-feed-text">优化两个生图功能及音乐功能，修复部分 API 参数、生成及调用异常；优化时间感知、小剧场功能及相关生成与显示逻辑。</p>
+            </div>
+            <div class="update-feed-item">
+              <div class="update-feed-tag">字体与世界书</div>
+              <p class="update-feed-text">优化字体相关设置和部分页面的文字显示效果，优化世界书功能，修复部分世界书使用及显示问题。</p>
+            </div>
+            <div class="update-feed-item">
+              <div class="update-feed-tag">新增双语功能</div>
+              <p class="update-feed-text">感谢 1900老师 授权。支持聊天双语输出，优化原文与翻译内容的处理，可以根据实际需要控制相关功能。</p>
+            </div>
+            <div class="update-feed-item">
+              <div class="update-feed-tag">功能独立开关</div>
+              <p class="update-feed-text">新增心声、动态、微博、情侣空间等功能的独立开关，默认关闭。关闭后不会向模型注入对应功能的提示词，可减少无关提示词对当前聊天的影响。</p>
+            </div>
+            <div class="update-feed-item">
+              <div class="update-feed-tag">API 与提示词管理</div>
+              <p class="update-feed-text">优化 API 属性及相关参数处理，提高不同 API 配置下的兼容性；新增自定义提示词与提示词分层管理，优化提示词管理入口及检查机制。分层设计灵感来源于 1900老师，感谢分享与授权。</p>
+            </div>
+            <div class="update-feed-item">
+              <div class="update-feed-tag">结构检查机制</div>
+              <p class="update-feed-text">对项目结构增加更多检查机制，用于检测拆分后的模块、思维链、音乐及相关功能是否正常加载。</p>
+            </div>
+          </div>
+          <div class="update-notice-tip">
+            本次更新涉及较多底层文件拆分。如发现以前正常的功能无法使用，请反馈具体功能及操作步骤。
+          </div>
+        </div>
+        <div class="modal-footer update-notice-footer">
+          <button type="button" class="update-btn-cancel" id="update-notice-never">不再显示</button>
+          <button type="button" class="update-btn-confirm" id="update-notice-confirm">我知道了</button>
+        </div>
+      </div>
+    </div>
